@@ -110,7 +110,13 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
         const from = current.state ? actions.get(current.state) : undefined;
         if (to) {
           to.reset().play();
-          if (from && from !== to) from.crossFadeTo(to, next.state.startsWith('Kick') ? 0.04 : 0.15, false);
+          if (from && from !== to) {
+            // Snappy into kicks (physics-timed); softer out of kick/miss/celebrate into Idle.
+            const fromKick = current.state?.startsWith('Kick');
+            const toKick = next.state.startsWith('Kick');
+            const fade = toKick ? 0.04 : fromKick || current.state === 'Miss' || current.state === 'Celebrate' ? 0.22 : 0.15;
+            from.crossFadeTo(to, fade, false);
+          }
         }
         current.state = next.state;
         current.token = next.token;

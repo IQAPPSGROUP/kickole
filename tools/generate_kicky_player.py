@@ -144,17 +144,48 @@ REST_ARM = 0.22
 
 
 def kick_pose(side, amount, wind=0.0, follow=0.0):
-    """Pose dict for a kick. amount=1 is foot contact, wind>0 pulls the foot back, follow raises it after contact."""
-    thigh, knee = solve_leg(CONTACT_H - 0.17 + follow * 0.18, BALL_Z - 0.2 + follow * 0.09)
+    """Pose dict for a kick. amount=1 is foot contact, wind>0 pulls the foot back, follow raises it after contact.
+
+    Contact (amount=1, follow=0) places the boot tip at the physics ball. Stall freezes that exact frame.
+    """
+    # Foot bone target so the boot toe meets the ball (matches glb-asset.test toe offset ~0.2 m along +Z).
+    thigh, knee = solve_leg(CONTACT_H - 0.19 + follow * 0.16, BALL_Z - 0.18 + follow * 0.10)
     other = "R" if side == "L" else "L"
+    sign = 1 if side == "L" else -1
+    # Plant foot softens; kicking foot dorsiflexes into the ball then points on follow-through.
+    plant_knee = 0.12 * amount
+    foot_kick = -0.35 * amount + 0.55 * follow
     p = {
-        f"UpperLeg_{side}": (-thigh * amount + 0.45 * wind, 0, 0),
-        f"LowerLeg_{side}": (knee * amount + 1.0 * wind, 0, 0),
-        "Spine": (0.12 * amount, 0, 0.05 * amount * (1 if side == "L" else -1)),
+        f"UpperLeg_{side}": (-thigh * amount + 0.38 * wind, 0, 0.04 * amount * sign),
+        f"LowerLeg_{side}": (knee * amount + 0.85 * wind, 0, 0),
+        f"Foot_{side}": (foot_kick, 0, 0),
+        f"UpperLeg_{other}": (0.08 * amount, 0, -0.03 * amount * sign),
+        f"LowerLeg_{other}": (plant_knee, 0, 0),
+        f"Foot_{other}": (0.05 * amount, 0, 0),
+        "Spine": (0.10 * amount - 0.04 * wind, 0, 0.06 * amount * sign),
+        "Head": (-0.06 * amount + 0.08 * wind, 0, 0),
         "Hips": (0, 0, 0),
-        f"UpperArm_{other}": (0, 0, (REST_ARM + 0.35 * amount) * (1 if other == "L" else -1)),
+        # Counter-arm up; kicking-side arm pulls back slightly for balance.
+        f"UpperArm_{other}": (-0.15 * amount, 0, (REST_ARM + 0.55 * amount) * (1 if other == "L" else -1)),
+        f"UpperArm_{side}": (0.25 * amount + 0.2 * wind, 0, (REST_ARM - 0.08 * amount) * (1 if side == "L" else -1)),
     }
     return p
+
+
+def idle_pose(phase):
+    """Soft arcade idle: breathe, weight shift, tiny knee flex. phase in [0, 1] over the loop."""
+    w = math.sin(phase * math.pi * 2)
+    b = math.sin(phase * math.pi * 2 + 0.4)
+    return {
+        "Spine": (0.025 + 0.015 * b, 0, 0.02 * w),
+        "Head": (-0.02 * b, 0.03 * w, 0),
+        "UpperLeg_L": (0.02 + 0.015 * w, 0, 0),
+        "UpperLeg_R": (0.02 - 0.015 * w, 0, 0),
+        "LowerLeg_L": (0.05 + 0.02 * w, 0, 0),
+        "LowerLeg_R": (0.05 - 0.02 * w, 0, 0),
+        "UpperArm_L": (0.02 * b, 0, REST_ARM + 0.04 * w),
+        "UpperArm_R": (0.02 * b, 0, -(REST_ARM - 0.04 * w)),
+    }
 
 
 def build_actions(armature):
@@ -183,32 +214,66 @@ def build_actions(armature):
             apply(frame, data, hz)
         return act
 
-    arm_up = lambda a: {"UpperArm_L": (0, 0, a), "UpperArm_R": (0, 0, -a)}
+    def arm_up(a, pitch=0.0):
+        return {"UpperArm_L": (pitch, 0, a), "UpperArm_R": (pitch, 0, -a)}
 
+    # Idle: 2 s loop, ends on the same pose as frame 0 for clean crossfades from kicks.
     clip("Idle", [
-        (0, {"Spine": (0.02, 0, 0)}, 0.0),
-        (30, {"Spine": (0.04, 0, 0), "Head": (-0.02, 0, 0)}, 0.012),
-        (60, {"Spine": (0.02, 0, 0)}, 0.0),
+        (0, idle_pose(0.0), 0.0),
+        (15, idle_pose(0.25), 0.010),
+        (30, idle_pose(0.5), 0.014),
+        (45, idle_pose(0.75), 0.010),
+        (60, idle_pose(1.0), 0.0),
     ])
     for side in ("L", "R"):
         name = "KickLeft" if side == "L" else "KickRight"
+        # Contact at frame 9 (0.30 s) with follow=0 so stall holds a true trap pose.
+        # Late swing: keep the foot well back until frame 8 so clip-start (0.26 s) is still a wind-up.
+        # Follow-through after contact; settle near Idle by frame 28 for recovery→Idle blends.
         clip(name, [
             (0, kick_pose(side, 0), 0.0),
-            (5, kick_pose(side, 0, wind=1.0), -0.02),
-            (CONTACT_FRAME, kick_pose(side, 1.0, follow=0.35), -0.03),
-            (13, kick_pose(side, 1.0, follow=1.0), -0.03),
-            (24, kick_pose(side, 0), 0.0),
+            (5, kick_pose(side, 0.0, wind=1.0), -0.015),
+            (8, kick_pose(side, 0.22, wind=0.25), -0.022),
+            (CONTACT_FRAME, kick_pose(side, 1.0, follow=0.0), -0.028),
+            (14, kick_pose(side, 0.92, follow=1.0), -0.022),
+            (20, kick_pose(side, 0.35, follow=0.25), -0.008),
+            (28, kick_pose(side, 0), 0.0),
         ])
+    # Miss: slump toward the dropped ball, hold the last frame.
     clip("Miss", [
         (0, {}, 0.0),
-        (10, {"Spine": (0.35, 0, 0), "Head": (0.5, 0, 0), "UpperArm_L": (0.2, 0, 0.05), "UpperArm_R": (0.2, 0, -0.05)}, -0.04),
-        (45, {"Spine": (0.32, 0, 0), "Head": (0.55, 0, 0), "UpperArm_L": (0.2, 0, 0.05), "UpperArm_R": (0.2, 0, -0.05)}, -0.04),
+        (8, {
+            "Spine": (0.28, 0, 0), "Head": (0.35, 0, 0),
+            "UpperArm_L": (0.35, 0, 0.08), "UpperArm_R": (0.35, 0, -0.08),
+            "UpperLeg_L": (0.06, 0, 0), "UpperLeg_R": (0.06, 0, 0),
+            "LowerLeg_L": (0.12, 0, 0), "LowerLeg_R": (0.12, 0, 0),
+        }, -0.03),
+        (18, {
+            "Spine": (0.38, 0, 0), "Head": (0.55, 0, 0),
+            "UpperArm_L": (0.45, 0, 0.04), "UpperArm_R": (0.45, 0, -0.04),
+            "UpperLeg_L": (0.08, 0, 0), "UpperLeg_R": (0.08, 0, 0),
+            "LowerLeg_L": (0.16, 0, 0), "LowerLeg_R": (0.16, 0, 0),
+        }, -0.05),
+        (45, {
+            "Spine": (0.36, 0, 0), "Head": (0.58, 0, 0),
+            "UpperArm_L": (0.42, 0, 0.04), "UpperArm_R": (0.42, 0, -0.04),
+            "UpperLeg_L": (0.08, 0, 0), "UpperLeg_R": (0.08, 0, 0),
+            "LowerLeg_L": (0.15, 0, 0), "LowerLeg_R": (0.15, 0, 0),
+        }, -0.05),
     ])
+    # Celebrate: arms up + small hop (knees), returns to Idle pose for a clean blend.
     clip("Celebrate", [
         (0, {}, 0.0),
-        (9, {**arm_up(2.7), "Spine": (-0.1, 0, 0), "Head": (-0.15, 0, 0)}, 0.10),
-        (18, {**arm_up(2.5), "Spine": (-0.05, 0, 0)}, 0.0),
-        (27, {**arm_up(2.7), "Spine": (-0.1, 0, 0)}, 0.08),
+        (6, {**arm_up(2.4, pitch=-0.2), "Spine": (-0.08, 0, 0), "Head": (-0.12, 0, 0),
+             "UpperLeg_L": (-0.25, 0, 0), "UpperLeg_R": (-0.25, 0, 0),
+             "LowerLeg_L": (0.45, 0, 0), "LowerLeg_R": (0.45, 0, 0)}, 0.12),
+        (12, {**arm_up(2.75, pitch=-0.35), "Spine": (-0.12, 0, 0.04), "Head": (-0.18, 0, 0),
+              "UpperLeg_L": (-0.05, 0, 0), "UpperLeg_R": (-0.05, 0, 0),
+              "LowerLeg_L": (0.08, 0, 0), "LowerLeg_R": (0.08, 0, 0)}, 0.06),
+        (20, {**arm_up(2.55, pitch=-0.25), "Spine": (-0.06, 0, -0.04), "Head": (-0.1, 0, 0),
+              "UpperLeg_L": (-0.2, 0, 0), "UpperLeg_R": (-0.2, 0, 0),
+              "LowerLeg_L": (0.35, 0, 0), "LowerLeg_R": (0.35, 0, 0)}, 0.10),
+        (28, {**arm_up(2.7, pitch=-0.3), "Spine": (-0.1, 0, 0), "Head": (-0.15, 0, 0)}, 0.04),
         (36, {}, 0.0),
     ])
     armature.animation_data.action = None

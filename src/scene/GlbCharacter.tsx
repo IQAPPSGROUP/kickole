@@ -8,7 +8,7 @@ import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
 import {
-  ANIMATION_STATES, BONE_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 
@@ -59,7 +59,14 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
 
   useEffect(() => {
     const colors = skinMaterialColors(skin);
-    materials.forEach((m, name) => { if (colors[name]) m.color.set(colors[name]); });
+    materials.forEach((m, name) => {
+      if (colors[name]) m.color.set(colors[name]);
+      // Matte cloth / skin, slightly glossy boots; a faint self-glow keeps shaded sides from going muddy.
+      const boots = name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole;
+      m.roughness = boots ? 0.45 : 0.72;
+      m.metalness = 0;
+      m.emissive.copy(m.color).multiplyScalar(0.12);
+    });
   }, [skin, materials]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);

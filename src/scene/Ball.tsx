@@ -84,12 +84,12 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
         <group ref={spin}>
           <mesh castShadow>
             <sphereGeometry args={[r, 32, 24]} />
-            <meshStandardMaterial color={skin.football.base} roughness={0.45} />
+            <meshStandardMaterial color={skin.football.base} roughness={0.32} metalness={0.05} emissive={skin.football.base} emissiveIntensity={0.08} />
           </mesh>
           {panels.map((p, i) => (
             <mesh key={i} position={p.pos} quaternion={p.q}>
               <circleGeometry args={[r * 0.36, 5]} />
-              <meshStandardMaterial color={skin.football.panels} roughness={0.5} />
+              <meshStandardMaterial color={skin.football.panels} roughness={0.4} />
             </mesh>
           ))}
         </group>
@@ -97,7 +97,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       {showTrail && Array.from({ length: TRAIL }, (_, i) => (
         <mesh key={i} ref={(m) => { trail.current[i] = m; }} visible={false}>
           <sphereGeometry args={[r, 12, 10]} />
-          <meshBasicMaterial color={skin.football.base} transparent opacity={0.2} depthWrite={false} />
+          <meshBasicMaterial color="#F5E9A8" transparent opacity={0.2} depthWrite={false} />
         </mesh>
       ))}
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>

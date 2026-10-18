@@ -1,5 +1,5 @@
-import { useMemo, useEffect } from 'react';
-import { CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace } from 'three';
+import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
+import { CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 
 const NAVY = '#142D35';
 const TEAL = '#12BFA6';
@@ -190,6 +190,36 @@ function Floodlight({ x, z }: { x: number; z: number }) {
   );
 }
 
+const BUNTING_COLORS = ['#1FA85A', '#F5C94D', '#2E6FD0', '#F7F5ED'];
+
+/** Festa-style bunting: one instanced draw call, strung across the back of the court. */
+function Bunting() {
+  const ref = useRef<InstancedMesh>(null);
+  const N = 22;
+  useLayoutEffect(() => {
+    const m = ref.current;
+    if (!m) return;
+    const d = new Object3D();
+    const c = new Color();
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1);
+      d.position.set(-3.7 + u * 7.4, 2.62 - Math.sin(u * Math.PI) * 0.22 - 0.09, -3.18);
+      d.rotation.set(0, 0, Math.PI + (u - 0.5) * 0.25);
+      d.updateMatrix();
+      m.setMatrixAt(i, d.matrix);
+      m.setColorAt(i, c.set(BUNTING_COLORS[i % BUNTING_COLORS.length]));
+    }
+    m.instanceMatrix.needsUpdate = true;
+    if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  }, []);
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, N]}>
+      <circleGeometry args={[0.1, 3]} />
+      <meshBasicMaterial side={DoubleSide} />
+    </instancedMesh>
+  );
+}
+
 export function Court({ shadows }: { shadows: boolean }) {
   const tex = useCourtTexture();
   const wall = useWallTexture();
@@ -275,6 +305,7 @@ export function Court({ shadows }: { shadows: boolean }) {
         <planeGeometry args={[1.8, 0.9]} />
         <meshBasicMaterial map={blob} transparent depthWrite={false} />
       </mesh>
+      <Bunting />
       <Floodlight x={-3.8} z={-3.2} />
       <Floodlight x={3.8} z={-3.2} />
     </group>

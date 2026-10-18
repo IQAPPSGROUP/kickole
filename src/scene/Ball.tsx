@@ -84,7 +84,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       const show = (k > 0.05 && engine.lastKickGrade !== 'miss') || engine.contact?.kind === 'stall';
       flash.current.visible = show;
       const pulse = engine.contact?.kind === 'stall' ? 0.55 + Math.sin(engine.time * 16) * 0.2 : k;
-      flash.current.scale.setScalar(0.7 + pulse * 1.5);
+      flash.current.scale.setScalar(0.45 + pulse * 0.65);
       const mat = flash.current.material as MeshBasicMaterial;
       mat.opacity = engine.contact?.kind === 'stall' ? 0.45 : 0.8 * k;
       mat.color.set(flashColor(engine));
@@ -122,7 +122,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     <>
       <group ref={group}>
         <mesh ref={flash} visible={false}>
-          <sphereGeometry args={[r * 1.85, 12, 10]} />
+          <sphereGeometry args={[r * 1.35, 12, 10]} />
           <meshBasicMaterial color="#EAF44A" transparent opacity={0} depthWrite={false} />
         </mesh>
         <group ref={spin}>

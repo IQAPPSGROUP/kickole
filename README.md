@@ -41,6 +41,7 @@ Best score and the top five runs are stored in `localStorage`.
 ## Deploying
 
 Cloudflare Pages: build command `npm run build`, output directory `dist`. The build uses relative asset paths (`base: './'`), so it can later be wrapped with Capacitor for iOS/Android.
+See `docs/PREVIEW_DEPLOY.md` for preview deployment and the device test checklist.
 
 ## Status (v0.1)
 

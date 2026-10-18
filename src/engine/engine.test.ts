@@ -136,4 +136,40 @@ describe('input abuse', () => {
     expect(e.stats.score).toBe(s);
     expect(e.phase).toBe('over');
   });
+
+  it('normal taps (held up to ~100 ms) never become a stall', () => {
+    for (const holdSteps of [0, 1, 6, 12]) {
+      const e = started();
+      runUntilContactDelta(e, 5);
+      e.press('left');
+      stepN(e, holdSteps);
+      e.release('left');
+      stepN(e, 30);
+      expect(e.stats.score, `hold ${holdSteps}`).toBe(1 + 2);
+      expect(e.ball.vy).toBeGreaterThan(0);
+    }
+  });
+
+  it('rapid alternating taps keep the run alive and score alternate bonuses', () => {
+    const e = started();
+    let side: 'left' | 'right' = 'right';
+    for (let k = 0; k < 8; k++) {
+      runUntilContactDelta(e, 5);
+      e.press(side); e.release(side);
+      stepN(e, 3);
+      side = side === 'left' ? 'right' : 'left';
+    }
+    expect(e.phase).toBe('playing');
+    expect(e.stats.score).toBeGreaterThan(8 * 3);
+  });
+
+  it('a stalled ball stays frozen while held', () => {
+    const e = started();
+    runUntilContactDelta(e, 5);
+    e.press('right');
+    stepN(e, 30);
+    const y = e.ball.y, x = e.ball.x, z = e.ball.z;
+    stepN(e, 30);
+    expect([e.ball.x, e.ball.y, e.ball.z]).toEqual([x, y, z]);
+  });
 });

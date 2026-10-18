@@ -52,3 +52,15 @@ Stage scope: bundled character integration, animation playback and rig contract.
 **Code-only checks:** kick clip time equals 0.30 s when the engine responds (`animation-sync.test.ts`); stall holds the clip at 0.30 s with foot position unchanged and the ball still (earlier inspection above).
 
 **Not verified:** any real iPhone/Android device, real fps/memory, full Miss clip frames, left-kick entry speed asymmetry (18.9 vs 11.2 m/s) which is a possible polish item.
+
+## Stage 2: mobile gameplay and controls (browser emulation only)
+
+Checked in headless Chromium with mobile emulation (320x568, 390x844, 844x390; Low/Medium/High), real touch events on the zones. **No physical device was used.**
+
+- Layout (script-measured, no page overflow, no JS errors): home, settings, game, game-over all fit at the three sizes and three quality levels. Only finding: at 320x568 and 844x390 the settings card scrolls internally and DONE was below the fold. **Fixed:** DONE is now sticky at the bottom of the card.
+- Touch zones: `.zones` only live in the game screen; menus/settings/over cards use their own `pointer-events:auto` layer. Card scroll uses `touch-action: pan-y`. Confirmed by real touch tap launching the ball in each configuration; scrolling inside the card was not gesture-tested.
+- Engine regression tests added (59 tests total): normal taps held 0-200 ms never become a stall; 8 rapid alternating taps keep the run alive and score the alternate bonus; a stalled ball stays frozen while held.
+- Stall hold/release recaptured (inspector, frames viewed): foot (0.10, 0.613, 0.4215) and ball (0.102, 0.72, 0.62, vy 0) identical at 0.2/0.4/0.6 s; release at 0.6 s flicks the ball up (vy 4.49) and the foot continues smoothly.
+- Miss: cannot be scrubbed in the inspector (the clip free-runs on state change). Viewed instead by hiding the game-over overlay and capturing the real game; the player leans and lowers the head as the ball drops and rests in the Miss pose. Early frames of the 1.5 s clip were not isolated.
+- Idle->KickLeft vs KickRight speed difference: not reproduced as a pose asymmetry (kicking-foot positions at clip 0.26 s / 0.30 s are mirror-identical: x=-/+0.1, y 0.393/0.613, z 0.187/0.421). The earlier number was from coarse software-rendered frames, so no change was made. Not conclusively explained.
+- Not verified: frame rate / memory / touch latency on real hardware, safe-area insets on notched devices (CSS uses `env(safe-area-inset-*)`, but emulation reports 0), iOS Safari behaviour.

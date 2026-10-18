@@ -101,7 +101,8 @@ export interface StateResult {
 }
 
 const KICK_POST_CONTACT = 0.35;
-const CELEBRATE_WINDOW = 0.8;
+/** Celebrate starts after the kick window and lasts the full clip (36 frames at 30 fps), ending on the Idle pose. */
+const CELEBRATE_WINDOW = KICK_POST_CONTACT + 1.2;
 
 /**
  * Clip time for a kick on `side`. The clip starts KICK_CLIP_START after 0 at the tap, reaches its 0.30 s contact frame

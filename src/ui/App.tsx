@@ -14,6 +14,7 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
+  if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
   useEffect(() => {
     let spaceDown = false;

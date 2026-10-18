@@ -11,6 +11,8 @@ export const inspector = {
   active: false,
   /** Foot bone world position of the kicking foot (set by the GLB character). */
   foot: null as [number, number, number] | null,
+  /** Dev-only: when set, the GLB character appends one sample per rendered frame (state + joint world positions). */
+  trace: null as null | { state: string; clip: number | null; t: number; joints: number[] }[],
 };
 
 export type InspectMode = 'kick' | 'stall';

@@ -114,6 +114,14 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
         const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
         if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }
       }
+      if (import.meta.env.DEV && inspector.trace) {
+        scene.updateMatrixWorld(true);
+        const joints: number[] = [];
+        for (const k of ['head', 'armLeft', 'armRight', 'footLeft', 'footRight', 'root'] as BoneKey[]) {
+          const b = bones[k]; if (b) { b.getWorldPosition(footPos); joints.push(footPos.x, footPos.y, footPos.z); }
+        }
+        inspector.trace.push({ state: current.state ?? '', clip: next.clipTime ?? null, t: engine.time, joints });
+      }
       return;
     }
     // Fallback for rigs without clips: apply the procedural pose on top of the rest pose.

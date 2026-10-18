@@ -65,8 +65,21 @@ export const sfx = {
 
 const BPM = 104;
 const EIGHTH = 60 / BPM / 2;
-const MELODY = [659.25, 0, 783.99, 880, 0, 783.99, 659.25, 523.25, 587.33, 0, 698.46, 783.99, 0, 659.25, 587.33, 523.25];
-const BASS = [130.81, 0, 0, 196, 0, 164.81, 0, 130.81, 146.83, 0, 0, 220, 0, 174.61, 0, 196];
+/** Four different 16-step phrases so the loop is a tune, not one bar repeated. */
+const MELODY = [
+  [659.25, 0, 783.99, 880, 0, 783.99, 659.25, 523.25, 587.33, 0, 698.46, 783.99, 0, 659.25, 587.33, 523.25],
+  [783.99, 880, 0, 987.77, 880, 783.99, 698.46, 659.25, 0, 587.33, 659.25, 783.99, 698.46, 0, 659.25, 523.25],
+  [523.25, 0, 659.25, 783.99, 880, 0, 783.99, 659.25, 587.33, 698.46, 0, 783.99, 880, 783.99, 659.25, 523.25],
+  [880, 0, 783.99, 0, 659.25, 698.46, 783.99, 880, 0, 987.77, 880, 783.99, 0, 659.25, 587.33, 523.25],
+];
+const BASS = [
+  [130.81, 0, 130.81, 196, 0, 164.81, 0, 130.81, 146.83, 0, 146.83, 220, 0, 174.61, 0, 196],
+  [196, 0, 196, 246.94, 0, 220, 0, 196, 174.61, 0, 164.81, 220, 0, 196, 0, 174.61],
+  [130.81, 0, 164.81, 196, 0, 174.61, 0, 146.83, 130.81, 0, 196, 220, 0, 174.61, 0, 130.81],
+  [220, 0, 196, 0, 174.61, 164.81, 146.83, 130.81, 0, 196, 220, 246.94, 0, 174.61, 0, 130.81],
+];
+const PHRASE = MELODY[0].length;
+const TUNE = MELODY.length * PHRASE;
 
 let running = false;
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -108,17 +121,22 @@ function pump() {
   const horizon = ctx.currentTime + 0.28;
   let guard = 0;
   while (nextTime < horizon && guard < 8) {
-    const i = stepIndex % MELODY.length;
+    const i = stepIndex % TUNE;
+    const phrase = Math.floor(i / PHRASE);
+    const beat = i % PHRASE;
     const when = nextTime;
-    const melody = MELODY[i];
-    const bass = BASS[i];
-    if (melody) tone(ctx, musicGain, melody, when, step * 0.9, 'triangle', 0.055);
-    if (bass) tone(ctx, musicGain, bass, when, step * 1.25, 'sine', 0.07);
-    if (i % 8 === 0) {
-      tone(ctx, musicGain, 523.25, when, 0.09, 'triangle', 0.03);
-      tone(ctx, musicGain, 659.25, when, 0.09, 'sine', 0.024);
+    const melody = MELODY[phrase][beat];
+    const bass = BASS[phrase][beat];
+    if (melody) tone(ctx, musicGain, melody, when, step * 0.85, phrase % 2 === 0 ? 'triangle' : 'sine', 0.05);
+    if (bass) tone(ctx, musicGain, bass, when, step * 1.2, 'sine', 0.06);
+    if (beat % 4 === 0) tone(ctx, musicGain, 98, when, step * 0.7, 'sine', 0.08);
+    if (beat % 4 === 2) tone(ctx, musicGain, phrase % 2 === 0 ? 740 : 880, when, 0.06, 'square', 0.012);
+    if (beat % 2 === 1) tone(ctx, musicGain, 1760, when, 0.03, 'triangle', 0.008);
+    if (beat === 0) {
+      tone(ctx, musicGain, 523.25, when, 0.12, 'triangle', 0.02);
+      tone(ctx, musicGain, phrase === 2 ? 830.61 : 659.25, when, 0.12, 'sine', 0.016);
     }
-    stepIndex = (stepIndex + 1) % MELODY.length;
+    stepIndex = (stepIndex + 1) % TUNE;
     nextTime += step;
     guard += 1;
   }

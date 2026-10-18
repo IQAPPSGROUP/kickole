@@ -19,7 +19,7 @@ describe('boots and coins', () => {
     if (!broke.ok) expect(broke.reason).toBe('broke');
     expect(broke.locker).toEqual(start);
 
-    const paid = buyOrEquip({ ...start, coins: 40 }, 'samba');
+    const paid = buyOrEquip({ ...start, coins: getBoot('samba').price }, 'samba');
     expect(paid.ok).toBe(true);
     if (paid.ok) {
       expect(paid.locker.equippedBoot).toBe('samba');

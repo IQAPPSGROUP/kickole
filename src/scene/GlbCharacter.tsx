@@ -262,6 +262,8 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
       // Skin and Hair on the Quaternius model already carry colour textures. Multiplying a skin tint
       // on top of those maps muddies the face, so only flat kit materials take the skin colours.
       const textured = !!m.map && (name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair);
+      // The bundled boot map is a flat black image, so a colour multiply stays black. Drop it and use the shop leather.
+      if (name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole) m.map = null;
       if (!textured && colors[name]) m.color.set(colors[name]);
       const part = kitPart(name);
       if (part) {

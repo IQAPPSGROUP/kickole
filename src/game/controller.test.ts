@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_CONFIG } from '../engine/config';
 import { fx } from '../scene/fx';
 import { CALLED_FOOT_BONUS } from './called-foot';
+import { getBoot } from './boots';
 
 function fakeStorage() {
   const data: Record<string, string> = {};
@@ -13,10 +14,11 @@ function fakeStorage() {
   };
 }
 
-async function make(settings?: object) {
+async function make(settings?: object, save?: object) {
   vi.resetModules();
   const ls = fakeStorage();
   if (settings) ls.data['kicky.settings.v1'] = JSON.stringify(settings);
+  if (save) ls.data['kicky.save.v1'] = JSON.stringify(save);
   vi.stubGlobal('localStorage', ls);
   vi.stubGlobal('navigator', { vibrate: vi.fn() });
   const { GameController } = await import('./controller');
@@ -242,15 +244,24 @@ describe('GameController', () => {
     }
     for (let i = 0; i < 20000 && c.engine.phase !== 'over'; i++) c.tick(0.016);
     const coins = c.getSnapshot().save.coins;
+    const price = getBoot('samba').price;
     expect(coins).toBe(c.getSnapshot().result?.score);
-    expect(coins).toBeGreaterThanOrEqual(40);
+    expect(coins).toBeGreaterThan(0);
+    expect(coins).toBeLessThan(price);
+    expect(c.buyBoot('samba')).toBe(false);
+    expect(c.getSnapshot().save.equippedBoot).toBe('street');
+  });
+
+  it('equips a pair once the saved balance covers the price', async () => {
+    const price = getBoot('samba').price;
+    const { c } = await make(QUIET, { coins: price, ownedBoots: ['street'], equippedBoot: 'street', best: 0, leaderboard: [] });
     expect(c.buyBoot('samba')).toBe(true);
     expect(c.getSnapshot().save.equippedBoot).toBe('samba');
-    expect(c.getSnapshot().save.coins).toBe(coins - 40);
+    expect(c.getSnapshot().save.coins).toBe(0);
     expect(c.engine.config.timing.perfectMs).toBe(DEFAULT_CONFIG.timing.perfectMs + 8);
     expect(c.buyBoot('street')).toBe(true);
     expect(c.getSnapshot().save.equippedBoot).toBe('street');
-    expect(c.getSnapshot().save.coins).toBe(coins - 40);
+    expect(c.getSnapshot().save.coins).toBe(0);
     expect(c.engine.config.timing.perfectMs).toBe(DEFAULT_CONFIG.timing.perfectMs);
   });
 });

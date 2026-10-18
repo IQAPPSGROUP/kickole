@@ -15,34 +15,34 @@ export interface PropPose {
 }
 
 export const BEACH_BALL_LOOP = 5.6;
-/** Closest the decorative ball comes to the origin, still outside the kick circle. */
-export const BEACH_BALL_INNER_X = 2.05;
+/** Closest the decorative ball comes to the origin, still outside the kick circle. Left of the player, in frame. */
+export const BEACH_BALL_INNER_X = 1.72;
 export const POP_BONUS = 5;
 /** Metres. Wide enough that a kick clips the ball when it has bounced in, not when it is out wide. */
 export const POP_NEAR = 2.2;
 
-/** Bounces in from the right sideline and back out. x stays at least BEACH_BALL_INNER_X. */
+/** Bounces in from the left sideline, in front of the camera, and back out. */
 export function beachBallPose(time: number): PropPose {
   const safe = Number.isFinite(time) ? time : 0;
   const loop = Math.floor(safe / BEACH_BALL_LOOP);
   const u = (safe - loop * BEACH_BALL_LOOP) / BEACH_BALL_LOOP;
   const inward = u < 0.55 ? u / 0.55 : 1 - (u - 0.55) / 0.45;
-  const x = BEACH_BALL_INNER_X + (1 - inward) * 2.6;
-  const z = 0.72;
+  const x = -(BEACH_BALL_INNER_X + (1 - inward) * 1.6);
+  const z = 1.68;
   const bounce = Math.abs(Math.sin(inward * Math.PI * 3));
-  const y = 0.22 + bounce * (0.45 + inward * 0.85);
+  const y = 0.28 + bounce * (0.35 + inward * 0.7);
   return { x, y, z, spin: safe * 3.4, loop };
 }
 
-/** Gull crossing the sky behind the pitch, clear of the kick circle. */
+/** Gull crossing the sky above the palms, inside the beach camera frame. */
 export function birdPose(time: number): { x: number; y: number; z: number; flap: number } {
-  const loop = 14;
+  const loop = 16;
   const u = ((time % loop) + loop) % loop / loop;
   return {
-    x: -7.6 + u * 15.2,
-    y: 4.45 + Math.sin(u * Math.PI * 2) * 0.32,
-    z: -5.8,
-    flap: Math.sin(time * 11),
+    x: -3.2 + u * 6.4,
+    y: 3.05 + Math.sin(u * Math.PI * 2) * 0.16,
+    z: -3.15,
+    flap: Math.sin(time * 9),
   };
 }
 

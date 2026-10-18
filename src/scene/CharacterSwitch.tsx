@@ -1,25 +1,11 @@
-import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Component, Suspense, useCallback, useState, type ReactNode } from 'react';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import { Character } from './Character';
 import { GlbCharacter } from './GlbCharacter';
-import { CHARACTER_MODEL_URL, USE_GLB_CHARACTER } from './rig';
+import { USE_GLB_CHARACTER } from './rig';
 
-type Status = 'checking' | 'available' | 'missing';
-
-/** True only when the URL really serves a binary glTF (dev servers return index.html for unknown paths). */
-async function modelExists(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, { headers: { Range: 'bytes=0-3' } });
-    if (!res.ok || !res.body) return false;
-    const reader = res.body.getReader();
-    const { value } = await reader.read();
-    void reader.cancel();
-    return !!value && String.fromCharCode(...value.slice(0, 4)) === 'glTF';
-  } catch {
-    return false;
-  }
-}
+type Status = 'available' | 'missing';
 
 class GlbBoundary extends Component<{ children: ReactNode; fallback: ReactNode; onError: () => void }, { failed: boolean }> {
   state = { failed: false };
@@ -29,23 +15,17 @@ class GlbBoundary extends Component<{ children: ReactNode; fallback: ReactNode; 
 }
 
 /**
- * Uses the rigged GLB footballer unless VITE_USE_GLB_CHARACTER=false, provided the model URL exists and matches a known rig,
- * otherwise the built-in primitive character.
+ * Uses the rigged GLB footballer unless VITE_USE_GLB_CHARACTER=false.
+ * The primitive character is only shown if that model fails to load.
  */
 export function CharacterSwitch({ engine, skin }: { engine: GameEngine; skin: Skin }) {
-  const [status, setStatus] = useState<Status>(USE_GLB_CHARACTER ? 'checking' : 'missing');
-  useEffect(() => {
-    if (!USE_GLB_CHARACTER) return;
-    let live = true;
-    void modelExists(CHARACTER_MODEL_URL).then((ok) => { if (live) setStatus(ok ? 'available' : 'missing'); });
-    return () => { live = false; };
-  }, []);
+  const [status, setStatus] = useState<Status>(USE_GLB_CHARACTER ? 'available' : 'missing');
   const reject = useCallback(() => setStatus('missing'), []);
   const fallback = <Character engine={engine} skin={skin} />;
   if (status !== 'available') return fallback;
   return (
     <GlbBoundary fallback={fallback} onError={reject}>
-      <Suspense fallback={fallback}>
+      <Suspense fallback={null}>
         <GlbCharacter engine={engine} skin={skin} onInvalid={reject} />
       </Suspense>
     </GlbBoundary>

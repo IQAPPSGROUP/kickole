@@ -1,6 +1,6 @@
-# Kicky
+# KICKOLÉ
 
-Kicky is a mobile-first, stylised 3D football freestyle arcade game by IQ Apps Group.
+KICKOLÉ is a mobile-first, stylised 3D football freestyle arcade game by IQ Apps Group.
 Tap at the right moment to keep the ball in the air, chase PERFECT timing, alternate feet and land foot stalls.
 
 Stack: React + TypeScript + Vite, Three.js, React Three Fiber and Drei. No backend, API keys or external assets.

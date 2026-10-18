@@ -14,7 +14,7 @@ export interface Skin {
 export const SKINS: Skin[] = [
   {
     id: 'kicky-teal',
-    name: 'Kicky Teal',
+    name: 'Kickolé Teal',
     clothing: { shirt: '#12BFA6', shirtTrim: '#F7F5ED', shorts: '#142D35', socks: '#12BFA6' },
     boots: { main: '#EAF44A', sole: '#142D35' },
     body: { skin: '#E8B48F', hair: '#2A1E1A' },

@@ -5,7 +5,7 @@ import type { Quality, RunRecord, Settings } from '../game/storage';
 export function Logo() {
   return (
     <h1 className="logo">
-      KICK<span>Y</span>
+      KICK<span>OLÉ</span>
     </h1>
   );
 }

@@ -30,7 +30,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .screen.settings { z-index: 20; overflow-y: auto; }
 .home { justify-content: space-between; align-items: center; }
 .home-top { text-align: center; padding-top: 24px; }
-.logo { margin: 0; font-size: clamp(64px, 20vw, 110px); line-height: 1; font-weight: 900; font-style: italic; color: var(--white); text-shadow: 0 5px 0 var(--teal), 0 10px 24px rgba(0,0,0,.4); letter-spacing: 2px; }
+.logo { margin: 0; font-size: clamp(48px, 15vw, 90px); line-height: 1; font-weight: 900; font-style: italic; color: var(--white); text-shadow: 0 5px 0 var(--teal), 0 10px 24px rgba(0,0,0,.4); letter-spacing: 2px; }
 .logo span { color: var(--lime); }
 .tagline { margin: 6px 0 0; font-weight: 700; letter-spacing: 3px; font-size: 13px; color: var(--teal); text-transform: uppercase; }
 .home-bottom { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: 28px; }

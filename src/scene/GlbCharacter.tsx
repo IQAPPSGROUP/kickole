@@ -1,16 +1,17 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, LoopOnce, Vector3, LoopRepeat, Material, MeshStandardMaterial, type AnimationAction, type Bone, type Object3D } from 'three';
+import { AnimationMixer, LoopOnce, Quaternion, Vector3, LoopRepeat, Material, MeshStandardMaterial, type AnimationAction, type Bone, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
 import {
-  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
+import { ueDeltaQuaternion } from './ue-pose';
 
 interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void }
 
@@ -20,32 +21,41 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void }
  */
 export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   const gltf = useGLTF(CHARACTER_MODEL_URL);
-  const { scene, clips, report, bones, materials } = useMemo(() => {
+  const { scene, clips, report, bones, materials, kind } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
+    const byName = new Map<string, Bone>();
     const mats = new Map<string, MeshStandardMaterial>();
     const boneNames: string[] = [];
     const matNames: string[] = [];
     root.traverse((o) => {
       if ((o as Bone).isBone) {
         boneNames.push(o.name);
-        (Object.keys(BONE_NAMES) as BoneKey[]).forEach((k) => { if (BONE_NAMES[k] === o.name) boneMap[k] = o as Bone; });
+        byName.set(o.name, o as Bone);
       }
-      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean; receiveShadow?: boolean };
+      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean; receiveShadow?: boolean; frustumCulled?: boolean };
       if (mesh.isMesh && mesh.material) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
         const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         const cloned = list.map((m) => m.clone());
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
         cloned.forEach((m) => { matNames.push(m.name); if ((m as MeshStandardMaterial).isMeshStandardMaterial) mats.set(m.name, m as MeshStandardMaterial); });
       }
     });
+    const resolved = rigKind(boneNames);
+    const names: Record<BoneKey, string> = resolved === 'ue' ? UE_BONE_NAMES : BONE_NAMES;
+    (Object.keys(names) as BoneKey[]).forEach((k) => {
+      const bone = byName.get(names[k]);
+      if (bone) boneMap[k] = bone;
+    });
     return {
       scene: root,
       clips: gltf.animations,
       bones: boneMap,
       materials: mats,
+      kind: resolved,
       report: validateModel(boneNames, gltf.animations.map((a) => a.name), matNames),
     };
   }, [gltf]);
@@ -54,20 +64,25 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   const usable = useClips || report.missingBones.length === 0;
 
   useEffect(() => {
-    if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); }
-    else if (report.missingBones.length || report.missingClips.length || report.missingMaterials.length) console.warn('Character GLB is missing contract items', report);
-  }, [usable, report, onInvalid]);
+    if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); return; }
+    if (report.missingBones.length || report.missingMaterials.length) console.warn('Character GLB is missing contract items', report);
+    // The Quaternius player ships without clips and is posed procedurally. Only the contract rig is expected to include them.
+    else if (kind === 'contract' && report.missingClips.length) console.warn('Character GLB is missing animation clips', report.missingClips);
+  }, [usable, report, onInvalid, kind]);
 
   useEffect(() => {
     const colors = skinMaterialColors(skin);
     materials.forEach((m, name) => {
-      if (colors[name]) m.color.set(colors[name]);
-      // Matte cloth / skin, slightly glossy boots; a faint self-glow keeps shaded sides from going muddy.
+      // Skin and Hair on the Quaternius model already carry colour textures. Multiplying a skin tint
+      // on top of those maps muddies the face, so only flat kit materials take the skin colours.
+      const textured = !!m.map && (name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair);
+      if (!textured && colors[name]) m.color.set(colors[name]);
       const boots = name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole;
       m.flatShading = false;
       m.roughness = boots ? 0.48 : name === MATERIAL_NAMES.hair ? 0.88 : name === MATERIAL_NAMES.skin ? 0.82 : 0.76;
       m.metalness = 0;
-      m.emissive.copy(m.color).multiplyScalar(0.12);
+      if (m.map) m.emissive.set('#000000');
+      else m.emissive.copy(m.color).multiplyScalar(0.12);
     });
   }, [skin, materials]);
 
@@ -91,6 +106,12 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     (Object.keys(bones) as BoneKey[]).forEach((k) => { const b = bones[k]!; m.set(k, { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z }); });
     return m;
   }, [bones]);
+  const restQuat = useMemo(() => {
+    const m = new Map<BoneKey, Quaternion>();
+    (Object.keys(bones) as BoneKey[]).forEach((k) => { const b = bones[k]; if (b) m.set(k, b.quaternion.clone()); });
+    return m;
+  }, [bones]);
+  const deltaQ = useMemo(() => new Quaternion(), []);
   const footPos = useMemo(() => new Vector3(), []);
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
 
@@ -136,6 +157,21 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
           const b = bones[k]; if (b) { b.getWorldPosition(footPos); joints.push(footPos.x, footPos.y, footPos.z); }
         }
         inspector.trace.push({ state: current.state ?? '', clip: next.clipTime ?? null, t: engine.time, joints });
+      }
+      return;
+    }
+    if (kind === 'ue') {
+      computePose(engine, pose);
+      scene.position.y = pose.bodyY;
+      (Object.keys(UE_BONE_NAMES) as BoneKey[]).forEach((k) => {
+        const b = bones[k];
+        const restQ = restQuat.get(k);
+        if (b && restQ) b.quaternion.copy(restQ).multiply(ueDeltaQuaternion(k, pose, deltaQ));
+      });
+      if (inspector.active) {
+        const kickLeft = engine.lastKick.left >= engine.lastKick.right;
+        const foot = bones[kickLeft ? 'footLeft' : 'footRight'];
+        if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }
       }
       return;
     }

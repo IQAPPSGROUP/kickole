@@ -1,0 +1,28 @@
+<!doctype html><html><body style="margin:0;background:#222831">
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import * as SU from 'three/addons/utils/SkeletonUtils.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
+const W=1200,H=900;
+const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setSize(W,H);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;document.body.appendChild(r.domElement);
+const sc=new THREE.Scene();
+const c1=document.createElement('canvas');c1.width=2;c1.height=256;const cx=c1.getContext('2d');const gr=cx.createLinearGradient(0,0,0,256);gr.addColorStop(0,'#6C5CE7');gr.addColorStop(1,'#FF8A5B');cx.fillStyle=gr;cx.fillRect(0,0,2,256);
+const bg=new THREE.CanvasTexture(c1);bg.colorSpace=THREE.SRGBColorSpace;sc.background=bg;
+sc.add(new THREE.HemisphereLight(0xffffff,0x445566,1.6));const d=new THREE.DirectionalLight(0xffffff,2.2);d.position.set(2,4,3);sc.add(d);
+const floor=new THREE.Mesh(new THREE.CircleGeometry(1.2,48),new THREE.MeshStandardMaterial({color:'#00B8A9'}));floor.rotation.x=-Math.PI/2;sc.add(floor);
+const l=new GLTFLoader();l.setMeshoptDecoder(MeshoptDecoder);
+l.load('kickole_player.glb?a',ga=>{window.A=ga;l.load('kickole_player.glb?b',g=>{
+  const info={meshes:[],bones:0,mats:new Set()};
+  g.scene.traverse(o=>{if(o.isSkinnedMesh){info.meshes.push(o.name);info.bones=o.skeleton.bones.length;}if(o.material)info.mats.add(o.material.name);});
+  const a=window.A.scene;a.position.x=-0.55;a.rotation.y=0.35;sc.add(a);a.traverse(o=>{if(o.isMesh)o.frustumCulled=false});
+  const b=g.scene;b.position.x=0.55;b.rotation.y=-0.6;
+  // pose test: turn head & raise arm on b
+  b.traverse(o=>{if(o.isBone&&o.name==='Head')o.rotation.z+=0.35; if(o.isBone&&o.name==='thigh_r')o.rotation.x+=0.8;});
+  sc.add(b);
+  const box=new THREE.Box3().setFromObject(a);info.box=[box.min.toArray(),box.max.toArray()];
+  const cam=new THREE.PerspectiveCamera(30,W/H,0.1,50);cam.position.set(0,1.1,5.2);cam.lookAt(0,0.92,0);
+  r.render(sc,cam);window.INFO=JSON.stringify({...info,mats:[...info.mats]});
+})},undefined,e=>{window.INFO='ERR '+e});
+</script></body></html>

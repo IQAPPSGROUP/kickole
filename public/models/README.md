@@ -7,9 +7,11 @@ club branding or player likenesses. See `LICENSE.txt` for the project asset's
 MIT terms, including commercial use. Blender and runtime dependencies retain
 their own licences.
 
-The GLB is 171,856 bytes and has the five contract clips: Idle, KickLeft,
-KickRight, Miss and Celebrate. The game loads it by default; set
-`VITE_USE_GLB_CHARACTER=false` to use the primitive fallback.
+`kicky-player-rigged.glb` has the five contract clips: Idle, KickLeft,
+KickRight, Miss and Celebrate. It is the clip-based reference asset. The
+game loads `kickole_player_v2.glb` instead (CC0, see `LICENSE.txt` and
+`docs/FREDDIE_CHARACTER_MODELS.md`). Set `VITE_USE_GLB_CHARACTER=false` to
+use the primitive fallback.
 
 The `_L` and `_R` suffixes follow control/world-X sides, not anatomical sides.
 See `docs/CHARACTER_GLB.md` for the rig, contact and export contract.

@@ -90,3 +90,50 @@ describe('GameEngine', () => {
     expect(e.stats.kickUps).toBe(0);
   });
 });
+
+describe('input abuse', () => {
+  it('rapid random mashing only scores kicks inside the timing window', () => {
+    let seed = 12345;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let run = 0; run < 20; run++) {
+      const e = new GameEngine();
+      const kicks: { deltaMs: number; points: number }[] = [];
+      e.on((ev) => { if (ev.type === 'kick') kicks.push({ deltaMs: ev.deltaMs, points: ev.points }); });
+      e.prepare('ready');
+      for (let i = 0; i < 6000 && e.phase !== 'over'; i++) {
+        const r = rnd();
+        const side = rnd() < 0.5 ? 'left' : 'right';
+        if (r < 0.15) e.press(side);
+        else if (r < 0.3) e.release(side);
+        e.step(e.config.fixedStep);
+      }
+      for (const k of kicks) expect(Math.abs(k.deltaMs)).toBeLessThanOrEqual(e.config.timing.poorMs + 1e-6);
+      const total = kicks.reduce((s, k) => s + k.points, 0);
+      expect(e.stats.score).toBeGreaterThanOrEqual(0);
+      expect(e.stats.score).toBe(total);
+    }
+  });
+
+  it('spamming early taps scores nothing and respects the miss cooldown', () => {
+    const e = started();
+    let misses = 0;
+    e.on((ev) => { if (ev.type === 'miss') misses++; });
+    for (let i = 0; i < 40; i++) {
+      e.press('left'); e.release('left');
+      e.press('right'); e.release('right');
+      e.step(e.config.fixedStep);
+    }
+    expect(e.stats.score).toBe(0);
+    expect(misses).toBeLessThanOrEqual(2);
+  });
+
+  it('inputs after the run ends do nothing', () => {
+    const e = started();
+    for (let i = 0; i < 5000 && e.phase !== 'over'; i++) e.step(e.config.fixedStep);
+    const s = e.stats.score;
+    e.press('left'); e.release('left'); e.press('right'); e.release('right');
+    stepN(e, 100);
+    expect(e.stats.score).toBe(s);
+    expect(e.phase).toBe('over');
+  });
+});

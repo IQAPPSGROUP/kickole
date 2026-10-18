@@ -116,7 +116,6 @@ describe('GLB rig contract', () => {
     e.press('left'); e.release('left');
     stepN(e, 5);
     expect(selectAnimationState(e).state).toBe('KickLeft');
-    expect(selectAnimationState(e).hold).toBeUndefined();
     stepN(e, 80);
     expect(selectAnimationState(e).state).toBe('Idle');
     toContact(e);
@@ -124,7 +123,7 @@ describe('GLB rig contract', () => {
     stepN(e, 60);
     const stall = selectAnimationState(e);
     expect(stall.state).toBe('KickRight');
-    expect(stall.hold).toBe(true);
+    expect(stall.clipTime).toBeCloseTo(KICK_CLIP_CONTACT_TIME, 5);
     e.release('right');
     stepN(e, 5);
     expect(selectAnimationState(e).state).toBe('KickRight');

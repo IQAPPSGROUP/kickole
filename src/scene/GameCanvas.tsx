@@ -10,6 +10,7 @@ import { CharacterSwitch } from './CharacterSwitch';
 import { Ball } from './Ball';
 import { Court } from './Court';
 import { Effects } from './Effects';
+import { inspector } from './inspector';
 import { fx } from './fx';
 
 const TARGET = new Vector3(0, 1.25, 0.3);
@@ -61,7 +62,7 @@ function Environment() {
 }
 
 function Simulation({ controller }: { controller: GameController }) {
-  useFrame((_, dt) => controller.tick(dt));
+  useFrame((_, dt) => { if (!inspector.active) controller.tick(dt); });
   return null;
 }
 

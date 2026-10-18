@@ -93,3 +93,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .zone.left { border-right: 1px dashed rgba(247,245,237,.12); }
 
 .vignette { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(5,22,27,.55) 100%); }
+
+.inspector { position: absolute; left: 6px; right: 6px; bottom: 6px; z-index: 40; background: rgba(5,22,27,.88); color: var(--white); padding: 8px; border-radius: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 6px; pointer-events: auto; }
+.inspector .row { display: flex; gap: 4px; flex-wrap: wrap; }
+.inspector button { background: var(--teal); color: var(--navy); border: 0; border-radius: 6px; padding: 6px 8px; font-weight: 800; font-size: 11px; }
+.inspector pre { margin: 0; font-size: 10px; white-space: pre-wrap; }

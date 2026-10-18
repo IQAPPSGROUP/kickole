@@ -41,8 +41,8 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     const b = engine.ball;
     if (group.current) group.current.position.set(b.x, b.y, b.z);
     if (spin.current) { euler.set(b.rx, b.ry, b.rz); spin.current.rotation.copy(euler); }
-    // Contact squash and flash: strongest right after the most recent foot action.
-    const since = engine.time - Math.max(engine.lastKick.left, engine.lastKick.right);
+    // Contact squash and flash: strongest right after the ball response.
+    const since = engine.time - Math.max(engine.lastContact.left, engine.lastContact.right);
     const k = since >= 0 && since < 0.12 ? Math.sin((since / 0.12) * Math.PI) : 0;
     if (group.current) group.current.scale.set(1 + 0.18 * k, 1 - 0.22 * k, 1 + 0.18 * k);
     if (flash.current) {

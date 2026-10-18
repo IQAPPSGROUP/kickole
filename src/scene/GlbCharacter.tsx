@@ -1,13 +1,14 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, LoopOnce, LoopRepeat, Material, MeshStandardMaterial, type AnimationAction, type Bone, type Object3D } from 'three';
+import { AnimationMixer, LoopOnce, Vector3, LoopRepeat, Material, MeshStandardMaterial, type AnimationAction, type Bone, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
+import { inspector } from './inspector';
 import {
-  ANIMATION_STATES, BONE_NAMES, CHARACTER_MODEL_URL, KICK_CLIP_CONTACT_TIME, KICK_CLIP_START, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 
@@ -81,6 +82,7 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     (Object.keys(bones) as BoneKey[]).forEach((k) => { const b = bones[k]!; m.set(k, { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z }); });
     return m;
   }, [bones]);
+  const footPos = useMemo(() => new Vector3(), []);
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
 
   useEffect(() => () => { mixer.stopAllAction(); }, [mixer]);
@@ -92,17 +94,20 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
         const to = actions.get(next.state);
         const from = current.state ? actions.get(current.state) : undefined;
         if (to) {
-          const kick = next.state.startsWith('Kick');
           to.reset().play();
-          // Skip the wind-up so the foot reaches the ball at the engine's contact time; physics stays authoritative.
-          if (kick) to.time = next.hold ? KICK_CLIP_CONTACT_TIME : KICK_CLIP_START;
-          to.paused = !!next.hold;
-          if (from && from !== to) from.crossFadeTo(to, kick ? 0.04 : 0.15, false);
+          if (from && from !== to) from.crossFadeTo(to, next.state.startsWith('Kick') ? 0.04 : 0.15, false);
         }
         current.state = next.state;
         current.token = next.token;
       }
+      // Kick clips are positioned explicitly from engine state (physics stays authoritative; no free-running timer).
+      const act = current.state ? actions.get(current.state) : undefined;
+      if (act && next.clipTime !== undefined) { act.paused = true; act.time = next.clipTime; }
       mixer.update(dt);
+      if (inspector.active) {
+        const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
+        if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }
+      }
       return;
     }
     // Fallback for rigs without clips: apply the procedural pose on top of the rest pose.

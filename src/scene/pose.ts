@@ -111,7 +111,14 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
   const sides: Side[] = ['left', 'right'];
   for (const side of sides) {
     const held = engine.contact && engine.contact.side === side;
-    const env = held ? 1 : kickEnvelope(t - engine.lastKick[side]);
+    const sinceTap = t - engine.lastKick[side];
+    const sinceContact = t - engine.lastContact[side];
+    // Ramp in from the tap to full extension at the ball response; hold while trapped; ease out after contact.
+    const env = held
+      ? Math.min(1, Math.max(0, sinceTap) / c.contactDelay)
+      : engine.lastContact[side] >= engine.lastKick[side]
+        ? Math.exp(-Math.max(0, sinceContact) / 0.14)
+        : kickEnvelope(sinceTap);
     if (env <= 0.001) continue;
     const bx = held ? b.x : (side === 'left' ? -1 : 1) * c.footX * 0.6;
     const stallLift = held && engine.contact!.kind === 'stall' ? 0.02 * Math.sin(t * 18) : 0;

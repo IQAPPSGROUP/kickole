@@ -133,6 +133,9 @@ export class GameController {
     }
   }
 
+  /** Re-publish the snapshot after the engine was changed from outside (dev inspector). */
+  refresh() { this.publish(); }
+
   /** Called on each frame loop; publishes only when the phase-visible state changed. */
   tick(dt: number) {
     const before = this.engine.phase;

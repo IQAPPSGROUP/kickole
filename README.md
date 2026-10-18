@@ -52,3 +52,14 @@ Not done: real character models and animation clips, Capacitor projects, purchas
 ## Character model
 
 The footballer is currently built from primitives. A rigged GLB can replace it without code changes once it meets the spec in [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md): put it at `public/models/kicky-player-rigged.glb` and build with `VITE_USE_GLB_CHARACTER=true`. Invalid or missing models fall back to the primitive character.
+
+## Animation inspector (development only)
+Run `VITE_USE_GLB_CHARACTER=true npm run dev` and open `http://localhost:5173/?inspect`. The panel lets you choose the foot,
+switch between a plain kick and a foot stall, pause/play, step one frame (1/30 s) or scrub, and jump to the 0.25 / 0.30 / 0.35 s
+clip times. It shows the tap-to-ball-response time, the ball position/velocity, the foot bone position and fps/frame-time/heap
+(useful when the dev server is opened from a phone on the LAN). The inspector is not included in production builds.
+`tools/capture-contact-frames.mjs` captures screenshots at those times (needs puppeteer-core and Chromium; not a project dependency).
+The scene is rebuilt by replaying the real engine, so the frames match gameplay.
+
+Foot contact: the engine responds `contactDelay` (0.04 s) after a tap, and the GLB kick clip is started at 0.26 s so its
+0.30 s contact frame coincides with that response.

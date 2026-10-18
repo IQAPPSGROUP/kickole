@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { GameController } from '../game/controller';
 import { GameCanvas } from '../scene/GameCanvas';
 import { Hud, TouchZones } from './Hud';
 import { Home, GameOver, SettingsScreen } from './Screens';
+
+// Development-only animation inspector; never bundled into production builds.
+const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
+const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
 export function App() {
   const controller = useMemo(() => new GameController(), []);
@@ -56,6 +60,7 @@ export function App() {
           onHome={() => controller.home()}
         />
       )}
+      {InspectorPanel && <Suspense fallback={null}><InspectorPanel controller={controller} /></Suspense>}
       {showSettings && (
         <SettingsScreen
           settings={snap.settings}

@@ -47,7 +47,10 @@ export class GameEngine {
   /** Simulated time in seconds. */
   time = 0;
   /** Sim time of the most recent foot action per foot, for animation. */
+  /** Time of the tap that started a foot action (the foot starts moving). */
   lastKick: Record<Side, number> = { left: -10, right: -10 };
+  /** Time the ball actually responded to a kick (tap + contactDelay at the earliest). */
+  lastContact: Record<Side, number> = { left: -10, right: -10 };
   lastKickGrade: Grade = 'good';
   lastDropTime = -10;
   lastPerfectTime = -10;
@@ -95,6 +98,8 @@ export class GameEngine {
     this.lastSide = null;
     this.contact = null;
     this.cooldown = 0;
+    this.lastKick = { left: -10, right: -10 };
+    this.lastContact = { left: -10, right: -10 };
     this.gravityScale = 1;
     this.acc = 0;
     this.held = { left: false, right: false };
@@ -138,7 +143,7 @@ export class GameEngine {
   release(side: Side) {
     this.held[side] = false;
     const c = this.contact;
-    if (c && c.side === side && this.phase === 'playing') {
+    if (c && c.side === side && this.phase === 'playing' && c.held >= this.config.contactDelay) {
       this.completeContact(c.kind === 'stall');
     }
   }
@@ -188,7 +193,7 @@ export class GameEngine {
     this.stats.score += points;
     this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     this.lastSide = c.side;
-    this.lastKick[c.side] = this.time;
+    this.lastContact[c.side] = this.time;
     this.lastKickGrade = c.grade;
     if (c.grade === 'perfect') this.lastPerfectTime = this.time;
 
@@ -236,7 +241,7 @@ export class GameEngine {
     const c = this.contact;
     if (c && this.phase === 'playing') {
       c.held += h;
-      if (!this.held[c.side]) {
+      if (!this.held[c.side] && c.held >= this.config.contactDelay - 1e-9) {
         this.completeContact(c.kind === 'stall');
       } else if (c.kind === 'pending' && c.held >= this.config.stallHoldTime) {
         c.kind = 'stall';

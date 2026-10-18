@@ -189,7 +189,7 @@ def build_actions(armature):
         clip(name, [
             (0, kick_pose(side, 0), 0.0),
             (5, kick_pose(side, 0, wind=1.0), -0.02),
-            (CONTACT_FRAME, kick_pose(side, 1.0), -0.03),
+            (CONTACT_FRAME, kick_pose(side, 1.0, follow=0.35), -0.03),
             (13, kick_pose(side, 1.0, follow=1.0), -0.03),
             (24, kick_pose(side, 0), 0.0),
         ])

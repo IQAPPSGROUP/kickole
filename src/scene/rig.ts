@@ -96,12 +96,26 @@ export interface StateResult {
   state: AnimationState;
   /** Changes every time a one-shot foot action starts so a repeated kick restarts its clip. */
   token: number;
-  /** Freeze the clip at its contact pose (foot stall: the ball is balanced on the foot). */
-  hold?: boolean;
+  /** For Kick states: the exact clip time (s) to display, derived from the engine so the foot meets the ball when physics does. */
+  clipTime?: number;
 }
 
-const KICK_WINDOW = 0.35;
+const KICK_POST_CONTACT = 0.35;
 const CELEBRATE_WINDOW = 0.8;
+
+/**
+ * Clip time for a kick on `side`. The clip starts KICK_CLIP_START after 0 at the tap, reaches its 0.30 s contact frame
+ * when the engine responds (tap + contactDelay), is held on that frame while the ball is trapped (foot stall) and plays
+ * on from it once the ball is released. Purely a function of engine state, so it is deterministic and testable.
+ */
+export function kickClipTime(engine: GameEngine, side: Side): number {
+  const t = engine.time;
+  const sinceTap = t - engine.lastKick[side];
+  const c = engine.contact;
+  if (c && c.side === side) return Math.min(KICK_CLIP_START + Math.max(0, sinceTap), KICK_CLIP_CONTACT_TIME);
+  if (engine.lastContact[side] >= engine.lastKick[side]) return KICK_CLIP_CONTACT_TIME + Math.max(0, t - engine.lastContact[side]);
+  return KICK_CLIP_START + Math.max(0, sinceTap);
+}
 
 /** Choose the animation state from engine state. Deterministic and independent of rendering. */
 export function selectAnimationState(engine: GameEngine): StateResult {
@@ -117,9 +131,13 @@ export function selectAnimationState(engine: GameEngine): StateResult {
   if (phase === 'menu') return { state: 'Idle', token: 0 };
   if (phase === 'ready') return { state: 'Idle', token: 0 };
 
+  const kickState = side === 'left' ? 'KickLeft' : 'KickRight';
   const c = engine.contact;
-  if (c && c.kind === 'stall') return { state: c.side === 'left' ? 'KickLeft' : 'KickRight', token, hold: true };
-  if (t - lastKick >= 0 && t - lastKick < KICK_WINDOW) return { state: side === 'left' ? 'KickLeft' : 'KickRight', token };
+  if (c) return { state: kickState, token, clipTime: kickClipTime(engine, c.side) };
+  const sinceTap = t - lastKick;
+  const lastContact = engine.lastContact[side];
+  const sinceEnd = lastContact >= lastKick ? t - lastContact : sinceTap;
+  if (sinceTap >= 0 && sinceEnd < KICK_POST_CONTACT) return { state: kickState, token, clipTime: kickClipTime(engine, side) };
   const sincePerfect = t - engine.lastPerfectTime;
   if (sincePerfect >= 0 && sincePerfect < CELEBRATE_WINDOW) return { state: 'Celebrate', token: Math.round(engine.lastPerfectTime * 1000) };
   return { state: 'Idle', token: 0 };

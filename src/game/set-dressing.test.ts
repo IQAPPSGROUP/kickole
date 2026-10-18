@@ -11,7 +11,6 @@ describe('set dressing', () => {
       const bird = birdPose(time);
       expect(outsideKickCircle(ball.x, ball.z)).toBe(true);
       expect(ball.x).toBeLessThanOrEqual(-1.7);
-      expect(ball.z).toBeGreaterThan(1.6);
       expect(outsideKickCircle(bird.x, bird.z)).toBe(true);
     }
     for (const scene of [CROWD.beach, CROWD.rua]) {

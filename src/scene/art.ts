@@ -11,7 +11,7 @@ export const ART = {
 } as const;
 
 function isMagenta(r: number, g: number, b: number): boolean {
-  return r > 170 && b > 170 && g < 110 && r - g > 70 && b - g > 70;
+  return r > 145 && b > 120 && g < 150 && r > g + 35 && b > g + 25;
 }
 
 function cutout(img: HTMLImageElement): CanvasTexture {

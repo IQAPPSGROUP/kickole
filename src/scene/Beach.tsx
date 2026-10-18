@@ -201,7 +201,7 @@ function Seagull({ art }: { art: CanvasTexture | null }) {
   return (
     <group ref={group}>
       <mesh>
-        <planeGeometry args={[1.55, 1.05]} />
+        <planeGeometry args={[1.7, 1.15]} />
         <meshStandardMaterial map={art ?? undefined} color={art ? '#ffffff' : '#f7f5ed'} transparent alphaTest={0.25} side={DoubleSide} roughness={0.8} fog={false} />
       </mesh>
     </group>

@@ -27,8 +27,8 @@ export function beachBallPose(time: number): PropPose {
   const loop = Math.floor(safe / BEACH_BALL_LOOP);
   const u = (safe - loop * BEACH_BALL_LOOP) / BEACH_BALL_LOOP;
   const inward = u < 0.55 ? u / 0.55 : 1 - (u - 0.55) / 0.45;
-  const x = -(BEACH_BALL_INNER_X + (1 - inward) * 1.6);
-  const z = 1.68;
+  const x = -(BEACH_BALL_INNER_X + (1 - inward) * 0.9);
+  const z = -0.45;
   const bounce = Math.abs(Math.sin(inward * Math.PI * 3));
   const y = 0.28 + bounce * (0.35 + inward * 0.7);
   return { x, y, z, spin: safe * 3.4, loop };
@@ -39,9 +39,9 @@ export function birdPose(time: number): { x: number; y: number; z: number; flap:
   const loop = 16;
   const u = ((time % loop) + loop) % loop / loop;
   return {
-    x: -3.2 + u * 6.4,
-    y: 3.05 + Math.sin(u * Math.PI * 2) * 0.16,
-    z: -3.15,
+    x: -2.15 + u * 2.05,
+    y: 2.55 + Math.sin(u * Math.PI * 2) * 0.1,
+    z: -3.25,
     flap: Math.sin(time * 9),
   };
 }

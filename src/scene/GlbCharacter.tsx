@@ -48,8 +48,8 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     };
   }, [gltf]);
 
-  const usable = report.missingBones.length === 0 || report.missingClips.length < ANIMATION_STATES.length;
   const useClips = report.missingClips.length === 0;
+  const usable = useClips || report.missingBones.length === 0;
 
   useEffect(() => {
     if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); }

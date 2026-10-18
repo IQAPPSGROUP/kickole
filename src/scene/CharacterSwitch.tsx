@@ -10,10 +10,12 @@ type Status = 'checking' | 'available' | 'missing';
 /** True only when the URL really serves a binary glTF (dev servers return index.html for unknown paths). */
 async function modelExists(url: string): Promise<boolean> {
   try {
-    const res = await fetch(url, { cache: 'force-cache' });
-    if (!res.ok) return false;
-    const head = new Uint8Array((await res.arrayBuffer()).slice(0, 4));
-    return String.fromCharCode(...head) === 'glTF';
+    const res = await fetch(url, { headers: { Range: 'bytes=0-3' } });
+    if (!res.ok || !res.body) return false;
+    const reader = res.body.getReader();
+    const { value } = await reader.read();
+    void reader.cancel();
+    return !!value && String.fromCharCode(...value.slice(0, 4)) === 'glTF';
   } catch {
     return false;
   }

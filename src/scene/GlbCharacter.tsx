@@ -8,7 +8,7 @@ import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
 import {
-  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, resolveBoneName, selectAnimationState, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 
@@ -16,7 +16,8 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void }
 
 /**
  * Rigged GLB footballer (see docs/CHARACTER_GLB.md). Plays the named clips when present, otherwise drives the
- * contract bones from the shared procedural pose. Reports an invalid model so the primitive fallback is used.
+ * contract bones from the shared procedural pose. Accepts Mixamo-style names or Freddie/UE aliases (with L/R swap).
+ * Reports an invalid model so the primitive fallback is used.
  */
 export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   const gltf = useGLTF(CHARACTER_MODEL_URL);
@@ -26,18 +27,28 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     const mats = new Map<string, MeshStandardMaterial>();
     const boneNames: string[] = [];
     const matNames: string[] = [];
+    const byName = new Map<string, Bone>();
     root.traverse((o) => {
       if ((o as Bone).isBone) {
         boneNames.push(o.name);
-        (Object.keys(BONE_NAMES) as BoneKey[]).forEach((k) => { if (BONE_NAMES[k] === o.name) boneMap[k] = o as Bone; });
+        byName.set(o.name, o as Bone);
       }
-      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean };
+      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean; receiveShadow?: boolean };
       if (mesh.isMesh && mesh.material) {
         mesh.castShadow = true;
+        mesh.receiveShadow = true;
         const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         const cloned = list.map((m) => m.clone());
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
         cloned.forEach((m) => { matNames.push(m.name); if ((m as MeshStandardMaterial).isMeshStandardMaterial) mats.set(m.name, m as MeshStandardMaterial); });
+      }
+    });
+    const present = new Set(boneNames);
+    (Object.keys(BONE_NAMES) as BoneKey[]).forEach((k) => {
+      const name = resolveBoneName(k, present);
+      if (name) {
+        const bone = byName.get(name);
+        if (bone) boneMap[k] = bone;
       }
     });
     return {
@@ -60,12 +71,15 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   useEffect(() => {
     const colors = skinMaterialColors(skin);
     materials.forEach((m, name) => {
+      // Eyes stay authored; textured Skin/Hair only multiply the map (best-effort tint).
+      if (name === 'Eyes') return;
       if (colors[name]) m.color.set(colors[name]);
       // Matte cloth / skin, slightly glossy boots; a faint self-glow keeps shaded sides from going muddy.
       const boots = name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole;
-      m.roughness = boots ? 0.45 : 0.72;
+      const texturedBody = name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair;
+      m.roughness = boots ? 0.45 : texturedBody ? (name === MATERIAL_NAMES.hair ? 0.88 : 0.82) : 0.72;
       m.metalness = 0;
-      m.emissive.copy(m.color).multiplyScalar(0.12);
+      m.emissive.copy(m.color).multiplyScalar(texturedBody ? 0.04 : 0.12);
     });
   }, [skin, materials]);
 

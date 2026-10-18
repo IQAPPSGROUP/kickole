@@ -52,7 +52,7 @@ Not done: Capacitor projects, purchases (skin `productId` is a placeholder), tun
 
 ## Character model
 
-The bundled procedural footballer uses a skinned GLB with five animations and follows [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). It loads from `public/models/kicky-player-rigged.glb` by default. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
+The default footballer is Freddie Quaternius v2 (`public/models/kickole_player_v2.glb`) with UE bone aliases and procedural posing until clips exist — see [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md) and [`docs/FREDDIE_CHARACTER_MODELS.md`](docs/FREDDIE_CHARACTER_MODELS.md). Set `VITE_CHARACTER_MODEL=models/kicky-player-rigged.glb` for the legacy procedural asset with five clips, or `VITE_USE_GLB_CHARACTER=false` for the primitive character. Invalid or missing models also fall back safely.
 
 ## Animation inspector (development only)
 Run `VITE_USE_GLB_CHARACTER=true npm run dev` and open `http://localhost:5173/?inspect`. The panel lets you choose the foot,

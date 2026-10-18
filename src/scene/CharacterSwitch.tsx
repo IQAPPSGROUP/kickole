@@ -29,8 +29,10 @@ class GlbBoundary extends Component<{ children: ReactNode; fallback: ReactNode; 
 }
 
 /**
- * Uses the rigged GLB footballer unless VITE_USE_GLB_CHARACTER=false, provided /models/kicky-player-rigged.glb exists and matches the rig contract,
- * otherwise the built-in primitive character.
+ * Uses the rigged GLB footballer unless VITE_USE_GLB_CHARACTER=false, provided the configured
+ * CHARACTER_MODEL_URL (default `models/kickole_player_v2.glb`) exists and matches the rig contract
+ * (Mixamo names or Freddie/UE aliases), otherwise the built-in primitive character.
+ * Set VITE_CHARACTER_MODEL=models/kicky-player-rigged.glb for the legacy procedural asset.
  */
 export function CharacterSwitch({ engine, skin }: { engine: GameEngine; skin: Skin }) {
   const [status, setStatus] = useState<Status>(USE_GLB_CHARACTER ? 'checking' : 'missing');

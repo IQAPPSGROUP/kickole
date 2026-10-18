@@ -155,6 +155,18 @@ describe('GLB rig contract', () => {
     expect(partial.missingMaterials).toContain('Hair');
   });
 
+  it('accepts Freddie/UE bone aliases with L/R swap as satisfying the bone contract', () => {
+    const ue = [
+      'pelvis', 'spine_01', 'Head',
+      'upperarm_r', 'upperarm_l',
+      'thigh_r', 'thigh_l', 'calf_r', 'calf_l', 'foot_r', 'foot_l',
+    ];
+    const report = validateModel(ue, [], Object.values(MATERIAL_NAMES));
+    expect(report.missingBones).toEqual([]);
+    expect(report.missingClips).toEqual([...ANIMATION_STATES]);
+    expect(report.missingMaterials).toEqual([]);
+  });
+
   it('provides a colour for every contract material in every skin', () => {
     for (const skin of SKINS) {
       const colors = skinMaterialColors(skin);

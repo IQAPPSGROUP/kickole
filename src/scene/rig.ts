@@ -10,8 +10,16 @@ import type { Skin } from '../game/skins';
 /** Use the bundled GLB by default; VITE_USE_GLB_CHARACTER=false selects the primitive fallback. */
 export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER !== 'false';
 
+/**
+ * Default gameplay model (Freddie Quaternius v2). Override with VITE_CHARACTER_MODEL
+ * (path under public/, e.g. `models/kicky-player-rigged.glb`) to use the legacy procedural GLB.
+ */
+export const DEFAULT_CHARACTER_MODEL = 'models/kickole_player_v2.glb';
+
 /** Where the model is expected. If the file is missing or invalid the primitive character is used. */
-export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kicky-player-rigged.glb`;
+export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}${(
+  (import.meta.env.VITE_CHARACTER_MODEL as string | undefined) ?? DEFAULT_CHARACTER_MODEL
+).replace(/^\//, '')}`;
 
 /** Named animation states. Each maps to an animation clip with exactly this name in the GLB. */
 export const ANIMATION_STATES = ['Idle', 'KickLeft', 'KickRight', 'Miss', 'Celebrate'] as const;
@@ -32,7 +40,7 @@ export const KICK_CLIP_CONTACT_TIME = 0.3;
  */
 export const KICK_CLIP_START = KICK_CLIP_CONTACT_TIME - KICK_CONTACT_TIME;
 
-/** Bone names the model must provide for procedural (pose-driven) animation. */
+/** Preferred Mixamo-style bone names (docs/CHARACTER_GLB.md). */
 export const BONE_NAMES = {
   root: 'Hips',
   spine: 'Spine',
@@ -47,6 +55,30 @@ export const BONE_NAMES = {
   footRight: 'Foot_R',
 } as const;
 export type BoneKey = keyof typeof BONE_NAMES;
+
+/**
+ * Accepted names per contract bone, first match wins.
+ * Freddie/Quaternius UE bones use anatomical `_l`/`_r` where anatomical left is world +X while facing +Z;
+ * the game’s `_L` is world −X, so UE sides are swapped relative to the Mixamo-style contract names.
+ */
+export const BONE_NAME_ALIASES: Record<BoneKey, readonly string[]> = {
+  root: ['Hips', 'pelvis'],
+  spine: ['Spine', 'spine_01'],
+  head: ['Head'],
+  armLeft: ['UpperArm_L', 'upperarm_r'],
+  armRight: ['UpperArm_R', 'upperarm_l'],
+  thighLeft: ['UpperLeg_L', 'thigh_r'],
+  thighRight: ['UpperLeg_R', 'thigh_l'],
+  shinLeft: ['LowerLeg_L', 'calf_r'],
+  shinRight: ['LowerLeg_R', 'calf_l'],
+  footLeft: ['Foot_L', 'foot_r'],
+  footRight: ['Foot_R', 'foot_l'],
+};
+
+/** Resolve the actual bone node name present in a model for a contract bone key. */
+export function resolveBoneName(key: BoneKey, present: ReadonlySet<string>): string | undefined {
+  return BONE_NAME_ALIASES[key].find((n) => present.has(n));
+}
 
 /** Material names the model must use; skins recolour them. */
 export const MATERIAL_NAMES = {
@@ -80,13 +112,15 @@ export interface ModelReport {
   missingMaterials: string[];
 }
 
-/** Compare what a loaded model provides with the contract. */
+/** Compare what a loaded model provides with the contract (bone aliases count as present). */
 export function validateModel(bones: Iterable<string>, clips: Iterable<string>, materials: Iterable<string>): ModelReport {
   const b = new Set(bones);
   const c = new Set(clips);
   const m = new Set(materials);
   return {
-    missingBones: Object.values(BONE_NAMES).filter((n) => !b.has(n)),
+    missingBones: (Object.keys(BONE_NAMES) as BoneKey[])
+      .filter((k) => !resolveBoneName(k, b))
+      .map((k) => BONE_NAMES[k]),
     missingClips: ANIMATION_STATES.filter((n) => !c.has(n)),
     missingMaterials: Object.values(MATERIAL_NAMES).filter((n) => !m.has(n)),
   };

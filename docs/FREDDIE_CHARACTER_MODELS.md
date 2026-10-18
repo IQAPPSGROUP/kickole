@@ -1,6 +1,9 @@
 # Freddie character models (Quaternius CC0)
 
-Branch `freddie/character-models`. These files do **not** replace `public/models/kicky-player-rigged.glb`; no game code was changed.
+Gameplay default is now `public/models/kickole_player_v2.glb` (see `CHARACTER_MODEL_URL` / `VITE_CHARACTER_MODEL` in
+`src/scene/rig.ts`). Bone aliases + L/R swap live in `BONE_NAME_ALIASES`. Clips are still missing — the game uses the
+procedural pose path until Idle/Kick/Miss/Celebrate are authored. Legacy procedural GLB remains at
+`public/models/kicky-player-rigged.glb`.
 
 Licence: Quaternius Universal Base Characters [Standard], **CC0 1.0** (see `public/models/LICENSE.txt`).
 

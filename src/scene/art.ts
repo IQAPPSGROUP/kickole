@@ -10,8 +10,11 @@ export const ART = {
   spectator: `${import.meta.env.BASE_URL}art/spectator.jpg`,
 } as const;
 
-function isMagenta(r: number, g: number, b: number): boolean {
-  return r > 145 && b > 120 && g < 150 && r > g + 35 && b > g + 25;
+function nearBackdrop(r: number, g: number, b: number, bgR: number, bgG: number, bgB: number): boolean {
+  const dr = r - bgR;
+  const dg = g - bgG;
+  const db = b - bgB;
+  return dr * dr + dg * dg + db * db < 90 * 90;
 }
 
 function cutout(img: HTMLImageElement): CanvasTexture {
@@ -26,8 +29,11 @@ function cutout(img: HTMLImageElement): CanvasTexture {
   g.drawImage(img, 0, 0);
   const frame = g.getImageData(0, 0, canvas.width, canvas.height);
   const px = frame.data;
+  const bgR = px[0];
+  const bgG = px[1];
+  const bgB = px[2];
   for (let i = 0; i < px.length; i += 4) {
-    if (isMagenta(px[i], px[i + 1], px[i + 2])) px[i + 3] = 0;
+    if (nearBackdrop(px[i], px[i + 1], px[i + 2], bgR, bgG, bgB)) px[i + 3] = 0;
   }
   g.putImageData(frame, 0, 0);
   texture.needsUpdate = true;

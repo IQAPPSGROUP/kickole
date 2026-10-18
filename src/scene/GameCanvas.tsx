@@ -12,6 +12,7 @@ import { Ball } from './Ball';
 import { Beach } from './Beach';
 import { Court } from './Court';
 import { Effects } from './Effects';
+import { celebrateOffset } from './camera-motion';
 import { inspector } from './inspector';
 import { fx } from './fx';
 
@@ -22,8 +23,8 @@ const FOV = 40;
 const BASE = new Vector3();
 const LOOK = new Vector3();
 
-/** Three-quarter front camera that fits the play area in portrait and landscape, with kick push-in and shake. */
-function CameraRig({ shake }: { shake: boolean }) {
+/** Three-quarter front camera. Low still pushes and lifts; shake and the wider orbit start at Medium. */
+function CameraRig({ quality }: { quality: Quality }) {
   const { camera, size } = useThree();
   useEffect(() => {
     const cam = camera as PerspectiveCamera;
@@ -37,29 +38,45 @@ function CameraRig({ shake }: { shake: boolean }) {
     cam.updateProjectionMatrix();
   }, [camera, size]);
   useFrame((state, dt) => {
-    fx.push = Math.max(0, fx.push - dt * 3);
-    fx.shake = Math.max(0, fx.shake - dt * 4);
-    if (!shake || BASE.lengthSq() === 0) return;
+    const step = Math.min(dt, 0.05);
+    fx.push = Math.max(0, fx.push - step * 2.2);
+    fx.shake = Math.max(0, fx.shake - step * 4);
+    fx.celebrate = Math.max(0, fx.celebrate - step * 0.42);
+    fx.sway *= Math.exp(-step * 2.2);
+    if (BASE.lengthSq() === 0) return;
     const t = state.clock.elapsedTime;
-    LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
-    camera.position.copy(BASE).add(LOOK);
-    camera.position.x += Math.sin(t * 55) * 0.015 * fx.shake;
-    camera.position.y += Math.cos(t * 63) * 0.015 * fx.shake;
-    camera.lookAt(TARGET);
+    const motion = celebrateOffset(fx.celebrate, t, quality);
+    const yaw = motion.yaw + fx.sway * (quality === 'low' ? 0.03 : 0.07);
+    const offsetX = BASE.x - TARGET.x;
+    const offsetZ = BASE.z - TARGET.z;
+    const c = Math.cos(yaw);
+    const s = Math.sin(yaw);
+    const dolly = 1 - fx.push * (quality === 'low' ? 0.04 : 0.06) - motion.dolly;
+    camera.position.set(
+      TARGET.x + (offsetX * c - offsetZ * s) * dolly,
+      BASE.y + motion.lift,
+      TARGET.z + (offsetX * s + offsetZ * c) * dolly,
+    );
+    if (quality !== 'low') {
+      camera.position.x += Math.sin(t * 55) * 0.02 * fx.shake;
+      camera.position.y += Math.cos(t * 63) * 0.016 * fx.shake;
+    }
+    LOOK.set(TARGET.x, TARGET.y + motion.lift * 0.35, TARGET.z);
+    camera.lookAt(LOOK);
   });
   return null;
 }
 
 /** Soft image-based lighting from a procedural room (no external HDR download). */
-function Environment() {
+function Environment({ intensity }: { intensity: number }) {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pm = new PMREMGenerator(gl);
     const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = 0.35;
+    scene.environmentIntensity = intensity;
     return () => { scene.environment = null; env.dispose(); pm.dispose(); };
-  }, [gl, scene]);
+  }, [gl, scene, intensity]);
   return null;
 }
 
@@ -76,12 +93,12 @@ interface SceneProps {
   onReady: () => void;
 }
 
-function Playground({ scene, shadows }: { scene: GameScene; shadows: boolean }) {
+function Playground({ scene, shadows, quality }: { scene: GameScene; shadows: boolean; quality: Quality }) {
   switch (scene.id) {
     case 'beach':
       return <Beach shadows={shadows} />;
     case 'rua':
-      return <Court shadows={shadows} />;
+      return <Court shadows={shadows} quality={quality} />;
     default: {
       const exhaustive: never = scene;
       return exhaustive;
@@ -96,8 +113,11 @@ function StreetGlow({ scene, quality }: { scene: GameScene; quality: Quality }) 
     case 'rua':
       return (
         <>
-          <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
-          {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
+          <directionalLight position={[-4.2, 3.4, 5.2]} intensity={0.55} color="#d7eeff" />
+          <pointLight position={[-3.3, 3.4, -2.3]} intensity={quality === 'low' ? 4 : 8} color="#ffe2b0" distance={14} decay={2} />
+          <pointLight position={[3.3, 3.4, -2.3]} intensity={quality === 'low' ? 3 : 6} color="#fff1d4" distance={13} decay={2} />
+          {quality !== 'low' && <pointLight position={[0.2, 1.7, 2.8]} intensity={1.6} color="#9adfff" distance={8} decay={2} />}
+          {quality === 'high' && <pointLight position={[2.2, 1.15, 0.2]} intensity={2.2} color="#ff8d62" distance={6} decay={2} />}
         </>
       );
     default: {
@@ -116,8 +136,8 @@ function World({ controller, skin, quality, sceneId, onReady }: SceneProps) {
     <>
       <color key={scene.id} attach="background" args={[scene.sky]} />
       <fog key={`${scene.id}-fog`} attach="fog" args={[scene.sky, scene.fogNear, scene.fogFar]} />
-      <CameraRig shake={quality !== 'low'} />
-      {quality === 'high' && <Environment />}
+      <CameraRig quality={quality} />
+      {quality === 'high' && <Environment intensity={scene.id === 'rua' ? 0.55 : 0.38} />}
       <Simulation controller={controller} />
       <hemisphereLight args={[scene.hemiSky, scene.hemiGround, scene.hemi]} />
       <ambientLight intensity={scene.ambient} />
@@ -127,17 +147,18 @@ function World({ controller, skin, quality, sceneId, onReady }: SceneProps) {
         color={scene.sun}
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}
-        shadow-camera-left={-3}
-        shadow-camera-right={3}
-        shadow-camera-top={4}
-        shadow-camera-bottom={-3}
-        shadow-camera-near={1}
-        shadow-camera-far={14}
-        shadow-bias={-0.0004}
-        shadow-radius={4}
+        shadow-camera-left={-4.6}
+        shadow-camera-right={4.6}
+        shadow-camera-top={4.6}
+        shadow-camera-bottom={-4.4}
+        shadow-camera-near={0.5}
+        shadow-camera-far={16}
+        shadow-bias={-0.00035}
+        shadow-normalBias={0.025}
+        shadow-radius={quality === 'high' ? 2.5 : 1.5}
       />
       <StreetGlow scene={scene} quality={quality} />
-      <Playground scene={scene} shadows={shadows} />
+      <Playground scene={scene} shadows={shadows} quality={quality} />
       {shadows && quality === 'high' && (
         <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color={scene.shadow} />
       )}

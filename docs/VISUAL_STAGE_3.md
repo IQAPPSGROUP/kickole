@@ -17,3 +17,8 @@
 - At 320x568 the score panel still touches the top of the sign.
 - Landscape game-over card was only partly visible in the montage crop; layout checked numerically (no overflow) not by full-frame review.
 - Real iPhone/Android performance and safe-area behaviour unverified.
+
+## Stage 4A follow-up
+- Short portrait screens (<=700 px tall): score panel compacted (YOUR RUN label hidden, 42 px score). At 320x568 the panel now ends at y=72 (+6 px shadow) while the sign's dark area starts at y~96 (pixel-measured in a Low-quality capture), up from a 93 px panel that touched the sign.
+- `tools/check-layout.mjs` (dev tool, needs puppeteer-core + Chromium, not a dependency) asserts for 320x568 / 390x844 / 844x390 at Low/Medium/High: no page overflow, settings DONE reachable, game-over card fully on screen without scrolling, portrait score panel height, no page errors. Result: 9/9 PASS, PNGs saved.
+- Landscape game-over (844x390): card is y=59..331, no clipping or scrolling (measured). **Not visually reviewed**: my image-viewing allowance for the session was used up, so the new captures, including Medium, were checked by measurement only, not by eye.

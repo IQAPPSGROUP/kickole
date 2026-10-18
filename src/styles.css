@@ -171,9 +171,10 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .stats b { color: #f7f5ed; }
 .zone span { box-shadow: 0 3px 0 #0a1b20; }
 @media (max-height: 700px) and (orientation: portrait) {
-  .hud-top { margin-top: 6px; padding: 6px 12px; min-width: 110px; }
-  .score { font-size: clamp(36px, 11vw, 48px); }
-  .score-label { margin-bottom: 0; }
+  .hud-top { margin-top: 4px; padding: 4px 12px 5px; min-width: 104px; }
+  .score { font-size: clamp(34px, 10vw, 42px); }
+  .score-label { display: none; }
+  .hud-sub { margin-top: 2px; }
   .final { font-size: 56px; }
   .card { padding: 16px; gap: 8px; }
 }

@@ -1,0 +1,64 @@
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { GameController } from '../game/controller';
+import { GameCanvas } from '../scene/GameCanvas';
+import { Hud, TouchZones } from './Hud';
+import { Home, GameOver, SettingsScreen } from './Screens';
+
+export function App() {
+  const controller = useMemo(() => new GameController(), []);
+  const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
+  const [showSettings, setShowSettings] = useState(false);
+  if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
+  const { phase } = snap.hud;
+
+  useEffect(() => {
+    const keys: Record<string, 'left' | 'right'> = { KeyA: 'left', KeyD: 'right' };
+    const down = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      if (e.code === 'Space') {
+        if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
+        e.preventDefault();
+        if (!showSettings) controller.action();
+      } else if (keys[e.code] && !showSettings) {
+        controller.press(keys[e.code]);
+      }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') controller.release('right');
+      else if (keys[e.code]) controller.release(keys[e.code]);
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [controller, showSettings]);
+
+  return (
+    <div className="app" onContextMenu={(e) => e.preventDefault()}>
+      <GameCanvas controller={controller} skin={snap.skin} quality={snap.settings.quality} />
+      {phase === 'menu' && !showSettings && (
+        <Home best={snap.save.best} onPlay={() => controller.play()} onSettings={() => setShowSettings(true)} />
+      )}
+      {phase !== 'menu' && <Hud hud={snap.hud} />}
+      {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
+      {phase === 'over' && snap.result && (
+        <GameOver
+          result={snap.result}
+          best={snap.save.best}
+          leaderboard={snap.save.leaderboard}
+          onAgain={() => controller.play()}
+          onHome={() => controller.home()}
+        />
+      )}
+      {showSettings && (
+        <SettingsScreen
+          settings={snap.settings}
+          onChange={(p) => controller.updateSettings(p)}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+    </div>
+  );
+}

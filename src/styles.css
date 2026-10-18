@@ -153,7 +153,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .home-help { font-size: 9px; text-align: center; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
   .score { font-size: 44px; }
-  .feedback { left: auto; right: 12px; top: 24px; width: 26%; font-size: 28px; }
+  .feedback { left: auto; right: max(12px, env(safe-area-inset-right)); top: 24px; width: 26%; font-size: 28px; }
   .tap-start { bottom: 15%; font-size: 24px; }
   .zone { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }

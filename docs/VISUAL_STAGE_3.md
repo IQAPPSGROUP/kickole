@@ -22,3 +22,10 @@
 - Short portrait screens (<=700 px tall): score panel compacted (YOUR RUN label hidden, 42 px score). At 320x568 the panel now ends at y=72 (+6 px shadow) while the sign's dark area starts at y~96 (pixel-measured in a Low-quality capture), up from a 93 px panel that touched the sign.
 - `tools/check-layout.mjs` (dev tool, needs puppeteer-core + Chromium, not a dependency) asserts for 320x568 / 390x844 / 844x390 at Low/Medium/High: no page overflow, settings DONE reachable, game-over card fully on screen without scrolling, portrait score panel height, no page errors. Result: 9/9 PASS, PNGs saved.
 - Landscape game-over (844x390): card is y=59..331, no clipping or scrolling (measured). **Not visually reviewed**: my image-viewing allowance for the session was used up, so the new captures, including Medium, were checked by measurement only, not by eye.
+
+## Stage 4B
+- Remote branch confirmed to contain 68c3389.
+- `tools/check-layout.mjs`: 9/9 PASS again (Low/Medium/High x 320x568, 390x844, 844x390). Montages were generated, but **the image viewer's per-session limit was hit before any screenshot could be opened, so no visual check is marked as passed**. Overlap/clipping results above are DOM measurements and one pixel-row measurement only. Someone must open the PNGs written by the tool.
+- Safe-area review (code only, `viewport-fit=cover` is set): top inset on `.screen`/`.hud`, bottom inset on touch-zone labels and cards, left/right insets on landscape home and score panel. Fixed: the landscape timing-feedback text now respects the right inset. Browser emulation reports insets of 0, so notch/home-indicator behaviour is **not verified on a device**.
+- Touch targets: buttons/toggles >= 44-52 px, touch zones are full half-screens. Not tested on real Android/iOS hardware.
+- Performance/asset loading: single JS bundle 1,258 kB (348 kB gzip), 172 KB GLB, no external assets; no frame-rate measurement is meaningful in software rendering.

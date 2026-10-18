@@ -91,3 +91,5 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .zone span { font-size: 12px; font-weight: 800; letter-spacing: 3px; color: var(--white); opacity: .28; pointer-events: none; }
 .zone:active { background: rgba(247,245,237,.05); }
 .zone.left { border-right: 1px dashed rgba(247,245,237,.12); }
+
+.vignette { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(5,22,27,.55) 100%); }

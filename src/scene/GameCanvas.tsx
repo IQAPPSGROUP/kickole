@@ -221,7 +221,12 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
         gl={{ antialias: props.quality !== 'low', powerPreference: 'high-performance' }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
         onCreated={({ gl }) => {
-          gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (mounted.current) setLost(true); });
+          const el = gl.domElement;
+          el.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            // Changing quality remounts the canvas and drops the old context. That event is not a device failure.
+            if (mounted.current && el.isConnected) setLost(true);
+          });
         }}
       >
         <World {...props} onReady={markReady} />

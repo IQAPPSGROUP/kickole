@@ -154,17 +154,18 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     }
   }
 
-  // Celebration after a perfect kick. Arms are up within a few frames; the chest leans back once the kick has followed through.
+  // Celebration after a perfect kick. Arms reach the raised pose quickly and stay there, so they do not rest on the T-pose on the way back down.
   const cel = t - engine.lastPerfectTime;
-  if (cel >= 0 && cel < 1.2 && phase === 'playing') {
-    const k = Math.sin((cel / 1.2) * Math.PI);
-    const armsUp = cel < 0.9 ? Math.min(1, cel / 0.16) : k;
-    out.armLeft = lerp(out.armLeft, 2.65, armsUp);
-    out.armRight = lerp(out.armRight, 2.65, armsUp);
-    out.bodyYaw += Math.sin(cel * 7) * 0.1 * k;
+  if (cel >= 0 && cel < 1.15 && phase === 'playing') {
+    const rise = clamp(cel / 0.08, 0, 1);
+    const fall = cel < 1.02 ? 1 : clamp(1 - (cel - 1.02) / 0.1, 0, 1);
+    const armsUp = Math.min(rise, fall);
+    out.armLeft = lerp(out.armLeft, 2.7, armsUp);
+    out.armRight = lerp(out.armRight, 2.7, armsUp);
+    out.bodyYaw += Math.sin(cel * 7) * 0.1 * armsUp;
     out.bodyY += 0.05 * armsUp + (cel < 0.34 ? Math.sin((cel / 0.34) * Math.PI) * 0.07 : 0);
     out.headPitch = lerp(out.headPitch, -0.28, armsUp);
-    const lean = clamp((cel - 0.28) / 0.3, 0, 1) * k;
+    const lean = clamp((cel - 0.28) / 0.3, 0, 1) * armsUp;
     out.torsoPitch = lerp(out.torsoPitch, -0.08, lean);
   }
 

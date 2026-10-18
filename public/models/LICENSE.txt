@@ -21,3 +21,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+-------------------------------------------------------------------------------
+Third-party CC0 assets
+
+kickole_player_v1.glb (and later kickole_player_v*.glb) are derived from
+Quaternius "Universal Base Characters [Standard]" (Superhero_Male_FullBody,
+Hair_SimpleParted, eyebrows). The pack's License_Standard.txt states:
+
+  CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+  https://creativecommons.org/publicdomain/zero/1.0/
+  Models by @Quaternius  (https://quaternius.com)
+
+The MIT licence above does not apply to these files. Modifications (kit
+geometry, materials, texture conversion) are also dedicated to CC0.

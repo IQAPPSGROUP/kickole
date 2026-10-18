@@ -161,6 +161,12 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     set('shinRight', pose.legs.right.knee, 0, 0);
     set('footLeft', pose.legs.left.foot, 0, 0);
     set('footRight', pose.legs.right.foot, 0, 0);
+    if (inspector.active) {
+      const side = engine.contact?.side
+        ?? (engine.lastKick.left >= engine.lastKick.right ? 'left' : 'right');
+      const foot = bones[side === 'left' ? 'footLeft' : 'footRight'];
+      if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }
+    }
   });
 
   return <primitive object={scene} />;

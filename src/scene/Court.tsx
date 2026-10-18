@@ -24,63 +24,67 @@ function makeCanvas(size: number, draw: (g: CanvasRenderingContext2D, n: number)
   return t;
 }
 
-/** Worn painted tarmac: speckle, scuffs and cracks. */
+/** Procedural grass with subtle alternating mowing stripes. */
 function useCourtTexture() {
   return useMemo(() => {
     const t = makeCanvas(512, (g, n) => {
       const random = seededRandom(81);
-      g.fillStyle = '#26786d';
+      g.fillStyle = '#287443';
       g.fillRect(0, 0, n, n);
-      for (let i = 0; i < 5000; i++) {
-        g.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.10)';
-        g.fillRect(random() * n, random() * n, 1 + random() * 2, 1 + random() * 2);
+      for (let i = 0; i < 8; i++) {
+        g.fillStyle = i % 2 ? '#2d7d47' : '#246c3d';
+        g.fillRect(i * n / 8, 0, n / 8, n);
       }
-      g.strokeStyle = 'rgba(0,0,0,0.25)';
-      g.lineWidth = 1.2;
-      for (let i = 0; i < 6; i++) {
-        let x = random() * n, y = random() * n;
-        g.beginPath(); g.moveTo(x, y);
-        for (let j = 0; j < 6; j++) { x += (random() - 0.5) * 60; y += (random() - 0.5) * 60; g.lineTo(x, y); }
-        g.stroke();
+      for (let i = 0; i < 2500; i++) {
+        g.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.045)';
+        g.fillRect(random() * n, random() * n, 1 + random() * 2, 2 + random() * 5);
       }
-      g.strokeStyle = 'rgba(0,0,0,0.2)';
-      g.lineWidth = 2;
-      g.strokeRect(0, 0, n, n);
     });
     t.wrapS = t.wrapT = RepeatWrapping;
-    t.repeat.set(3, 3);
+    t.repeat.set(1, 1);
     return t;
   }, []);
 }
 
-/** Original painted mural: sun, rolling colour bands and pavement-inspired waves. */
+/** Lightweight dusk sky and softly blurred crowd painted into a single backdrop texture. */
 function useWallTexture() {
   return useMemo(() => makeCanvas(1024, (g, n) => {
     const random = seededRandom(1962);
-    g.fillStyle = '#E8CF9C'; g.fillRect(0, 0, n, n);
-    g.fillStyle = GOLD;
-    g.beginPath(); g.arc(n * .74, n * .30, n * .23, 0, Math.PI * 2); g.fill();
-    for (const [color, y] of [['#D76D4B', .53], ['#168F7A', .67], ['#12594F', .84]] as const) {
-      g.fillStyle = color; g.beginPath(); g.moveTo(0, n * y);
-      g.bezierCurveTo(n * .3, n * (y - .3), n * .55, n * (y + .2), n, n * (y - .1));
-      g.lineTo(n, n); g.lineTo(0, n); g.closePath(); g.fill();
-    }
-    g.strokeStyle = '#F7E9C5'; g.lineWidth = 6;
-    for (let row = 0; row < 3; row++) {
-      g.beginPath();
-      for (let x = 0; x <= n; x += 4) {
-        const y = n * (.87 + row * .04) + Math.sin(x / 52) * 12;
-        if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    const sky = g.createLinearGradient(0, 0, 0, n);
+    sky.addColorStop(0, '#172d46'); sky.addColorStop(0.45, '#52677a'); sky.addColorStop(1, '#e5a56d');
+    g.fillStyle = sky; g.fillRect(0, 0, n, n);
+    g.fillStyle = 'rgba(255,210,145,.55)';
+    g.beginPath(); g.arc(n * .76, n * .33, n * .09, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#263b47';
+    g.fillRect(0, n * .43, n, n * .57);
+    g.fillStyle = '#354c56';
+    g.fillRect(0, n * .49, n, n * .06);
+    g.fillStyle = '#152b35';
+    g.fillRect(0, n * .75, n, n * .25);
+    const colors = ['#f2c18c', '#e9e2ce', '#d97858', '#61b89a', '#e3c84c', '#788fb4'];
+    g.save();
+    g.filter = 'blur(2px)';
+    for (let row = 0; row < 7; row++) {
+      const y = n * (0.51 + row * 0.037);
+      const offset = row % 2 ? 12 : 0;
+      for (let x = -8 + offset; x < n; x += 18) {
+        const cx = x + random() * 7;
+        const cy = y + random() * 8;
+        g.fillStyle = colors[(random() * colors.length) | 0];
+        g.beginPath(); g.arc(cx, cy, 3 + random() * 2, 0, Math.PI * 2); g.fill();
+        g.beginPath();
+        g.ellipse(cx, cy + 9, 6, 7 + random() * 3, 0, 0, Math.PI * 2);
+        g.fill();
       }
-      g.stroke();
     }
-    for (let i = 0; i < 6500; i++) {
-      g.fillStyle = i % 2 ? 'rgba(255,255,255,.10)' : 'rgba(20,45,53,.08)';
-      g.fillRect(random() * n, random() * n, 1 + random() * 3, 1 + random() * 3);
+    g.restore();
+    for (let x = 0; x < n; x += 128) {
+      g.fillStyle = x % 256 ? '#e3a849' : '#d36e50';
+      g.fillRect(x, n * .79, 96, n * .025);
     }
-    const grad = g.createLinearGradient(0, n * .65, 0, n);
-    grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,.28)');
-    g.fillStyle = grad; g.fillRect(0, n * .65, n, n * .35);
+    const shade = g.createLinearGradient(0, 0, 0, n);
+    shade.addColorStop(0, 'rgba(8,20,32,.15)'); shade.addColorStop(1, 'rgba(8,20,32,.45)');
+    g.fillStyle = shade; g.fillRect(0, 0, n, n);
   }), []);
 }
 
@@ -244,10 +248,34 @@ export function Court({ shadows }: { shadows: boolean }) {
         <meshBasicMaterial color={WHITE} />
       </mesh>
       {[-3.4, 3.4].map((x) => (
-        <mesh key={x} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.003, 0]}>
-          <planeGeometry args={[0.06, 9]} />
+        <mesh key={`side-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.003, 0]}>
+          <planeGeometry args={[0.055, 8.2]} />
           <meshBasicMaterial color={WHITE} />
         </mesh>
+      ))}
+      {[-4.1, 4.1].map((z) => (
+        <mesh key={`end-${z}`} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, z]}>
+          <planeGeometry args={[6.85, 0.055]} />
+          <meshBasicMaterial color={WHITE} />
+        </mesh>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
+        <planeGeometry args={[6.85, 0.045]} />
+        <meshBasicMaterial color={WHITE} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <group key={`box-${side}`}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, side * 2.75]}>
+            <planeGeometry args={[2.3, 0.045]} />
+            <meshBasicMaterial color={WHITE} />
+          </mesh>
+          {[-1.15, 1.15].map((x) => (
+            <mesh key={x} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.003, side * 3.4]}>
+              <planeGeometry args={[0.045, 1.35]} />
+              <meshBasicMaterial color={WHITE} />
+            </mesh>
+          ))}
+        </group>
       ))}
       {/* Fake ambient occlusion where the walls meet the floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, -3.3]}>
@@ -255,9 +283,9 @@ export function Court({ shadows }: { shadows: boolean }) {
         <meshBasicMaterial map={blob} transparent opacity={0.8} depthWrite={false} />
       </mesh>
       {/* Back wall */}
-      <mesh position={[0, 1.3, -3.6]} receiveShadow={shadows}>
-        <boxGeometry args={[9, 2.6, 0.2]} />
-        <meshStandardMaterial map={wall} roughness={0.9} />
+      <mesh position={[0, 1.3, -3.6]}>
+        <planeGeometry args={[9, 2.6]} />
+        <meshBasicMaterial map={wall} />
       </mesh>
       <mesh position={[-1.6, 2.02, -3.48]}>
         <planeGeometry args={[3.2, 0.8]} />

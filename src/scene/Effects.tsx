@@ -105,7 +105,7 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       </instancedMesh>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
         <ringGeometry args={[0.16, 0.2, 40]} />
-        <meshBasicMaterial color="#EAF44A" transparent depthWrite={false} />
+        <meshBasicMaterial color="#FFE2A3" transparent depthWrite={false} toneMapped={false} />
       </mesh>
     </>
   );

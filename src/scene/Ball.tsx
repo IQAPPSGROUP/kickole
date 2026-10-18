@@ -1,6 +1,6 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Euler, Matrix4, Quaternion, Vector3, type Group, type Mesh } from 'three';
+import { CanvasTexture, Euler, Matrix4, Quaternion, SRGBColorSpace, Vector3, type Group, type Mesh } from 'three';
 import type { Quality } from '../game/storage';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
@@ -25,8 +25,25 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
   const shadow = useRef<Mesh>(null);
+  const shadowTexture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 128;
+    const context = canvas.getContext('2d');
+    if (context) {
+      const gradient = context.createRadialGradient(64, 64, 3, 64, 64, 64);
+      gradient.addColorStop(0, 'rgba(255,255,255,0.48)');
+      gradient.addColorStop(0.45, 'rgba(255,255,255,0.24)');
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      context.fillStyle = gradient;
+      context.fillRect(0, 0, 128, 128);
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    return texture;
+  }, []);
   const r = engine.config.ballRadius;
   const euler = useMemo(() => new Euler(0, 0, 0, 'XYZ'), []);
+  useEffect(() => () => shadowTexture.dispose(), [shadowTexture]);
 
   const panels = useMemo(() => {
     const m = new Matrix4();
@@ -70,7 +87,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       const s = 1 / (1 + h * 0.9);
       shadow.current.position.set(b.x, 0.012, b.z);
       shadow.current.scale.set(s, s, s);
-      (shadow.current.material as unknown as { opacity: number }).opacity = 0.4 * s;
+      (shadow.current.material as unknown as { opacity: number }).opacity = 0.65 * s;
     }
   });
 
@@ -101,8 +118,8 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
         </mesh>
       ))}
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[r * 1.25, 24]} />
-        <meshBasicMaterial color="#05161b" transparent opacity={0.4} depthWrite={false} />
+        <planeGeometry args={[r * 3.2, r * 3.2]} />
+        <meshBasicMaterial map={shadowTexture} color="#05161b" transparent opacity={0.7} depthWrite={false} />
       </mesh>
     </>
   );

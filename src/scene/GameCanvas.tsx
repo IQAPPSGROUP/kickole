@@ -76,7 +76,7 @@ interface SceneProps {
 function World({ controller, skin, quality, onReady }: SceneProps) {
   const shadows = quality !== 'low';
   useEffect(() => { onReady(); }, [onReady]);
-  const mapSize = quality === 'high' ? 2048 : 1024;
+  const mapSize = quality === 'high' ? 1024 : 512;
   return (
     <>
       <color attach="background" args={['#234F4B']} />
@@ -84,11 +84,10 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <CameraRig shake={quality !== 'low'} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
-      <hemisphereLight args={['#fff1dc', '#12363f', 0.8]} />
-      <ambientLight intensity={0.2} />
+      <hemisphereLight args={['#fff1dc', '#12363f', 0.9]} />
       <directionalLight
         position={[2.5, 6, 4]}
-        intensity={2.3}
+        intensity={2}
         color="#ffe9c7"
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}
@@ -101,8 +100,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         shadow-bias={-0.0004}
         shadow-radius={4}
       />
-      <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
-      {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
+      <pointLight position={[-3, 2.5, 1]} intensity={3.5} color="#FFD18A" distance={9} />
+      {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={3} color="#FFF0D4" distance={8} />}
       <Court shadows={shadows} />
       {shadows && quality === 'high' && (
         <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color="#05161b" />

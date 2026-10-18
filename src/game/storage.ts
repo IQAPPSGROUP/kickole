@@ -43,7 +43,7 @@ function write(key: string, value: unknown) {
 export function loadSave(): SaveData {
   const d = read<SaveData>(SAVE_KEY);
   const lb = Array.isArray(d?.leaderboard)
-    ? d.leaderboard.filter((r) => r && typeof r.score === 'number' && typeof r.kickUps === 'number').slice(0, 5)
+    ? d.leaderboard.filter((r) => r && typeof r.score === 'number' && typeof r.kickUps === 'number' && typeof r.date === 'number').slice(0, 5)
     : [];
   const best = typeof d?.best === 'number' ? d.best : 0;
   return { best: Math.max(best, ...lb.map((r) => r.score), 0), leaderboard: lb };

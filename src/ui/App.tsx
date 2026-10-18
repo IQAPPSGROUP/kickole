@@ -12,19 +12,23 @@ export function App() {
   const { phase } = snap.hud;
 
   useEffect(() => {
+    let spaceDown = false;
     const keys: Record<string, 'left' | 'right'> = { KeyA: 'left', KeyD: 'right' };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
       if (e.code === 'Space') {
         if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
         e.preventDefault();
-        if (!showSettings) controller.action();
+        if (!showSettings) { spaceDown = controller.engine.phase === 'ready'; controller.action(); }
       } else if (keys[e.code] && !showSettings) {
         controller.press(keys[e.code]);
       }
     };
     const up = (e: KeyboardEvent) => {
-      if (e.code === 'Space') controller.release('right');
+      if (e.code === 'Space') {
+        if (spaceDown) controller.release('right');
+        spaceDown = false;
+      }
       else if (keys[e.code]) controller.release(keys[e.code]);
     };
     window.addEventListener('keydown', down);

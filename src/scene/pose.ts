@@ -54,7 +54,7 @@ function solveLeg(side: Side, target: { x: number; y: number; z: number }): LegP
   return {
     thigh: -thighFwd,
     knee,
-    abduct: Math.atan2(dx, d) * (side === 'left' ? 1 : 1),
+    abduct: Math.atan2(dx, d),
     foot: thighFwd - knee + 0.4,
   };
 }

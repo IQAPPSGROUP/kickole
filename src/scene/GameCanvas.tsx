@@ -110,7 +110,10 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   if (!supported) return <GlError message="Your browser or device does not support WebGL. Try updating your browser." />;
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;

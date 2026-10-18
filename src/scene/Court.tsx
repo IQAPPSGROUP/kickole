@@ -1,6 +1,9 @@
 import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
-import { CanvasTexture, CatmullRomCurve3, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace, Vector3 } from 'three';
+import { useFrame } from '@react-three/fiber';
+import { CanvasTexture, CatmullRomCurve3, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace, Vector3, type MeshBasicMaterial, type PointLight } from 'three';
 import type { Quality } from '../game/storage';
+import { fx } from './fx';
+import { Spectators } from './Spectators';
 
 const NAVY = '#142D35';
 const TEAL = '#12BFA6';
@@ -235,6 +238,16 @@ function Poster({ x, y, color, w = 0.7, h = 0.95 }: { x: number; y: number; colo
 }
 
 function Floodlight({ x, z }: { x: number; z: number }) {
+  const lamp = useRef<MeshBasicMaterial>(null);
+  const glow = useRef<MeshBasicMaterial>(null);
+  const bulb = useRef<PointLight>(null);
+  useFrame(({ clock }) => {
+    const shower = fx.shower;
+    const blink = shower > 0 && Math.sin(clock.elapsedTime * 34) > 0.15;
+    if (lamp.current) lamp.current.color.set(blink ? '#5c4e32' : '#fff1c9');
+    if (glow.current) glow.current.opacity = shower > 0 ? (blink ? 0.12 : 0.7) : 0.55;
+    if (bulb.current) bulb.current.intensity = shower > 0 ? (blink ? 0.3 : 7) : 0;
+  });
   return (
     <group position={[x, 0, z]}>
       <mesh position={[0, 1.8, 0]} castShadow>
@@ -247,12 +260,13 @@ function Floodlight({ x, z }: { x: number; z: number }) {
       </mesh>
       <mesh position={[0, 3.58, 0.08]}>
         <boxGeometry args={[0.42, 0.06, 0.04]} />
-        <meshBasicMaterial color="#fff1c9" toneMapped={false} />
+        <meshBasicMaterial ref={lamp} color="#fff1c9" toneMapped={false} />
       </mesh>
       <mesh position={[0, 3.45, 0.2]}>
         <sphereGeometry args={[0.16, 10, 8]} />
-        <meshBasicMaterial color="#ffe7b0" transparent opacity={0.55} toneMapped={false} depthWrite={false} />
+        <meshBasicMaterial ref={glow} color="#ffe7b0" transparent opacity={0.55} toneMapped={false} depthWrite={false} />
       </mesh>
+      <pointLight ref={bulb} position={[0, 3.3, 0.4]} color="#ffe2b0" intensity={0} distance={9} decay={2} />
     </group>
   );
 }
@@ -518,6 +532,7 @@ export function Court({ shadows, quality }: { shadows: boolean; quality: Quality
       {quality !== 'low' && <Festoon bulbs={quality === 'high' ? 22 : 14} />}
       <Floodlight x={-3.8} z={-3.2} />
       <Floodlight x={3.8} z={-3.2} />
+      <Spectators scene="rua" />
     </group>
   );
 }

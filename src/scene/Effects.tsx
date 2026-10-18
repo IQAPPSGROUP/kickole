@@ -24,6 +24,8 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
   const ringT = useRef(1);
   const ringColor = useRef('#EAF44A');
   const colors = useMemo(() => new Float32Array(max * 3), [max]);
+  const burstSeen = useRef(fx.milestoneBurst);
+  const spawnRef = useRef<((n: number, x: number, y: number, z: number, speed: number, gravity: number, life: number, color?: Color) => void) | null>(null);
 
   useEffect(() => {
     const spawn = (n: number, x: number, y: number, z: number, speed: number, gravity: number, life: number, color?: Color) => {
@@ -40,6 +42,7 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
         });
       }
     };
+    spawnRef.current = spawn;
     return engine.on((e) => {
       const b = engine.ball;
       const budget = quality === 'low' ? 0.45 : 1;
@@ -73,6 +76,12 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
 
   useFrame((_, dt) => {
     const d = Math.min(dt, 0.05);
+    if (quality === 'low') burstSeen.current = fx.milestoneBurst;
+    else if (fx.milestoneBurst !== burstSeen.current) {
+      burstSeen.current = fx.milestoneBurst;
+      const b = engine.ball;
+      spawnRef.current?.(20, b.x, b.y + 0.5, b.z, 3.2, 3.2, 1.05, GOLD);
+    }
     const list = parts.current;
     const m = mesh.current;
     for (let i = list.length - 1; i >= 0; i--) {

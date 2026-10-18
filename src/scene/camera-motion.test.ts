@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraKickFor, celebrateOffset } from './camera-motion';
+import { cameraKickFor, celebrateOffset, milestonePush } from './camera-motion';
 
 describe('cameraKickFor', () => {
   const perfect = { grade: 'perfect' as const, stall: false, alternate: false, streak: 1, side: 'left' as const };
@@ -34,5 +34,14 @@ describe('celebrateOffset', () => {
     const high = celebrateOffset(1, 0.4, 'high');
     expect(Math.abs(high.yaw)).toBeGreaterThan(Math.abs(low.yaw));
     expect(high.lift).toBeGreaterThan(low.lift);
+  });
+});
+
+describe('milestonePush', () => {
+  it('keeps a light push on Low and a fuller one on High', () => {
+    expect(milestonePush('low')).toBeGreaterThan(0);
+    expect(milestonePush('low')).toBeLessThan(milestonePush('medium'));
+    expect(milestonePush('medium')).toBeLessThan(milestonePush('high'));
+    expect(milestonePush('high')).toBe(1);
   });
 });

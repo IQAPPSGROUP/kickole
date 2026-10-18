@@ -81,6 +81,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .feedback.poor { color: var(--white); }
 .feedback.miss { color: var(--coral); }
 .feedback.stall { color: var(--lime); }
+.feedback.milestone { color: #F5C94D; }
 @keyframes floatup { 0% { transform: translateY(14px) scale(.6); opacity: 0; } 15% { transform: translateY(0) scale(1.15); opacity: 1; } 70% { opacity: 1; } 100% { transform: translateY(-34px) scale(1); opacity: 0; } }
 .tap-start { position: absolute; left: 0; right: 0; bottom: 14%; text-align: center; font-size: clamp(34px, 10vw, 52px); font-weight: 900; font-style: italic; color: var(--lime); letter-spacing: 2px; text-shadow: 0 4px 0 rgba(0,0,0,.4); animation: pulse 1s ease-in-out infinite; }
 .tap-start small { display: block; font-size: 13px; color: var(--white); font-style: normal; letter-spacing: 2px; opacity: .8; }
@@ -160,7 +161,81 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .feedback { opacity: 1; }
+  .call-foot { opacity: 1; }
 }
+
+.call-foot {
+  position: absolute;
+  top: 36%;
+  z-index: 7;
+  font-size: clamp(44px, 14vw, 78px);
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 3px;
+  pointer-events: none;
+  -webkit-text-stroke: 5px #142d35;
+  paint-order: stroke fill;
+  text-shadow: 0 0 18px currentColor, 4px 4px 0 #142d35;
+}
+.call-foot.left { left: 4%; color: #5dfff0; animation: call-bob 0.65s ease-in-out infinite; }
+.call-foot.right { right: 4%; color: #ffe14a; animation: call-bob 0.65s ease-in-out infinite reverse; }
+@keyframes call-bob {
+  0%, 100% { transform: translateY(0) rotate(-7deg) scale(1); }
+  50% { transform: translateY(-18px) rotate(6deg) scale(1.08); }
+}
+.world-board {
+  width: min(100%, 280px);
+  margin: 0 auto;
+  text-align: left;
+}
+.world-board p { margin: 0 0 4px; font-size: 10px; letter-spacing: 2px; font-weight: 800; color: #f5c94d; }
+.world-board ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.world-board li { display: flex; gap: 8px; align-items: center; background: rgba(247,245,237,.07); border-radius: 8px; padding: 4px 8px; font-size: 12px; }
+.world-board li b { flex: 1; }
+.world-board li span { opacity: .65; font-size: 10px; }
+.world-board li em { font-style: normal; font-weight: 800; }
+.world-board li.you { background: rgba(234,244,74,.22); outline: 2px solid #eaf44a; color: #eaf44a; }
+.world-board small { display: block; margin-top: 4px; font-size: 9px; letter-spacing: 1px; opacity: .7; }
+.world-board.live {
+  position: absolute;
+  top: 8px;
+  left: max(8px, env(safe-area-inset-left));
+  width: 148px;
+  z-index: 6;
+  pointer-events: none;
+  background: rgba(20,45,53,.82);
+  border: 1px solid rgba(245,201,77,.45);
+  border-radius: 10px;
+  padding: 6px 8px 4px;
+}
+.world-board.live ol { position: relative; height: 110px; }
+.world-board.live li {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 20px;
+  transition: top .35s ease;
+}
+.coin-earn { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: 1px; color: #f5c94d; }
+.nick { font: inherit; font-weight: 800; width: 100%; border-radius: 12px; border: 2px solid #f5c94d; background: #0e242b; color: var(--white); padding: 10px 12px; }
+.shop-lead { margin: 0; font-size: 13px; line-height: 1.35; }
+.shop-list { display: flex; flex-direction: column; gap: 8px; }
+.boot {
+  display: flex; gap: 10px; align-items: center; text-align: left;
+  font: inherit; color: var(--white); background: rgba(247,245,237,.08);
+  border: 2px solid transparent; border-radius: 14px; padding: 10px; cursor: pointer;
+}
+.boot i { width: 28px; height: 28px; border-radius: 50%; flex: none; }
+.boot span { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.boot small { font-size: 11px; opacity: .8; font-weight: 600; }
+.boot em { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+.boot.on { border-color: #eaf44a; }
+.boot:disabled { cursor: default; opacity: .72; }
+@media (orientation: landscape) and (max-height: 600px) {
+  .world-board.live { top: auto; bottom: 8px; }
+  .call-foot { top: 18%; font-size: 36px; }
+}
+
 
 /* Stage 3 interface polish */
 .hud-top { background: linear-gradient(#17353d, #102830); box-shadow: 0 6px 0 #0a1b20, 0 12px 22px #0006; }

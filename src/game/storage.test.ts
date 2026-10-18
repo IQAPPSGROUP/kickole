@@ -23,12 +23,12 @@ describe('storage', () => {
 
   it('returns an empty save when nothing is stored', async () => {
     const { loadSave } = await load();
-    expect(loadSave()).toEqual({ best: 0, leaderboard: [] });
+    expect(loadSave()).toEqual({ best: 0, leaderboard: [], coins: 0, ownedBoots: ['street'], equippedBoot: 'street' });
   });
 
   it('survives corrupt JSON', async () => {
     const { loadSave, loadSettings, DEFAULT_SETTINGS } = await load({ 'kicky.save.v1': '{nope', 'kicky.settings.v1': '[[' });
-    expect(loadSave()).toEqual({ best: 0, leaderboard: [] });
+    expect(loadSave()).toEqual({ best: 0, leaderboard: [], coins: 0, ownedBoots: ['street'], equippedBoot: 'street' });
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 
@@ -46,6 +46,7 @@ describe('storage', () => {
     }
     expect(save.leaderboard.map((r) => r.score)).toEqual([70, 60, 50, 40, 30]);
     expect(save.best).toBe(70);
+    expect(save.coins).toBe(280);
     expect(JSON.parse(ls.data['kicky.save.v1']).best).toBe(70);
   });
 
@@ -77,10 +78,13 @@ describe('storage', () => {
     expect(s.vibration).toBe(false);
     expect(s.skinId).toBe('coral-flash');
     expect(s.sceneId).toBe('beach');
+    expect(s.nickname).toBe('Kicky');
     saveSettings({ ...s, quality: 'low', sceneId: 'rua' });
     expect(loadSettings().quality).toBe('low');
     expect(loadSettings().sceneId).toBe('rua');
     saveSettings({ ...loadSettings(), sceneId: 'plaza' as 'rua' });
     expect(loadSettings().sceneId).toBe('beach');
+    saveSettings({ ...loadSettings(), nickname: '  Ana\nB  ' });
+    expect(loadSettings().nickname).toBe('AnaB');
   });
 });

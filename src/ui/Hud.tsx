@@ -1,9 +1,24 @@
 import type { PointerEvent } from 'react';
-import type { GameController, Hud as HudState } from '../game/controller';
+import { calledFootForKick } from '../game/called-foot';
 import type { Side } from '../engine/config';
+import type { GameController, Hud as HudState } from '../game/controller';
+
+function callLabel(call: Side): string {
+  switch (call) {
+    case 'left':
+      return 'LEFT';
+    case 'right':
+      return 'RIGHT';
+    default: {
+      const exhaustive: never = call;
+      return exhaustive;
+    }
+  }
+}
 
 export function Hud({ hud }: { hud: HudState }) {
   const f = hud.feedback;
+  const call = hud.phase === 'playing' ? calledFootForKick(hud.kickUps + 1) : null;
   return (
     <div className="hud">
       <div className="hud-top">
@@ -14,6 +29,7 @@ export function Hud({ hud }: { hud: HudState }) {
           {hud.streak >= 2 && <span className="combo" key={hud.streak}>COMBO x{hud.streak}</span>}
         </div>
       </div>
+      {call && <div className={`call-foot ${call}`}>{callLabel(call)}</div>}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}

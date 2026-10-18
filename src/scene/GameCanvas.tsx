@@ -12,7 +12,7 @@ import { Ball } from './Ball';
 import { Beach } from './Beach';
 import { Court } from './Court';
 import { Effects } from './Effects';
-import { celebrateOffset } from './camera-motion';
+import { celebrateOffset, milestonePush } from './camera-motion';
 import { inspector } from './inspector';
 import { fx } from './fx';
 
@@ -42,19 +42,21 @@ function CameraRig({ quality }: { quality: Quality }) {
     fx.push = Math.max(0, fx.push - step * 2.2);
     fx.shake = Math.max(0, fx.shake - step * 4);
     fx.celebrate = Math.max(0, fx.celebrate - step * 0.42);
+    fx.pulse = Math.max(0, fx.pulse - step * 1.7);
     fx.sway *= Math.exp(-step * 2.2);
     if (BASE.lengthSq() === 0) return;
     const t = state.clock.elapsedTime;
     const motion = celebrateOffset(fx.celebrate, t, quality);
+    const milestone = fx.pulse * milestonePush(quality);
     const yaw = motion.yaw + fx.sway * (quality === 'low' ? 0.03 : 0.07);
     const offsetX = BASE.x - TARGET.x;
     const offsetZ = BASE.z - TARGET.z;
     const c = Math.cos(yaw);
     const s = Math.sin(yaw);
-    const dolly = 1 - fx.push * (quality === 'low' ? 0.04 : 0.06) - motion.dolly;
+    const dolly = 1 - fx.push * (quality === 'low' ? 0.04 : 0.06) - motion.dolly - milestone * 0.06;
     camera.position.set(
       TARGET.x + (offsetX * c - offsetZ * s) * dolly,
-      BASE.y + motion.lift,
+      BASE.y + motion.lift + milestone * (quality === 'low' ? 0.02 : 0.05),
       TARGET.z + (offsetX * s + offsetZ * c) * dolly,
     );
     if (quality !== 'low') {

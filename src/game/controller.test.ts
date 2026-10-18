@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_CONFIG } from '../engine/config';
+import { fx } from '../scene/fx';
+import { CALLED_FOOT_BONUS } from './called-foot';
 
 function fakeStorage() {
   const data: Record<string, string> = {};
@@ -29,6 +32,18 @@ function tickTo(c: Awaited<ReturnType<typeof make>>['c'], ms = 5) {
     c.tick(e.config.fixedStep);
   }
   throw new Error('no contact');
+}
+
+function scoreKick(c: Awaited<ReturnType<typeof make>>['c'], side: 'left' | 'right') {
+  tickTo(c);
+  const before = c.engine.stats.score;
+  let points = 0;
+  const stop = c.engine.on((e) => { if (e.type === 'kick') points = e.points; });
+  c.press(side);
+  c.release(side);
+  c.tick(0.05);
+  stop();
+  return { before, points, after: c.engine.stats.score };
 }
 
 describe('GameController', () => {
@@ -143,5 +158,99 @@ describe('GameController', () => {
     c.release('right');
     expect(c.getSnapshot().hud.stalling).toBe(false);
     expect(c.engine.stats.stalls).toBe(1);
+  });
+
+  it('shows each kick-up milestone once per run and cheers at 5', async () => {
+    const { c } = await make(QUIET);
+    fx.pulse = 0;
+    fx.cheer = 0;
+    fx.milestoneBurst = 0;
+    c.play();
+    c.press('left');
+    c.release('left');
+    const sides = ['right', 'left', 'right', 'left', 'right'] as const;
+    for (const side of sides) scoreKick(c, side);
+    const hud = c.getSnapshot().hud;
+    expect(hud.kickUps).toBe(5);
+    expect(hud.feedback?.kind).toBe('milestone');
+    expect(hud.feedback?.text).toBe('5 KICK-UPS');
+    expect(fx.pulse).toBe(1);
+    expect(fx.cheer).toBe(1);
+    expect(fx.milestoneBurst).toBe(1);
+    const sixth = scoreKick(c, 'left');
+    expect(c.getSnapshot().hud.feedback?.kind).not.toBe('milestone');
+    expect(sixth.after - sixth.before).toBe(sixth.points);
+    c.play();
+    c.press('right');
+    c.release('right');
+    for (const side of sides) scoreKick(c, side);
+    expect(c.getSnapshot().hud.feedback?.text).toBe('5 KICK-UPS');
+  });
+
+  it('adds the called-foot bonus only when the kick matches', async () => {
+    const matched = await make(QUIET);
+    matched.c.play();
+    matched.c.press('right');
+    matched.c.release('right');
+    scoreKick(matched.c, 'left');
+    scoreKick(matched.c, 'right');
+    const hit = scoreKick(matched.c, 'left');
+    expect(matched.c.engine.stats.kickUps).toBe(3);
+    expect(hit.after - hit.before).toBe(hit.points + CALLED_FOOT_BONUS);
+    expect(matched.c.getSnapshot().hud.feedback?.text).toContain('+2');
+
+    const missed = await make(QUIET);
+    missed.c.play();
+    missed.c.press('right');
+    missed.c.release('right');
+    scoreKick(missed.c, 'left');
+    scoreKick(missed.c, 'right');
+    const other = scoreKick(missed.c, 'right');
+    expect(other.after - other.before).toBe(other.points);
+    expect(missed.c.engine.phase).toBe('playing');
+  });
+
+  it('tightens the window during a long combo and restores it when the combo breaks', async () => {
+    const { c } = await make(QUIET);
+    c.play();
+    c.press('left');
+    c.release('left');
+    let side: 'left' | 'right' = 'right';
+    for (let i = 0; i < 8; i++) {
+      scoreKick(c, side);
+      side = side === 'left' ? 'right' : 'left';
+    }
+    expect(c.engine.streak).toBeGreaterThanOrEqual(8);
+    expect(c.engine.config.timing.perfectMs).toBeCloseTo(DEFAULT_CONFIG.timing.perfectMs * 0.92);
+    expect(DEFAULT_CONFIG.timing.perfectMs).toBe(45);
+    c.press('left');
+    expect(c.engine.config.timing.perfectMs).toBe(DEFAULT_CONFIG.timing.perfectMs);
+  });
+
+  it('blocks a boot the player cannot afford and equips one they buy', async () => {
+    const { c } = await make(QUIET);
+    expect(c.buyBoot('samba')).toBe(false);
+    expect(c.getSnapshot().save.equippedBoot).toBe('street');
+    expect(c.getSnapshot().save.coins).toBe(0);
+    c.play();
+    c.press('left');
+    c.release('left');
+    let side: 'left' | 'right' = 'right';
+    for (let i = 0; i < 12; i++) {
+      scoreKick(c, side);
+      side = side === 'left' ? 'right' : 'left';
+    }
+    for (let i = 0; i < 20000 && c.engine.phase !== 'over'; i++) c.tick(0.016);
+    const coins = c.getSnapshot().save.coins;
+    expect(coins).toBe(c.getSnapshot().result?.score);
+    expect(coins).toBeGreaterThanOrEqual(40);
+    expect(c.buyBoot('samba')).toBe(true);
+    expect(c.getSnapshot().save.equippedBoot).toBe('samba');
+    expect(c.getSnapshot().save.coins).toBe(coins - 40);
+    expect(c.engine.config.timing.perfectMs).toBe(DEFAULT_CONFIG.timing.perfectMs + 8);
+    expect(c.buyBoot('street')).toBe(true);
+    expect(c.getSnapshot().save.equippedBoot).toBe('street');
+    expect(c.getSnapshot().save.coins).toBe(coins - 40);
+    expect(c.engine.config.timing.perfectMs).toBe(DEFAULT_CONFIG.timing.perfectMs);
   });
 });

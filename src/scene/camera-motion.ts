@@ -28,6 +28,22 @@ export function cameraKickFor(
   };
 }
 
+/** Extra dolly strength for a kick-up milestone. Low stays a light push. */
+export function milestonePush(quality: Quality): number {
+  switch (quality) {
+    case 'low':
+      return 0.4;
+    case 'medium':
+      return 0.75;
+    case 'high':
+      return 1;
+    default: {
+      const exhaustive: never = quality;
+      return exhaustive;
+    }
+  }
+}
+
 /** Orbit, rise and extra dolly for the current celebration amount. */
 export function celebrateOffset(celebrate: number, elapsed: number, quality: Quality): { yaw: number; lift: number; dolly: number } {
   const amp = quality === 'high' ? 0.22 : quality === 'medium' ? 0.12 : 0.055;

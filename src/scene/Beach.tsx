@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, MeshStandardMaterial, RepeatWrapping, SRGBColorSpace, type Group, type Mesh } from 'three';
+import { beachBallPose, birdPose } from '../game/set-dressing';
 import type { Quality } from '../game/storage';
+import { fx } from './fx';
+import { Spectators } from './Spectators';
 
 function seededRandom(seed: number) {
   return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -195,24 +198,152 @@ function Waves() {
   );
 }
 
+function Seagull() {
+  const group = useRef<Group>(null);
+  const wingL = useRef<Group>(null);
+  const wingR = useRef<Group>(null);
+  useFrame(({ clock }) => {
+    const pose = birdPose(clock.elapsedTime);
+    if (group.current) {
+      group.current.position.set(pose.x, pose.y, pose.z);
+      group.current.rotation.set(Math.sin(pose.flap) * 0.08, -Math.PI / 2, 0);
+    }
+    if (wingL.current) wingL.current.rotation.z = 0.25 + pose.flap * 0.85;
+    if (wingR.current) wingR.current.rotation.z = -0.25 - pose.flap * 0.85;
+  });
+  return (
+    <group ref={group}>
+      <mesh scale={[0.42, 0.28, 1]}>
+        <sphereGeometry args={[0.14, 8, 6]} />
+        <meshBasicMaterial color="#f7f5ed" fog={false} />
+      </mesh>
+      <mesh position={[0, 0, 0.16]} rotation={[Math.PI / 2, 0, 0]}>
+        <coneGeometry args={[0.03, 0.12, 5]} />
+        <meshBasicMaterial color="#f0b429" fog={false} />
+      </mesh>
+      <group ref={wingL} position={[0.02, 0.02, 0]}>
+        <mesh position={[0.16, 0, 0]}>
+          <boxGeometry args={[0.32, 0.025, 0.1]} />
+          <meshBasicMaterial color="#f4f1e8" fog={false} />
+        </mesh>
+      </group>
+      <group ref={wingR} position={[-0.02, 0.02, 0]}>
+        <mesh position={[-0.16, 0, 0]}>
+          <boxGeometry args={[0.32, 0.025, 0.1]} />
+          <meshBasicMaterial color="#efe8dc" fog={false} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+function useBeachBallTexture() {
+  return useMemo(() => makeCanvas(256, (g, n) => {
+    const colors = ['#f7f5ed', '#e23d3d', '#f7f5ed', '#f2c14e', '#f7f5ed', '#2f6fe0'];
+    const stripe = n / colors.length;
+    for (let i = 0; i < colors.length; i++) {
+      g.fillStyle = colors[i];
+      g.fillRect(i * stripe, 0, stripe + 1, n);
+    }
+  }), []);
+}
+
+/** Decorative ball only. It never joins the physics ball. */
+function BeachBall({ quality }: { quality: Quality }) {
+  const group = useRef<Group>(null);
+  const spin = useRef<Group>(null);
+  const shadow = useRef<Mesh>(null);
+  const map = useBeachBallTexture();
+  useEffect(() => () => map.dispose(), [map]);
+  useFrame(({ clock }) => {
+    const pose = beachBallPose(clock.elapsedTime);
+    fx.propTime = clock.elapsedTime;
+    const popped = fx.beachPop === pose.loop;
+    if (group.current) group.current.position.set(pose.x, popped ? 0.06 : pose.y, pose.z);
+    if (spin.current) {
+      spin.current.rotation.z = pose.spin;
+      spin.current.scale.set(popped ? 1.35 : 1, popped ? 0.12 : 1, popped ? 1.35 : 1);
+    }
+    if (shadow.current) {
+      shadow.current.position.set(pose.x, 0.02, pose.z);
+      const lift = Math.min(1, pose.y);
+      shadow.current.scale.setScalar(popped ? 1.2 : Math.max(0.45, 1.05 - lift * 0.35));
+    }
+  });
+  return (
+    <group>
+      <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.2, 14]} />
+        <meshBasicMaterial color="#6a4a28" transparent opacity={0.22} depthWrite={false} />
+      </mesh>
+      <group ref={group}>
+        <group ref={spin}>
+          <mesh>
+            <sphereGeometry args={[0.22, quality === 'low' ? 10 : 18, quality === 'low' ? 8 : 14]} />
+            <meshStandardMaterial map={map} roughness={0.42} />
+          </mesh>
+        </group>
+      </group>
+    </group>
+  );
+}
+
+function Rain({ quality }: { quality: Quality }) {
+  const drops = useRef<Group>(null);
+  const count = quality === 'low' ? 6 : 14;
+  useFrame(({ clock }) => {
+    const group = drops.current;
+    if (!group) return;
+    group.visible = fx.shower > 0.04;
+    const t = clock.elapsedTime;
+    group.children.forEach((child, i) => {
+      const fall = (t * 1.8 + i * 0.37) % 1;
+      child.position.set(-3.2 + (i % 7) * 1.05, 4.2 - fall * 4, -1.2 - (i % 3) * 0.8);
+    });
+  });
+  return (
+    <group ref={drops} visible={false}>
+      {Array.from({ length: count }, (_, i) => (
+        <mesh key={i}>
+          <boxGeometry args={[0.015, 0.28, 0.015]} />
+          <meshBasicMaterial color="#d5f4ff" transparent opacity={0.45} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /** Open sand pitch with the sea behind the player. Props stay outside the kick circle. */
 export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality }) {
   const sand = useSandTexture();
   const water = useWaterTexture();
   const sky = useSkyTexture();
   const sea = useRef<Mesh>(null);
+  const sandMat = useRef<MeshStandardMaterial>(null);
+  const skyDim = useRef<Mesh>(null);
   const leaves = quality === 'low' ? 5 : 7;
   useEffect(() => () => { sand.dispose(); water.dispose(); sky.dispose(); }, [sand, water, sky]);
   useFrame(({ clock }) => {
     const material = sea.current?.material;
-    if (quality === 'low' || !(material instanceof MeshStandardMaterial) || !material.map) return;
-    material.map.offset.x = clock.elapsedTime * 0.04;
+    if (quality !== 'low' && material instanceof MeshStandardMaterial && material.map) material.map.offset.x = clock.elapsedTime * 0.04;
+    const wet = fx.shower;
+    if (sandMat.current) sandMat.current.color.setRGB(0.953 - wet * 0.42, 0.843 - wet * 0.38, 0.643 - wet * 0.25);
+    const dim = skyDim.current;
+    if (dim) {
+      dim.visible = wet > 0.02;
+      const mat = dim.material;
+      if (mat instanceof MeshStandardMaterial) mat.opacity = wet * 0.55;
+    }
   });
   return (
     <group>
       <mesh position={[0, 5.2, -14.2]}>
         <planeGeometry args={[42, 16]} />
         <meshBasicMaterial map={sky} />
+      </mesh>
+      <mesh ref={skyDim} position={[0, 5.15, -13.5]} visible={false}>
+        <planeGeometry args={[42, 16]} />
+        <meshStandardMaterial color="#1c3348" transparent opacity={0} depthWrite={false} />
       </mesh>
       <mesh position={[-6.6, 1.4, -7.8]} scale={[2.2, 1.35, 1.4]}>
         <sphereGeometry args={[1.05, 14, 10]} />
@@ -224,7 +355,7 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.4]} receiveShadow={shadows}>
         <planeGeometry args={[22, 16]} />
-        <meshStandardMaterial map={sand} color="#f3d7a4" roughness={1} />
+        <meshStandardMaterial ref={sandMat} map={sand} color="#f3d7a4" roughness={1} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, -3.5]} receiveShadow={shadows}>
         <planeGeometry args={[22, 2.4]} />
@@ -255,6 +386,10 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
         <meshBasicMaterial color="#fff6df" />
       </mesh>
       <Waves />
+      <Seagull />
+      <BeachBall quality={quality} />
+      <Rain quality={quality} />
+      <Spectators scene="beach" />
       <Palm x={-3.6} z={-2.2} lean={0.08} leaves={leaves} />
       <Palm x={3.5} z={-1.6} lean={-0.1} scale={0.92} leaves={leaves} />
       <Palm x={-4.6} z={1.2} lean={0.16} scale={0.8} leaves={leaves} />

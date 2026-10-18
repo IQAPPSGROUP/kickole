@@ -31,9 +31,10 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
         boneNames.push(o.name);
         (Object.keys(BONE_NAMES) as BoneKey[]).forEach((k) => { if (BONE_NAMES[k] === o.name) boneMap[k] = o as Bone; });
       }
-      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean };
+      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean; receiveShadow?: boolean };
       if (mesh.isMesh && mesh.material) {
         mesh.castShadow = true;
+        mesh.receiveShadow = true;
         const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         const cloned = list.map((m) => m.clone());
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
@@ -63,7 +64,8 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
       if (colors[name]) m.color.set(colors[name]);
       // Matte cloth / skin, slightly glossy boots; a faint self-glow keeps shaded sides from going muddy.
       const boots = name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole;
-      m.roughness = boots ? 0.45 : 0.72;
+      m.flatShading = false;
+      m.roughness = boots ? 0.48 : name === MATERIAL_NAMES.hair ? 0.88 : name === MATERIAL_NAMES.skin ? 0.82 : 0.76;
       m.metalness = 0;
       m.emissive.copy(m.color).multiplyScalar(0.12);
     });

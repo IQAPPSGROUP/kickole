@@ -1,4 +1,4 @@
-"""Generate Kicky's arcade footballer: a low-poly skinned character with a real armature and five animation clips.
+"""Generate Kicky's arcade footballer: a smooth, stylised skinned character with a real armature and five animation clips.
 
 Run (Blender 3.6 - 5.x):  blender --background --python tools/generate_kicky_player.py
 Output: public/models/kicky-player-rigged.glb
@@ -77,7 +77,7 @@ def build_mesh(armature, mats):
 
     def part(name, shape, loc, scale, mat, bone, rot=(0, 0, 0)):
         if shape == "sphere":
-            bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=8, radius=1)
+            bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=1)
         else:
             bpy.ops.mesh.primitive_cube_add(size=2)
         o = bpy.context.object
@@ -94,20 +94,26 @@ def build_mesh(armature, mats):
         parts.append(o)
 
     part("Torso", "sphere", (0, 0, 1.25), (0.21, 0.14, 0.30), "Shirt", "Spine")
-    part("ShirtTrim", "cube", (0, -0.135, 1.27), (0.05, 0.012, 0.25), "Shirt_Trim", "Spine")
+    part("ShirtTrim", "sphere", (0, -0.137, 1.27), (0.045, 0.012, 0.24), "Shirt_Trim", "Spine")
     part("Shorts", "sphere", (0, 0, 0.98), (0.21, 0.15, 0.15), "Shorts", "Hips")
     part("Neck", "sphere", (0, 0, 1.56), (0.06, 0.06, 0.07), "Skin", "Head")
+    part("Collar", "sphere", (0, -0.11, 1.51), (0.075, 0.018, 0.025), "Shirt_Trim", "Spine")
     part("Head", "sphere", (0, 0, 1.67), (0.17, 0.16, 0.17), "Skin", "Head")
     part("Hair", "sphere", (0, 0.025, 1.74), (0.18, 0.17, 0.12), "Hair", "Head")
-    part("EyeL", "sphere", (-0.06, -0.15, 1.69), (0.02, 0.015, 0.025), "Hair", "Head")
-    part("EyeR", "sphere", (0.06, -0.15, 1.69), (0.02, 0.015, 0.025), "Hair", "Head")
+    for s, x in (("L", -1), ("R", 1)):
+        part(f"Ear_{s}", "sphere", (x * 0.16, 0, 1.67), (0.035, 0.045, 0.05), "Skin", "Head")
+        part(f"Eye_{s}", "sphere", (x * 0.06, -0.15, 1.69), (0.025, 0.018, 0.03), "Hair", "Head")
+        part(f"Brow_{s}", "sphere", (x * 0.06, -0.148, 1.73), (0.035, 0.012, 0.01), "Hair", "Head")
+    part("Nose", "sphere", (0, -0.16, 1.66), (0.025, 0.025, 0.035), "Skin", "Head")
     for s, x in (("L", -1), ("R", 1)):
         part(f"Sleeve_{s}", "sphere", (x * 0.27, 0, 1.38), (0.075, 0.075, 0.09), "Shirt", f"UpperArm_{s}")
-        part(f"Arm_{s}", "sphere", (x * 0.27, 0, 1.17), (0.055, 0.055, 0.19), "Skin", f"UpperArm_{s}")
-        part(f"Thigh_{s}", "sphere", (x * 0.10, 0, 0.80), (0.095, 0.095, 0.22), "Shorts", f"UpperLeg_{s}")
-        part(f"Sock_{s}", "sphere", (x * 0.10, 0, 0.32), (0.065, 0.065, 0.24), "Socks", f"LowerLeg_{s}")
+        part(f"Arm_{s}", "sphere", (x * 0.27, 0, 1.17), (0.06, 0.06, 0.20), "Skin", f"UpperArm_{s}")
+        part(f"Hand_{s}", "sphere", (x * 0.27, 0, 0.98), (0.06, 0.06, 0.075), "Skin", f"UpperArm_{s}")
+        part(f"Thigh_{s}", "sphere", (x * 0.10, 0, 0.80), (0.095, 0.095, 0.24), "Shorts", f"UpperLeg_{s}")
+        part(f"Knee_{s}", "sphere", (x * 0.10, 0, 0.54), (0.075, 0.075, 0.09), "Socks", f"LowerLeg_{s}")
+        part(f"Sock_{s}", "sphere", (x * 0.10, 0, 0.31), (0.07, 0.07, 0.26), "Socks", f"LowerLeg_{s}")
         part(f"Boot_{s}", "sphere", (x * 0.10, -0.06, 0.06), (0.065, 0.14, 0.06), "Boots", f"Foot_{s}")
-        part(f"Sole_{s}", "cube", (x * 0.10, -0.06, 0.012), (0.062, 0.14, 0.012), "Boots_Sole", f"Foot_{s}")
+        part(f"Sole_{s}", "sphere", (x * 0.10, -0.06, 0.012), (0.062, 0.14, 0.012), "Boots_Sole", f"Foot_{s}")
 
     bpy.ops.object.select_all(action="DESELECT")
     for p in parts:

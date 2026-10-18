@@ -13,10 +13,31 @@ Licence: Quaternius Universal Base Characters [Standard], **CC0 1.0** (see `publ
 | Exactly 5 clips `Idle, KickLeft, KickRight, Miss, Celebrate` (30 fps, in place, contact 0.30 s) | **no clips** | author/retarget clips (see below); game falls back to procedural pose |
 | Materials `Shirt, Shirt_Trim, Shorts, Socks, Boots, Boots_Sole, Skin, Hair` | v1: `Skin, Kit_Shirt, Kit_Shorts, Kit_Socks, Boots, Hair, Eyes`; v2: contract names + `Eyes` | v1 wrong names; v2 has one extra (`Eyes`, 9 total vs max 8) |
 | Base colours neutral, overwritten at runtime | `Skin` and `Hair` use colour textures (runtime colour multiplies them) | tint skin via `color` near white only |
-| < 15k tris, < 1.5 MB, textures ≤ 1024 | v1 15,619 tris / 375,864 B; textures ≤ 1024 WebP | v1 slightly over tris |
+| < 15k tris, < 1.5 MB, textures ≤ 1024 | v1 15,619 tris / 375,864 B; v2 16,889 tris / 361,448 B; textures ≤ 1024 WebP | both slightly over the 15k tris |
 | T/A-pose rest, feet at y=0, origin between feet, height 1.6–1.9 m | T-pose, feet y≈0, ~1.84 m | OK |
 | Idle bbox width < 1 m | T-pose arm span ~1.86 m (no Idle clip yet) | resolved once an Idle clip lowers arms |
 | Meshopt/Draco + KTX2/WebP | Meshopt + WebP (`EXT_meshopt_compression`, `EXT_texture_webp`) | the loader must set a Meshopt decoder |
+
+## v2 – `public/models/kickole_player_v2.glb` (modelled kit) — recommended
+
+![v2 preview](img/kickole_player_v2_preview.png)
+
+| | |
+|---|---|
+| Size | 361,448 bytes (~353 KB) |
+| Triangles | 16,889 (Body 8,066 · Shirt 2,148 · Boots 1,884 · Hair 1,301 · Eyebrows 984 · Shorts 904 · Socks 834 · Eyes 768) |
+| Skeleton | one skin, same 65 UE-style bones as v1 (Blender round-trip verified: joint node transforms identical to the Quaternius original) |
+| Materials | `Shirt` #FFD93D, `Shirt_Trim` #1E2A5A (collar, cuffs **and sock bands**), `Shorts` #1E2A5A, `Socks` #FFD93D, `Boots` #FF4F9A, `Boots_Sole` #222831, `Skin`, `Hair`, `Eyes` – kit materials are flat colour (no textures), roughness 0.5–0.85, metalness 0, double-sided |
+| Textures | Skin 1024² base+normal WebP, Hair 512² base+normal WebP, Eyes 256² WebP |
+| Compression | Meshopt (scene quantization volume) + WebP |
+
+How it was built (`tools/freddie/blender_build_player_v2.py`, Blender 4.5.9 LTS headless, then `tools/freddie/post_player_v2.mjs`):
+- Shirt / shorts / socks are copies of the body surface, cut with planes (clean hems: waist hem z=1.0 m, sleeves at |x|=0.36 m, crew neck lower at the front), decimated to 60 %, pushed out 6–25 mm along normals (shirt and shorts flare slightly at the hem). They keep the body's original skin weights.
+- Boots: convex hull of each foot inflated by 13 mm, voxel-remeshed, smoothed, decimated, opening cut at the ankle, a sole band cut at 16 mm; weights by Data Transfer from the body (nearest-face interpolated).
+- Body faces fully hidden under clothing (torso, thighs, calves, feet) were deleted, so no skin pokes through. Skin stays on the head, neck, forearms, hands, knees and the gap between socks and shorts.
+- Rebuild: `blender -b --python tools/freddie/blender_build_player_v2.py` (paths at the top), then `node tools/freddie/post_player_v2.mjs raw.glb kickole_player_v2.glb`.
+
+Known limitations: boots are a simple rounded "clog" shape (no studs or laces); collar trim edge is a little uneven; light faceting from decimation on the shirt; sock bands share `Shirt_Trim`, so recolouring the trim also changes the sock bands. The extra `Eyes` material makes 9 materials (contract max 8). 16.9k tris is over the contract's 15k (decimate the body or drop eyebrows to reach it).
 
 ## v1 – `public/models/kickole_player_v1.glb`
 

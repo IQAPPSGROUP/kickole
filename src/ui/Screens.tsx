@@ -1,4 +1,5 @@
 import type { Result } from '../game/controller';
+import { SCENES, type GameScene } from '../game/scenes';
 import { SKINS } from '../game/skins';
 import type { Quality, RunRecord, Settings } from '../game/storage';
 
@@ -10,11 +11,11 @@ export function Logo() {
   );
 }
 
-export function Home({ best, onPlay, onSettings }: { best: number; onPlay: () => void; onSettings: () => void }) {
+export function Home({ best, scene, onPlay, onSettings }: { best: number; scene: GameScene; onPlay: () => void; onSettings: () => void }) {
   return (
     <div className="screen home">
       <div className="home-top">
-        <p className="court-label">FUTEBOL DE RUA <span>•</span> STREET FREESTYLE</p>
+        <p className="court-label">{scene.place} <span>•</span> {scene.subtitle}</p>
         <Logo />
         <p className="tagline">Find your rhythm. Own the court.</p>
       </div>
@@ -72,6 +73,16 @@ export function SettingsScreen({
     <div className="screen settings">
       <div className="card">
         <h2>SETTINGS</h2>
+        <div className="group">
+          <label>Scene</label>
+          <div className="seg">
+            {SCENES.map((scene) => (
+              <button key={scene.id} className={settings.sceneId === scene.id ? 'on' : ''} onClick={() => onChange({ sceneId: scene.id })}>
+                {scene.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
         <Toggle label="Vibration" value={settings.vibration} onChange={(vibration) => onChange({ vibration })} />
         <div className="group">

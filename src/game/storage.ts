@@ -1,3 +1,5 @@
+import { DEFAULT_SCENE_ID, isSceneId, type SceneId } from './scenes';
+
 export interface RunRecord {
   score: number;
   kickUps: number;
@@ -11,6 +13,7 @@ export interface Settings {
   vibration: boolean;
   quality: Quality;
   skinId: string;
+  sceneId: SceneId;
 }
 
 export interface SaveData {
@@ -21,7 +24,7 @@ export interface SaveData {
 const SAVE_KEY = 'kicky.save.v1';
 const SETTINGS_KEY = 'kicky.settings.v1';
 
-export const DEFAULT_SETTINGS: Settings = { sound: true, vibration: true, quality: 'high', skinId: 'kicky-teal' };
+export const DEFAULT_SETTINGS: Settings = { sound: true, vibration: true, quality: 'high', skinId: 'kicky-teal', sceneId: DEFAULT_SCENE_ID };
 
 function read<T>(key: string): Partial<T> | null {
   try {
@@ -67,6 +70,7 @@ export function loadSettings(): Settings {
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
     quality: d.quality === 'low' || d.quality === 'medium' || d.quality === 'high' ? d.quality : DEFAULT_SETTINGS.quality,
     skinId: typeof d.skinId === 'string' ? d.skinId : DEFAULT_SETTINGS.skinId,
+    sceneId: typeof d.sceneId === 'string' && isSceneId(d.sceneId) ? d.sceneId : DEFAULT_SETTINGS.sceneId,
   };
 }
 

@@ -76,7 +76,11 @@ describe('storage', () => {
     expect(s.quality).toBe(DEFAULT_SETTINGS.quality);
     expect(s.vibration).toBe(false);
     expect(s.skinId).toBe('coral-flash');
-    saveSettings({ ...s, quality: 'low' });
+    expect(s.sceneId).toBe('beach');
+    saveSettings({ ...s, quality: 'low', sceneId: 'rua' });
     expect(loadSettings().quality).toBe('low');
+    expect(loadSettings().sceneId).toBe('rua');
+    saveSettings({ ...loadSettings(), sceneId: 'plaza' as 'rua' });
+    expect(loadSettings().sceneId).toBe('beach');
   });
 });

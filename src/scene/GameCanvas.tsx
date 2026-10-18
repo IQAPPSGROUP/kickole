@@ -6,8 +6,10 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
+import { sceneById, type GameScene, type SceneId } from '../game/scenes';
 import { CharacterSwitch } from './CharacterSwitch';
 import { Ball } from './Ball';
+import { Beach } from './Beach';
 import { Court } from './Court';
 import { Effects } from './Effects';
 import { inspector } from './inspector';
@@ -70,26 +72,59 @@ interface SceneProps {
   controller: GameController;
   skin: Skin;
   quality: Quality;
+  sceneId: SceneId;
   onReady: () => void;
 }
 
-function World({ controller, skin, quality, onReady }: SceneProps) {
+function Playground({ scene, shadows }: { scene: GameScene; shadows: boolean }) {
+  switch (scene.id) {
+    case 'beach':
+      return <Beach shadows={shadows} />;
+    case 'rua':
+      return <Court shadows={shadows} />;
+    default: {
+      const exhaustive: never = scene;
+      return exhaustive;
+    }
+  }
+}
+
+function StreetGlow({ scene, quality }: { scene: GameScene; quality: Quality }) {
+  switch (scene.id) {
+    case 'beach':
+      return null;
+    case 'rua':
+      return (
+        <>
+          <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
+          {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
+        </>
+      );
+    default: {
+      const exhaustive: never = scene;
+      return exhaustive;
+    }
+  }
+}
+
+function World({ controller, skin, quality, sceneId, onReady }: SceneProps) {
   const shadows = quality !== 'low';
+  const scene = sceneById(sceneId);
   useEffect(() => { onReady(); }, [onReady]);
   const mapSize = quality === 'high' ? 2048 : 1024;
   return (
     <>
-      <color attach="background" args={['#234F4B']} />
-      <fog attach="fog" args={['#234F4B', 10, 22]} />
+      <color key={scene.id} attach="background" args={[scene.sky]} />
+      <fog key={`${scene.id}-fog`} attach="fog" args={[scene.sky, scene.fogNear, scene.fogFar]} />
       <CameraRig shake={quality !== 'low'} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
-      <hemisphereLight args={['#fff1dc', '#12363f', 0.8]} />
-      <ambientLight intensity={0.2} />
+      <hemisphereLight args={[scene.hemiSky, scene.hemiGround, scene.hemi]} />
+      <ambientLight intensity={scene.ambient} />
       <directionalLight
-        position={[2.5, 6, 4]}
-        intensity={2.3}
-        color="#ffe9c7"
+        position={scene.sunPosition}
+        intensity={scene.sunIntensity}
+        color={scene.sun}
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}
         shadow-camera-left={-3}
@@ -101,11 +136,10 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         shadow-bias={-0.0004}
         shadow-radius={4}
       />
-      <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
-      {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
-      <Court shadows={shadows} />
+      <StreetGlow scene={scene} quality={quality} />
+      <Playground scene={scene} shadows={shadows} />
       {shadows && quality === 'high' && (
-        <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color="#05161b" />
+        <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color={scene.shadow} />
       )}
       <CharacterSwitch engine={controller.engine} skin={skin} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />

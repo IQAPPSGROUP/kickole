@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { GameController } from '../game/controller';
+import { sceneById } from '../game/scenes';
 import { GameCanvas } from '../scene/GameCanvas';
 import { Hud, TouchZones } from './Hud';
 import { Home, GameOver, SettingsScreen } from './Screens';
@@ -46,9 +47,9 @@ export function App() {
 
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
-      <GameCanvas controller={controller} skin={snap.skin} quality={snap.settings.quality} />
+      <GameCanvas controller={controller} skin={snap.skin} quality={snap.settings.quality} sceneId={snap.settings.sceneId} />
       {phase === 'menu' && !showSettings && (
-        <Home best={snap.save.best} onPlay={() => controller.play()} onSettings={() => setShowSettings(true)} />
+        <Home best={snap.save.best} scene={sceneById(snap.settings.sceneId)} onPlay={() => controller.play()} onSettings={() => setShowSettings(true)} />
       )}
       {phase !== 'menu' && <Hud hud={snap.hud} />}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}

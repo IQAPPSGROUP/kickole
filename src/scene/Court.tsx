@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace } from 'three';
 
 const NAVY = '#142D35';
@@ -6,6 +6,12 @@ const TEAL = '#12BFA6';
 const LIME = '#EAF44A';
 const CORAL = '#FF805D';
 const WHITE = '#F7F5ED';
+const GOLD = '#F5C94D';
+
+// Stable paint wear: reloading or changing quality must not rearrange the court.
+function seededRandom(seed: number) {
+  return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+}
 
 function makeCanvas(size: number, draw: (g: CanvasRenderingContext2D, n: number) => void) {
   const c = document.createElement('canvas');
@@ -22,18 +28,19 @@ function makeCanvas(size: number, draw: (g: CanvasRenderingContext2D, n: number)
 function useCourtTexture() {
   return useMemo(() => {
     const t = makeCanvas(512, (g, n) => {
-      g.fillStyle = '#1f4a54';
+      const random = seededRandom(81);
+      g.fillStyle = '#26786d';
       g.fillRect(0, 0, n, n);
       for (let i = 0; i < 5000; i++) {
-        g.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.10)';
-        g.fillRect(Math.random() * n, Math.random() * n, 1 + Math.random() * 2, 1 + Math.random() * 2);
+        g.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.10)';
+        g.fillRect(random() * n, random() * n, 1 + random() * 2, 1 + random() * 2);
       }
       g.strokeStyle = 'rgba(0,0,0,0.25)';
       g.lineWidth = 1.2;
       for (let i = 0; i < 6; i++) {
-        let x = Math.random() * n, y = Math.random() * n;
+        let x = random() * n, y = random() * n;
         g.beginPath(); g.moveTo(x, y);
-        for (let j = 0; j < 6; j++) { x += (Math.random() - 0.5) * 60; y += (Math.random() - 0.5) * 60; g.lineTo(x, y); }
+        for (let j = 0; j < 6; j++) { x += (random() - 0.5) * 60; y += (random() - 0.5) * 60; g.lineTo(x, y); }
         g.stroke();
       }
       g.strokeStyle = 'rgba(0,0,0,0.2)';
@@ -46,34 +53,35 @@ function useCourtTexture() {
   }, []);
 }
 
-/** Brand-colour graffiti wall with soft shapes and tags. */
+/** Original painted mural: sun, rolling colour bands and pavement-inspired waves. */
 function useWallTexture() {
-  return useMemo(
-    () => makeCanvas(1024, (g, n) => {
-      g.fillStyle = NAVY;
-      g.fillRect(0, 0, n, n);
-      for (let y = 0; y < n; y += 64) {
-        g.fillStyle = y % 128 ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.12)';
-        g.fillRect(0, y, n, 62);
+  return useMemo(() => makeCanvas(1024, (g, n) => {
+    const random = seededRandom(1962);
+    g.fillStyle = '#E8CF9C'; g.fillRect(0, 0, n, n);
+    g.fillStyle = GOLD;
+    g.beginPath(); g.arc(n * .74, n * .30, n * .23, 0, Math.PI * 2); g.fill();
+    for (const [color, y] of [['#D76D4B', .53], ['#168F7A', .67], ['#12594F', .84]] as const) {
+      g.fillStyle = color; g.beginPath(); g.moveTo(0, n * y);
+      g.bezierCurveTo(n * .3, n * (y - .3), n * .55, n * (y + .2), n, n * (y - .1));
+      g.lineTo(n, n); g.lineTo(0, n); g.closePath(); g.fill();
+    }
+    g.strokeStyle = '#F7E9C5'; g.lineWidth = 6;
+    for (let row = 0; row < 3; row++) {
+      g.beginPath();
+      for (let x = 0; x <= n; x += 4) {
+        const y = n * (.87 + row * .04) + Math.sin(x / 52) * 12;
+        if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
       }
-      const cols = [TEAL, LIME, CORAL, WHITE];
-      for (let i = 0; i < 14; i++) {
-        g.globalAlpha = 0.55;
-        g.fillStyle = cols[i % 4];
-        g.beginPath();
-        g.ellipse(Math.random() * n, n * 0.25 + Math.random() * n * 0.6, 40 + Math.random() * 90, 25 + Math.random() * 60, Math.random() * 3, 0, Math.PI * 2);
-        g.fill();
-      }
-      g.globalAlpha = 1;
-      // dark floor-fade for baked-style ambient occlusion
-      const grad = g.createLinearGradient(0, n * 0.65, 0, n);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, 'rgba(0,0,0,0.55)');
-      g.fillStyle = grad;
-      g.fillRect(0, n * 0.65, n, n * 0.35);
-    }),
-    [],
-  );
+      g.stroke();
+    }
+    for (let i = 0; i < 6500; i++) {
+      g.fillStyle = i % 2 ? 'rgba(255,255,255,.10)' : 'rgba(20,45,53,.08)';
+      g.fillRect(random() * n, random() * n, 1 + random() * 3, 1 + random() * 3);
+    }
+    const grad = g.createLinearGradient(0, n * .65, 0, n);
+    grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,.28)');
+    g.fillStyle = grad; g.fillRect(0, n * .65, n, n * .35);
+  }), []);
 }
 
 /** KICKOLÉ sign. The canvas aspect (4:1) matches the 3 x 0.75 m plane so letters are not stretched. */
@@ -83,22 +91,13 @@ function useSignTexture() {
     c.width = 1024; c.height = 256;
     const g = c.getContext('2d');
     if (g) {
-      g.font = 'italic 900 190px "Trebuchet MS", "Segoe UI", sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.lineJoin = 'round';
-      g.lineWidth = 22;
-      g.strokeStyle = NAVY;
-      g.strokeText('KICKOLÉ', 512, 140);
-      g.fillStyle = WHITE;
-      g.fillText('KICKOLÉ', 512, 140);
-      g.save();
-      g.beginPath();
-      g.rect(670, 0, 354, 256);
-      g.clip();
-      g.fillStyle = LIME;
-      g.fillText('KICKOLÉ', 512, 140);
-      g.restore();
+      g.fillStyle = NAVY; g.fillRect(0, 0, 1024, 256);
+      g.strokeStyle = GOLD; g.lineWidth = 6; g.strokeRect(12, 12, 1000, 232);
+      g.font = 'italic 900 150px "Trebuchet MS", "Segoe UI", sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillStyle = WHITE; g.fillText('KICKOLÉ', 512, 106, 930);
+      g.font = '700 30px "Trebuchet MS", sans-serif';
+      g.fillStyle = GOLD; g.fillText('FUTEBOL DE RUA', 512, 209);
     }
     const t = new CanvasTexture(c);
     t.colorSpace = SRGBColorSpace;
@@ -197,6 +196,9 @@ export function Court({ shadows }: { shadows: boolean }) {
   const sign = useSignTexture();
   const fence = useFenceTexture();
   const blob = useBlobTexture();
+  useEffect(() => () => {
+    tex.dispose(); wall.dispose(); sign.dispose(); fence.dispose(); blob.dispose();
+  }, [tex, wall, sign, fence, blob]);
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow={shadows}>
@@ -204,7 +206,7 @@ export function Court({ shadows }: { shadows: boolean }) {
         <meshStandardMaterial map={tex} roughness={0.9} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <ringGeometry args={[1.17, 1.22, 64]} />
+        <ringGeometry args={[1.17, 1.24, 64]} />
         <meshBasicMaterial color={WHITE} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
@@ -227,8 +229,8 @@ export function Court({ shadows }: { shadows: boolean }) {
         <boxGeometry args={[9, 2.6, 0.2]} />
         <meshStandardMaterial map={wall} roughness={0.9} />
       </mesh>
-      <mesh position={[-2.1, 2.05, -3.49]}>
-        <planeGeometry args={[3, 0.75]} />
+      <mesh position={[-1.6, 2.02, -3.48]}>
+        <planeGeometry args={[3.2, 0.8]} />
         <meshBasicMaterial map={sign} transparent toneMapped={false} />
       </mesh>
       <Poster x={1.9} y={1.4} color={CORAL} />
@@ -248,7 +250,14 @@ export function Court({ shadows }: { shadows: boolean }) {
       {[-4.4, 4.4].map((x) => (
         <mesh key={x} position={[x, 0.45, 0]}>
           <boxGeometry args={[0.2, 0.9, 9]} />
-          <meshStandardMaterial color="#0f2229" roughness={0.9} />
+          <meshStandardMaterial color="#D49468" roughness={0.9} />
+        </mesh>
+      ))}
+      {/* Painted court corners; simple geometry adds no texture downloads. */}
+      {[-2.6, 2.6].map((x) => (
+        <mesh key={`paint-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.004, 1.2]}>
+          <planeGeometry args={[0.09, 3.4]} />
+          <meshBasicMaterial color={GOLD} />
         </mesh>
       ))}
       {/* Props */}

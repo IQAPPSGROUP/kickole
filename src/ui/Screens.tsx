@@ -14,13 +14,15 @@ export function Home({ best, onPlay, onSettings }: { best: number; onPlay: () =>
   return (
     <div className="screen home">
       <div className="home-top">
+        <p className="court-label">FUTEBOL DE RUA <span>•</span> STREET FREESTYLE</p>
         <Logo />
-        <p className="tagline">Football freestyle arcade</p>
+        <p className="tagline">Find your rhythm. Own the court.</p>
       </div>
       <div className="home-bottom">
         <div className="best-pill">PERSONAL BEST <b>{best}</b></div>
-        <button className="btn primary big" onClick={onPlay}>PLAY</button>
-        <button className="btn ghost" onClick={onSettings}>⚙ SETTINGS</button>
+        <button className="btn primary big" onClick={onPlay}>LET’S PLAY <span aria-hidden="true">↗</span></button>
+        <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
+        <p className="home-help">Tap to juggle · Hold to stall</p>
         <p className="credit">IQ Apps Group · v0.1</p>
       </div>
     </div>

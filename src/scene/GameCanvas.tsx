@@ -79,8 +79,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const mapSize = quality === 'high' ? 2048 : 1024;
   return (
     <>
-      <color attach="background" args={['#142D35']} />
-      <fog attach="fog" args={['#142D35', 9, 18]} />
+      <color attach="background" args={['#234F4B']} />
+      <fog attach="fog" args={['#234F4B', 10, 22]} />
       <CameraRig shake={quality !== 'low'} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />

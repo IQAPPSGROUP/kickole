@@ -7,6 +7,7 @@ export function Hud({ hud }: { hud: HudState }) {
   return (
     <div className="hud">
       <div className="hud-top">
+        <span className="score-label">YOUR RUN</span>
         <div className="score" key={hud.score}>{hud.score}</div>
         <div className="hud-sub">
           <span>KICK-UPS <b>{hud.kickUps}</b></span>
@@ -20,7 +21,7 @@ export function Hud({ hud }: { hud: HudState }) {
         </div>
       )}
       {hud.phase === 'ready' && (
-        <div className="tap-start">TAP TO START<small>Tap left or right to kick</small></div>
+        <div className="tap-start">FIND YOUR RHYTHM<small>Tap either side to start</small></div>
       )}
       {hud.stalling && <div className="stall-hint">HOLD… RELEASE TO FLICK!</div>}
     </div>

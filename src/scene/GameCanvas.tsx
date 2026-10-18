@@ -37,6 +37,7 @@ function CameraRig({ shake }: { shake: boolean }) {
   useFrame((state, dt) => {
     fx.push = Math.max(0, fx.push - dt * 3);
     fx.shake = Math.max(0, fx.shake - dt * 4);
+    fx.slowMotion = Math.max(0, fx.slowMotion - dt);
     if (!shake || BASE.lengthSq() === 0) return;
     const t = state.clock.elapsedTime;
     LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
@@ -62,7 +63,12 @@ function Environment() {
 }
 
 function Simulation({ controller }: { controller: GameController }) {
-  useFrame((_, dt) => { if (!inspector.active) controller.tick(dt); });
+  useFrame((_, dt) => {
+    if (!inspector.active) {
+      const slowMotion = controller.engine.phase === 'over' && fx.slowMotion > 0;
+      controller.tick(dt * (slowMotion ? 0.28 : 1));
+    }
+  });
   return null;
 }
 

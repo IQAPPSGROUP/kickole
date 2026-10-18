@@ -39,9 +39,10 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       if (e.type === 'kick') {
         ringT.current = 0;
         fx.push = Math.max(fx.push, e.grade === 'perfect' ? 1 : 0.35);
-        if (e.grade === 'perfect') {
-          fx.shake = 1;
-          spawn(quality === 'low' ? 8 : 18, b.x, b.y, b.z, 2.2, 6, 0.7);
+        if (e.grade === 'perfect' || e.grade === 'good') {
+          const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (!reducedMotion) fx.shake = Math.max(fx.shake, e.grade === 'perfect' ? 1 : 0.45);
+          spawn(quality === 'low' ? 5 : e.grade === 'perfect' ? 18 : 10, b.x, b.y, b.z, 2.2, 6, 0.7);
         }
         if (e.streak > 0 && e.streak % 10 === 0) spawn(quality === 'low' ? 15 : 60, b.x, b.y + 0.3, b.z, 3.2, 5, 1.4);
       } else if (e.type === 'drop') {

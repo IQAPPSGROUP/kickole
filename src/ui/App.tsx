@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { GameController } from '../game/controller';
 import { GameCanvas } from '../scene/GameCanvas';
+import { fx } from '../scene/fx';
 import { Hud, TouchZones } from './Hud';
 import { Home, GameOver, SettingsScreen } from './Screens';
 
@@ -43,6 +44,12 @@ export function App() {
       window.removeEventListener('keyup', up);
     };
   }, [controller, showSettings]);
+
+  useEffect(() => {
+    if (snap.result?.newBest && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      fx.slowMotion = 0.8;
+    }
+  }, [snap.result]);
 
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>

@@ -3,4 +3,5 @@ export const fx = {
   /** Camera kick (0..1), decays each frame. */
   shake: 0,
   push: 0,
+  slowMotion: 0,
 };

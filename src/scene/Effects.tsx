@@ -10,6 +10,7 @@ interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz
 const PALETTE = ['#EAF44A', '#12BFA6', '#FF805D', '#F7F5ED'].map((c) => new Color(c));
 const DUST = new Color('#9fb3b8');
 const dummy = new Object3D();
+const scratch = new Color();
 
 /** Particle bursts, ring pulse and camera feedback driven by engine events. */
 export function Effects({ engine, quality }: { engine: GameEngine; quality: Quality }) {
@@ -57,7 +58,7 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
     for (let i = list.length - 1; i >= 0; i--) {
       const p = list[i];
       p.life -= d;
-      if (p.life <= 0) { list.splice(i, 1); continue; }
+      if (p.life <= 0) { list[i] = list[list.length - 1]; list.pop(); continue; }
       p.vy -= p.gravity * d;
       p.x += p.vx * d; p.y = Math.max(0.02, p.y + p.vy * d); p.z += p.vz * d;
     }
@@ -75,7 +76,7 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
         }
         dummy.updateMatrix();
         m.setMatrixAt(i, dummy.matrix);
-        m.setColorAt(i, PALETTE[0].clone().fromArray(colors, i * 3));
+        m.setColorAt(i, scratch.fromArray(colors, i * 3));
       }
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;

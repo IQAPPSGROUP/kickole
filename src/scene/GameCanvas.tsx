@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
 import { PMREMGenerator, PerspectiveCamera, Vector3 } from 'three';
@@ -74,7 +74,7 @@ interface SceneProps {
 
 function World({ controller, skin, quality, onReady }: SceneProps) {
   const shadows = quality !== 'low';
-  useEffect(onReady, [onReady]);
+  useEffect(() => { onReady(); }, [onReady]);
   const mapSize = quality === 'high' ? 2048 : 1024;
   return (
     <>
@@ -143,6 +143,7 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
+  const markReady = useCallback(() => setReady(true), []);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -167,7 +168,7 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
           gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (mounted.current) setLost(true); });
         }}
       >
-        <World {...props} onReady={() => setReady(true)} />
+        <World {...props} onReady={markReady} />
       </Canvas>
     </Boundary>
   );

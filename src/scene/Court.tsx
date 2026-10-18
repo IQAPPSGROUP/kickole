@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three';
+import { CanvasTexture, DoubleSide, RepeatWrapping, SRGBColorSpace } from 'three';
 
 const NAVY = '#142D35';
 const TEAL = '#12BFA6';
@@ -206,7 +206,7 @@ export function Court({ shadows }: { shadows: boolean }) {
       {/* Chain-link fence along the top of the wall */}
       <mesh position={[0, 2.9, -3.4]}>
         <planeGeometry args={[9, 0.7]} />
-        <meshStandardMaterial map={fence} transparent alphaTest={0.3} side={2} roughness={0.5} metalness={0.5} />
+        <meshStandardMaterial map={fence} transparent alphaTest={0.3} side={DoubleSide} roughness={0.5} metalness={0.5} />
       </mesh>
       {[-4, -2, 0, 2, 4].map((x) => (
         <mesh key={x} position={[x, 2.9, -3.4]}>

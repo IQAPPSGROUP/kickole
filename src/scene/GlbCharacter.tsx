@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, LoopOnce, Vector3, LoopRepeat, Material, MeshStandardMaterial, type AnimationAction, type Bone, type Object3D } from 'three';
+import { AnimationMixer, LoopOnce, Vector3, LoopRepeat, Material, MeshStandardMaterial, Quaternion, type AnimationAction, type Bone, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
@@ -98,9 +98,33 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   }, [clips, mixer]);
 
   const pose = useMemo(() => createPose(), []);
+  // Rest local quaternion plus parent-relative axes that match Mixamo (X right, Y along bone, Z forward).
+  // Procedural deltas are authored in that space; UE bones need the axes remapped.
   const rest = useMemo(() => {
-    const m = new Map<BoneKey, { x: number; y: number; z: number }>();
-    (Object.keys(bones) as BoneKey[]).forEach((k) => { const b = bones[k]!; m.set(k, { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z }); });
+    const m = new Map<BoneKey, { q: Quaternion; axes: [Vector3, Vector3, Vector3] }>();
+    const basis = (dir: 'up' | 'down'): [Vector3, Vector3, Vector3] => (
+      dir === 'up'
+        ? [new Vector3(1, 0, 0), new Vector3(0, 1, 0), new Vector3(0, 0, 1)]
+        : [new Vector3(1, 0, 0), new Vector3(0, -1, 0), new Vector3(0, 0, -1)]
+    );
+    const axisDir: Record<BoneKey, 'up' | 'down'> = {
+      root: 'up', spine: 'up', head: 'up',
+      armLeft: 'down', armRight: 'down',
+      thighLeft: 'down', thighRight: 'down',
+      shinLeft: 'down', shinRight: 'down',
+      footLeft: 'down', footRight: 'down',
+    };
+    (Object.keys(bones) as BoneKey[]).forEach((k) => {
+      const b = bones[k]!;
+      const parent = b.parent;
+      const parentQ = parent ? parent.getWorldQuaternion(new Quaternion()) : new Quaternion();
+      const invParent = parentQ.clone().invert();
+      const [wx, wy, wz] = basis(axisDir[k]);
+      m.set(k, {
+        q: b.quaternion.clone(),
+        axes: [wx.applyQuaternion(invParent), wy.applyQuaternion(invParent), wz.applyQuaternion(invParent)],
+      });
+    });
     return m;
   }, [bones]);
   const footPos = useMemo(() => new Vector3(), []);
@@ -146,10 +170,20 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
       return;
     }
     // Fallback for rigs without clips: apply the procedural pose on top of the rest pose.
+    // Deltas are Mixamo-style (X right, Y along the bone, Z forward) expressed in the bone's parent frame.
     computePose(engine, pose);
+    const delta = new Quaternion();
+    const qx = new Quaternion();
+    const qy = new Quaternion();
+    const qz = new Quaternion();
     const set = (k: BoneKey, x: number, y: number, z: number) => {
       const b = bones[k]; const r = rest.get(k);
-      if (b && r) b.rotation.set(r.x + x, r.y + y, r.z + z);
+      if (!b || !r) return;
+      qx.setFromAxisAngle(r.axes[0], x);
+      qy.setFromAxisAngle(r.axes[1], y);
+      qz.setFromAxisAngle(r.axes[2], z);
+      delta.copy(qz).multiply(qy).multiply(qx);
+      b.quaternion.copy(r.q).premultiply(delta);
     };
     set('spine', pose.torsoPitch, 0, pose.torsoRoll);
     set('head', pose.headPitch, pose.headYaw, 0);

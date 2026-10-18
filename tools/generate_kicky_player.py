@@ -11,7 +11,7 @@ Contract (see docs/CHARACTER_GLB.md):
   * Materials: Shirt, Shirt_Trim, Shorts, Socks, Boots, Boots_Sole, Skin, Hair (recoloured by skins at runtime).
   * Clips (30 fps, each exported as its own glTF animation): Idle (loop), KickLeft, KickRight, Miss, Celebrate.
     The kick clips reach foot contact at CONTACT_FRAME / 30 = 0.30 s.
-  * One skinned mesh (one draw call per material), no textures: mobile friendly.
+  * One skinned mesh with detailed face, boots and kit accents; no textures: mobile friendly.
 """
 import math
 import os
@@ -108,6 +108,41 @@ def build_mesh(armature, mats):
         part(f"Sock_{s}", "sphere", (x * 0.10, 0, 0.32), (0.065, 0.065, 0.24), "Socks", f"LowerLeg_{s}")
         part(f"Boot_{s}", "sphere", (x * 0.10, -0.06, 0.06), (0.065, 0.14, 0.06), "Boots", f"Foot_{s}")
         part(f"Sole_{s}", "cube", (x * 0.10, -0.06, 0.012), (0.062, 0.14, 0.012), "Boots_Sole", f"Foot_{s}")
+
+    # Premium arcade detailing: all pieces follow their parent bones and reuse
+    # the eight contract materials, so recolouring and the rig remain unchanged.
+    # Facial features stay above the contact foot silhouette on small screens.
+    part("HairFringe", "sphere", (0, -0.116, 1.773), (0.16, 0.075, 0.044), "Hair", "Head")
+    for s, x in (("L", -1), ("R", 1)):
+        part(f"Brow_{s}", "sphere", (x * 0.064, -0.157, 1.719),
+             (0.044, 0.014, 0.012), "Hair", "Head")
+        part(f"Cheek_{s}", "sphere", (x * 0.103, -0.124, 1.643),
+             (0.034, 0.018, 0.027), "Skin", "Head")
+        part(f"ShirtShoulder_{s}", "sphere", (x * 0.174, -0.012, 1.454),
+             (0.066, 0.09, 0.045), "Shirt_Trim", "Spine")
+        part(f"SleeveCuff_{s}", "sphere", (x * 0.27, -0.005, 1.306),
+             (0.077, 0.077, 0.022), "Shirt_Trim", f"UpperArm_{s}")
+        part(f"ShortHem_{s}", "sphere", (x * 0.10, -0.005, 0.701),
+             (0.099, 0.099, 0.021), "Shirt_Trim", f"UpperLeg_{s}")
+        part(f"SockStripe_{s}", "sphere", (x * 0.10, -0.003, 0.463),
+             (0.068, 0.068, 0.016), "Shirt_Trim", f"LowerLeg_{s}")
+        part(f"BootTongue_{s}", "sphere", (x * 0.10, -0.125, 0.106),
+             (0.047, 0.055, 0.014), "Boots_Sole", f"Foot_{s}")
+        for lace in range(3):
+            part(f"Lace_{s}_{lace}", "cube",
+                 (x * 0.10, -0.115 + lace * 0.029, 0.121 - lace * 0.006),
+                 (0.036, 0.006, 0.004), "Boots_Sole", f"Foot_{s}")
+        for stud in (-0.041, 0.041):
+            part(f"Stud_{s}_{stud:+.2f}", "sphere",
+                 (x * 0.10 + stud, -0.108, 0.007),
+                 (0.014, 0.017, 0.007), "Boots_Sole", f"Foot_{s}")
+
+    part("Nose", "sphere", (0, -0.169, 1.663),
+         (0.031, 0.034, 0.033), "Skin", "Head")
+    part("Mouth", "sphere", (0, -0.164, 1.603),
+         (0.049, 0.012, 0.009), "Hair", "Head")
+    part("Collar", "sphere", (0, -0.013, 1.493),
+         (0.112, 0.107, 0.022), "Shirt_Trim", "Spine")
 
     bpy.ops.object.select_all(action="DESELECT")
     for p in parts:

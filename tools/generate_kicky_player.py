@@ -112,8 +112,9 @@ def build_mesh(armature, mats):
         part(f"Thigh_{s}", "sphere", (x * 0.10, 0, 0.80), (0.095, 0.095, 0.24), "Shorts", f"UpperLeg_{s}")
         part(f"Knee_{s}", "sphere", (x * 0.10, 0, 0.54), (0.075, 0.075, 0.09), "Socks", f"LowerLeg_{s}")
         part(f"Sock_{s}", "sphere", (x * 0.10, 0, 0.31), (0.07, 0.07, 0.26), "Socks", f"LowerLeg_{s}")
-        part(f"Boot_{s}", "sphere", (x * 0.10, -0.06, 0.06), (0.065, 0.14, 0.06), "Boots", f"Foot_{s}")
-        part(f"Sole_{s}", "sphere", (x * 0.10, -0.06, 0.012), (0.062, 0.14, 0.012), "Boots_Sole", f"Foot_{s}")
+        # Boot tip sits ~0.2 m forward of the ankle so the contact probe and yellow mesh agree.
+        part(f"Boot_{s}", "sphere", (x * 0.10, -0.10, 0.055), (0.07, 0.16, 0.055), "Boots", f"Foot_{s}")
+        part(f"Sole_{s}", "sphere", (x * 0.10, -0.10, 0.012), (0.068, 0.16, 0.012), "Boots_Sole", f"Foot_{s}")
 
     bpy.ops.object.select_all(action="DESELECT")
     for p in parts:
@@ -148,11 +149,11 @@ def kick_pose(side, amount, wind=0.0, follow=0.0):
 
     Contact (amount=1, follow=0) places the boot tip at the physics ball. Stall freezes that exact frame.
     """
-    # Foot bone target so the boot toe meets the ball (matches glb-asset.test toe offset ~0.2 m along +Z).
+    # Foot bone target so the boot tip meets the ball (matches glb-asset.test toe offset ~0.2 m along +Z).
     thigh, knee = solve_leg(CONTACT_H - 0.19 + follow * 0.16, BALL_Z - 0.18 + follow * 0.10)
     other = "R" if side == "L" else "L"
     sign = 1 if side == "L" else -1
-    # Plant foot softens; kicking foot dorsiflexes into the ball then points on follow-through.
+    # Plant softens; kicking foot tips into the ball then points on follow-through.
     plant_knee = 0.12 * amount
     foot_kick = -0.35 * amount + 0.55 * follow
     p = {

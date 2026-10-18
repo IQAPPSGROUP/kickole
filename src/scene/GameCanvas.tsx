@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { PMREMGenerator, PerspectiveCamera, Vector3 } from 'three';
+import { ACESFilmicToneMapping, PMREMGenerator, PerspectiveCamera, SRGBColorSpace, Vector3 } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
@@ -96,7 +96,7 @@ interface SceneProps {
 function Playground({ scene, shadows, quality }: { scene: GameScene; shadows: boolean; quality: Quality }) {
   switch (scene.id) {
     case 'beach':
-      return <Beach shadows={shadows} />;
+      return <Beach shadows={shadows} quality={quality} />;
     case 'rua':
       return <Court shadows={shadows} quality={quality} />;
     default: {
@@ -106,10 +106,16 @@ function Playground({ scene, shadows, quality }: { scene: GameScene; shadows: bo
   }
 }
 
-function StreetGlow({ scene, quality }: { scene: GameScene; quality: Quality }) {
+function SceneLights({ scene, quality }: { scene: GameScene; quality: Quality }) {
   switch (scene.id) {
     case 'beach':
-      return null;
+      return (
+        <>
+          <directionalLight position={[-2.4, 5.2, 6]} intensity={0.55} color="#d5f3ff" />
+          <pointLight position={[0.4, 0.6, -7]} intensity={quality === 'low' ? 1.4 : 3.2} color="#6ed4e6" distance={18} decay={2} />
+          {quality !== 'low' && <pointLight position={[3.6, 2.4, 1.2]} intensity={1.5} color="#ffe1ad" distance={9} decay={2} />}
+        </>
+      );
     case 'rua':
       return (
         <>
@@ -157,7 +163,7 @@ function World({ controller, skin, quality, sceneId, onReady }: SceneProps) {
         shadow-normalBias={0.025}
         shadow-radius={quality === 'high' ? 2.5 : 1.5}
       />
-      <StreetGlow scene={scene} quality={quality} />
+      <SceneLights scene={scene} quality={quality} />
       <Playground scene={scene} shadows={shadows} quality={quality} />
       {shadows && quality === 'high' && (
         <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color={scene.shadow} />
@@ -221,6 +227,9 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
         gl={{ antialias: props.quality !== 'low', powerPreference: 'high-performance' }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
         onCreated={({ gl }) => {
+          gl.toneMapping = ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.08;
+          gl.outputColorSpace = SRGBColorSpace;
           const el = gl.domElement;
           el.addEventListener('webglcontextlost', (e) => {
             e.preventDefault();

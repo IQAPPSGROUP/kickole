@@ -11,26 +11,26 @@ import type { Skin } from '../game/skins';
 export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER === 'true';
 
 /** Where the model is expected. If the file is missing or invalid the primitive character is used. */
-export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/footballer.glb`;
+export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kicky-player-rigged.glb`;
 
 /** Named animation states. Each maps to an animation clip with exactly this name in the GLB. */
-export const ANIMATION_STATES = [
-  'Idle',
-  'Ready',
-  'Kick_Left',
-  'Kick_Right',
-  'Stall_Left',
-  'Stall_Right',
-  'Celebrate',
-  'Dejected',
-] as const;
+export const ANIMATION_STATES = ['Idle', 'KickLeft', 'KickRight', 'Miss', 'Celebrate'] as const;
 export type AnimationState = (typeof ANIMATION_STATES)[number];
 
 /** Clips that must loop; all others play once and hold the last frame until the next state. */
-export const LOOPING_STATES: ReadonlySet<AnimationState> = new Set(['Idle', 'Ready', 'Stall_Left', 'Stall_Right']);
+export const LOOPING_STATES: ReadonlySet<AnimationState> = new Set(['Idle']);
 
-/** Seconds from the start of a Kick clip to the instant the foot meets the ball. */
+/** Seconds after the tap at which the foot meets the ball (matches the procedural kickEnvelope peak). */
 export const KICK_CONTACT_TIME = 0.04;
+
+/** Seconds into a Kick clip at which the foot meets the ball in the authored animation. */
+export const KICK_CLIP_CONTACT_TIME = 0.3;
+
+/**
+ * Where a Kick clip starts so its contact frame lands KICK_CONTACT_TIME after the engine registered the tap.
+ * The wind-up is skipped because the player cannot be seen to wind up before they decide to tap.
+ */
+export const KICK_CLIP_START = KICK_CLIP_CONTACT_TIME - KICK_CONTACT_TIME;
 
 /** Bone names the model must provide for procedural (pose-driven) animation. */
 export const BONE_NAMES = {
@@ -96,6 +96,8 @@ export interface StateResult {
   state: AnimationState;
   /** Changes every time a one-shot foot action starts so a repeated kick restarts its clip. */
   token: number;
+  /** Freeze the clip at its contact pose (foot stall: the ball is balanced on the foot). */
+  hold?: boolean;
 }
 
 const KICK_WINDOW = 0.35;
@@ -111,13 +113,13 @@ export function selectAnimationState(engine: GameEngine): StateResult {
   const lastKick = Math.max(lastL, lastR);
   const token = Math.round(lastKick * 1000);
 
-  if (phase === 'dropped' || phase === 'over') return { state: 'Dejected', token: 0 };
+  if (phase === 'dropped' || phase === 'over') return { state: 'Miss', token: 0 };
   if (phase === 'menu') return { state: 'Idle', token: 0 };
-  if (phase === 'ready') return { state: 'Ready', token: 0 };
+  if (phase === 'ready') return { state: 'Idle', token: 0 };
 
   const c = engine.contact;
-  if (c && c.kind === 'stall') return { state: c.side === 'left' ? 'Stall_Left' : 'Stall_Right', token };
-  if (t - lastKick >= 0 && t - lastKick < KICK_WINDOW) return { state: side === 'left' ? 'Kick_Left' : 'Kick_Right', token };
+  if (c && c.kind === 'stall') return { state: c.side === 'left' ? 'KickLeft' : 'KickRight', token, hold: true };
+  if (t - lastKick >= 0 && t - lastKick < KICK_WINDOW) return { state: side === 'left' ? 'KickLeft' : 'KickRight', token };
   const sincePerfect = t - engine.lastPerfectTime;
   if (sincePerfect >= 0 && sincePerfect < CELEBRATE_WINDOW) return { state: 'Celebrate', token: Math.round(engine.lastPerfectTime * 1000) };
   return { state: 'Idle', token: 0 };

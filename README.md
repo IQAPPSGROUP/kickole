@@ -51,4 +51,4 @@ Not done: real character models and animation clips, Capacitor projects, purchas
 
 ## Character model
 
-The footballer is currently built from primitives. A rigged GLB can replace it without code changes once it meets the spec in [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md): put it at `public/models/footballer.glb` and build with `VITE_USE_GLB_CHARACTER=true`. Invalid or missing models fall back to the primitive character.
+The footballer is currently built from primitives. A rigged GLB can replace it without code changes once it meets the spec in [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md): put it at `public/models/kicky-player-rigged.glb` and build with `VITE_USE_GLB_CHARACTER=true`. Invalid or missing models fall back to the primitive character.

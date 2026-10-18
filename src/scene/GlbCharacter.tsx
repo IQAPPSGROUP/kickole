@@ -7,7 +7,7 @@ import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
 import {
-  ANIMATION_STATES, BONE_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, CHARACTER_MODEL_URL, KICK_CLIP_CONTACT_TIME, KICK_CLIP_START, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 
@@ -92,8 +92,12 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
         const to = actions.get(next.state);
         const from = current.state ? actions.get(current.state) : undefined;
         if (to) {
+          const kick = next.state.startsWith('Kick');
           to.reset().play();
-          if (from && from !== to) from.crossFadeTo(to, next.state.startsWith('Kick') ? 0.04 : 0.15, false);
+          // Skip the wind-up so the foot reaches the ball at the engine's contact time; physics stays authoritative.
+          if (kick) to.time = next.hold ? KICK_CLIP_CONTACT_TIME : KICK_CLIP_START;
+          to.paused = !!next.hold;
+          if (from && from !== to) from.crossFadeTo(to, kick ? 0.04 : 0.15, false);
         }
         current.state = next.state;
         current.token = next.token;

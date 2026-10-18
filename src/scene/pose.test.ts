@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GameEngine } from '../engine/engine';
 import { computePose, createPose, kickEnvelope, solveLeg } from './pose';
-import { ANIMATION_STATES, selectAnimationState, validateModel, BONE_NAMES, MATERIAL_NAMES, skinMaterialColors } from './rig';
+import { ANIMATION_STATES, selectAnimationState, validateModel, BONE_NAMES, MATERIAL_NAMES, skinMaterialColors , KICK_CLIP_CONTACT_TIME, KICK_CLIP_START, KICK_CONTACT_TIME } from './rig';
 import { SKINS } from '../game/skins';
 
 const stepN = (e: GameEngine, n: number) => { for (let i = 0; i < n; i++) e.step(e.config.fixedStep); };
@@ -112,28 +112,31 @@ describe('GLB rig contract', () => {
     e.prepare('menu');
     expect(selectAnimationState(e).state).toBe('Idle');
     e.prepare('ready');
-    expect(selectAnimationState(e).state).toBe('Ready');
+    expect(selectAnimationState(e).state).toBe('Idle');
     e.press('left'); e.release('left');
     stepN(e, 5);
-    expect(selectAnimationState(e).state).toBe('Kick_Left');
+    expect(selectAnimationState(e).state).toBe('KickLeft');
+    expect(selectAnimationState(e).hold).toBeUndefined();
     stepN(e, 80);
     expect(selectAnimationState(e).state).toBe('Idle');
     toContact(e);
     e.press('right');
     stepN(e, 60);
-    expect(selectAnimationState(e).state).toBe('Stall_Right');
+    const stall = selectAnimationState(e);
+    expect(stall.state).toBe('KickRight');
+    expect(stall.hold).toBe(true);
     e.release('right');
     stepN(e, 5);
-    expect(selectAnimationState(e).state).toBe('Kick_Right');
+    expect(selectAnimationState(e).state).toBe('KickRight');
     stepN(e, 50);
     expect(selectAnimationState(e).state).toBe('Celebrate');
     for (let i = 0; i < 5000 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
-    expect(selectAnimationState(e).state).toBe('Dejected');
+    expect(selectAnimationState(e).state).toBe('Miss');
   });
 
   it('only produces states that have documented clip names', () => {
-    expect(ANIMATION_STATES).toContain('Kick_Left');
-    expect(ANIMATION_STATES).toHaveLength(8);
+    expect([...ANIMATION_STATES]).toEqual(['Idle', 'KickLeft', 'KickRight', 'Miss', 'Celebrate']);
+    expect(ANIMATION_STATES).toHaveLength(5);
   });
 
   it('restarts a repeated kick through a changing token', () => {
@@ -149,7 +152,7 @@ describe('GLB rig contract', () => {
     expect(full).toEqual({ missingBones: [], missingClips: [], missingMaterials: [] });
     const partial = validateModel(['Hips'], ['Idle'], ['Shirt']);
     expect(partial.missingBones).toContain('Head');
-    expect(partial.missingClips).toContain('Kick_Left');
+    expect(partial.missingClips).toContain('KickLeft');
     expect(partial.missingMaterials).toContain('Hair');
   });
 
@@ -158,5 +161,12 @@ describe('GLB rig contract', () => {
       const colors = skinMaterialColors(skin);
       for (const name of Object.values(MATERIAL_NAMES)) expect(colors[name]).toMatch(/^#[0-9a-f]{6}$/i);
     }
+  });
+});
+
+describe('GLB kick timing', () => {
+  it('starts kick clips so the 0.30 s contact frame lands at the engine contact offset', () => {
+    expect(KICK_CLIP_CONTACT_TIME).toBeCloseTo(0.3);
+    expect(KICK_CLIP_START + KICK_CONTACT_TIME).toBeCloseTo(KICK_CLIP_CONTACT_TIME);
   });
 });

@@ -29,3 +29,10 @@
 - Safe-area review (code only, `viewport-fit=cover` is set): top inset on `.screen`/`.hud`, bottom inset on touch-zone labels and cards, left/right insets on landscape home and score panel. Fixed: the landscape timing-feedback text now respects the right inset. Browser emulation reports insets of 0, so notch/home-indicator behaviour is **not verified on a device**.
 - Touch targets: buttons/toggles >= 44-52 px, touch zones are full half-screens. Not tested on real Android/iOS hardware.
 - Performance/asset loading: single JS bundle 1,258 kB (348 kB gzip), 172 KB GLB, no external assets; no frame-rate measurement is meaningful in software rendering.
+
+## Stage 4C
+- e0d1dbb confirmed on the remote branch. `tools/check-layout.mjs`: 9/9 PASS, nine-plus PNGs per run generated.
+- **Visual inspection did not happen.** The image viewer refused every screenshot (per-conversation limit already used), so **no screenshot has been visually inspected** and nothing is marked visually verified: not Medium, not landscape game-over, not scoreboard/sign clearance, contrast, or styling.
+- Substitute (not visual): DOM check of the game-over card at 320x568, 390x844, 844x390 (Medium): 10 text elements each, no overlapping text boxes, no truncated text, card horizontally centred.
+- No defects were confirmed, so no code changes were made.
+- Still needed: a person (or a session with viewer access) opens the PNGs from `node tools/check-layout.mjs`.

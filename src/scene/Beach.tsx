@@ -214,12 +214,12 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
         <planeGeometry args={[42, 16]} />
         <meshBasicMaterial map={sky} />
       </mesh>
-      <mesh position={[-6.5, 1.6, -12.2]} scale={[2.2, 1.5, 1.4]}>
-        <sphereGeometry args={[1.1, 12, 10]} />
+      <mesh position={[-6.6, 1.4, -7.8]} scale={[2.2, 1.35, 1.4]}>
+        <sphereGeometry args={[1.05, 14, 10]} />
         <meshStandardMaterial color="#2f6a45" roughness={1} />
       </mesh>
-      <mesh position={[7.2, 2.4, -12.6]} scale={[1.5, 2.2, 1.3]}>
-        <sphereGeometry args={[1.15, 12, 10]} />
+      <mesh position={[-1.15, 1.45, -8.2]} scale={[1.7, 1.55, 1.3]}>
+        <sphereGeometry args={[1.05, 14, 10]} />
         <meshStandardMaterial color="#24563a" roughness={1} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.4]} receiveShadow={shadows}>
@@ -238,10 +238,18 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
         <planeGeometry args={[20, 0.55]} />
         <meshBasicMaterial color="#f7f5ed" transparent opacity={0.55} />
       </mesh>
-      <mesh position={[5.2, 6.2, -10]}>
-        <sphereGeometry args={[0.85, quality === 'low' ? 10 : 20, quality === 'low' ? 10 : 16]} />
-        <meshBasicMaterial color="#ffe56a" />
-      </mesh>
+      <group position={[-4.6, 1.75, -6.1]}>
+        <mesh>
+          <sphereGeometry args={[0.62, quality === 'low' ? 10 : 20, quality === 'low' ? 10 : 16]} />
+          <meshBasicMaterial color="#ffe56a" fog={false} />
+        </mesh>
+        {quality !== 'low' && (
+          <mesh>
+            <sphereGeometry args={[1.25, 16, 12]} />
+            <meshBasicMaterial color="#ffe9a8" transparent opacity={0.32} depthWrite={false} fog={false} />
+          </mesh>
+        )}
+      </group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
         <ringGeometry args={[1.15, 1.22, 48]} />
         <meshBasicMaterial color="#fff6df" />

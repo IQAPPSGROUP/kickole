@@ -156,7 +156,7 @@ export function ShopScreen({ save, onBuy, onClose }: { save: SaveData; onBuy: (i
             const owned = save.ownedBoots.includes(boot.id);
             const equipped = save.equippedBoot === boot.id;
             const afford = owned || save.coins >= boot.price;
-            const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : afford ? `BUY ${boot.price}` : 'NEED COINS';
+            const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : afford ? `BUY ${boot.price}` : `${boot.price} COINS`;
             return (
               <button
                 key={boot.id}

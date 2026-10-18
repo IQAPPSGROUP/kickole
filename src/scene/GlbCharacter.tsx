@@ -78,11 +78,14 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
       const textured = !!m.map && (name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair);
       if (!textured && colors[name]) m.color.set(colors[name]);
       const boots = name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole;
+      const skinMat = name === MATERIAL_NAMES.skin;
+      const hair = name === MATERIAL_NAMES.hair;
       m.flatShading = false;
-      m.roughness = boots ? 0.48 : name === MATERIAL_NAMES.hair ? 0.88 : name === MATERIAL_NAMES.skin ? 0.82 : 0.76;
-      m.metalness = 0;
-      if (m.map) m.emissive.set('#000000');
-      else m.emissive.copy(m.color).multiplyScalar(0.12);
+      m.roughness = boots ? 0.32 : hair ? 0.9 : skinMat ? 0.55 : 0.68;
+      m.metalness = boots ? 0.14 : 0;
+      m.envMapIntensity = boots ? 1.2 : skinMat ? 0.85 : 0.65;
+      if (m.map || boots) m.emissive.set('#000000');
+      else m.emissive.copy(m.color).multiplyScalar(0.08);
     });
   }, [skin, materials]);
 

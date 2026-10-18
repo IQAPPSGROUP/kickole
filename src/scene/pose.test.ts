@@ -77,6 +77,21 @@ describe('computePose', () => {
     expect(p.torsoPitch).toBeGreaterThan(0.05);
   });
 
+  it('bends the supporting knee as the ball drops, without moving that thigh', () => {
+    const e = playing();
+    e.lastKick.left = -10;
+    e.lastKick.right = -10;
+    e.lastContact.left = -10;
+    e.lastContact.right = -10;
+    e.lastPerfectTime = -10;
+    e.ball.y = 0.35;
+    const p = computePose(e);
+    expect(p.legs.left.thigh).toBe(0);
+    expect(p.legs.right.thigh).toBe(0);
+    expect(p.legs.left.knee).toBeGreaterThan(0.15);
+    expect(p.armLeft).toBeGreaterThan(0.4);
+  });
+
   it('raises the arms to celebrate a perfect kick', () => {
     const e = playing();
     toContact(e, 5);

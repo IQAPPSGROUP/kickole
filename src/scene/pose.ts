@@ -93,15 +93,15 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
   const breathe = Math.sin(t * 2.4);
   out.breathe = breathe;
   out.bodyY = breathe * 0.006;
-  out.bodyYaw = 0;
+  out.bodyYaw = Math.sin(t * 0.8) * 0.04;
   out.torsoPitch = 0.02;
-  out.torsoRoll = 0;
-  out.armLeft = 0.22 + breathe * 0.02;
-  out.armRight = 0.22 + breathe * 0.02;
+  out.torsoRoll = Math.sin(t * 0.8) * 0.035;
+  out.armLeft = 0.26 + Math.sin(t * 1.4) * 0.05;
+  out.armRight = 0.26 + Math.sin(t * 1.4 + 1.2) * 0.05;
   out.armLeftPitch = 0;
   out.armRightPitch = 0;
-  out.legs.left = { ...REST };
-  out.legs.right = { ...REST };
+  out.legs.left = { ...REST, knee: 0.05 + Math.sin(t * 1.7) * 0.02 };
+  out.legs.right = { ...REST, knee: 0.05 + Math.sin(t * 1.7 + Math.PI) * 0.02 };
 
   if (active) {
     out.torsoRoll = clamp(-b.x * 0.18, -0.12, 0.12);
@@ -109,6 +109,7 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
 
   // Foot contact: IK leg to the ball position at the instant of contact.
   const sides: Side[] = ['left', 'right'];
+  const kicking: Record<Side, boolean> = { left: false, right: false };
   for (const side of sides) {
     const held = engine.contact && engine.contact.side === side;
     const sinceTap = t - engine.lastKick[side];
@@ -120,6 +121,7 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
         ? Math.exp(-Math.max(0, sinceContact) / 0.14)
         : kickEnvelope(sinceTap);
     if (env <= 0.001) continue;
+    kicking[side] = true;
     const bx = held ? b.x : (side === 'left' ? -1 : 1) * c.footX * 0.6;
     const stallLift = held && engine.contact!.kind === 'stall' ? 0.02 * Math.sin(t * 18) : 0;
     const target = { x: bx, y: c.contactHeight - 0.17 + stallLift, z: c.ballZ - 0.2 };
@@ -137,13 +139,33 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     out.bodyY -= 0.03 * env;
   }
 
-  // Celebration after a perfect kick.
+  // Weight the supporting leg as the ball comes down. The kicking thigh stays on the IK pose.
+  if (phase === 'playing') {
+    const drop = clamp((1.15 - b.y) / 1.15, 0, 1);
+    for (const side of sides) {
+      if (kicking[side]) continue;
+      out.legs[side].knee = 0.06 + drop * 0.16;
+      out.legs[side].thigh = 0;
+    }
+    if (!kicking.left && !kicking.right) {
+      out.armLeft = 0.32 + drop * 0.14 + Math.sin(t * 2.2) * 0.03;
+      out.armRight = 0.32 + drop * 0.14 + Math.sin(t * 2.2 + Math.PI) * 0.03;
+      out.torsoPitch = 0.03 + drop * 0.05;
+    }
+  }
+
+  // Celebration after a perfect kick. Arms are up within a few frames; the chest leans back once the kick has followed through.
   const cel = t - engine.lastPerfectTime;
-  if (cel >= 0 && cel < 0.7 && phase === 'playing') {
-    const k = Math.sin((cel / 0.7) * Math.PI);
-    out.armLeft = lerp(out.armLeft, 2.7, k);
-    out.armRight = lerp(out.armRight, 2.7, k);
-    out.bodyY += 0.08 * k;
+  if (cel >= 0 && cel < 1.2 && phase === 'playing') {
+    const k = Math.sin((cel / 1.2) * Math.PI);
+    const armsUp = cel < 0.9 ? Math.min(1, cel / 0.16) : k;
+    out.armLeft = lerp(out.armLeft, 2.65, armsUp);
+    out.armRight = lerp(out.armRight, 2.65, armsUp);
+    out.bodyYaw += Math.sin(cel * 7) * 0.1 * k;
+    out.bodyY += 0.05 * armsUp + (cel < 0.34 ? Math.sin((cel / 0.34) * Math.PI) * 0.07 : 0);
+    out.headPitch = lerp(out.headPitch, -0.28, armsUp);
+    const lean = clamp((cel - 0.28) / 0.3, 0, 1) * k;
+    out.torsoPitch = lerp(out.torsoPitch, -0.08, lean);
   }
 
   // Dejection after the ball drops.

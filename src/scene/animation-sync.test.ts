@@ -114,13 +114,13 @@ describe('celebrate then idle', () => {
     const e = engineAtPerfectTap();
     e.press('left'); e.release('left');
     const seen: string[] = [];
-    let first = -1, last = -1;
+    let first = -1;
     const t0 = e.time;
     for (let i = 0; i < 120 * 1.2 && e.phase === 'playing'; i++) {
       step(e);
       const st = selectAnimationState(e).state;
       if (!seen.length || seen[seen.length - 1] !== st) seen.push(st);
-      if (st === 'Celebrate') { if (first < 0) first = e.time - t0; last = e.time - t0; }
+      if (st === 'Celebrate') { if (first < 0) first = e.time - t0; }
     }
     expect(seen.slice(0, 2)).toEqual(['KickLeft', 'Celebrate']);
     expect(first).toBeGreaterThan(0.3);

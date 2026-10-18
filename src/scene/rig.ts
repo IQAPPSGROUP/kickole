@@ -7,8 +7,8 @@ import type { Skin } from '../game/skins';
  * Everything here is renderer-agnostic so it can be unit tested.
  */
 
-/** The GLB character is opt-in (VITE_USE_GLB_CHARACTER=true) so builds without an asset make no failing request. */
-export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER === 'true';
+/** Use the bundled GLB by default; VITE_USE_GLB_CHARACTER=false selects the primitive fallback. */
+export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER !== 'false';
 
 /** Where the model is expected. If the file is missing or invalid the primitive character is used. */
 export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kicky-player-rigged.glb`;
@@ -133,7 +133,11 @@ export function selectAnimationState(engine: GameEngine): StateResult {
 
   const kickState = side === 'left' ? 'KickLeft' : 'KickRight';
   const c = engine.contact;
-  if (c) return { state: kickState, token, clipTime: kickClipTime(engine, c.side) };
+  if (c) return {
+    state: c.side === 'left' ? 'KickLeft' : 'KickRight',
+    token: Math.round(engine.lastKick[c.side] * 1000),
+    clipTime: kickClipTime(engine, c.side),
+  };
   const sinceTap = t - lastKick;
   const lastContact = engine.lastContact[side];
   const sinceEnd = lastContact >= lastKick ? t - lastContact : sinceTap;

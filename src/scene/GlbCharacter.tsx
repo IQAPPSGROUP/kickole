@@ -85,7 +85,13 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   const footPos = useMemo(() => new Vector3(), []);
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
 
-  useEffect(() => () => { mixer.stopAllAction(); }, [mixer]);
+  useEffect(() => () => {
+    mixer.stopAllAction();
+    // React StrictMode replays effects on mount. Reset the state cache too,
+    // otherwise the next frame thinks the stopped action is still playing.
+    current.state = null;
+    current.token = -1;
+  }, [mixer, current]);
 
   useFrame((_, dt) => {
     if (useClips) {

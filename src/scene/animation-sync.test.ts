@@ -27,7 +27,8 @@ describe('foot contact vs ball response', () => {
       if (responseAt < 0) {
         expect(e.ball.vy).toBeLessThanOrEqual(0);
         expect(e.ball.y).toBeCloseTo(e.config.contactHeight, 6);
-        expect(e.ball.x).toBeCloseTo(e.ball.x, 9);
+        expect(e.ball.x).toBeCloseTo(start.x, 9);
+        expect(e.ball.z).toBeCloseTo(start.z, 9);
       }
     }
     expect(start.y).toBeCloseTo(e.config.contactHeight, 6);

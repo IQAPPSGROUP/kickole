@@ -1,7 +1,6 @@
 # Rigged GLB footballer – asset specification
 
-The game loads `public/models/kicky-player-rigged.glb` (served as `/models/kicky-player-rigged.glb`) only when built with `VITE_USE_GLB_CHARACTER=true`
-(e.g. `VITE_USE_GLB_CHARACTER=true npm run dev`), so default builds make no request for it. When enabled and the file is missing, is not a
+The game loads `public/models/kicky-player-rigged.glb` (served as `/models/kicky-player-rigged.glb`) by default. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
 binary glTF, fails to load, or lacks the required rig, the built-in primitive character (`src/scene/Character.tsx`)
 is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene/GlbCharacter.tsx` and
 `src/scene/CharacterSwitch.tsx`.
@@ -29,7 +28,7 @@ is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene
 | Legs (shin) | `LowerLeg_L`, `LowerLeg_R` |
 | Feet | `Foot_L`, `Foot_R` |
 
-Extra bones (neck, hands, toes, chest, forearms, etc.) are welcome. Left and right refer to the character's own left and right.
+Extra bones (neck, hands, toes, chest, forearms, etc.) are welcome. Left and right follow the game's screen/control convention: `_L` is world -X and `_R` is world +X while facing +Z. These are not anatomical left/right. Preserve this convention when importing or retargeting assets.
 Up to 40 bones; at most 2 influences per vertex is preferred on mobile.
 
 ## Animation clips (exact names)

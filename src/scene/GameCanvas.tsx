@@ -6,7 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
-import { Character } from './Character';
+import { CharacterSwitch } from './CharacterSwitch';
 import { Ball } from './Ball';
 import { Court } from './Court';
 import { Effects } from './Effects';
@@ -106,7 +106,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       {shadows && quality === 'high' && (
         <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color="#05161b" />
       )}
-      <Character engine={controller.engine} skin={skin} />
+      <CharacterSwitch engine={controller.engine} skin={skin} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
     </>
@@ -160,7 +160,7 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
       {props.quality !== 'low' && <div className="vignette" />}
       <Canvas
         key={props.quality}
-        shadows={props.quality !== 'low'}
+        shadows={props.quality !== 'low' ? 'percentage' : false}
         dpr={dpr}
         gl={{ antialias: props.quality !== 'low', powerPreference: 'high-performance' }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}

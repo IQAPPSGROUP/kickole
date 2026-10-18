@@ -40,7 +40,7 @@ const HIP_X = 0.1;
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
-function solveLeg(side: Side, target: { x: number; y: number; z: number }): LegPose {
+export function solveLeg(side: Side, target: { x: number; y: number; z: number }): LegPose {
   const hipX = side === 'left' ? -HIP_X : HIP_X;
   const f = target.z;
   const d = Math.max(0.05, HIP_Y - target.y);
@@ -67,7 +67,7 @@ function lerpLeg(a: LegPose, b: LegPose, t: number): LegPose {
 }
 
 /** Kick envelope: snaps to full extension at the contact instant, then eases out. */
-function kickEnvelope(dt: number): number {
+export function kickEnvelope(dt: number): number {
   if (dt < 0) return 0;
   if (dt < 0.04) return dt / 0.04;
   return Math.exp(-(dt - 0.04) / 0.14);

@@ -48,3 +48,7 @@ Working and checked (unit tests, TypeScript, production build, headless-browser 
 Implemented but only lightly checked: settings persistence, top-5 leaderboard UI, skins (3 free, cosmetic only), sound/vibration, WebGL error state.
 
 Not done: real character models and animation clips, Capacitor projects, purchases (skin `productId` is a placeholder), tuning on physical devices.
+
+## Character model
+
+The footballer is currently built from primitives. A rigged GLB can replace it without code changes once it meets the spec in [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md): put it at `public/models/footballer.glb` and build with `VITE_USE_GLB_CHARACTER=true`. Invalid or missing models fall back to the primitive character.

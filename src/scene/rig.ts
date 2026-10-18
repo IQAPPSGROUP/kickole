@@ -1,0 +1,124 @@
+import type { GameEngine } from '../engine/engine';
+import type { Side } from '../engine/config';
+import type { Skin } from '../game/skins';
+
+/**
+ * Contract for a rigged GLB footballer. See docs/CHARACTER_GLB.md for the full specification.
+ * Everything here is renderer-agnostic so it can be unit tested.
+ */
+
+/** The GLB character is opt-in (VITE_USE_GLB_CHARACTER=true) so builds without an asset make no failing request. */
+export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER === 'true';
+
+/** Where the model is expected. If the file is missing or invalid the primitive character is used. */
+export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/footballer.glb`;
+
+/** Named animation states. Each maps to an animation clip with exactly this name in the GLB. */
+export const ANIMATION_STATES = [
+  'Idle',
+  'Ready',
+  'Kick_Left',
+  'Kick_Right',
+  'Stall_Left',
+  'Stall_Right',
+  'Celebrate',
+  'Dejected',
+] as const;
+export type AnimationState = (typeof ANIMATION_STATES)[number];
+
+/** Clips that must loop; all others play once and hold the last frame until the next state. */
+export const LOOPING_STATES: ReadonlySet<AnimationState> = new Set(['Idle', 'Ready', 'Stall_Left', 'Stall_Right']);
+
+/** Seconds from the start of a Kick clip to the instant the foot meets the ball. */
+export const KICK_CONTACT_TIME = 0.04;
+
+/** Bone names the model must provide for procedural (pose-driven) animation. */
+export const BONE_NAMES = {
+  root: 'Hips',
+  spine: 'Spine',
+  head: 'Head',
+  armLeft: 'UpperArm_L',
+  armRight: 'UpperArm_R',
+  thighLeft: 'UpperLeg_L',
+  thighRight: 'UpperLeg_R',
+  shinLeft: 'LowerLeg_L',
+  shinRight: 'LowerLeg_R',
+  footLeft: 'Foot_L',
+  footRight: 'Foot_R',
+} as const;
+export type BoneKey = keyof typeof BONE_NAMES;
+
+/** Material names the model must use; skins recolour them. */
+export const MATERIAL_NAMES = {
+  shirt: 'Shirt',
+  shirtTrim: 'Shirt_Trim',
+  shorts: 'Shorts',
+  socks: 'Socks',
+  boots: 'Boots',
+  bootsSole: 'Boots_Sole',
+  skin: 'Skin',
+  hair: 'Hair',
+} as const;
+
+/** Colour for each contract material, taken from the skin config. */
+export function skinMaterialColors(skin: Skin): Record<string, string> {
+  return {
+    [MATERIAL_NAMES.shirt]: skin.clothing.shirt,
+    [MATERIAL_NAMES.shirtTrim]: skin.clothing.shirtTrim,
+    [MATERIAL_NAMES.shorts]: skin.clothing.shorts,
+    [MATERIAL_NAMES.socks]: skin.clothing.socks,
+    [MATERIAL_NAMES.boots]: skin.boots.main,
+    [MATERIAL_NAMES.bootsSole]: skin.boots.sole,
+    [MATERIAL_NAMES.skin]: skin.body.skin,
+    [MATERIAL_NAMES.hair]: skin.body.hair,
+  };
+}
+
+export interface ModelReport {
+  missingBones: string[];
+  missingClips: string[];
+  missingMaterials: string[];
+}
+
+/** Compare what a loaded model provides with the contract. */
+export function validateModel(bones: Iterable<string>, clips: Iterable<string>, materials: Iterable<string>): ModelReport {
+  const b = new Set(bones);
+  const c = new Set(clips);
+  const m = new Set(materials);
+  return {
+    missingBones: Object.values(BONE_NAMES).filter((n) => !b.has(n)),
+    missingClips: ANIMATION_STATES.filter((n) => !c.has(n)),
+    missingMaterials: Object.values(MATERIAL_NAMES).filter((n) => !m.has(n)),
+  };
+}
+
+export interface StateResult {
+  state: AnimationState;
+  /** Changes every time a one-shot foot action starts so a repeated kick restarts its clip. */
+  token: number;
+}
+
+const KICK_WINDOW = 0.35;
+const CELEBRATE_WINDOW = 0.8;
+
+/** Choose the animation state from engine state. Deterministic and independent of rendering. */
+export function selectAnimationState(engine: GameEngine): StateResult {
+  const t = engine.time;
+  const phase = engine.phase;
+  const lastL = engine.lastKick.left;
+  const lastR = engine.lastKick.right;
+  const side: Side = lastL >= lastR ? 'left' : 'right';
+  const lastKick = Math.max(lastL, lastR);
+  const token = Math.round(lastKick * 1000);
+
+  if (phase === 'dropped' || phase === 'over') return { state: 'Dejected', token: 0 };
+  if (phase === 'menu') return { state: 'Idle', token: 0 };
+  if (phase === 'ready') return { state: 'Ready', token: 0 };
+
+  const c = engine.contact;
+  if (c && c.kind === 'stall') return { state: c.side === 'left' ? 'Stall_Left' : 'Stall_Right', token };
+  if (t - lastKick >= 0 && t - lastKick < KICK_WINDOW) return { state: side === 'left' ? 'Kick_Left' : 'Kick_Right', token };
+  const sincePerfect = t - engine.lastPerfectTime;
+  if (sincePerfect >= 0 && sincePerfect < CELEBRATE_WINDOW) return { state: 'Celebrate', token: Math.round(engine.lastPerfectTime * 1000) };
+  return { state: 'Idle', token: 0 };
+}

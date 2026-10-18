@@ -65,12 +65,6 @@ function useWallTexture() {
         g.fill();
       }
       g.globalAlpha = 1;
-      g.font = 'italic 900 150px sans-serif';
-      g.lineWidth = 12;
-      g.strokeStyle = NAVY;
-      g.fillStyle = LIME;
-      g.strokeText('KICKOLÉ', 150, 620);
-      g.fillText('KICKOLÉ', 150, 620);
       // dark floor-fade for baked-style ambient occlusion
       const grad = g.createLinearGradient(0, n * 0.65, 0, n);
       grad.addColorStop(0, 'rgba(0,0,0,0)');
@@ -80,6 +74,37 @@ function useWallTexture() {
     }),
     [],
   );
+}
+
+/** KICKOLÉ sign. The canvas aspect (4:1) matches the 3 x 0.75 m plane so letters are not stretched. */
+function useSignTexture() {
+  return useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = 1024; c.height = 256;
+    const g = c.getContext('2d');
+    if (g) {
+      g.font = 'italic 900 190px "Trebuchet MS", "Segoe UI", sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.lineJoin = 'round';
+      g.lineWidth = 22;
+      g.strokeStyle = NAVY;
+      g.strokeText('KICKOLÉ', 512, 140);
+      g.fillStyle = WHITE;
+      g.fillText('KICKOLÉ', 512, 140);
+      g.save();
+      g.beginPath();
+      g.rect(670, 0, 354, 256);
+      g.clip();
+      g.fillStyle = LIME;
+      g.fillText('KICKOLÉ', 512, 140);
+      g.restore();
+    }
+    const t = new CanvasTexture(c);
+    t.colorSpace = SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  }, []);
 }
 
 /** Chain-link fence pattern with transparency. */
@@ -169,6 +194,7 @@ function Floodlight({ x, z }: { x: number; z: number }) {
 export function Court({ shadows }: { shadows: boolean }) {
   const tex = useCourtTexture();
   const wall = useWallTexture();
+  const sign = useSignTexture();
   const fence = useFenceTexture();
   const blob = useBlobTexture();
   return (
@@ -201,7 +227,11 @@ export function Court({ shadows }: { shadows: boolean }) {
         <boxGeometry args={[9, 2.6, 0.2]} />
         <meshStandardMaterial map={wall} roughness={0.9} />
       </mesh>
-      <Poster x={-3.2} y={1.5} color={CORAL} />
+      <mesh position={[-2.1, 2.05, -3.49]}>
+        <planeGeometry args={[3, 0.75]} />
+        <meshBasicMaterial map={sign} transparent toneMapped={false} />
+      </mesh>
+      <Poster x={1.9} y={1.4} color={CORAL} />
       <Poster x={3.1} y={1.45} color={TEAL} w={0.9} h={0.7} />
       {/* Chain-link fence along the top of the wall */}
       <mesh position={[0, 2.9, -3.4]}>

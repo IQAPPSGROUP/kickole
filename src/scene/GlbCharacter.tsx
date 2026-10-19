@@ -61,11 +61,24 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     const colors = skinMaterialColors(skin);
     materials.forEach((m, name) => {
       if (colors[name]) m.color.set(colors[name]);
-      // Matte cloth / skin, slightly glossy boots; a faint self-glow keeps shaded sides from going muddy.
-      const boots = name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole;
-      m.roughness = boots ? 0.45 : 0.72;
+      // Distinct PBR responses help cloth, skin, hair and boots read as separate
+      // surfaces. Keep authored normal/roughness maps and skin recolouring intact.
+      const roughness: Record<string, number> = {
+        [MATERIAL_NAMES.shirt]: 0.91,
+        [MATERIAL_NAMES.shirtTrim]: 0.76,
+        [MATERIAL_NAMES.shorts]: 0.89,
+        [MATERIAL_NAMES.socks]: 0.94,
+        [MATERIAL_NAMES.boots]: 0.38,
+        [MATERIAL_NAMES.bootsSole]: 0.82,
+        [MATERIAL_NAMES.skin]: 0.69,
+        [MATERIAL_NAMES.hair]: 0.78,
+      };
+      // Preserve authored roughness when a replacement GLB supplies a map.
+      if (!m.roughnessMap && roughness[name] !== undefined) m.roughness = roughness[name];
       m.metalness = 0;
-      m.emissive.copy(m.color).multiplyScalar(0.12);
+      // The original universal glow washed out shadows and made every surface
+      // look similar. Keep material emissive properties from the authored GLB.
+      m.needsUpdate = true;
     });
   }, [skin, materials]);
 

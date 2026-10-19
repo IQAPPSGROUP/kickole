@@ -128,7 +128,9 @@ export function App() {
           onShop={() => setOverlay('shop')}
         />
       )}
-      {phase !== 'menu' && <Hud hud={snap.hud} onSkipCelebration={() => controller.skipCelebration()} />}
+      {phase !== 'menu' && (
+        <Hud hud={snap.hud} controller={controller} onSkipCelebration={() => controller.skipCelebration()} />
+      )}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
       {phase === 'over' && snap.result && overlay === 'none' && (
         <GameOver

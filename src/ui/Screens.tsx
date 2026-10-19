@@ -101,6 +101,7 @@ export function SettingsScreen({
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
         <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />
         <Toggle label="Vibration" value={settings.vibration} onChange={(vibration) => onChange({ vibration })} />
+        <Toggle label="Trick hints" value={settings.hints} onChange={(hints) => onChange({ hints })} />
         <div className="group">
           <label>Graphics quality</label>
           <div className="seg">
@@ -117,7 +118,8 @@ export function SettingsScreen({
           <p><b>Foot stall:</b> press and hold on a good kick, then release to flick for +10.</p>
           <p><b>Coins</b> are earned from run score and spent in the Shop. Customise looks are free. Boots and kits never change timing.</p>
           <p>Keyboard: <b>A</b>/<b>D</b> feet · <b>H</b> header · <b>N</b> neck (hold) · <b>W</b> ATW · <b>T</b> thigh · <b>F</b> flick · <b>Esc</b> cancel · <b>Space</b> start.</p>
-          <p>Arm <b>ATW</b> / <b>THIGH</b> / <b>FLICK</b>, then tap left or right. <b>HEAD</b> taps immediately; <b>NECK</b> is press-and-hold, release to flick out.</p>
+          <p>Arm <b>ATW</b> / <b>THIGH</b> / <b>FLICK</b> / <b>GROOVE</b>, then tap left or right. <b>HEAD</b> taps immediately; <b>NECK</b> is press-and-hold, release to flick out. Groove scores extra when the tap lands on the beat.</p>
+          <p><b>Trick hints</b> call a move, glow the button, and show a tap, hold or swipe. Finish it before the ring empties for bonus points. Turn hints off here once you know the tricks. Each lesson is remembered on this device.</p>
           <p><b>Combos +5:</b> flick→header · header→neck→release · stall→ATW · alternating foot↔thigh. Chains expire if you wait too long or miss.</p>
         </div>
         <div className="group help">

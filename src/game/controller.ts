@@ -13,6 +13,16 @@ import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../eng
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
 import { beatClock, cheer, setBed, sfx, unlockAudio } from './audio';
+import {
+  applyPromptAction,
+  beginRun,
+  freshClock,
+  actionForTrick,
+  tickPrompts,
+  type ActivePrompt,
+  type PromptAction,
+  type PromptClock,
+} from './prompts';
 import { beatErrorMs, beatsToSeconds, GAMEPLAY_BPM, gradeBeat } from './beat';
 import { crowdLevel, loudestCheer, milestoneHits, newlyOpenedTiers, type AudioProgress } from './audioPolicy';
 import {
@@ -61,6 +71,8 @@ export interface Hud {
   neckHolding: boolean;
   celebrating: boolean;
   celebrationLabel: string | null;
+  prompt: ActivePrompt | null;
+  hintTip: string | null;
 }
 
 export interface Result {
@@ -100,6 +112,9 @@ export class GameController {
   private progress: AudioProgress = { streak: 0, kickUps: 0, perfects: 0 };
   private pendingCheers: string[] = [];
   private queuedCelebration: string | null = null;
+  private prompts: PromptClock = freshClock([], true);
+  /** The thigh and rainbow finish events are followed by a kick in the same turn. */
+  private suppressKickPrompt = false;
   private readonly billing: PurchaseService = createDefaultPurchaseService();
   private billingMessage: string | null = null;
   private billingBusy = false;
@@ -115,6 +130,7 @@ export class GameController {
 
   constructor() {
     this.engine.prepare('menu');
+    this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
     this.engine.on((e) => this.onEvent(e));
     this.billing.setEntitlementListener((snapshot) => this.applyBillingSnapshot(snapshot));
     this.snapshot = this.build();
@@ -204,6 +220,8 @@ export class GameController {
           && (e.trick.phase === 'contact' || e.trick.phase === 'execute'),
         celebrating: e.celebration != null,
         celebrationLabel: e.celebration ? (getDance(e.celebration.danceId)?.name ?? 'Dance') : null,
+        prompt: e.phase === 'playing' ? this.prompts.active : null,
+        hintTip: e.phase === 'playing' ? this.prompts.tip : null,
       },
       save: this.save,
       settings: this.settings,
@@ -324,12 +342,16 @@ export class GameController {
         if (sound) { if (e.stall) sfx.stall(); sfx.kick(e.grade, e.streak); }
         this.vibrate(e.grade === 'perfect' ? [12, 20, 12] : 10);
         fx.swoop = Math.max(fx.swoop, swoopStrength(e.streak, 0, prefersReducedMotion()));
+        if (this.suppressKickPrompt) this.suppressKickPrompt = false;
+        else if (high) this.onPromptAction('flick');
+        else this.onPromptAction('kick');
         this.publish();
         break;
       }
       case 'miss':
         this.show('miss', 'MISS', 0);
         if (sound) sfx.miss();
+        this.onPromptAction('miss');
         this.publish();
         break;
       case 'stallStart':
@@ -350,6 +372,7 @@ export class GameController {
         } else if (e.kind === 'neckStall' && e.phase === 'execute') {
           this.show('good', 'NECK RELEASE', 0);
         }
+        this.noteTrickPrompt(e.kind, e.phase, e.points);
         this.publish();
         break;
       case 'combo':
@@ -361,6 +384,7 @@ export class GameController {
         break;
       case 'trickFail':
         this.show('miss', 'TRICK MISS', 0);
+        this.onPromptAction('miss');
         this.publish();
         break;
       case 'drop':
@@ -417,6 +441,42 @@ export class GameController {
       this.queuedCelebration = null;
       this.beginCelebration(reason);
       this.publish();
+    }
+    if (this.engine.phase === 'playing' && this.settings.hints) {
+      const previousPrompt = this.promptKey();
+      this.prompts = tickPrompts(this.prompts, this.engine.time, Math.floor(this.engine.time));
+      if (this.promptKey() !== previousPrompt) this.publish();
+    }
+  }
+
+  private promptKey(): string {
+    const active = this.prompts.active;
+    return `${active?.id ?? ''}:${active?.chainCount ?? 0}:${active?.startedAt ?? 0}:${this.prompts.tip ?? ''}`;
+  }
+
+  private noteTrickPrompt(kind: string, phase: string, points: number) {
+    const action = actionForTrick(kind, phase, points);
+    if (action === 'thigh' || action === 'rainbow') this.suppressKickPrompt = true;
+    if (action) this.onPromptAction(action);
+  }
+
+  private onPromptAction(action: PromptAction) {
+    if (!this.settings.hints || this.engine.phase !== 'playing') return;
+    const beat = action === 'groove'
+      ? (this.engine.lastBeatGrade === 'perfect' || this.engine.lastBeatGrade === 'good' ? this.engine.lastBeatGrade : 'off')
+      : null;
+    const result = applyPromptAction(this.prompts, action, this.engine.time, beat);
+    this.prompts = result.clock;
+    if (result.learned) {
+      this.save = { ...this.save, learnedTricks: result.clock.learned };
+      persistSave(this.save);
+    }
+    if (result.bonus > 0) {
+      this.engine.stats.score += result.bonus;
+      this.show('perfect', result.call ?? 'NAILED IT!', result.bonus);
+      if (this.voices()) cheer('prompt');
+      if (!prefersReducedMotion()) fx.confetti = 1;
+      fx.flash = Math.max(fx.flash, 0.35);
     }
   }
 
@@ -495,6 +555,8 @@ export class GameController {
     this.progress = { streak: 0, kickUps: 0, perfects: 0 };
     this.pendingCheers = [];
     this.queuedCelebration = null;
+    this.suppressKickPrompt = false;
+    this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
     this.engine.prepare('ready');
     this.publish();
   }
@@ -502,12 +564,16 @@ export class GameController {
   home() {
     this.feedback = null;
     this.result = null;
+    this.suppressKickPrompt = false;
+    this.prompts = freshClock(this.save.learnedTricks, this.settings.hints);
     this.engine.prepare('menu');
     this.publish();
   }
 
   updateSettings(patch: Partial<Settings>) {
     this.settings = { ...this.settings, ...patch };
+    if (patch.hints === false) this.prompts = freshClock(this.save.learnedTricks, false);
+    if (patch.hints === true) this.prompts = beginRun(this.save.learnedTricks, true);
     saveSettings(this.settings);
     this.publish();
   }

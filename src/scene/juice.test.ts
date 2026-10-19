@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { comboHeat, particleBudget, swoopStrength } from './juice';
+import { cameraSway, comboHeat, crowdBob, particleBudget, sceneLifeBudget, swoopStrength } from './juice';
 import { kickToeClearance } from './kickClearance';
 
 describe('graphics juice budgets', () => {
@@ -24,6 +24,33 @@ describe('graphics juice budgets', () => {
     expect(swoopStrength(10, 0, false)).toBeGreaterThan(0);
     expect(swoopStrength(10, 0, true)).toBe(0);
     expect(swoopStrength(3, 5, false)).toBe(1);
+  });
+
+  it('scales background life down for low quality and reduced motion', () => {
+    const high = sceneLifeBudget('high', false);
+    const medium = sceneLifeBudget('medium', false);
+    const low = sceneLifeBudget('low', false);
+    const still = sceneLifeBudget('high', true);
+    expect(high.crowd).toBeGreaterThan(medium.crowd);
+    expect(medium.crowd).toBeGreaterThan(low.crowd);
+    expect(high.birds).toBeGreaterThan(0);
+    expect(low.birds).toBe(0);
+    expect(low.balloons).toBe(0);
+    expect(low.cameraSway).toBe(false);
+    expect(still.birds).toBe(0);
+    expect(still.buntingSway).toBe(false);
+    expect(still.lightSweep).toBe(false);
+    expect(still.cameraSway).toBe(false);
+    expect(high.crowd).toBeLessThanOrEqual(22);
+  });
+
+  it('bobs the crowd with the combo and holds the camera when motion is reduced', () => {
+    expect(crowdBob(0, false)).toBeGreaterThan(0);
+    expect(crowdBob(16, false)).toBeGreaterThan(crowdBob(0, false));
+    expect(crowdBob(20, true)).toBe(0);
+    expect(cameraSway(1, 'high', false).x).not.toBe(0);
+    expect(cameraSway(1, 'low', false)).toEqual({ x: 0, y: 0 });
+    expect(cameraSway(1, 'high', true)).toEqual({ x: 0, y: 0 });
   });
 
   it('lifts the toe only around the kick contact frame', () => {

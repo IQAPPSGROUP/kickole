@@ -1,0 +1,250 @@
+{
+  "version": 1,
+  "seed": 20261019,
+  "units": "metres",
+  "up": "+Y",
+  "front": "+Z",
+  "provenance": "Original procedural artwork created for IQ Apps Group; no downloaded models or photographic textures.",
+  "texture": {
+    "file": "beach-atlas.png",
+    "width": 1024,
+    "height": 1024,
+    "colorSpace": "sRGB"
+  },
+  "assets": [
+    {
+      "file": "beach-lod0.glb",
+      "lod": 0,
+      "triangles": 36470,
+      "vertices": 85618,
+      "bytes": 3536048,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -18.0,
+          -0.4,
+          -34.5
+        ],
+        "max": [
+          18.0,
+          5.272111432597035,
+          -4.5
+        ]
+      },
+      "sha256": "218e2f4ed4d3984dd64b0e54cd3f1e6fcb6ad8fdc96909580ee4c16c1e87d227",
+      "reviewFrame": {
+        "center": [
+          0,
+          1.5,
+          -9.3
+        ],
+        "span": 23
+      }
+    },
+    {
+      "file": "beach-lod1.glb",
+      "lod": 1,
+      "triangles": 9322,
+      "vertices": 21168,
+      "bytes": 1091928,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -18.0,
+          -0.4,
+          -34.5
+        ],
+        "max": [
+          18.0,
+          5.252989898732233,
+          -4.5
+        ]
+      },
+      "sha256": "0bf4b921d11c32dbd1d8bb2d0a3da41c9f78ef45d97e8db1dcf50423d5a4f348",
+      "reviewFrame": {
+        "center": [
+          0,
+          1.5,
+          -9.3
+        ],
+        "span": 23
+      }
+    },
+    {
+      "file": "beach-lod2.glb",
+      "lod": 2,
+      "triangles": 5094,
+      "vertices": 11554,
+      "bytes": 758928,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -18.0,
+          -0.30000000000000004,
+          -34.5
+        ],
+        "max": [
+          18.0,
+          5.262487113059643,
+          -4.5
+        ]
+      },
+      "sha256": "44204097b8ffa71a4a68cf840b6794957619c62ea4746ab2ee8111bfbf8e8bab",
+      "reviewFrame": {
+        "center": [
+          0,
+          1.5,
+          -9.3
+        ],
+        "span": 23
+      }
+    },
+    {
+      "file": "palm-cluster.glb",
+      "lod": 0,
+      "triangles": 7416,
+      "vertices": 17556,
+      "bytes": 964984,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.4704614786591668,
+          -0.010525695886190617,
+          -2.364589258003767
+        ],
+        "max": [
+          2.985448307631451,
+          4.872111432597036,
+          2.182785895413667
+        ]
+      },
+      "sha256": "81b2acb0fa30e2dd2a526f3ad5bb596f43a3f6c46c36a71743dfd97bced7a5fb"
+    },
+    {
+      "file": "coconut-kiosk.glb",
+      "lod": 0,
+      "triangles": 1128,
+      "vertices": 2608,
+      "bytes": 448836,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.85,
+          0.0,
+          -1.6
+        ],
+        "max": [
+          1.85,
+          3.392308108396233,
+          1.86
+        ]
+      },
+      "sha256": "00434f279b902c3b2b0e9f83091eb22d9808d0ee8c88d3177b8fd75d37fc8d37"
+    },
+    {
+      "file": "lifeguard-tower.glb",
+      "lod": 0,
+      "triangles": 1298,
+      "vertices": 3126,
+      "bytes": 466456,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.0,
+          -0.006398345726329449,
+          -1.12
+        ],
+        "max": [
+          1.4,
+          3.9,
+          1.6603317859905957
+        ]
+      },
+      "sha256": "cd145b6a4482637f99436d190f89885cbb39bdd81a0487c525711eb8a6b15699"
+    },
+    {
+      "file": "umbrella-loungers.glb",
+      "lod": 0,
+      "triangles": 1200,
+      "vertices": 2856,
+      "bytes": 457212,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.25,
+          0.0,
+          -1.25
+        ],
+        "max": [
+          1.25,
+          2.38,
+          1.3900000000000001
+        ]
+      },
+      "sha256": "5cdc0dd117a9028b826de95af7adf3fb6dc0dd86c2d1ca34903e9237c877369b"
+    },
+    {
+      "file": "beach-goal.glb",
+      "lod": 0,
+      "triangles": 840,
+      "vertices": 1992,
+      "bytes": 427420,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.5523081083962333,
+          -0.04,
+          -1.035
+        ],
+        "max": [
+          1.5523081083962333,
+          1.9023081083962334,
+          0.055
+        ]
+      },
+      "sha256": "03596deefd3b3a7fd57edf69a8a92debe54d844a2ac7699b889290f50049cc03"
+    },
+    {
+      "file": "fishing-boat.glb",
+      "lod": 0,
+      "triangles": 1096,
+      "vertices": 2600,
+      "bytes": 448432,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -0.7627685401856674,
+          0.05949611200159123,
+          -1.77
+        ],
+        "max": [
+          0.7627685401856674,
+          0.745,
+          2.007840830461083
+        ]
+      },
+      "sha256": "466d5a31b56fa33b5169cf8b5daf9c470faa5f8e529b51fca13f8c6c33216e53"
+    },
+    {
+      "file": "boardwalk.glb",
+      "lod": 0,
+      "triangles": 1224,
+      "vertices": 2832,
+      "bytes": 456576,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -0.925,
+          0.0,
+          -4.005
+        ],
+        "max": [
+          1.375,
+          0.975,
+          0.2450000000000001
+        ]
+      },
+      "sha256": "ca6a88b8aa536a6379627db44e7e462fce907bde4578a70755a5bdaa6d631773"
+    }
+  ]
+}

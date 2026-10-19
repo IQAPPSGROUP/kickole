@@ -5,4 +5,5 @@ dist
 inspect-shots/
 .validation/
 environment-shots/
+beach-shots/
 tools/__pycache__/

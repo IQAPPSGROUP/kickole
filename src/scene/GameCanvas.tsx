@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
 import { PMREMGenerator, PerspectiveCamera, Vector3 } from 'three';
@@ -12,6 +12,7 @@ import { Court } from './Court';
 import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
+import { ENVIRONMENT_THEME } from './environment';
 
 const TARGET = new Vector3(0, 1.25, 0.3);
 const DIR = new Vector3(0.42, 0.38, 0.82).normalize();
@@ -66,6 +67,18 @@ function Simulation({ controller }: { controller: GameController }) {
   return null;
 }
 
+/** Unsubscribe before a quality change disposes this canvas and releases its GL context. */
+function ContextLossGuard({ onLost }: { onLost: () => void }) {
+  const gl = useThree(state => state.gl);
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const lost = (event: Event) => { event.preventDefault(); onLost(); };
+    canvas.addEventListener('webglcontextlost', lost);
+    return () => canvas.removeEventListener('webglcontextlost', lost);
+  }, [gl, onLost]);
+  return null;
+}
+
 interface SceneProps {
   controller: GameController;
   skin: Skin;
@@ -79,8 +92,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const mapSize = quality === 'high' ? 2048 : 1024;
   return (
     <>
-      <color attach="background" args={['#234F4B']} />
-      <fog attach="fog" args={['#234F4B', 10, 22]} />
+      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#8dc5cb' : '#234F4B']} />
+      <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#8dc5cb', 24, 52] : ['#234F4B', 10, 22]} />
       <CameraRig shake={quality !== 'low'} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
@@ -145,11 +158,7 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
   const markReady = useCallback(() => setReady(true), []);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
+  const markLost = useCallback(() => setLost(true), []);
 
   if (!supported) return <GlError message="Your browser or device does not support WebGL. Try updating your browser." />;
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
@@ -165,10 +174,8 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
         dpr={dpr}
         gl={{ antialias: props.quality !== 'low', powerPreference: 'high-performance' }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
-        onCreated={({ gl }) => {
-          gl.domElement.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (mounted.current) setLost(true); });
-        }}
       >
+        <ContextLossGuard onLost={markLost} />
         <World {...props} onReady={markReady} />
       </Canvas>
     </Boundary>

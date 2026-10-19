@@ -5,7 +5,9 @@ import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 const require = createRequire(new URL('../.validation/package.json', import.meta.url));
 const { validateBytes } = require('gltf-validator');
-const root = new URL('../public/models/environment/', import.meta.url);
+const theme=process.argv[2]==='beach'?'beach':'environment';
+const folder=theme==='beach'?'beach-shots':'environment-shots';
+const root = new URL(`../public/models/${theme}/`, import.meta.url);
 const manifest=JSON.parse(readFileSync(new URL('manifest.json',root),'utf8'));
 const report=[];
 for(const asset of manifest.assets){
@@ -16,7 +18,7 @@ for(const asset of manifest.assets){
   report.push({file:asset.file,bytes:bytes.length,gzipBytes:gzipSync(bytes).length,triangles:asset.triangles,
     errors:validation.issues.numErrors,warnings:validation.issues.numWarnings,messages:validation.issues.messages});
 }
-mkdirSync(new URL('../environment-shots/',import.meta.url),{recursive:true});
-writeFileSync(new URL('../environment-shots/gltf-validation.json',import.meta.url),JSON.stringify(report,null,2)+'\n');
+mkdirSync(new URL(`../${folder}/`,import.meta.url),{recursive:true});
+writeFileSync(new URL(`../${folder}/gltf-validation.json`,import.meta.url),JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify(report,null,2));
 if(report.some(r=>r.errors||r.warnings)) process.exitCode=1;

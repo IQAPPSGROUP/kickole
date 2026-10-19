@@ -2,6 +2,8 @@ import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
+import { BeachCourt } from './BeachCourt';
+import { ENVIRONMENT_THEME } from './environment';
 
 const NAVY = '#142D35';
 const TEAL = '#12BFA6';
@@ -312,7 +314,7 @@ function HillsideNeighbourhood() {
   );
 }
 
-export function Court({ shadows, quality }: { shadows: boolean; quality: Quality }) {
+function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality }) {
   const tex = useCourtTexture();
   const wall = useWallTexture();
   const sign = useSignTexture();
@@ -403,4 +405,8 @@ export function Court({ shadows, quality }: { shadows: boolean; quality: Quality
       <Floodlight x={3.8} z={-3.2} />
     </group>
   );
+}
+
+export function Court(props: { shadows: boolean; quality: Quality }) {
+  return ENVIRONMENT_THEME === 'beach' ? <BeachCourt {...props} /> : <StreetCourt {...props} />;
 }

@@ -3,7 +3,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const base = `${import.meta.env.BASE_URL}models/environment/`;
+const theme = new URLSearchParams(location.search).get('theme') === 'beach' ? 'beach' : 'environment';
+const base = `${import.meta.env.BASE_URL}models/${theme}/`;
+if (theme === 'beach') {
+  document.querySelector('h1')!.textContent = 'Futebol, sol e mar.';
+  document.querySelector('header p')!.textContent = 'Brazilian beach-football environment kit';
+  document.title = 'Kickolé · Beach workshop';
+}
 const manifest = await fetch(`${base}manifest.json`).then(r => r.json());
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -22,7 +28,7 @@ const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshSt
 floor.rotation.x = -Math.PI/2; floor.position.y = -.46; scene.add(floor);
 const select = document.querySelector<HTMLSelectElement>('#asset')!;
 for(const asset of manifest.assets) select.add(new Option(asset.file.replace('.glb','').replaceAll('-',' '),asset.file));
-select.value = new URLSearchParams(location.search).get('asset') ?? 'hillside-lod0.glb';
+select.value = new URLSearchParams(location.search).get('asset') ?? (theme === 'beach' ? 'beach-lod0.glb' : 'hillside-lod0.glb');
 let model: THREE.Group | undefined;
 let info: any;
 let generation = 0;
@@ -30,8 +36,9 @@ const review = { loaded:false, error:'', file:'', triangles:0, draws:0, textures
 (window as any).__environmentReview = review;
 function frame(){
   if(!model) return;
-  const box = new THREE.Box3().setFromObject(model), size=box.getSize(new THREE.Vector3()), center=box.getCenter(new THREE.Vector3());
-  const radius = Math.max(size.x,size.y,size.z)*.67;
+  const box = new THREE.Box3().setFromObject(model), size=box.getSize(new THREE.Vector3());
+  const center = info.reviewFrame ? new THREE.Vector3(...info.reviewFrame.center as [number, number, number]) : box.getCenter(new THREE.Vector3());
+  const radius = (info.reviewFrame?.span ?? Math.max(size.x,size.y,size.z))*.67;
   camera.position.copy(center).add(new THREE.Vector3(.48,.38,1).normalize().multiplyScalar(radius/Math.tan(THREE.MathUtils.degToRad(19))));
   controls.target.copy(center); controls.update();
 }

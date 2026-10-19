@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest';
+import { FAN_BUTTON, circleGap, fanLayout, fanRects } from './fanLayout';
+
+function nearestGap(width: number, height: number, safeLeft = 0, safeRight = 0, safeBottom = 0) {
+  const layout = fanLayout(width, safeLeft, safeRight, safeBottom);
+  const rects = fanRects(width, height, layout);
+  let nearest = Infinity;
+  let pair = '';
+  for (let i = 0; i < rects.length; i++) {
+    for (let j = i + 1; j < rects.length; j++) {
+      const gap = circleGap(rects[i], rects[j]);
+      if (gap < nearest) {
+        nearest = gap;
+        pair = `${rects[i].name}/${rects[j].name}`;
+      }
+    }
+  }
+  return { layout, rects, nearest, pair };
+}
+
+describe('corner fan', () => {
+  it('puts HEAD above, NECK at 35°, and ATW beside the left foot', () => {
+    const { layout, rects } = nearestGap(375, 667);
+    const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
+    expect(byName.head.x).toBeCloseTo(byName.left.x, 4);
+    expect(byName.head.y).toBeLessThan(byName.left.y);
+    expect(byName.atw.y).toBeCloseTo(byName.left.y, 4);
+    expect(byName.atw.x).toBeGreaterThan(byName.left.x);
+    const angle = Math.atan2(layout.dy, layout.dx) * (180 / Math.PI);
+    expect(angle).toBeCloseTo(35, 4);
+    expect(byName.flick.x).toBeCloseTo(byName.right.x, 4);
+    expect(byName.groove.y).toBeCloseTo(byName.right.y, 4);
+    expect(byName.thigh.x).toBeLessThan(byName.right.x);
+  });
+
+  it('keeps 72px buttons from overlapping on a 375x667 phone and a large phone', () => {
+    for (const [width, height] of [[375, 667], [390, 844], [430, 932]] as const) {
+      const { nearest, pair, rects } = nearestGap(width, height);
+      expect(nearest, `${width} ${pair}`).toBeGreaterThanOrEqual(6);
+      for (const rect of rects) expect(rect.w).toBe(FAN_BUTTON);
+    }
+  });
+
+  it('keeps the fan inside the screen when the safe area grows', () => {
+    const { rects, nearest } = nearestGap(390, 844, 12, 12, 34);
+    expect(nearest).toBeGreaterThanOrEqual(6);
+    for (const rect of rects) {
+      expect(rect.x).toBeGreaterThanOrEqual(12);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.w).toBeLessThanOrEqual(390 - 12);
+      expect(rect.y + rect.h).toBeLessThanOrEqual(844 - 34);
+    }
+  });
+});

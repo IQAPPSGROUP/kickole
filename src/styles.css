@@ -15,8 +15,18 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   inset: 0;
   overflow: hidden;
   --trick-size: 72px;
+  --btn: 72px;
   --trick-gap: 8px;
-  --control-lift: calc(var(--trick-size) * 3 + var(--trick-gap) * 2 + 16px);
+  --sat-l: env(safe-area-inset-left, 0px);
+  --sat-r: env(safe-area-inset-right, 0px);
+  --sat-b: env(safe-area-inset-bottom, 0px);
+  --fan-d: 80px;
+  --fan-dx: 107.36px;
+  --fan-dy: 75.17px;
+  --fan-inset-l: 4px;
+  --fan-inset-r: 4px;
+  --fan-inset-b: 8px;
+  --control-lift: calc(var(--fan-d) + var(--btn) + 12px);
 }
 .app canvas { display: block; touch-action: none; }
 
@@ -217,27 +227,40 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 
 .zones {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 6;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-  padding: 0 max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   pointer-events: none;
 }
-.trick-bar {
-  pointer-events: none;
+.fan {
   position: absolute;
-  right: max(8px, env(safe-area-inset-right));
-  bottom: max(10px, env(safe-area-inset-bottom));
-  display: grid;
-  grid-template-columns: repeat(2, var(--trick-size));
-  grid-template-rows: repeat(3, var(--trick-size));
-  gap: var(--trick-gap);
+  bottom: var(--fan-inset-b);
+  width: var(--btn);
+  height: var(--btn);
+  pointer-events: none;
 }
+.fan-left { left: var(--fan-inset-l); }
+.fan-right { right: var(--fan-inset-r); }
+.fan .trick-btn,
+.fan .foot-btn {
+  position: absolute;
+  width: var(--btn);
+  height: var(--btn);
+  margin: 0;
+}
+.fan-left .foot-btn,
+.fan-left .fan-top { left: 0; }
+.fan-left .foot-btn,
+.fan-left .fan-side { bottom: 0; }
+.fan-left .fan-side { left: var(--fan-d); }
+.fan-left .fan-top { bottom: var(--fan-d); }
+.fan-left .fan-diag { left: var(--fan-dx); bottom: var(--fan-dy); }
+.fan-right .foot-btn,
+.fan-right .fan-top { right: 0; }
+.fan-right .foot-btn,
+.fan-right .fan-side { bottom: 0; }
+.fan-right .fan-side { right: var(--fan-d); }
+.fan-right .fan-top { bottom: var(--fan-d); }
+.fan-right .fan-diag { right: var(--fan-dx); bottom: var(--fan-dy); }
 .trick-btn {
   pointer-events: auto;
   position: relative;
@@ -280,12 +303,12 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .trick-icon { width: 22px; height: 22px; display: block; }
 .trick-label { font-size: 11px; line-height: 1; letter-spacing: .6px; }
 .trick-sub { font-size: 9px; letter-spacing: 1px; opacity: .9; }
-.ps-head { grid-column: 1; grid-row: 1; --ps-tint: #FFD93D; }
-.ps-atw { grid-column: 2; grid-row: 1; --ps-tint: #6C5CE7; }
-.ps-neck { grid-column: 1; grid-row: 2; --ps-tint: #FF4F9A; }
-.ps-flick { grid-column: 2; grid-row: 2; --ps-tint: #FF8A5B; }
-.ps-groove { grid-column: 1; grid-row: 3; --ps-tint: #FFD93D; color: #1E2A5A; }
-.ps-thigh { grid-column: 2; grid-row: 3; --ps-tint: #00B8A9; }
+.ps-head { --ps-tint: #FFD93D; }
+.ps-atw { --ps-tint: #6C5CE7; }
+.ps-neck { --ps-tint: #FF4F9A; }
+.ps-flick { --ps-tint: #FF8A5B; }
+.ps-groove { --ps-tint: #FFD93D; color: #1E2A5A; }
+.ps-thigh { --ps-tint: #00B8A9; }
 .beat-ring {
   position: absolute;
   inset: 4px;
@@ -333,6 +356,10 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .trick-btn:active:not(.locked) { transform: scale(.94); }
 .trick-help {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--fan-inset-b) + var(--control-lift) + 8px);
   margin: 0;
   text-align: center;
   font-size: 9px;
@@ -356,14 +383,6 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   text-shadow: 0 2px 6px #142d35;
   pointer-events: none;
 }
-.foot-row {
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-end;
-  gap: 10px;
-  width: calc(100% - (var(--trick-size) * 2 + var(--trick-gap) + 12px));
-  pointer-events: none;
-}
 .power-ring {
   position: absolute;
   inset: -7px;
@@ -384,8 +403,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   flex-shrink: 0;
   -webkit-user-select: none;
   user-select: none;
-  width: min(24vw, 104px);
-  height: min(24vw, 104px);
+  width: var(--btn);
+  height: var(--btn);
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, .42);
   background:
@@ -491,9 +510,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
   .score { font-size: 44px; }
   .feedback { left: auto; right: max(12px, env(safe-area-inset-right)); top: 24px; width: 26%; font-size: 28px; }
-  .foot-btn { width: min(18vw, 76px); height: min(18vw, 76px); }
   .tap-start { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 16px); font-size: 24px; }
-  .foot-btn { width: min(20vw, 84px); height: min(20vw, 84px); }
   .foot-btn-mark { font-size: 26px; }
   .stall-hint { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); }
 }
@@ -517,10 +534,6 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .hud-sub { margin-top: 2px; }
   .final { font-size: 56px; }
   .card { padding: 16px; gap: 8px; }
-  /* Keep trick arming + foot cues compact so the player/ball stay visible on iPhone SE/13 mini. */
-  .zones { gap: 4px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-  .foot-row { gap: 8px; }
-  .foot-btn { width: 72px; height: 72px; }
   .trick-armed { bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); font-size: 11px; }
   .stall-hint { bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); font-size: 12px; }
   .feedback { top: 28%; font-size: clamp(24px, 7vw, 40px); }
@@ -531,7 +544,6 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .stats b { font-size: 20px; }
   .card .btn.primary.big { padding-top: 8px; padding-bottom: 8px; }
   .board li { padding: 3px 10px; font-size: 12px; }
-  .trick-bar { gap: 4px; }
   .trick-help { display: none; }
   .trick-armed { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); }
 }

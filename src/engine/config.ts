@@ -89,6 +89,8 @@ export interface GameConfig {
   /** Hold time (s) before a held control becomes a foot stall. */
   /** Seconds between the tap and the ball response, so the foot arrives before the ball leaves (animation contact). */
   contactDelay: number;
+  /** Seconds the ball and the kick pose hold on the boot after a foot strike. Spin keeps turning. */
+  hitPause: number;
   stallHoldTime: number;
   /** Max stall duration (s) before an automatic flick. */
   stallMaxTime: number;
@@ -143,6 +145,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   maxGravityScale: 1.45,
   missCooldown: 0.22,
   contactDelay: 0.04,
+  hitPause: 0.04,
   stallHoldTime: 0.14,
   stallMaxTime: 1.0,
   dropTime: 1.1,

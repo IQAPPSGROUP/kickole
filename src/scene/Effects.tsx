@@ -39,6 +39,7 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       if (e.type === 'kick') {
         ringT.current = 0;
         fx.push = Math.max(fx.push, e.grade === 'perfect' ? 1 : 0.35);
+        spawn(quality === 'low' ? 5 : 8, b.x, b.y - 0.04, b.z, 0.7, 1.4, 0.28, true);
         if (e.grade === 'perfect') {
           fx.shake = 1;
           spawn(quality === 'low' ? 8 : 18, b.x, b.y, b.z, 2.2, 6, 0.7);

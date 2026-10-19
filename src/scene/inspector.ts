@@ -48,7 +48,8 @@ export function buildScenario(engine: GameEngine, side: Side, mode: InspectMode,
   let contactAt: number | null = null;
   const off = engine.on((e) => { if (e.type === 'kick') contactAt = engine.time - tapAt; });
   // Advance in fixed steps; the tap happens on the first step at or after tapAt.
-  while (engine.time < target - 1e-9) {
+  let steps = 0;
+  while (engine.time < target - 1e-9 && steps++ < 200000) {
     if (!pressed && engine.time >= tapAt - 1e-9) { engine.press(side); pressed = true; if (mode === 'kick') { engine.release(side); released = true; } }
     if (mode === 'stall' && pressed && !released && engine.time - tapAt >= STALL_RELEASE_AFTER - 1e-9) { engine.release(side); released = true; }
     engine.step(h);

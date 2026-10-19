@@ -28,6 +28,17 @@ const LOOK = new Vector3();
 const INTRO_POS = new Vector3();
 const INTRO_TARGET = new Vector3();
 
+interface Kickcam {
+  fov: number;
+  pos: [number, number, number];
+  look: [number, number, number];
+}
+
+function devKickcam(): Kickcam | null {
+  if (!import.meta.env.DEV) return null;
+  return (window as unknown as { __kickcam?: Kickcam | null }).__kickcam ?? null;
+}
+
 function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
   cam.fov = FOV;
   gameplayCameraPosition(aspect, BASE);
@@ -56,6 +67,16 @@ function CameraRig({ shake }: { shake: boolean }) {
   }, [camera, size]);
   useFrame((state, dt) => {
     const cam = camera as PerspectiveCamera;
+    const kickcam = devKickcam();
+    if (kickcam) {
+      if (cam.fov !== kickcam.fov) {
+        cam.fov = kickcam.fov;
+        cam.updateProjectionMatrix();
+      }
+      cam.position.set(kickcam.pos[0], kickcam.pos[1], kickcam.pos[2]);
+      cam.lookAt(kickcam.look[0], kickcam.look[1], kickcam.look[2]);
+      return;
+    }
     const aspect = size.width / Math.max(1, size.height);
     if (!isOpeningIntroDone()) {
       // idle/waiting hold the start pose (u=0); playing advances; skip/finish snaps to endpoint.

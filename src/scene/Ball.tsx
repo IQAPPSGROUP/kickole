@@ -81,14 +81,19 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     const b = engine.ball;
     if (group.current) group.current.position.set(b.x, b.y, b.z);
     if (spin.current) { euler.set(b.rx, b.ry, b.rz); spin.current.rotation.copy(euler); }
-    // Contact squash and flash: strongest right after the ball response.
+    // Squash is full while the hit-pause holds the contact frame (engine time stays put), then eases out.
+    // The spin group is a child, so the panels keep turning inside the flattened ball.
     const since = engine.time - Math.max(engine.lastContact.left, engine.lastContact.right);
-    const k = since >= 0 && since < 0.12 ? Math.sin((since / 0.12) * Math.PI) : 0;
-    if (group.current) group.current.scale.set(1 + 0.18 * k, 1 - 0.22 * k, 1 + 0.18 * k);
+    const squashWindow = 0.1;
+    const squash = since >= 0 && since < squashWindow && engine.lastKickGrade !== 'miss'
+      ? Math.cos((since / squashWindow) * Math.PI * 0.5)
+      : 0;
+    // Depth stays at 1 so the face against the boot does not grow through the leather.
+    if (group.current) group.current.scale.set(1 + 0.045 * squash, 1 - 0.07 * squash, 1);
     if (flash.current) {
-      flash.current.visible = k > 0.05 && engine.lastKickGrade !== 'miss';
-      flash.current.scale.setScalar(0.6 + k * 1.4);
-      (flash.current.material as unknown as { opacity: number }).opacity = 0.8 * k;
+      flash.current.visible = squash > 0.04;
+      flash.current.scale.setScalar(1 + 0.06 * squash);
+      (flash.current.material as unknown as { opacity: number }).opacity = 0.22 * squash;
     }
     if (showTrail) {
       const speed = Math.hypot(b.vx, b.vy, b.vz);
@@ -119,8 +124,8 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     <>
       <group ref={group}>
         <mesh ref={flash} visible={false}>
-          <sphereGeometry args={[r * 1.8, 12, 10]} />
-          <meshBasicMaterial color="#FFD93D" transparent opacity={0} depthWrite={false} />
+          <sphereGeometry args={[r * 1.06, 12, 10]} />
+          <meshBasicMaterial color="#FFF1C9" transparent opacity={0} depthWrite={false} />
         </mesh>
         <group ref={spin}>
           <mesh castShadow material={leather}>

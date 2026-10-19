@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameEngine } from './engine';
+import { clearFootContactAnchors, setFootContactAnchors } from './footContact';
 
 function runUntilContactDelta(e: GameEngine, targetMs: number) {
   for (let i = 0; i < 100000; i++) {
@@ -171,5 +172,69 @@ describe('input abuse', () => {
     const y = e.ball.y, x = e.ball.x, z = e.ball.z;
     stepN(e, 30);
     expect([e.ball.x, e.ball.y, e.ball.z]).toEqual([x, y, z]);
+  });
+});
+
+describe('kick contact', () => {
+  it('snaps a foot trap onto the measured boot', () => {
+    const anchor = { x: -0.11, y: 0.69, z: 0.55 };
+    setFootContactAnchors(anchor, { x: 0.11, y: 0.69, z: 0.55 });
+    try {
+      const e = started();
+      runUntilContactDelta(e, 5);
+      e.press('left');
+      expect(e.ball.x).toBeCloseTo(anchor.x, 6);
+      expect(e.ball.y).toBeCloseTo(anchor.y, 6);
+      expect(e.ball.z).toBeCloseTo(anchor.z, 6);
+      expect(e.ball.vy).toBe(0);
+    } finally {
+      clearFootContactAnchors();
+    }
+  });
+
+  it('holds the ball on the boot for about 40 ms while spin keeps turning', () => {
+    const e = started();
+    runUntilContactDelta(e, 5);
+    e.press('left');
+    e.release('left');
+    const h = e.config.fixedStep;
+    for (let i = 0; i < 20 && e.stats.kickUps === 0; i++) e.update(h);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.hitPause).toBeGreaterThan(0.03);
+    const y = e.ball.y;
+    const rx = e.ball.rx;
+    const t = e.time;
+    e.update(0.02);
+    expect(e.ball.y).toBeCloseTo(y, 6);
+    expect(e.ball.vy).toBeGreaterThan(3);
+    expect(Math.abs(e.ball.rx - rx)).toBeGreaterThan(0.1);
+    expect(e.time).toBeCloseTo(t, 6);
+    expect(e.hitPause).toBeGreaterThan(0);
+    e.update(0.05);
+    expect(e.hitPause).toBeLessThan(1e-6);
+    expect(e.ball.y).toBeGreaterThan(y + 0.02);
+    expect(e.time).toBeGreaterThan(t);
+  });
+
+  it('does not hit-pause a thigh touch', () => {
+    const e = started();
+    e.setTrick('thigh');
+    e.ball.y = e.config.contacts.thigh.y + 0.7;
+    e.ball.vy = 0;
+    e.ball.vx = 0;
+    e.ball.vz = 0;
+    e.ball.x = 0;
+    e.ball.z = e.config.contacts.thigh.z;
+    for (let i = 0; i < 100000 && !(e.ball.vy < 0 && e.timingDeltaMs(e.config.contacts.thigh.y) <= 8); i++) {
+      e.step(e.config.fixedStep);
+    }
+    e.press('left');
+    e.release('left');
+    for (let i = 0; i < 20 && e.stats.thighs === 0; i++) e.update(e.config.fixedStep);
+    expect(e.stats.thighs).toBe(1);
+    expect(e.hitPause).toBe(0);
+    const y = e.ball.y;
+    e.update(0.02);
+    expect(e.ball.y).toBeGreaterThan(y);
   });
 });

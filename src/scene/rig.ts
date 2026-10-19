@@ -168,8 +168,8 @@ const CELEBRATE_WINDOW = KICK_POST_CONTACT + 1.2;
 
 /**
  * Clip time for a kick on `side`. The clip starts KICK_CLIP_START after 0 at the tap, reaches its 0.30 s contact frame
- * when the engine responds (tap + contactDelay), is held on that frame while the ball is trapped (foot stall) and plays
- * on from it once the ball is released. Purely a function of engine state, so it is deterministic and testable.
+ * when the engine responds (tap + contactDelay), is held on that frame while the ball is trapped (foot stall) and while
+ * a hit-pause freezes simulation time, then plays on once the ball leaves. Purely a function of engine state, so it is deterministic and testable.
  */
 export function kickClipTime(engine: GameEngine, side: Side): number {
   const t = engine.time;

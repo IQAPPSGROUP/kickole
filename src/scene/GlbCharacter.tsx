@@ -5,6 +5,7 @@ import { AnimationMixer, BoxGeometry, CanvasTexture, LoopOnce, LoopRepeat, Mater
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
+import { clearFootContactAnchors, setFootContactAnchors } from '../engine/footContact';
 import type { SurfacePattern } from '../game/catalogue';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
@@ -20,6 +21,7 @@ import {
 import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
 import { HairVariants } from './HairVariants';
+import { measureKickContactAnchors } from './measureFootContact';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
 function toonRole(name: string): ToonRole {
@@ -231,6 +233,19 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   const useClips = report.missingClips.length === 0;
   const usable = useClips || report.missingBones.length === 0;
 
+  useLayoutEffect(() => {
+    if (!useClips) {
+      clearFootContactAnchors();
+      return;
+    }
+    const anchors = measureKickContactAnchors(scene, clips);
+    setFootContactAnchors(anchors.left, anchors.right);
+    if (import.meta.env.DEV) {
+      (window as unknown as { __footContact?: typeof anchors }).__footContact = anchors;
+    }
+    return () => clearFootContactAnchors();
+  }, [scene, clips, useClips]);
+
   useEffect(() => {
     if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); return; }
     if (report.missingBones.length || report.missingMaterials.length) console.warn('Character GLB is missing contract items', report);
@@ -283,6 +298,11 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     };
     attach(bones.footLeft);
     attach(bones.footRight);
+    const anchors = measureKickContactAnchors(scene, clips);
+    setFootContactAnchors(anchors.left, anchors.right);
+    if (import.meta.env.DEV) {
+      (window as unknown as { __footContact?: typeof anchors }).__footContact = anchors;
+    }
     return () => {
       for (const mesh of added) mesh.parent?.remove(mesh);
       laceMat.dispose();
@@ -290,7 +310,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       for (const geo of laceGeos) geo.dispose();
       heelGeo.dispose();
     };
-  }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality]);
+  }, [scene, clips, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
   const actions = useMemo(() => {

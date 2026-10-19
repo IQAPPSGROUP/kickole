@@ -5,6 +5,7 @@ import { AnimationMixer, Box3, Matrix4, Texture, Vector3, type AnimationClip, ty
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { DEFAULT_CONFIG } from '../engine/config';
+import { ballCenterForKick } from './measureFootContact';
 import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel } from './rig';
 
 const LOD0 = new URL('../../public/models/kickole_player_v4.glb', import.meta.url);
@@ -196,6 +197,22 @@ describe.each([
       expect(meshGap).toBeLessThan(0.06);
     },
   );
+
+  it.each([['left'], ['right']] as const)('puts the ball on the %s boot at the contact frame', async (side) => {
+    const gltf = await load(file);
+    const anchor = ballCenterForKick(gltf.scene, gltf.animations, side);
+    expect(anchor).not.toBeNull();
+    const center = anchor!.center;
+    const strike = anchor!.strike;
+    const touch = Math.hypot(center.x - strike.x, center.y - strike.y, center.z - strike.z);
+    expect(Math.abs(touch - DEFAULT_CONFIG.ballRadius)).toBeLessThan(0.003);
+    expect(strike.z).toBeGreaterThan(0.35);
+    expect(center.z).toBeGreaterThan(strike.z);
+    expect(center.x * (side === 'left' ? -1 : 1)).toBeGreaterThan(0.02);
+    const gap = bootSurfaceGap(gltf.scene, new Vector3(center.x, center.y, center.z));
+    expect(gap).toBeGreaterThan(-0.004);
+    expect(gap).toBeLessThan(0.004);
+  });
 
   it('skins the authored hair to the head', async () => {
     const gltf = await load(file);

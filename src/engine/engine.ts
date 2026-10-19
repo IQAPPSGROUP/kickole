@@ -1,4 +1,5 @@
 import { DEFAULT_CONFIG, type GameConfig, type Grade, type Side } from './config';
+import { footContactAnchors } from './footContact';
 import {
   createComboTracker,
   pushComboEvent,
@@ -88,6 +89,11 @@ export class GameEngine {
   /** Last non-foot trick for animation (not a fake left/right kick). */
   lastTrick: { kind: TrickKind; time: number } | null = null;
   contact: Contact | null = null;
+  /**
+   * Seconds left to hold a foot strike on the boot. Simulation time does not advance,
+   * so the kick clip stays on its contact frame while the ball keeps spinning.
+   */
+  hitPause = 0;
   /** Active trick state machine, if any. */
   trick: TrickState | null = null;
   /** Next trick intent. `null` keeps classic foot-only controls. */
@@ -148,6 +154,7 @@ export class GameEngine {
     this.streak = 0;
     this.lastSide = null;
     this.contact = null;
+    this.hitPause = 0;
     this.trick = null;
     this.selectedTrick = null;
     this.cooldown = 0;
@@ -323,10 +330,17 @@ export class GameEngine {
     }
     this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick, thigh: false };
     const b = this.ball;
-    b.y = this.config.contactHeight;
-    b.z = this.config.ballZ;
     b.vx = b.vy = b.vz = 0;
-    b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.6;
+    const anchor = footContactAnchors[side];
+    if (anchor) {
+      b.x = anchor.x;
+      b.y = anchor.y;
+      b.z = anchor.z;
+    } else {
+      b.y = this.config.contactHeight;
+      b.z = this.config.ballZ;
+      b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.6;
+    }
     if (highFlick) this.selectedTrick = null;
   }
 
@@ -644,11 +658,19 @@ export class GameEngine {
     b.vx = (targetX - b.x) / flight;
     b.vz = c.thigh ? (this.config.ballZ - b.z) / Math.max(flight, 1e-3) : 0;
     this.applySpin(c.side, quality);
+    if (!c.thigh) this.hitPause = this.config.hitPause;
     this.emit({ type: 'kick', side: c.side, grade: c.grade, points, alternate, stall, streak: this.streak, deltaMs: c.deltaMs });
     if (c.highFlick) this.noteCombo('highFlick');
     else if (c.thigh) this.noteCombo('thighTouch');
     else if (stall) this.noteCombo('footStall');
     else this.noteCombo('footTouch');
+  }
+
+  private spinHeld(dt: number) {
+    const b = this.ball;
+    b.rx += b.wx * dt;
+    b.ry += b.wy * dt;
+    b.rz += b.wz * dt;
   }
 
   private applySpin(side: Side, power: number) {
@@ -670,6 +692,14 @@ export class GameEngine {
   }
 
   step(h: number) {
+    if (this.hitPause > 0) {
+      const take = Math.min(h, this.hitPause);
+      this.hitPause -= take;
+      this.spinHeld(take);
+      const rest = h - take;
+      if (rest <= 1e-9) return;
+      h = rest;
+    }
     this.time += h;
     if (this.cooldown > 0) this.cooldown = Math.max(0, this.cooldown - h);
     if (this.trickCooldown > 0) this.trickCooldown = Math.max(0, this.trickCooldown - h);
@@ -730,6 +760,9 @@ export class GameEngine {
         b.rx += b.wx * h; b.ry += b.wy * h; b.rz += b.wz * h;
         return;
       }
+      // The strike landed in this step. Hold the ball here; the pause runs on the following steps
+      // so this step's clock advance stays the contact instant and the clip does not jump.
+      if (this.hitPause > 0) return;
     }
 
     if (this.phase === 'dropped') {

@@ -37,5 +37,7 @@ describe('quality tiers', () => {
     expect(profileFor('high').dof).toBe(true);
     expect(characterModelUrl(0)).toMatch(/kickole_player_v4\.glb$/);
     expect(characterModelUrl(1)).toMatch(/kickole_player_v4_lod1\.glb$/);
+    expect(characterModelUrl(0, 'female')).toMatch(/kickole_player_v4_female\.glb$/);
+    expect(characterModelUrl(1, 'female')).toMatch(/kickole_player_v4_female_lod1\.glb$/);
   });
 });

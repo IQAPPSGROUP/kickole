@@ -260,7 +260,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
           color={street ? '#1a120e' : '#1E2A5A'}
         />
       )}
-      <CharacterSwitch engine={controller.engine} skin={skin} quality={quality} />
+      <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
       {post && <PostFX profile={profile} engine={controller.engine} />}

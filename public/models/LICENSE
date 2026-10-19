@@ -1,30 +1,41 @@
 Kickolé realistic assets
 ========================
 
-kickole_player_v4.glb and kickole_player_v4_lod1.glb
-----------------------------------------------------
-The body, head, face and helper meshes (eyes, teeth, eyelashes, hair shells)
-are derived from the MakeHuman hm08 base mesh, released under CC0 1.0
-Universal in September 2020 by MakeHuman (Data Collection AB / Palmius /
-Hauquier). The source file is vendored at
-tools/realistic/sources/makehuman-hm08-base.obj.
+kickole_player_v4.glb, kickole_player_v4_lod1.glb,
+kickole_player_v4_female.glb and kickole_player_v4_female_lod1.glb
+---------------------------------------------------------------------
+The body, head, face and helper meshes (eyes, teeth) are derived from the
+MakeHuman hm08 base mesh, released under CC0 1.0 Universal in September 2020
+by MakeHuman (Data Collection AB / Palmius / Hauquier). The source file is
+vendored at tools/realistic/sources/makehuman-hm08-base.obj.
+
+Male and female shapes add the CC0 macro targets vendored in
+tools/realistic/sources/targets/ (young caucasian gender target, plus a
+partial max-muscle corner so both read as athletic rather than extreme).
+Those targets are part of the MakeHuman asset set relicensed CC0 in
+September 2020. The same skeleton, bone names and clip contract are baked
+into both GLBs.
 
 https://creativecommons.org/publicdomain/zero/1.0/
 http://www.makehumancommunity.org/
 
 The street kit is fitted from CC0 MakeHuman clothes, then retinted at runtime:
 
-- crude male t-shirt by Elvaerwyn (CC0), a continuous jersey with sleeves
-- jean shorts by Cortu (CC0), used as the shorts mesh with a neutral albedo
+- crude male t-shirt by Elvaerwyn (CC0), the male jersey
+- crude female t-shirt by Joel Palmius (CC0), the women’s jersey
+- jean shorts by Cortu (CC0), refitted per body and used with a neutral albedo
 - Socks2 (CC0)
 - SR Shoes 01 by spamrakuen (CC0)
 - male short hair by abumeqbel (CC0), rendered as an opaque scalp cap
+- ponytail01 from the MakeHuman 1.2 base assets (CC0 as of the September 2020
+  asset relicense; the file header still says AGPL, which is the old tool
+  boilerplate). Rendered as an opaque ponytail, not alpha cards.
 
 Sources are vendored under tools/realistic/sources/clothes/. The body faces
 under those garments are removed. Skin, cloth and leather textures, the
 skeleton and the clips (Idle, KickLeft, KickRight, Miss, Celebrate) are
-original. No club, league or real-player likeness is included. Rebuild with
-`npm run build:player`.
+original. No club, league or real-player likeness is included. Both bodies
+are free in the game. Rebuild with `npm run build:player`.
 
 This project does not ship Sketchfab or Mixamo characters.
 

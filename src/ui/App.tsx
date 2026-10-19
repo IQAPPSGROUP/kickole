@@ -12,7 +12,7 @@ import {
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { Home, GameOver, SettingsScreen } from './Screens';
-import { CustomiseScreen, ShopScreen } from './Wardrobe';
+import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
@@ -41,7 +41,8 @@ export function App() {
     };
   }, [controller]);
 
-  const blocking = overlay !== 'none';
+  const needsBody = !snap.save.bodyChosen;
+  const blocking = overlay !== 'none' || needsBody;
 
   useEffect(() => {
     let spaceDown = false;
@@ -114,7 +115,10 @@ export function App() {
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} quality={snap.settings.quality} />
       {intro.active && <OpeningSkip onSkip={skipOpeningIntro} />}
-      {phase === 'menu' && overlay === 'none' && !intro.active && (
+      {needsBody && phase === 'menu' && (
+        <BodySelect onChoose={(body) => controller.chooseBody(body)} />
+      )}
+      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && (
         <Home
           best={snap.save.best}
           coins={snap.save.coins}
@@ -149,6 +153,7 @@ export function App() {
         <CustomiseScreen
           save={snap.save}
           onChange={(a) => controller.setAppearance(a)}
+          onBody={(body) => controller.chooseBody(body)}
           onClose={closeOverlay}
         />
       )}

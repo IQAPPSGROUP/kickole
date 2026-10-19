@@ -178,7 +178,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   const gl = useThree((state) => state.gl);
   ktxRenderer.gl = gl;
   // drei types GLTFLoader from three-stdlib, which does not match three's KTX2Loader.
-  const gltf = useGLTF(characterModelUrl(characterLod(quality)), false, true, extendCharacterLoader as never);
+  const gltf = useGLTF(characterModelUrl(characterLod(quality), skin.playerBody), false, true, extendCharacterLoader as never);
   const { scene, clips, report, bones, materials, hairMeshes, kind, quaternius, pbr, chest } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};

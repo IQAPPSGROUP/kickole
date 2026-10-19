@@ -163,8 +163,11 @@ describe('shop economy', () => {
     const migrated = normalizeLocker({ legacySkinId: 'coral-flash' });
     expect(migrated.appearance.skinTone).toBe('#8D5A3C');
     expect(migrated.appearance.clothing.shirt).toBe('#FF805D');
-    expect(migrated.wardrobeVersion).toBe(2);
+    expect(migrated.wardrobeVersion).toBe(3);
+    expect(migrated.appearance.body).toBe('male');
+    expect(migrated.bodyChosen).toBe(false);
     const custom = {
+      body: 'male' as const,
       skinTone: '#F2CDAA',
       hairColor: '#C9822B',
       hairStyle: 'short' as const,
@@ -180,6 +183,21 @@ describe('shop economy', () => {
     const third = normalizeLocker({ ...again, legacySkinId: 'lime-night' });
     expect(third.appearance).toEqual(custom);
     expect(third.ownedKits).toEqual(again.ownedKits);
+  });
+
+  it('defaults an existing save to the male footballer and keeps a chosen female', () => {
+    const migrated = normalizeLocker({ wardrobeVersion: 2, coins: 12, appearance: { skinTone: '#C68642', hairColor: '#16100E', hairStyle: 'braids', clothing: { shirt: '#FFD93D', shirtTrim: '#1E2A5A', shorts: '#1E2A5A', socks: '#F8F9FB' } } });
+    expect(migrated.appearance.body).toBe('male');
+    expect(migrated.bodyChosen).toBe(true);
+    expect(migrated.appearance.hairStyle).toBe('braids');
+    const chosen = normalizeLocker({
+      ...migrated,
+      bodyChosen: true,
+      appearance: { ...migrated.appearance, body: 'female' },
+    });
+    expect(chosen.appearance.body).toBe('female');
+    expect(chosen.bodyChosen).toBe(true);
+    expect(chosen.appearance.skinTone).toBe('#C68642');
   });
 
   it('catalogue has ~8 boots and ~6 kits including starters', () => {

@@ -9,6 +9,8 @@ import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, v
 
 const LOD0 = new URL('../../public/models/kickole_player_v4.glb', import.meta.url);
 const LOD1 = new URL('../../public/models/kickole_player_v4_lod1.glb', import.meta.url);
+const FEMALE0 = new URL('../../public/models/kickole_player_v4_female.glb', import.meta.url);
+const FEMALE1 = new URL('../../public/models/kickole_player_v4_female_lod1.glb', import.meta.url);
 
 function glbJson(file: URL) {
   const bytes = readFileSync(file);
@@ -104,6 +106,8 @@ function triangles(scene: Group): number {
 describe.each([
   ['kickole_player_v4.glb', LOD0, 35_000, 50_000],
   ['kickole_player_v4_lod1.glb', LOD1, 12_000, 15_000],
+  ['kickole_player_v4_female.glb', FEMALE0, 35_000, 50_000],
+  ['kickole_player_v4_female_lod1.glb', FEMALE1, 12_000, 15_000],
 ] as const)('%s', (label, file, minTris, maxTris) => {
   it('is meshopt + KTX2 and stays inside the triangle budget', async () => {
     const json = glbJson(file);

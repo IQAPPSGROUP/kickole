@@ -58,6 +58,7 @@ export function PlayerPreview({
       aria-label={label ?? 'Player preview — drag to rotate'}
     >
       <Canvas
+        key={skin.playerBody}
         camera={{ position: closeUp ? [0.55, 1.55, 1.35] : [1.1, 1.35, 2.4], fov: 35 }}
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}

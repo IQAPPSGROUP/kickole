@@ -1,6 +1,6 @@
 # Rigged GLB footballer – asset specification
 
-The game loads `public/models/kickole_player_v4.glb` (served as `/models/kickole_player_v4.glb`) on medium and high, and `kickole_player_v4_lod1.glb` on low. v4 is a realistic street footballer built from the CC0 MakeHuman hm08 base (`tools/realistic/sources/makehuman-hm08-base.obj`). v2 and v3 stay in the repo as the Quaternius stylised sources. `kicky-player-rigged.glb` stays as the procedural reference. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
+The game loads `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb` on medium and high, and the matching `*_lod1.glb` on low. Both are realistic street footballers built from the CC0 MakeHuman hm08 base (`tools/realistic/sources/makehuman-hm08-base.obj`) with the CC0 young male or female macro target plus a partial athletic muscle target. They share one skeleton, the same bone names and the same five clips, so tricks and dances play on either. The free body choice lives on `appearance.body` (`male` | `female`). v2 and v3 stay in the repo as the Quaternius stylised sources. `kicky-player-rigged.glb` stays as the procedural reference. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
 binary glTF, fails to load, or lacks the required rig, the built-in primitive character (`src/scene/Character.tsx`)
 is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene/GlbCharacter.tsx` and
 `src/scene/CharacterSwitch.tsx`. Rebuild v4 with `npm run build:player`. Rebuild v3 with `npx tsx tools/build_player_v3.ts`.
@@ -62,8 +62,8 @@ Use `MeshStandardMaterial`-compatible (glTF PBR metal-rough) materials, one per 
 - Do not bake lighting or shadows; the game lights the model.
 
 ## Budget
-- LOD0 (`kickole_player_v4.glb`): 35k–50k triangles, at most 40 bones, KTX2 albedo ≤ 2048.
-- LOD1 (`kickole_player_v4_lod1.glb`): 12k–15k triangles for the low tier, same skeleton and clips, KTX2 albedo 1024.
+- LOD0 (`kickole_player_v4.glb` and `kickole_player_v4_female.glb`): 35k–50k triangles, at most 40 bones, KTX2 albedo ≤ 2048.
+- LOD1 (`kickole_player_v4_lod1.glb` and `kickole_player_v4_female_lod1.glb`): 12k–15k triangles for the low tier, same skeleton and clips, KTX2 albedo 1024.
 - v3 remains the stylised asset and keeps its own under-15k budget in `src/scene/player-v3.test.ts`.
 
 ## Acceptance checklist

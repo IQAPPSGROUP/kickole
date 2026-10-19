@@ -3,6 +3,9 @@
  * Shop kits/boots never overwrite these when equipped; composeAppearance merges them.
  */
 
+/** Free body choice. Not a shop item. Existing saves migrate to male. */
+export type PlayerBody = 'male' | 'female';
+
 export type HairStyle =
   | 'short'
   | 'afro'
@@ -22,6 +25,8 @@ export interface ClothingColors {
 }
 
 export interface Appearance {
+  /** Male or female footballer. Both looks are free. */
+  body: PlayerBody;
   skinTone: string;
   hairColor: string;
   hairStyle: HairStyle;
@@ -53,7 +58,12 @@ export const CLOTHING_SWATCHES: readonly string[] = [
   '#FFD93D', '#1E2A5A', '#FF4F9A', '#00B8A9', '#FF8A5B', '#6C5CE7', '#F8F9FB', '#222831',
 ];
 
+export function isPlayerBody(id: string): id is PlayerBody {
+  return id === 'male' || id === 'female';
+}
+
 export const DEFAULT_APPEARANCE: Appearance = {
+  body: 'male',
   skinTone: '#E8B48F',
   hairColor: '#2A1E1A',
   hairStyle: 'short',
@@ -72,6 +82,7 @@ export function isHairStyle(id: string): id is HairStyle {
 export function normalizeAppearance(raw: Partial<Appearance> | null | undefined): Appearance {
   const clothing = raw?.clothing;
   return {
+    body: typeof raw?.body === 'string' && isPlayerBody(raw.body) ? raw.body : DEFAULT_APPEARANCE.body,
     skinTone: typeof raw?.skinTone === 'string' ? raw.skinTone : DEFAULT_APPEARANCE.skinTone,
     hairColor: typeof raw?.hairColor === 'string' ? raw.hairColor : DEFAULT_APPEARANCE.hairColor,
     hairStyle: typeof raw?.hairStyle === 'string' && isHairStyle(raw.hairStyle)

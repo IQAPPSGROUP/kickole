@@ -21,6 +21,7 @@ import {
   type ChallengeProgress,
 } from './shop';
 import {
+  choosePlayerBody,
   loadSave,
   loadSettings,
   persistSave,
@@ -422,6 +423,12 @@ export class GameController {
 
   setAppearance(appearance: Appearance) {
     this.save = updateAppearance(this.save, appearance);
+    this.publish();
+  }
+
+  /** Free body choice from the first-launch picker or the wardrobe. */
+  chooseBody(body: Appearance['body']) {
+    this.save = choosePlayerBody(this.save, body);
     this.publish();
   }
 

@@ -77,6 +77,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .card h2 { margin: 0; letter-spacing: 3px; color: var(--coral); font-size: 22px; }
 .card .btn { align-self: center; }
 .screen.settings .card > .btn.primary { position: sticky; bottom: 0; flex-shrink: 0; box-shadow: 0 0 0 10px var(--navy); }
+.screen.settings .wardrobe-card > .btn.primary { position: static; box-shadow: none; }
+.body-select .card > .btn { width: 100%; position: static; box-shadow: none; }
 @keyframes pop { from { transform: scale(.85); opacity: 0; } }
 .final { font-size: 84px; font-weight: 900; line-height: 1; color: var(--lime); text-shadow: 0 4px 0 rgba(0,0,0,.3); }
 .stats { display: flex; justify-content: space-around; }

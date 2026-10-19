@@ -27,6 +27,11 @@ export interface WardrobeLocker {
   ownedKits: string[];
   equippedKit: string;
   appearance: Appearance;
+  /**
+   * False only until the first-launch picker writes a choice.
+   * Saves from before the picker migrate to true and stay on the male footballer.
+   */
+  bodyChosen: boolean;
   challenges: ChallengeProgress;
   /**
    * Cache of paid Launch Collection ownership. Never treat this alone as proof of payment
@@ -42,7 +47,9 @@ export interface WardrobeLocker {
   wardrobeVersion: number;
 }
 
-export const WARDROBE_VERSION = 2;
+/** v3 adds the free male/female body. Legacy kit seeds stay on versions older than 2. */
+export const WARDROBE_VERSION = 3;
+const LEGACY_SKIN_VERSION = 2;
 
 export interface NormalizeLockerOptions {
   /**
@@ -180,6 +187,9 @@ export interface RawSaveFields {
   entitlementVerifiedAt?: unknown;
   entitlementTransactionRef?: unknown;
   wardrobeVersion?: unknown;
+  bodyChosen?: unknown;
+  /** Set by loadSave when a save object already existed. Not written back. */
+  hadSave?: boolean;
   /** Legacy settings skin carried during migration. */
   legacySkinId?: string | null;
 }
@@ -215,7 +225,7 @@ export function normalizeLocker(
     : [];
 
   // Legacy skin seeds run once, while the save is still older than the wardrobe schema.
-  const legacy = storedVersion < WARDROBE_VERSION && typeof raw?.legacySkinId === 'string'
+  const legacy = storedVersion < LEGACY_SKIN_VERSION && typeof raw?.legacySkinId === 'string'
     ? LEGACY_SKIN_MAP[raw.legacySkinId]
     : undefined;
   if (legacy && !ownedKits.includes(legacy.kit) && isKitId(legacy.kit)) {
@@ -271,6 +281,12 @@ export function normalizeLocker(
     || (trustStoreCache && (entitlementSource === 'apple' || entitlementSource === 'google'))
   );
 
+  const bodyChosen = raw?.bodyChosen === true
+    ? true
+    : raw?.bodyChosen === false
+      ? false
+      : raw?.hadSave === true || storedVersion > 0;
+
   let locker: WardrobeLocker = {
     coins,
     ownedBoots,
@@ -278,6 +294,7 @@ export function normalizeLocker(
     ownedKits,
     equippedKit: ownedKits.includes(equippedKit) ? equippedKit : STARTER_KIT_ID,
     appearance,
+    bodyChosen,
     challenges,
     launchCollectionOwned: false,
     launchGrantedItemIds: [],

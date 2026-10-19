@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import type { Appearance } from './appearance';
+import type { Appearance, PlayerBody } from './appearance';
 import { normalizeAppearance } from './appearance';
 import {
   bumpChallenges,
@@ -86,6 +86,7 @@ export function loadSave(): SaveData {
   const storedVersion = typeof d?.wardrobeVersion === 'number' ? d.wardrobeVersion : 0;
   const locker = normalizeLocker({
     ...d,
+    hadSave: d != null,
     legacySkinId: storedVersion < WARDROBE_VERSION && typeof settings?.skinId === 'string'
       ? settings.skinId
       : null,
@@ -146,6 +147,17 @@ export function saveSettings(s: Settings) {
 
 export function updateAppearance(save: SaveData, appearance: Appearance): SaveData {
   const next: SaveData = { ...save, appearance: normalizeAppearance(appearance) };
+  write(SAVE_KEY, next);
+  return next;
+}
+
+/** Persist a free male/female choice and dismiss the first-launch picker. */
+export function choosePlayerBody(save: SaveData, body: PlayerBody): SaveData {
+  const next: SaveData = {
+    ...save,
+    bodyChosen: true,
+    appearance: normalizeAppearance({ ...save.appearance, body }),
+  };
   write(SAVE_KEY, next);
   return next;
 }

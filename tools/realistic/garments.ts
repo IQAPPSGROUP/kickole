@@ -39,6 +39,8 @@ function parseHide(text: string): Set<number> {
   return hide;
 }
 
+const HEADER = /^(name|obj_file|material|uuid|tag|x_scale|y_scale|z_scale|z_depth|max_pole|author|license|homepage|description)\b/;
+
 function parseBindings(text: string, base: number[][]): number[][] {
   const at = text.indexOf('verts 0');
   if (at < 0) throw new Error('mhclo has no vertex block');
@@ -46,6 +48,8 @@ function parseBindings(text: string, base: number[][]): number[][] {
   for (const line of text.slice(at).split('\n').slice(1)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
+    // Some official mhclo files place `material` between the verts header and the numbers.
+    if (HEADER.test(trimmed)) continue;
     if (/^[A-Za-z_]/.test(trimmed)) break;
     const p = trimmed.split(/\s+/).map(Number);
     if (p.length === 1) {

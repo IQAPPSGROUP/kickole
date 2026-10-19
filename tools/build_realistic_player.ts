@@ -4,8 +4,9 @@
  * Source: tools/realistic/sources/makehuman-hm08-base.obj (CC0, September 2020).
  * The naked base is scaled to about 1.82 m, arms are dropped into a relaxed A-pose,
  * and a street kit (shirt, shorts, socks, boots) is modelled over the body.
- * Bones use the Kickolé contract with primitive-rig Euler axes so the existing
- * pose solver and clips line up. Run: npm run build:player
+ * Male and female share the contract skeleton. Each uses its own CC0 macro
+ * target, jersey and hair; socks, boots and clips stay on the same bone names.
+ * Run: npm run build:player
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
@@ -26,8 +27,7 @@ import { loadGarment, type Garment } from './realistic/garments.ts';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OBJ = join(ROOT, 'realistic/sources/makehuman-hm08-base.obj');
-const OUT0 = join(ROOT, '../public/models/kickole_player_v4.glb');
-const OUT1 = join(ROOT, '../public/models/kickole_player_v4_lod1.glb');
+const TARGETS = join(ROOT, 'realistic/sources/targets');
 const TOKTX = process.env.TOKTX ?? '/tmp/ktx/KTX-Software-4.4.0-Linux-x86_64/bin/toktx';
 
 const TARGET_HEIGHT = 1.82;
@@ -37,6 +37,68 @@ const GROUPS = new Set([
   'helper-upper-teeth', 'helper-lower-teeth',
 ]);
 const CLOTHES = join(ROOT, 'realistic/sources/clothes');
+
+interface TargetSpec { file: string; weight: number }
+interface BodyRecipe {
+  id: 'male' | 'female';
+  targets: TargetSpec[];
+  shirt: [string, string];
+  shorts: [string, string];
+  hair: [string, string];
+  subdiv: Record<string, number>;
+  /** Drop loose cuffs onto the forearm. Tuned per jersey. */
+  sleeveDrop: number;
+  out0: string;
+  out1: string;
+}
+
+/** Athletic, not a bodybuilder: full young gender target plus a partial muscle corner. */
+const RECIPES: BodyRecipe[] = [
+  {
+    id: 'male',
+    targets: [
+      { file: 'caucasian-male-young.target', weight: 1 },
+      { file: 'universal-male-young-maxmuscle-averageweight.target', weight: 0.45 },
+    ],
+    shirt: ['crude_male_shirt.obj', 'crude_male_shirt.mhclo'],
+    shorts: ['jean_shorts.obj', 'jean_shorts.mhclo'],
+    hair: ['hair_short.obj', 'hair_short.mhclo'],
+    subdiv: { Shirt: 1, Shirt_Trim: 1, Shorts: 1, Boots: 1, Boots_Sole: 1, Socks: 1, Hair: 1 },
+    sleeveDrop: 0.03,
+    out0: join(ROOT, '../public/models/kickole_player_v4.glb'),
+    out1: join(ROOT, '../public/models/kickole_player_v4_lod1.glb'),
+  },
+  {
+    id: 'female',
+    targets: [
+      { file: 'caucasian-female-young.target', weight: 1 },
+      { file: 'universal-female-young-maxmuscle-averageweight.target', weight: 0.35 },
+    ],
+    shirt: ['crude_female_tshirt.obj', 'crude_female_tshirt.mhclo'],
+    shorts: ['jean_shorts.obj', 'jean_shorts.mhclo'],
+    hair: ['ponytail01.obj', 'ponytail01.mhclo'],
+    subdiv: { Shirt: 1, Shirt_Trim: 1, Shorts: 1, Boots: 1, Boots_Sole: 1, Socks: 1, Hair: 0 },
+    sleeveDrop: 0.012,
+    out0: join(ROOT, '../public/models/kickole_player_v4_female.glb'),
+    out1: join(ROOT, '../public/models/kickole_player_v4_female_lod1.glb'),
+  },
+];
+
+function applyTargets(verts: number[][], targets: TargetSpec[]) {
+  for (const target of targets) {
+    const text = readFileSync(join(TARGETS, target.file), 'utf8');
+    for (const line of text.split('\n')) {
+      if (!line || line.startsWith('#')) continue;
+      const p = line.trim().split(/\s+/);
+      if (p.length < 4) continue;
+      const v = verts[Number(p[0])];
+      if (!v) continue;
+      v[0] += Number(p[1]) * target.weight;
+      v[1] += Number(p[2]) * target.weight;
+      v[2] += Number(p[3]) * target.weight;
+    }
+  }
+}
 
 type V3 = Vector3;
 
@@ -336,8 +398,11 @@ interface Built {
   toeRest: { left: V3; right: V3 };
 }
 
-function buildMesh(): Built {
-  const parsed = parseObj(readFileSync(OBJ, 'utf8'));
+function buildMesh(recipe: BodyRecipe): Built {
+  const source = parseObj(readFileSync(OBJ, 'utf8'));
+  const verts = source.v.map((p) => [p[0], p[1], p[2]]);
+  applyTargets(verts, recipe.targets);
+  const parsed = { v: verts, groups: source.groups };
   let minY = Infinity, maxY = -Infinity;
   for (const p of parsed.v) { minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); }
   const scale = TARGET_HEIGHT / (maxY - minY);
@@ -443,11 +508,11 @@ function buildMesh(): Built {
   };
 
   const bodyFaces = parsed.groups.get('body') ?? [];
-  const shirtG = loadGarment(CLOTHES, 'crude_male_shirt.obj', 'crude_male_shirt.mhclo', parsed.v);
-  const shortsG = loadGarment(CLOTHES, 'jean_shorts.obj', 'jean_shorts.mhclo', parsed.v);
+  const shirtG = loadGarment(CLOTHES, recipe.shirt[0], recipe.shirt[1], parsed.v);
+  const shortsG = loadGarment(CLOTHES, recipe.shorts[0], recipe.shorts[1], parsed.v);
   const socksG = loadGarment(CLOTHES, 'socks.obj', 'socks.mhclo', parsed.v);
   const shoesG = loadGarment(CLOTHES, 'sr_shoes_01.obj', 'sr_shoes_01.mhclo', parsed.v);
-  const hairG = loadGarment(CLOTHES, 'hair_short.obj', 'hair_short.mhclo', parsed.v);
+  const hairG = loadGarment(CLOTHES, recipe.hair[0], recipe.hair[1], parsed.v);
   const hide = new Set<number>([...shirtG.hide, ...shortsG.hide, ...shoesG.hide]);
   const mouthW = mouth.clone();
   mouthW.y -= floor;
@@ -605,8 +670,7 @@ function buildMesh(): Built {
     }
   }
 
-  const times: Record<string, number> = { Shirt: 1, Shirt_Trim: 1, Shorts: 1, Boots: 1, Boots_Sole: 1, Socks: 1, Hair: 1 };
-  for (const [name, count] of Object.entries(times)) {
+  for (const [name, count] of Object.entries(recipe.subdiv)) {
     let mesh = prims.get(name);
     if (!mesh || mesh.idx.length === 0) continue;
     for (let i = 0; i < count; i++) mesh = subdividePrim(mesh);
@@ -622,7 +686,7 @@ function buildMesh(): Built {
       const amp = (torso ? 0.006 : 0.002) * Math.sin(y * 46) + Math.sin(x * 16 + y * 8) * 0.003;
       mesh.pos[i] += (x / len) * amp;
       mesh.pos[i + 2] += (z / len) * amp;
-      if (!torso && y < 1.08) mesh.pos[i + 1] -= 0.03;
+      if (!torso && y < 1.08) mesh.pos[i + 1] -= recipe.sleeveDrop;
     }
   }
 
@@ -660,7 +724,7 @@ function buildMesh(): Built {
       if ((side === 'L' ? x < 0 : x > 0) && z > tip) { tip = z; tipY = y; tipX = x; }
     }
     const ankle = byName.get(`Foot_${side}`)!.dstA;
-    world.set(`Toe_${side}`, new Vector3(tipX * 0.85 + ankle.x * 0.15, tipY + 0.01, tip - 0.08));
+    world.set(`Toe_${side}`, new Vector3(tipX * 0.85 + ankle.x * 0.15, tipY + 0.035, tip - 0.08));
   }
 
   let sink = 0;
@@ -896,7 +960,7 @@ function bootGap(built: Built, pose: Pose, side: Side): { mesh: number; bone: nu
     }
   }
   if (!samples) throw new Error('no boot vertices');
-  return { mesh, bone: toe.distanceTo(ball) - 0.14, footDz: footZ - restZ };
+  return { mesh, bone: toe.distanceTo(ball) - 0.14, footDz: footZ - restZ, toeY: toe.y };
 }
 
 function scoreNudge(built: Built, nudge: Nudge): number {
@@ -904,11 +968,13 @@ function scoreNudge(built: Built, nudge: Nudge): number {
   for (const side of ['left', 'right'] as const) {
     const pose = nudgeBoot(computePose(contactEngine(side, 0.04)), side, 1, nudge);
     const g = bootGap(built, pose, side);
-    const meshMiss = Math.abs(g.mesh - 0.02) * 8;
-    const sunk = g.mesh < -0.01 ? (-0.01 - g.mesh) * 20 : 0;
+    const meshMiss = Math.abs(g.mesh - 0.028) * 8;
+    const sunk = g.mesh < 0.008 ? (0.008 - g.mesh) * 30 : 0;
     const bone = g.bone < 0.06 ? (0.06 - g.bone) * 8 : g.bone > 0.14 ? (g.bone - 0.14) * 6 : Math.abs(g.bone - 0.09);
     const swing = g.footDz < 0.28 ? 5 : 0;
-    score += meshMiss + sunk + bone + swing;
+    // The contract test keeps the toe above the ball's lower hemisphere.
+    const lowToe = g.toeY < 0.64 ? (0.64 - g.toeY) * 50 : 0;
+    score += meshMiss + sunk + bone + swing + lowToe;
   }
   return score;
 }
@@ -922,7 +988,7 @@ function chooseNudge(built: Built): Nudge {
   };
   for (const thigh of [-0.5, -0.41, -0.28, -0.12]) {
     for (const knee of [0.35, 0.53, 0.7]) {
-      for (const foot of [-0.2, -0.05, 0.15]) {
+      for (const foot of [-0.2, -0.05, 0.15, 0.32]) {
         for (const abduct of [0, 0.1, 0.18]) grid({ thigh, knee, foot, abduct });
       }
     }
@@ -1281,12 +1347,9 @@ async function writeGlb(built: Built, prims: Prim[], albedo: number, dataSize: n
   await io.write(file, doc);
 }
 
-async function main() {
-  await MeshoptDecoder.ready;
-  await MeshoptEncoder.ready;
-  await MeshoptSimplifier.ready;
-  console.log('fitting MakeHuman base…');
-  const built = buildMesh();
+async function buildOne(recipe: BodyRecipe) {
+  console.log('fitting', recipe.id, '…');
+  const built = buildMesh(recipe);
   for (const [name, bone] of built.bones) {
     if (name === 'Hips') bone.userData.restY = bone.position.y;
     const inv = new Matrix4().copy(bone.matrixWorld).invert();
@@ -1305,7 +1368,7 @@ async function main() {
   const nudge = chooseNudge(built);
   for (const side of ['left', 'right'] as const) {
     const g = bootGap(built, nudgeBoot(computePose(contactEngine(side, 0.04)), side, 1, nudge), side);
-    console.log(side, 'mesh', +g.mesh.toFixed(3), 'bone', +g.bone.toFixed(3), 'Δz', +g.footDz.toFixed(3));
+    console.log(side, 'mesh', +g.mesh.toFixed(3), 'bone', +g.bone.toFixed(3), 'Δz', +g.footDz.toFixed(3), 'toeY', +g.toeY.toFixed(3));
   }
   applyContract(built.bones, loopingIdle(0.4));
   const left = built.bones.get('Hand_L')!.getWorldPosition(new Vector3());
@@ -1338,18 +1401,29 @@ async function main() {
       }
       base += prim.pos.length / 3;
     }
-    writeFileSync('/tmp/fitted.obj', lines.join('\n'));
-    console.log('wrote /tmp/fitted.obj');
+    writeFileSync(`/tmp/fitted-${recipe.id}.obj`, lines.join('\n'));
+    console.log('wrote', `/tmp/fitted-${recipe.id}.obj`);
   }
   if (process.env.FAST) return;
   // 1K albedo stays inside the 2K cap and the 15MB first-load budget. UASTC normals/ORM are 512.
-  console.log('encoding LOD0 (1k albedo)…');
-  await writeGlb(built, built.prims, 1024, 512, OUT0, clips);
+  console.log(recipe.id, 'encoding LOD0 (1k albedo)…');
+  await writeGlb(built, built.prims, 1024, 512, recipe.out0, clips);
   const lod1 = built.prims.map((p) => simplifyPrim(p, 14000 / Math.max(1, tris)));
-  console.log('LOD1 triangles', triCount(lod1));
-  console.log('encoding LOD1 (1k albedo)…');
-  await writeGlb(built, lod1, 1024, 512, OUT1, clips);
-  console.log('bytes', readFileSync(OUT0).length, readFileSync(OUT1).length);
+  console.log(recipe.id, 'LOD1 triangles', triCount(lod1));
+  console.log(recipe.id, 'encoding LOD1 (1k albedo)…');
+  await writeGlb(built, lod1, 1024, 512, recipe.out1, clips);
+  console.log(recipe.id, 'bytes', readFileSync(recipe.out0).length, readFileSync(recipe.out1).length);
+}
+
+async function main() {
+  await MeshoptDecoder.ready;
+  await MeshoptEncoder.ready;
+  await MeshoptSimplifier.ready;
+  const only = process.env.BODY;
+  for (const recipe of RECIPES) {
+    if (only && recipe.id !== only) continue;
+    await buildOne(recipe);
+  }
 }
 
 main().catch((error) => {

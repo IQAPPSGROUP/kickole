@@ -33,6 +33,8 @@ describe('storage', () => {
     expect(save.equippedBoot).toBe(STARTER_BOOT_ID);
     expect(save.equippedKit).toBe(STARTER_KIT_ID);
     expect(save.launchCollectionOwned).toBe(false);
+    expect(save.bodyChosen).toBe(false);
+    expect(save.appearance.body).toBe('male');
   });
 
   it('survives corrupt JSON', async () => {
@@ -88,6 +90,8 @@ describe('storage', () => {
     expect(save.equippedBoot).toBe('boot-beach-wave');
     expect(save.ownedKits).toContain('kit-carnival');
     expect(save.appearance.skinTone).toBe('#8D5A3C');
+    expect(save.appearance.body).toBe('male');
+    expect(save.bodyChosen).toBe(true);
   });
 
   it('does not reset a saved look on later launches when settings still hold a legacy skin', async () => {
@@ -97,6 +101,7 @@ describe('storage', () => {
       hairStyle: 'short',
       clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
     };
+    const kept = { ...appearance, body: 'male' as const };
     const raw = JSON.stringify({
       wardrobeVersion: 2,
       appearance,
@@ -111,11 +116,24 @@ describe('storage', () => {
       'kicky.settings.v1': JSON.stringify({ skinId: 'coral-flash', sound: true, vibration: true, quality: 'high' }),
     });
     const first = loadSave();
-    expect(first.appearance).toEqual(appearance);
+    expect(first.appearance).toEqual(kept);
+    expect(first.bodyChosen).toBe(true);
     expect(first.ownedKits).not.toContain('kit-carnival');
     const second = loadSave();
-    expect(second.appearance).toEqual(appearance);
+    expect(second.appearance).toEqual(kept);
     expect(second.appearance.clothing.shirt).toBe('#9B59B6');
+  });
+
+  it('persists a free female choice and leaves an unchosen install unwritten', async () => {
+    const { loadSave, choosePlayerBody, ls } = await load();
+    expect(ls.data['kicky.save.v1']).toBeUndefined();
+    const chosen = choosePlayerBody(loadSave(), 'female');
+    expect(chosen.appearance.body).toBe('female');
+    expect(chosen.bodyChosen).toBe(true);
+    expect(JSON.parse(ls.data['kicky.save.v1']).appearance.body).toBe('female');
+    const again = loadSave();
+    expect(again.appearance.body).toBe('female');
+    expect(again.bodyChosen).toBe(true);
   });
 
   it('flags a new personal best and reports the rank', async () => {

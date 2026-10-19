@@ -1,4 +1,4 @@
-import type { Appearance } from './appearance';
+import type { Appearance, PlayerBody } from './appearance';
 import { getBoot, getKit, STARTER_BOOT_ID, STARTER_KIT_ID, type BootDesign, type KitDesign, type SurfacePattern } from './catalogue';
 
 export interface Skin {
@@ -8,6 +8,7 @@ export interface Skin {
   boots: { main: string; sole: string; lace: string; trim: string };
   body: { skin: string; hair: string };
   football: { base: string; panels: string };
+  playerBody: PlayerBody;
   hairStyle: Appearance['hairStyle'];
   kitPattern: SurfacePattern;
   bootPattern: SurfacePattern;
@@ -27,6 +28,7 @@ export const SKINS: Skin[] = [
     boots: { main: '#EAF44A', sole: '#142D35', lace: '#2a211c', trim: '#12BFA6' },
     body: { skin: '#E8B48F', hair: '#2A1E1A' },
     football: { base: '#F8F9FB', panels: '#222831' },
+    playerBody: 'male',
     hairStyle: 'short',
     kitPattern: 'plain',
     bootPattern: 'panels',
@@ -40,6 +42,7 @@ export const SKINS: Skin[] = [
     boots: { main: '#F7F5ED', sole: '#142D35', lace: '#2a211c', trim: '#FF805D' },
     body: { skin: '#8D5A3C', hair: '#16100E' },
     football: { base: '#F7F5ED', panels: '#FF805D' },
+    playerBody: 'male',
     hairStyle: 'short',
     kitPattern: 'carnival',
     bootPattern: 'plain',
@@ -53,6 +56,7 @@ export const SKINS: Skin[] = [
     boots: { main: '#12BFA6', sole: '#F7F5ED', lace: '#2a211c', trim: '#EAF44A' },
     body: { skin: '#F2CDAA', hair: '#C9822B' },
     football: { base: '#EAF44A', panels: '#142D35' },
+    playerBody: 'male',
     hairStyle: 'short',
     kitPattern: 'midnight',
     bootPattern: 'plain',
@@ -83,7 +87,7 @@ export function composePlayerSkin(
   // Starter kit defers to free clothing colours; purchased kits keep their authored palette.
   const clothing = kit.id === STARTER_KIT_ID ? { ...appearance.clothing } : { ...kit.clothing };
   return {
-    id: `live:${kit.id}:${boot.id}:${appearance.hairStyle}`,
+    id: `live:${kit.id}:${boot.id}:${appearance.body}:${appearance.hairStyle}`,
     name: `${kit.name} · ${boot.name}`,
     clothing,
     boots: {
@@ -97,6 +101,7 @@ export function composePlayerSkin(
       hair: appearance.hairColor,
     },
     football: { base: '#F8F9FB', panels: '#222831' },
+    playerBody: appearance.body,
     hairStyle: appearance.hairStyle,
     kitPattern: kit.pattern,
     bootPattern: boot.pattern,

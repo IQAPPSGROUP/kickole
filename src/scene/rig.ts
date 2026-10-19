@@ -1,5 +1,6 @@
 import type { GameEngine } from '../engine/engine';
 import type { Side } from '../engine/config';
+import type { PlayerBody } from '../game/appearance';
 import type { Skin } from '../game/skins';
 
 /**
@@ -11,16 +12,20 @@ import type { Skin } from '../game/skins';
 export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER !== 'false';
 
 /**
- * Runtime character. `kickole_player_v4.glb` is the realistic street footballer
- * (see docs/CHARACTER_GLB.md). v2 and v3 stay in the repo as the stylised sources.
- * Low graphics loads `kickole_player_v4_lod1.glb`. If the file is missing or invalid
+ * Runtime character. `kickole_player_v4.glb` is the male street footballer and
+ * `kickole_player_v4_female.glb` is the female one. They share the contract
+ * skeleton (see docs/CHARACTER_GLB.md). v2 and v3 stay as the stylised sources.
+ * Low graphics loads the matching `*_lod1.glb`. If the file is missing or invalid
  * the primitive character is used.
  */
 export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kickole_player_v4.glb`;
 
 /** LOD0 is the 35–50k player. LOD1 is the 12–15k player for the low tier. */
-export function characterModelUrl(lod: 0 | 1 = 0): string {
-  const file = lod === 0 ? 'kickole_player_v4.glb' : 'kickole_player_v4_lod1.glb';
+export function characterModelUrl(lod: 0 | 1 = 0, body: PlayerBody = 'male'): string {
+  const female = body === 'female';
+  const file = lod === 0
+    ? (female ? 'kickole_player_v4_female.glb' : 'kickole_player_v4.glb')
+    : (female ? 'kickole_player_v4_female_lod1.glb' : 'kickole_player_v4_lod1.glb');
   return `${import.meta.env.BASE_URL}models/${file}`;
 }
 

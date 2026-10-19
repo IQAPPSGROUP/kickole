@@ -6,6 +6,7 @@ import {
   SKIN_TONES,
   type Appearance,
   type HairStyle,
+  type PlayerBody,
 } from '../game/appearance';
 import {
   BOOTS,
@@ -56,16 +57,34 @@ function SwatchRow({
   );
 }
 
+export function BodySelect({ onChoose }: { onChoose: (body: PlayerBody) => void }) {
+  return (
+    <div className="screen settings body-select">
+      <div className="card">
+        <h2>YOUR FOOTBALLER</h2>
+        <p className="shop-lead">Pick a male or female player. Both are free, and you can change this later in Customise.</p>
+        <button type="button" className="btn primary big" onClick={() => onChoose('male')}>MALE</button>
+        <button type="button" className="btn ghost" onClick={() => onChoose('female')}>FEMALE</button>
+      </div>
+    </div>
+  );
+}
+
 export function CustomiseScreen({
   save,
   onChange,
+  onBody,
   onClose,
 }: {
   save: SaveData;
   onChange: (a: Appearance) => void;
+  onBody: (body: PlayerBody) => void;
   onClose: () => void;
 }) {
   const a = save.appearance;
+  const hairStyles = HAIR_STYLES.map((h) => (
+    h.id === 'short' && a.body === 'female' ? { ...h, label: 'Ponytail' } : h
+  ));
   const skin = useMemo(
     () => composePlayerSkin(a, save.equippedKit, save.equippedBoot),
     [a, save.equippedKit, save.equippedBoot],
@@ -83,14 +102,31 @@ export function CustomiseScreen({
     <div className="screen settings wardrobe">
       <div className="card wardrobe-card">
         <h2>CUSTOMISE</h2>
-        <p className="shop-lead">Free looks — skin, hair and basic colours. Shop kits never change your face or hair.</p>
+        <p className="shop-lead">Free looks — footballer, skin, hair and basic colours. Shop kits never change your face or hair.</p>
         <PlayerPreview skin={skin} closeUp label="Customise preview" />
+        <div className="group">
+          <label>Footballer</label>
+          <div className="seg" role="listbox" aria-label="Footballer">
+            {(['male', 'female'] as const).map((body) => (
+              <button
+                key={body}
+                type="button"
+                className={a.body === body ? 'on' : ''}
+                aria-selected={a.body === body}
+                onClick={() => onBody(body)}
+              >
+                {body === 'male' ? 'Male' : 'Female'}
+              </button>
+            ))}
+          </div>
+          <p className="shop-note">Both footballers are free. Kit colours, numbers and hair colours work on either.</p>
+        </div>
         <SwatchRow label="Skin tone" colours={SKIN_TONES} value={a.skinTone} onPick={(skinTone) => patch({ skinTone })} />
         <SwatchRow label="Hair colour" colours={HAIR_COLORS} value={a.hairColor} onPick={(hairColor) => patch({ hairColor })} />
         <div className="group">
           <label>Hair style</label>
           <div className="seg wrap">
-            {HAIR_STYLES.map((h) => (
+            {hairStyles.map((h) => (
               <button
                 key={h.id}
                 type="button"

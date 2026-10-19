@@ -1,4 +1,4 @@
-import { Component, Suspense, useCallback, useState, type ReactNode } from 'react';
+import { Component, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
@@ -22,10 +22,13 @@ class GlbBoundary extends Component<{ children: ReactNode; fallback: ReactNode; 
 export function CharacterSwitch({ engine, skin, quality = 'high' }: { engine: GameEngine; skin: Skin; quality?: Quality }) {
   const [status, setStatus] = useState<Status>(USE_GLB_CHARACTER ? 'available' : 'missing');
   const reject = useCallback(() => setStatus('missing'), []);
+  useEffect(() => {
+    setStatus(USE_GLB_CHARACTER ? 'available' : 'missing');
+  }, [skin.playerBody]);
   const fallback = <Character engine={engine} skin={skin} />;
   if (status !== 'available') return fallback;
   return (
-    <GlbBoundary fallback={fallback} onError={reject}>
+    <GlbBoundary key={skin.playerBody} fallback={fallback} onError={reject}>
       <Suspense fallback={null}>
         <GlbCharacter engine={engine} skin={skin} onInvalid={reject} quality={quality} />
       </Suspense>

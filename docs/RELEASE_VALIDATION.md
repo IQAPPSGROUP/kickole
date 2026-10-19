@@ -11,7 +11,8 @@ Internal TestFlight / Play internal-track preparation. **Production App Store an
 | Android `minSdk` | 24 |
 | Android `compileSdk` / `targetSdk` | **36** |
 | Android `versionCode` / `versionName` | **1** / **1.0** (first internal candidate) |
-| Play Billing Library | **7.1.1** (`plugins/kickole-billing`) |
+| Play Billing Library | **9.1.0** (`plugins/kickole-billing`) |
+| iOS archive image | **macos-26** / Xcode 26 (required for App Store upload since 28 Apr 2026). No Codemagic config in repo |
 | iOS deployment target | **15.0** |
 | iOS `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | **1.0** / **1** |
 | StoreKit | StoreKit 2 (Swift plugin) |
@@ -23,10 +24,10 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 
 | Check | Result |
 | --- | --- |
-| `npm test` | **150 passed** |
+| `npm test` | **167 passed** (includes billing regression tests) |
 | `npm run typecheck` | **pass** |
 | `npm run build` (`VITE_ENVIRONMENT_THEME=beach`) | **pass** |
-| Android `assembleDebug` (JDK 21 + SDK 36) | **BUILD SUCCESSFUL** (debug APK; unsigned for Play) |
+| Android `assembleDebug` (JDK 21 + SDK 36) | **BUILD SUCCESSFUL** (debug APK; Play Billing 9.1.0 compiled; unsigned for Play) |
 | iOS archive / TestFlight upload | **Blocked** — no macOS runner secrets / Apple signing on this host |
 | Play internal AAB upload | **Blocked** — no upload keystore / Play API credentials |
 

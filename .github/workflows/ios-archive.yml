@@ -1,5 +1,9 @@
 # Manual macOS archive when Apple signing secrets exist.
 # Does not publish to production. Does not run on every push.
+# App Store uploads have required Xcode 26 since 28 Apr 2026.
+# This job uses the macos-26 image, which includes that toolchain.
+# There is no codemagic.yaml. A Codemagic stack needs `xcode: 26` as well.
+# Signing secrets are not stored in this file.
 name: iOS Archive (manual)
 
 on:
@@ -10,7 +14,7 @@ permissions:
 
 jobs:
   archive:
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +22,8 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+      - name: Show Xcode
+        run: xcodebuild -version
       - run: npm ci
       - run: npm run build
       - run: npx cap sync ios

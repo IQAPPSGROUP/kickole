@@ -30,6 +30,8 @@ Copy these answers into App Store Connect privacy nutrition labels and Google Pl
 
 **Name:** Kickolé Launch Collection  
 
-**Description:** One-time unlock of the Kickolé launch boots and kits collection. Free skin tones, hairstyles and basic styling stay free. Future collections are sold separately. No subscriptions or consumable coin packs. Restore Purchases uses your App Store or Google Play account. Purchases do not transfer between Apple and Google.
+**Description:** One-time unlock of every boot and kit in the Kickolé launch collection, including items that otherwise require challenge progress. It does not complete those challenges. Free skin tones, hairstyles and basic styling stay free. Future collections are sold separately. No subscriptions or consumable coin packs. Restore Purchases uses your App Store or Google Play account. Purchases do not transfer between Apple and Google.
+
+Android `allowBackup` is true, so a device backup can include the on-device save (scores, coins, appearance, cached entitlement). The next native launch re-checks that entitlement with the store. The app does not send that save to IQ Apps Group.
 
 **Price:** Configure UK £2.99 (or current equivalent tier); the app displays the store’s localised price string.

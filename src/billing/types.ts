@@ -50,6 +50,8 @@ export interface BillingAdapter {
   restorePurchases(): Promise<PurchaseResult>;
   /** Query current store entitlements without presenting UI. */
   refreshEntitlements(): Promise<EntitlementSnapshot>;
+  /** Live store updates (Ask to Buy, pending completion, refunds). */
+  setEntitlementListener?(listener: ((snapshot: EntitlementSnapshot) => void) | null): void;
   /** Tear down listeners (transaction updates / billing client). */
   dispose(): void;
 }

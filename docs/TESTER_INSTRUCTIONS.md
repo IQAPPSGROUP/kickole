@@ -13,7 +13,7 @@ Use these notes for **TestFlight** and **Google Play internal testing**. Public 
 1. Complete scoring runs. Coins = floor(run score).
 2. Open **Shop**. Locked items show their **exact** coin price and any lifetime challenge (alternating feet, stalls, perfect touches).
 3. Buy when you meet the requirement, or **Equip** once owned.
-4. Achievement / challenge progress stays earned through play; buying the Launch Collection does **not** grant challenge badges.
+4. Challenge counters stay earned through play. Buying the Launch Collection unlocks the launch cosmetics, including ones that otherwise need those challenges. It does **not** mark the challenges complete.
 
 | Tier | Coins | Challenge |
 | --- | --- | --- |
@@ -25,9 +25,9 @@ Use these notes for **TestFlight** and **Google Play internal testing**. Public 
 ## Kickolé Launch Collection (paid)
 
 - **One-time** non-consumable purchase on the **iOS App Store** or **Google Play** only.
-- Unlocks **this launch collection only** (all launch boots and kits listed in the Shop). Future collections are separate.
+- Unlocks **this launch collection only** (all 14 launch boots and kits, including Street, Freestyle and Legend items that otherwise need challenge progress). Future collections are separate.
 - Price shown in the app is the **store’s localised price** (UK list target £2.99).
-- Free customise stays free. Challenges still need play.
+- Free customise stays free. The purchase does not complete challenge counters.
 - **Restore Purchases** reloads entitlement for the **same store account**. Apple purchases do **not** transfer to Google Play (and vice versa).
 - Refunds may remove paid unlocks; items you bought with coins remain.
 

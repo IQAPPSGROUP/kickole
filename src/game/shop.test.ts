@@ -139,6 +139,49 @@ describe('shop economy', () => {
     expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
   });
 
+  it('does not unlock a hand-edited apple or google entitlement unless the native cache is trusted', () => {
+    const forged = normalizeLocker({
+      launchCollectionOwned: true,
+      entitlementSource: 'apple',
+      entitlementVerifiedAt: 50,
+    });
+    expect(forged.launchCollectionOwned).toBe(false);
+    expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
+
+    const cached = normalizeLocker({
+      launchCollectionOwned: true,
+      entitlementSource: 'google',
+      entitlementVerifiedAt: 40,
+      launchGrantedItemIds: ['boot-gold'],
+    }, { trustStoreCache: true });
+    expect(cached.launchCollectionOwned).toBe(true);
+    expect(cached.entitlementSource).toBe('google');
+    expect(cached.ownedBoots).toContain('boot-gold');
+  });
+
+  it('applies a legacy skin once and then keeps a customised look', () => {
+    const migrated = normalizeLocker({ legacySkinId: 'coral-flash' });
+    expect(migrated.appearance.skinTone).toBe('#8D5A3C');
+    expect(migrated.appearance.clothing.shirt).toBe('#FF805D');
+    expect(migrated.wardrobeVersion).toBe(2);
+    const custom = {
+      skinTone: '#F2CDAA',
+      hairColor: '#C9822B',
+      hairStyle: 'short' as const,
+      clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
+    };
+    const again = normalizeLocker({
+      ...migrated,
+      legacySkinId: 'coral-flash',
+      wardrobeVersion: 2,
+      appearance: custom,
+    });
+    expect(again.appearance).toEqual(custom);
+    const third = normalizeLocker({ ...again, legacySkinId: 'lime-night' });
+    expect(third.appearance).toEqual(custom);
+    expect(third.ownedKits).toEqual(again.ownedKits);
+  });
+
   it('catalogue has ~8 boots and ~6 kits including starters', () => {
     expect(BOOTS.length).toBeGreaterThanOrEqual(8);
     expect(KITS.length).toBeGreaterThanOrEqual(6);

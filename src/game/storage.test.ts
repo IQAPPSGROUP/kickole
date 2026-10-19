@@ -90,6 +90,34 @@ describe('storage', () => {
     expect(save.appearance.skinTone).toBe('#8D5A3C');
   });
 
+  it('does not reset a saved look on later launches when settings still hold a legacy skin', async () => {
+    const appearance = {
+      skinTone: '#F2CDAA',
+      hairColor: '#C9822B',
+      hairStyle: 'short',
+      clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
+    };
+    const raw = JSON.stringify({
+      wardrobeVersion: 2,
+      appearance,
+      coins: 10,
+      best: 3,
+      leaderboard: [],
+      ownedBoots: ['boot-street-classic'],
+      ownedKits: ['kit-street-classic'],
+    });
+    const { loadSave } = await load({
+      'kicky.save.v1': raw,
+      'kicky.settings.v1': JSON.stringify({ skinId: 'coral-flash', sound: true, vibration: true, quality: 'high' }),
+    });
+    const first = loadSave();
+    expect(first.appearance).toEqual(appearance);
+    expect(first.ownedKits).not.toContain('kit-carnival');
+    const second = loadSave();
+    expect(second.appearance).toEqual(appearance);
+    expect(second.appearance.clothing.shirt).toBe('#9B59B6');
+  });
+
   it('flags a new personal best and reports the rank', async () => {
     const { loadSave, saveRun } = await load();
     const first = saveRun(loadSave(), { score: 20, kickUps: 4, date: 1 });

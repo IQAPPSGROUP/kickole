@@ -4,7 +4,13 @@ import type { Quality, RunRecord, Settings } from '../game/storage';
 export function Logo() {
   return (
     <h1 className="logo">
-      KICK<span>OLÉ</span>
+      <img
+        src="/brand/kickole-wordmark.webp"
+        alt="KICKOLÉ"
+        width={1024}
+        height={368}
+        draggable={false}
+      />
     </h1>
   );
 }

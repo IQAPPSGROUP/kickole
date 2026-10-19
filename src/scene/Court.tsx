@@ -220,6 +220,62 @@ function Bunting() {
   );
 }
 
+/** Low-poly hillside neighbourhood: original geometry, no downloaded models or textures.
+ * Placed behind the back wall so the ball and player remain unobstructed.
+ * Static buildings are intentionally unlit to minimise mobile GPU cost. */
+function HillsideNeighbourhood() {
+  const buildings = useMemo(() => {
+    const random = seededRandom(1969);
+    const palette = ['#E7A56F', '#D46D62', '#E9C886', '#6AAB9D', '#8BA5B4', '#B987AD'];
+    return Array.from({ length: 22 }, (_, i) => {
+      const row = i < 12 ? 0 : 1;
+      const index = row === 0 ? i : i - 12;
+      const x = (index - (row === 0 ? 5.5 : 4.5)) * (row === 0 ? 0.93 : 1.24);
+      const z = row === 0 ? -5.5 - random() * 0.5 : -7.3 - random() * 0.9;
+      const width = 0.74 + random() * 0.48;
+      const height = (row === 0 ? 2.0 : 3.0) + random() * 2.0;
+      const depth = 0.7 + random() * 0.55;
+      return { x, z, width, height, depth, color: palette[i % palette.length], roof: i % 3 === 0, balcony: i % 4 === 0 };
+    });
+  }, []);
+  return (
+    <group>
+      {/* Distant skyline blocks: flat shaded and intentionally low-poly. */}
+      {buildings.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]}>
+          <mesh position={[0, b.height / 2, 0]}>
+            <boxGeometry args={[b.width, b.height, b.depth]} />
+            <meshLambertMaterial color={b.color} />
+          </mesh>
+          <mesh position={[0, b.height + 0.055, 0]}>
+            <boxGeometry args={[b.width + 0.13, 0.11, b.depth + 0.13]} />
+            <meshLambertMaterial color="#D8C6AA" />
+          </mesh>
+          {/* Dark windows face the camera. */}
+          {[-0.22, 0.22].map((u, k) => (
+            <mesh key={k} position={[u * b.width, b.height * 0.68, b.depth / 2 + 0.008]}>
+              <planeGeometry args={[0.14, 0.22]} />
+              <meshBasicMaterial color="#294854" />
+            </mesh>
+          ))}
+          {b.roof && (
+            <mesh position={[b.width * 0.23, b.height + 0.24, 0]}>
+              <boxGeometry args={[0.09, 0.37, 0.09]} />
+              <meshLambertMaterial color="#56616A" />
+            </mesh>
+          )}
+          {b.balcony && (
+            <mesh position={[0, b.height * 0.46, b.depth / 2 + 0.12]}>
+              <boxGeometry args={[b.width * 0.72, 0.06, 0.23]} />
+              <meshLambertMaterial color="#E3D4BB" />
+            </mesh>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
 export function Court({ shadows }: { shadows: boolean }) {
   const tex = useCourtTexture();
   const wall = useWallTexture();
@@ -231,6 +287,7 @@ export function Court({ shadows }: { shadows: boolean }) {
   }, [tex, wall, sign, fence, blob]);
   return (
     <group>
+      <HillsideNeighbourhood />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow={shadows}>
         <planeGeometry args={[9, 9]} />
         <meshStandardMaterial map={tex} roughness={0.9} />

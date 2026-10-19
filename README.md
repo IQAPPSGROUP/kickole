@@ -3,7 +3,7 @@
 KICKOLÉ is a mobile-first 3D street-football freestyle game by IQ Apps Group, with a realistic player, ball and court.
 Tap at the right moment to keep the ball in the air, chase PERFECT timing, alternate feet and land foot stalls.
 
-Stack: React + TypeScript + Vite, Three.js, React Three Fiber and Drei. No backend or API keys. Art is bundled CC0 (MakeHuman, Poly Haven) plus original meshes. See `docs/REALISTIC_STYLE.md`.
+Stack: React + TypeScript + Vite, Three.js, React Three Fiber and Drei. No backend or API keys. The footballers are licensed Fab characters. The court uses CC0 Poly Haven textures plus original meshes. See `docs/REALISTIC_STYLE.md`.
 
 ## Run locally
 
@@ -60,7 +60,7 @@ An optional beach theme includes ten textured GLBs, sand court, coastal sky/fog 
 
 ## Character model
 
-The street footballer is `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb`. Both are CC0 MakeHuman bodies on the same contract skeleton and the same five clips. Low quality loads the matching LOD1 file. `kickole_player_v3.glb` and `kickole_player_v2.glb` stay as the stylised Quaternius sources, and `kicky-player-rigged.glb` remains the procedural reference for [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). See [`public/models/LICENSE`](public/models/LICENSE) and [`docs/REALISTIC_STYLE.md`](docs/REALISTIC_STYLE.md). Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
+The street footballer is `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb`. Both are Fab Standard licence characters (artist artistofthemonth, licensed to Rob Stancombe t/a IQ Apps Group) on the same contract skeleton and the same five clips. Low quality loads the matching LOD1 file. Rebuild with `npm run build:player` after pointing `FAB_PLAYER_SRC` at the local Fab download. Do not commit that download. `kickole_player_v3.glb` and `kickole_player_v2.glb` stay as the stylised Quaternius sources, and `kicky-player-rigged.glb` remains the procedural reference for [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). See [`public/models/LICENSE`](public/models/LICENSE) and [`docs/REALISTIC_STYLE.md`](docs/REALISTIC_STYLE.md). Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
 
 Both character renderers add expressive idle/ready movement, ball tracking, three touch gestures, stall balancing and varied reactions. V2 uses rig-specific complete arm poses for distinct reactions while retaining main's procedural leg transforms during live play. See [`docs/PLAYER_MOVEMENT.md`](docs/PLAYER_MOVEMENT.md) for validation and `/tools/movement-preview.html` on the dev server for a side-by-side motion review with nine selectable scenarios.
 

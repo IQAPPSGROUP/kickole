@@ -104,11 +104,12 @@ function triangles(scene: Group): number {
 }
 
 describe.each([
-  ['kickole_player_v4.glb', LOD0, 35_000, 50_000],
+  ['kickole_player_v4.glb', LOD0, 18_000, 50_000],
   ['kickole_player_v4_lod1.glb', LOD1, 12_000, 15_000],
-  ['kickole_player_v4_female.glb', FEMALE0, 35_000, 50_000],
+  ['kickole_player_v4_female.glb', FEMALE0, 18_000, 50_000],
   ['kickole_player_v4_female_lod1.glb', FEMALE1, 12_000, 15_000],
 ] as const)('%s', (label, file, minTris, maxTris) => {
+  const allowed = new Set<string>([...Object.values(MATERIAL_NAMES), 'Eyes', 'InnerMouth']);
   it('is meshopt + KTX2 and stays inside the triangle budget', async () => {
     const json = glbJson(file);
     expect(json.extensionsRequired).toEqual(expect.arrayContaining(['KHR_texture_basisu', 'EXT_meshopt_compression']));
@@ -125,7 +126,8 @@ describe.each([
     expect(gltf.animations.map((a) => a.name).sort()).toEqual([...ANIMATION_STATES].sort());
     expect(validateModel(names, gltf.animations.map((a) => a.name), mats)).toEqual({ missingBones: [], missingClips: [], missingMaterials: [] });
     expect(Object.values(BONE_NAMES).every((n) => names.includes(n))).toBe(true);
-    expect([...mats].sort()).toEqual([...Object.values(MATERIAL_NAMES)].sort());
+    expect(mats.has('Eyes')).toBe(true);
+    for (const name of mats) expect(allowed.has(name)).toBe(true);
     expect(names.length).toBeLessThanOrEqual(40);
     const tris = triangles(gltf.scene);
     expect(tris).toBeGreaterThanOrEqual(minTris);

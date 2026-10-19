@@ -4,40 +4,31 @@ Kickolé realistic assets
 kickole_player_v4.glb, kickole_player_v4_lod1.glb,
 kickole_player_v4_female.glb and kickole_player_v4_female_lod1.glb
 ---------------------------------------------------------------------
-The body, head, face and helper meshes (eyes, teeth) are derived from the
-MakeHuman hm08 base mesh, released under CC0 1.0 Universal in September 2020
-by MakeHuman (Data Collection AB / Palmius / Hauquier). The source file is
-vendored at tools/realistic/sources/makehuman-hm08-base.obj.
+These four files are optimised game models derived from two realistic
+footballers bought on Fab.
 
-Male and female shapes add the CC0 macro targets vendored in
-tools/realistic/sources/targets/ (young caucasian gender target, plus a
-partial max-muscle corner so both read as athletic rather than extreme).
-Those targets are part of the MakeHuman asset set relicensed CC0 in
-September 2020. The same skeleton, bone names and clip contract are baked
-into both GLBs.
+  Licence:     Fab Standard License, Personal tier
+  Licensee:    Rob Stancombe t/a IQ Apps Group
+  Artist:      artistofthemonth
+  Male source: the 21,071-triangle model with the Godot humanoid rig
+               (84 bones in the download; reduced to the game contract)
+  Female source: the 29,085-triangle model with the normal FBX rig
 
-https://creativecommons.org/publicdomain/zero/1.0/
-http://www.makehumancommunity.org/
+The optimised GLBs may ship inside the Kickolé app and the web build.
+The raw purchased source (zips, FBX, blend, and the unpacked textures)
+must not be redistributed and is not in this repository.
 
-The street kit is fitted from CC0 MakeHuman clothes, then retinted at runtime:
+Rebuild with `npm run build:player`. The script expects the download at
+`FAB_PLAYER_SRC` (default `/cursor/stores/bot/kickole-fab-models`),
+containing `source_4.zip` (male) and `source.zip` (female). It writes only
+the four GLBs above. Do not commit the Fab download.
 
-- crude male t-shirt by Elvaerwyn (CC0), the male jersey
-- crude female t-shirt by Joel Palmius (CC0), the women’s jersey
-- jean shorts by Cortu (CC0), refitted per body and used with a neutral albedo
-- Socks2 (CC0)
-- SR Shoes 01 by spamrakuen (CC0)
-- male short hair by abumeqbel (CC0), rendered as an opaque scalp cap
-- ponytail01 from the MakeHuman 1.2 base assets (CC0 as of the September 2020
-  asset relicense; the file header still says AGPL, which is the old tool
-  boilerplate). Rendered as an opaque ponytail, not alpha cards.
-
-Sources are vendored under tools/realistic/sources/clothes/. The body faces
-under those garments are removed. Skin, cloth and leather textures, the
-skeleton and the clips (Idle, KickLeft, KickRight, Miss, Celebrate) are
-original. No club, league or real-player likeness is included. Both bodies
-are free in the game. Rebuild with `npm run build:player`.
-
-This project does not ship Sketchfab or Mixamo characters.
+Both bodies share the skeleton and clip contract in `docs/CHARACTER_GLB.md`.
+Fingers, twist bones and face bones are merged into at most 20 joints.
+The clips (Idle, KickLeft, KickRight, Miss, Celebrate) are original and
+sampled from the game pose. Kit colours and the chest number are applied
+at runtime. No club, league or real-player likeness is included. Both
+bodies are free in the game.
 
 Court and lighting textures
 ---------------------------

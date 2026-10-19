@@ -1,6 +1,6 @@
 # Rigged GLB footballer – asset specification
 
-The game loads `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb` on medium and high, and the matching `*_lod1.glb` on low. Both are realistic street footballers built from the CC0 MakeHuman hm08 base (`tools/realistic/sources/makehuman-hm08-base.obj`) with the CC0 young male or female macro target plus a partial athletic muscle target. They share one skeleton, the same bone names and the same five clips, so tricks and dances play on either. The free body choice lives on `appearance.body` (`male` | `female`). v2 and v3 stay in the repo as the Quaternius stylised sources. `kicky-player-rigged.glb` stays as the procedural reference. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
+The game loads `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb` on medium and high, and the matching `*_lod1.glb` on low. Both are realistic street footballers bought on Fab (artist artistofthemonth, Fab Standard licence, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group). The male is the 21k-triangle Godot rig and the female is the 29k-triangle FBX rig. `tools/prepare_fab_player.py` and `tools/build_fab_player.ts` remap both onto one skeleton, the same bone names and the same five clips, so tricks and dances play on either. The raw Fab download is not in this repository. Set `FAB_PLAYER_SRC` to the local folder that contains `source_4.zip` and `source.zip` before `npm run build:player`. The free body choice lives on `appearance.body` (`male` | `female`). v2 and v3 stay in the repo as the Quaternius stylised sources. `kicky-player-rigged.glb` stays as the procedural reference. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
 binary glTF, fails to load, or lacks the required rig, the built-in primitive character (`src/scene/Character.tsx`)
 is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene/GlbCharacter.tsx` and
 `src/scene/CharacterSwitch.tsx`. Rebuild v4 with `npm run build:player`. Rebuild v3 with `npx tsx tools/build_player_v3.ts`.
@@ -8,7 +8,7 @@ is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene
 ## Format and licence
 - Binary glTF 2.0 (`.glb`), one skinned mesh set sharing one armature, one scene.
 - v4 is Meshopt geometry plus KTX2/Basis textures (`KHR_texture_basisu`, `EXT_meshopt_compression`). Albedo is 1024 (inside the 2K cap; 2K UASTC does not fit the first-load budget). Normals and ORM are 512, UASTC. Cloth and leather albedo are ETC1S. Each GLB stays under 8 MB. Only the LOD for the active tier is requested.
-- Must be licensed for commercial use and redistributable inside a web bundle. No club logos, real kits, or real player likenesses. See `public/models/LICENSE`.
+- The v4 bodies are Fab Standard licence assets. They may ship inside the app and the web build. The raw source (zips, FBX, blend) must not be redistributed. No club logos, real kits, or real player likenesses. See `public/models/LICENSE`.
 
 ## Scale, orientation and origin
 - 1 unit = 1 metre. Standing height about 1.8 m (realistic proportions on v4). Keep feet-to-head height between 1.6 and 1.9.
@@ -56,14 +56,16 @@ Use `MeshStandardMaterial`-compatible (glTF PBR metal-rough) materials, one per 
 
 `Shirt`, `Shirt_Trim`, `Shorts`, `Socks`, `Boots`, `Boots_Sole`, `Skin`, `Hair`
 
-- Base colour is overwritten at runtime from the skin config (`src/game/skins.ts`); author them in neutral/white or a representative colour with no baked colour in textures that would tint wrongly.
-- No transparency or alpha-blended materials. Roughness 0.5 to 0.9, metalness 0.
-- Single material slot per mesh part; up to 8 materials, 1 to 2 draw calls per material.
+v4 also has an `Eyes` material, and the male GLB has `InnerMouth` (jaw, tongue and teeth). Those two are not tinted. The kit slots stay separate so runtime colour and the chest number still apply.
+
+- Base colour is overwritten at runtime from the skin config (`src/game/skins.ts`) for the eight names above. Kit albedo is high-key so the swatch reads. Skin albedo is exposure-matched so the default swatch restores the photograph.
+- Eyes stay opaque and double-sided. The male eyes are the authored eye mesh. The female eyes are the eye region split off the head so they are not tinted with the skin.
+- No transparency or alpha-blended materials. Roughness stays distinct per slot so a glTF dedupe cannot merge the kit. Metalness 0.
 - Do not bake lighting or shadows; the game lights the model.
 
 ## Budget
-- LOD0 (`kickole_player_v4.glb` and `kickole_player_v4_female.glb`): 35k–50k triangles, at most 40 bones, KTX2 albedo ≤ 2048.
-- LOD1 (`kickole_player_v4_lod1.glb` and `kickole_player_v4_female_lod1.glb`): 12k–15k triangles for the low tier, same skeleton and clips, KTX2 albedo 1024.
+- LOD0 (`kickole_player_v4.glb` and `kickole_player_v4_female.glb`): the source mesh, about 21k triangles for the male and 29k for the female (under the 50k cap), at most 40 bones, KTX2 albedo ≤ 2048. The shipped maps are 1024 on the long side so each GLB stays under 8 MB.
+- LOD1 (`kickole_player_v4_lod1.glb` and `kickole_player_v4_female_lod1.glb`): 12k–15k triangles for the low tier, same skeleton and clips. Eyes, mouth and hair are barely simplified.
 - v3 remains the stylised asset and keeps its own under-15k budget in `src/scene/player-v3.test.ts`.
 
 ## Acceptance checklist

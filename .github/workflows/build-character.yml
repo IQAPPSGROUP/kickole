@@ -1,0 +1,60 @@
+name: Build upgraded Kickole character
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - graphics/stylized-character-upgrade
+    paths:
+      - 'tools/generate_kicky_player.py'
+      - '.github/workflows/build-character.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  character:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout graphics branch
+        uses: actions/checkout@v4
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version
+      - name: Generate upgraded GLB
+        run: blender --background --python tools/generate_kicky_player.py
+      - name: Check GLB header and size
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          p = Path('public/models/kicky-player-rigged.glb')
+          data = p.read_bytes()
+          assert data[:4] == b'glTF', 'Not a GLB'
+          assert struct.unpack_from('<I', data, 4)[0] == 2, 'Not glTF 2.0'
+          assert struct.unpack_from('<I', data, 8)[0] == len(data), 'Incorrect GLB length'
+          assert len(data) < 1_500_000, f'GLB too large: {len(data)} bytes'
+          print(f'Valid GLB container: {len(data):,} bytes')
+          PY
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: Upload upgraded model for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: kickole-upgraded-character-glb
+          path: public/models/kicky-player-rigged.glb
+          retention-days: 14

@@ -95,8 +95,8 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'groove',
     call: 'Groove on the beat!',
-    tip: 'Tap GROOVE. It plays on the beat.',
-    missTip: 'Tap GROOVE while the ring is wide.',
+    tip: 'Tap GROOVE for a high kick, dance, then catch it.',
+    missTip: 'Tap GROOVE on the beat, then keep the ball up.',
     control: 'groove',
     gesture: 'tap',
     beat: true,

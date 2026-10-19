@@ -273,7 +273,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       // so the head — and the skinned hair — still follow the ball.
       if (quaternius) {
         computePose(engine, pose);
-        const dancing = engine.celebration != null || engine.selectedTrick === 'groove' || engine.trick?.kind === 'groove';
+        const dancing = engine.celebration != null || engine.trick?.kind === 'groove';
         const trickPose = pose.lockMotion || engine.trick != null || dancing;
         if (trickPose) {
           scene.position.set(0, pose.bodyY, 0);

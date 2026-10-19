@@ -78,6 +78,8 @@ export interface Contact {
   kickPower: number;
   /** When true, release is a thigh return (trick bonus already handled on trap). */
   thigh: boolean;
+  /** High kick that starts the equipped dance, then leaves a normal catch. */
+  groove?: boolean;
 }
 
 export type FootTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick' | 'groove'>;
@@ -499,74 +501,32 @@ export class GameEngine {
   }
 
   private tryGroove(side: Side) {
-    if (this.trick && this.trick.kind !== 'groove' && this.trick.phase !== 'recover' && this.trick.phase !== 'fail') {
+    if (this.trick && this.trick.phase !== 'recover' && this.trick.phase !== 'fail') {
       this.rejectTrick('groove', 'busy');
       return;
     }
-    const choice = this.grooveTarget();
-    if (!choice) {
-      this.rejectTrick('groove', 'window');
-      return;
-    }
-    const deltaMs = this.timingDeltaMs(choice.target.y);
-    const grade = this.gradeFor(deltaMs, this.config.tricks.grooveWindowMs);
+    // Same foot window as a flick. A tap sends the ball high; the dance plays in the air.
+    const deltaMs = this.timingDeltaMs();
+    const grade = this.gradeFor(deltaMs);
+    this.lastKick[side] = this.time;
+    this.selectedTrick = null;
     if (grade === 'miss') {
-      this.rejectTrick('groove', 'timing');
       this.streak = 0;
       this.cooldown = this.config.missCooldown;
+      this.lastKickGrade = 'miss';
+      resetComboTracker(this.combos);
+      this.emit({ type: 'miss', side, deltaMs });
       return;
     }
-    const { scoring } = this.config;
-    const beat = this.lastBeatGrade;
-    const points = groovePoints(scoring.groove, beat, scoring.grooveBeatPerfect, scoring.grooveBeatGood);
-    this.stats.grooves++;
-    this.stats.score += points;
-    this.streak++;
-    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
-    this.lastKickGrade = grade;
-    if (grade === 'perfect') this.lastPerfectTime = this.time;
-    this.lastKick[side] = this.time;
-    this.lastContact[side] = this.time;
-    this.lastSide = side;
-    this.groovePart = choice.part;
+    this.contact = {
+      kind: 'pending', side, grade, deltaMs, held: 0,
+      highFlick: false, kickPower: 0, thigh: false, groove: true,
+    };
     const b = this.ball;
-    b.x = (side === 'left' ? -1 : 1) * this.config.footX * (choice.part === 'knee' ? 0.4 : 0.12);
-    b.y = choice.target.y;
-    b.z = choice.target.z;
-    b.vx = 0;
-    b.vz = 0;
-    const apex = choice.part === 'chest' ? 1.58 : 1.48;
-    b.vy = impulseForApex(apex, b.y, this.gravity);
-    b.wx = 4;
-    b.wy = side === 'left' ? 2 : -2;
-    b.wz = 1;
-    const trick = createTrickState('groove', side, this.time, 'recover');
-    trick.awarded = true;
-    this.trick = trick;
-    this.lastTrick = { kind: 'groove', time: this.time };
-    this.emit({ type: 'trick', kind: 'groove', phase: 'execute', points, side });
-  }
-
-  /** Knee or chest, whichever the descending ball will meet sooner. */
-  private grooveTarget(): { target: { y: number; z: number; x?: number }; part: GroovePart } | null {
-    if (this.ball.vy >= 0) return null;
-    const options: Array<{ target: { y: number; z: number; x?: number }; part: GroovePart }> = [
-      { target: this.config.contacts.chest, part: 'chest' },
-      { target: this.config.contacts.thigh, part: 'knee' },
-    ];
-    let best: { target: { y: number; z: number; x?: number }; part: GroovePart } | null = null;
-    let bestAbs = Infinity;
-    for (const option of options) {
-      if (!this.inContactBand(option.target)) continue;
-      const eta = this.timeToContact(this.ball.y, this.ball.vy, option.target.y);
-      if (!Number.isFinite(eta)) continue;
-      const abs = Math.abs(eta);
-      if (abs < bestAbs) {
-        bestAbs = abs;
-        best = option;
-      }
-    }
-    return best;
+    b.y = this.config.contactHeight;
+    b.z = this.config.ballZ;
+    b.vx = b.vy = b.vz = 0;
+    b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.6;
   }
 
   private tryHeader() {
@@ -813,6 +773,10 @@ export class GameEngine {
     const c = this.contact;
     if (!c) return;
     this.contact = null;
+    if (c.groove) {
+      this.finishGrooveKick(c);
+      return;
+    }
     const { scoring } = this.config;
     const alternate = this.lastSide !== null && this.lastSide !== c.side;
     let points = scoring.kickUp;
@@ -874,6 +838,38 @@ export class GameEngine {
     else if (c.thigh) this.noteCombo('thighTouch');
     else if (stall) this.noteCombo('footStall');
     else this.noteCombo('footTouch');
+  }
+
+  /** High kick, on-beat score, and a dance that ends while the ball is still above the player. */
+  private finishGrooveKick(c: Contact) {
+    const { scoring } = this.config;
+    const points = groovePoints(scoring.groove, this.lastBeatGrade, scoring.grooveBeatPerfect, scoring.grooveBeatGood);
+    this.stats.grooves++;
+    this.stats.score += points;
+    this.streak++;
+    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
+    this.lastSide = c.side;
+    this.lastContact[c.side] = this.time;
+    this.lastKickGrade = c.grade;
+    if (c.grade === 'perfect') this.lastPerfectTime = this.time;
+    this.selectedTrick = null;
+    const nextScale = Math.min(this.config.maxGravityScale, this.gravityScale + this.config.gravityRamp);
+    this.gravityScale = nextScale;
+    const g = this.config.gravity * nextScale;
+    const flight = this.config.tricks.grooveFlightSec;
+    const b = this.ball;
+    b.x = 0;
+    b.y = this.config.contactHeight;
+    b.z = this.config.ballZ;
+    b.vx = 0;
+    b.vz = 0;
+    b.vy = (flight * g) / 2;
+    this.applySpin(c.side, c.grade === 'poor' ? 0.86 : 1);
+    const trick = createTrickState('groove', c.side, this.time, 'execute');
+    trick.awarded = true;
+    this.trick = trick;
+    this.lastTrick = { kind: 'groove', time: this.time };
+    this.emit({ type: 'trick', kind: 'groove', phase: 'execute', points, side: c.side });
   }
 
   private inputBlocked(): boolean {
@@ -983,21 +979,12 @@ export class GameEngine {
       if (this.ball.vy >= 0 || !this.inContactBand(target)) return false;
       return this.gradeFor(this.timingDeltaMs(target.y)) !== 'miss';
     }
-    if (kind === 'groove') {
-      const choice = this.grooveTarget();
-      if (!choice) return false;
-      return this.gradeFor(this.timingDeltaMs(choice.target.y), this.config.tricks.grooveWindowMs) !== 'miss';
-    }
     if (this.ball.vy >= 0) return false;
     return this.gradeFor(this.timingDeltaMs()) !== 'miss';
   }
 
   private footWindowPassed(kind: FootTrick): boolean {
-    const height = kind === 'thigh'
-      ? this.config.contacts.thigh.y
-      : kind === 'groove'
-        ? Math.min(this.config.contacts.chest.y, this.config.contacts.thigh.y)
-        : this.config.contactHeight;
+    const height = kind === 'thigh' ? this.config.contacts.thigh.y : this.config.contactHeight;
     if (this.ball.vy < 0 && this.ball.y < height - 0.28) return true;
     return this.timingDeltaMs(height) < -this.config.timing.poorMs;
   }
@@ -1050,7 +1037,7 @@ export class GameEngine {
     if (!this.footWindowReady(q.kind)) {
       if (this.footWindowPassed(q.kind)) {
         this.queuedFoot = null;
-        if (q.kind !== 'groove' && q.kind !== 'aroundTheWorld') this.selectedTrick = null;
+        if (q.kind !== 'aroundTheWorld') this.selectedTrick = null;
       }
       return;
     }
@@ -1061,7 +1048,7 @@ export class GameEngine {
     const started = this.contact != null || this.trick !== trick || this.stats.score !== score;
     if (!started) return;
     this.queuedFoot = null;
-    if (q.kind !== 'groove' && q.kind !== 'aroundTheWorld') this.selectedTrick = null;
+    if (q.kind !== 'aroundTheWorld') this.selectedTrick = null;
   }
 
   private applySpin(side: Side, power: number) {
@@ -1094,6 +1081,9 @@ export class GameEngine {
     if (this.phase === 'menu' || this.phase === 'ready') return;
 
     if (this.phase === 'playing' && !this.celebration) {
+      if (this.trick?.kind === 'groove' && this.time - this.trick.startedAt >= this.config.tricks.grooveDanceSec) {
+        this.trick = null;
+      }
       this.advanceKickCharge(h);
       this.flushQueues();
     }
@@ -1176,7 +1166,9 @@ export class GameEngine {
     const c = this.contact;
     if (c && this.phase === 'playing') {
       c.held += h;
-      if (!this.held[c.side] && c.held >= this.config.contactDelay - 1e-9) {
+      if (c.groove && c.held >= this.config.contactDelay - 1e-9) {
+        this.completeContact(false);
+      } else if (!this.held[c.side] && c.held >= this.config.contactDelay - 1e-9) {
         this.completeContact(c.kind === 'stall');
       } else if (c.thigh && c.held >= this.config.stallHoldTime) {
         // Thigh touches do not become foot stalls.

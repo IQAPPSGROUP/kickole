@@ -99,4 +99,27 @@ describe('trick poses', () => {
     expect(a.neckPitch).toBeCloseTo(b.neckPitch, 8);
     expect(a.lockMotion).toBe(true);
   });
+
+  it('dances through a groove and is back in a ready stance while the ball is still up', () => {
+    const e = started();
+    e.equippedDance = 'shuffle';
+    e.setTrick('groove');
+    fallThrough(e, e.config.contactHeight, e.config.ballZ);
+    e.press('right');
+    e.release('right');
+    stepN(e, Math.ceil(e.config.contactDelay / e.config.fixedStep) + 3);
+    const dancing = computePose(e);
+    expect(e.trick?.kind).toBe('groove');
+    expect(dancing.lockMotion).toBe(true);
+    expect(dancing.legs.left.knee).toBeLessThan(0.5);
+    expect(dancing.legs.right.knee).toBeLessThan(0.5);
+    expect(dancing.legs.left.thigh).toBeGreaterThan(-0.4);
+    for (let i = 0; i < 4000 && e.trick; i++) e.step(e.config.fixedStep);
+    expect(e.trick).toBeNull();
+    expect(e.ball.y).toBeGreaterThan(e.config.contacts.forehead.y);
+    const ready = computePose(e);
+    expect(ready.lockMotion).toBe(false);
+    expect(Math.abs(ready.legs.left.thigh)).toBeLessThan(0.35);
+    expect(Math.abs(ready.legs.right.thigh)).toBeLessThan(0.35);
+  });
 });

@@ -280,28 +280,52 @@ describe('trick safety and determinism', () => {
 });
 
 describe('groove trick', () => {
-  it('pops the ball and pays the on-beat bonus without leaving groove', () => {
+  function launchGroove(e: GameEngine, beat: 'perfect' | 'good' | 'off' = 'perfect') {
+    e.equippedDance = 'sway';
+    e.setBeatGrade(beat);
+    runUntilContactDelta(e, 5);
+    expect(e.requestFootTrick('groove')).toBe('fired');
+    stepN(e, Math.ceil(e.config.contactDelay / e.config.fixedStep) + 2);
+  }
+
+  it('pays the on-beat bonus and sends the ball well above the head', () => {
     const e = started();
-    expect(e.armTrick('groove')).toBe(true);
-    e.setBeatGrade('perfect');
-    fallThrough(e, e.config.contacts.chest.y, e.config.contacts.chest.z, 20);
-    e.press('left');
+    launchGroove(e, 'perfect');
     expect(e.stats.grooves).toBe(1);
     expect(e.stats.score).toBe(e.config.scoring.groove + e.config.scoring.grooveBeatPerfect);
-    expect(e.ball.vy).toBeGreaterThan(1);
-    expect(e.selectedTrick).toBe('groove');
     expect(e.stats.kickUps).toBe(0);
+    expect(e.selectedTrick).toBeNull();
+    expect(e.trick?.kind).toBe('groove');
+    const flight = (2 * e.ball.vy) / e.gravity;
+    expect(flight).toBeGreaterThan(1.5);
+    expect(flight).toBeLessThan(2);
+    let apex = e.ball.y;
+    let clearedY = 0;
+    for (let i = 0; i < 4000 && !(e.ball.vy < 0 && e.ball.y < e.config.contactHeight + 0.15); i++) {
+      e.step(e.config.fixedStep);
+      apex = Math.max(apex, e.ball.y);
+      if (clearedY === 0 && e.trick == null) clearedY = e.ball.y;
+    }
+    expect(apex).toBeGreaterThan(e.config.contacts.forehead.y + 0.8);
+    expect(clearedY).toBeGreaterThan(e.config.contacts.forehead.y + 0.4);
+    expect(e.trick).toBeNull();
+    expect(e.phase).toBe('playing');
+    runUntilContactDelta(e, 8);
+    e.press('left');
+    e.release('left');
+    stepN(e, 6);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.stats.grooves).toBe(1);
+    expect(e.phase).toBe('playing');
   });
 
   it('still scores the touch when the tap misses the beat', () => {
     const e = started();
-    e.setTrick('groove');
-    e.setBeatGrade('off');
-    fallThrough(e, e.config.contacts.thigh.y, e.config.contacts.thigh.z, 15);
-    e.press('right');
+    launchGroove(e, 'off');
     expect(e.stats.grooves).toBe(1);
     expect(e.stats.score).toBe(e.config.scoring.groove);
     expect(e.lastBeatGrade).toBe('off');
+    expect(e.ball.vy).toBeGreaterThan(e.config.kickSpeed);
   });
 
   it('leaves classic kicks alone until groove is armed', () => {

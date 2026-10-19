@@ -3,7 +3,7 @@ import type { Side } from '../engine/config';
 import { isDanceId, STARTER_DANCE_ID } from '../game/dances';
 import { atwLeg } from './atwOrbit';
 import { GAMEPLAY_BPM } from '../game/beat';
-import { accentGrooveTouch, applyDancePose } from './dancePose';
+import { applyDancePose } from './dancePose';
 import { V2_LIMBS } from './limbCalibration';
 
 export interface LegPose {
@@ -381,18 +381,15 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     out.bodyY -= 0.04 * k;
   }
 
-  const dancing = engine.celebration != null
-    || engine.selectedTrick === 'groove'
-    || engine.trick?.kind === 'groove';
+  const groove = engine.trick?.kind === 'groove' && engine.trick.phase === 'execute';
+  const dancing = engine.celebration != null || groove;
   if (dancing) {
-    const phaseBeat = engine.beatPhase != null ? engine.beatPhase : ((t * GAMEPLAY_BPM) / 60) % 1;
     const danceId = engine.celebration?.danceId ?? engine.equippedDance;
     const dance = isDanceId(danceId) ? danceId : STARTER_DANCE_ID;
+    const phaseBeat = groove
+      ? (t - (engine.trick?.startedAt ?? t)) / c.tricks.grooveDanceSec
+      : engine.beatPhase != null ? engine.beatPhase : ((t * GAMEPLAY_BPM) / 60) % 1;
     applyDancePose(out, dance, phaseBeat, engine.reducedMotion ? 0.35 : 1);
-    if (engine.trick?.kind === 'groove' && engine.trick.side) {
-      const amount = Math.max(0, 1 - (t - engine.trick.startedAt) / 0.22);
-      accentGrooveTouch(out, engine.trick.side, engine.groovePart, amount);
-    }
   }
 
   return out;

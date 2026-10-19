@@ -26,7 +26,7 @@ export interface ScoringConfig {
   aroundTheWorld: number;
   /** Variety bonus awarded once per completed trick combination. */
   varietyBonus: number;
-  /** Groove knee/chest touch before the on-beat bonus. */
+  /** Groove high kick before the on-beat bonus. */
   groove: number;
   grooveBeatGood: number;
   grooveBeatPerfect: number;
@@ -48,8 +48,10 @@ export interface TrickTimingConfig {
   trickCooldown: number;
   /** Seconds between successful combo steps before progress expires. */
   comboExpirySec: number;
-  /** Timing window for a groove knee or chest touch (ms). Wider than a foot kick. */
-  grooveWindowMs: number;
+  /** Air time of a groove kick, from the foot back to the foot (s). */
+  grooveFlightSec: number;
+  /** Equipped dance length during a groove. Shorter than the flight so the catch is ready. */
+  grooveDanceSec: number;
 }
 
 export interface GameConfig {
@@ -143,7 +145,8 @@ export const DEFAULT_CONFIG: GameConfig = {
     atwReturnMs: 160,
     trickCooldown: 0.2,
     comboExpirySec: 3.5,
-    grooveWindowMs: 190,
+    grooveFlightSec: 1.75,
+    grooveDanceSec: 1.05,
   },
   contacts: {
     foot: FOOT,

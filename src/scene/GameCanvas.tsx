@@ -135,7 +135,7 @@ function StreetTone() {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = 1.05;
+    gl.toneMappingExposure = 1;
   }, [gl]);
   return null;
 }
@@ -153,8 +153,8 @@ function SunsetIbl() {
         env = pm.fromEquirectangular(hdr).texture;
         scene.environment = env;
         scene.background = env;
-        scene.backgroundBlurriness = 0.42;
-        scene.environmentIntensity = 0.85;
+        scene.backgroundBlurriness = 0.55;
+        scene.environmentIntensity = 0.42;
         hdr.dispose();
         pm.dispose();
       });
@@ -216,7 +216,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
     <>
       {street && <StreetTone />}
       <color attach="background" args={[street ? '#3a2a28' : '#8dc5cb']} />
-      <fog attach="fog" args={street ? ['#b98362', 16, 42] : ['#8dc5cb', 24, 52]} />
+      <fog attach="fog" args={street ? ['#5c3a32', 22, 48] : ['#8dc5cb', 24, 52]} />
       <CameraRig shake={quality !== 'low'} />
       {street && profile.ibl && <SunsetIbl />}
       {!street && quality === 'high' && <Environment />}
@@ -224,8 +224,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <PerfProbe />
       {street ? (
         <>
-          <hemisphereLight args={['#ffd2a8', '#2a2420', 0.55]} />
-          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.35} color="#8aa4c8" />
+          <hemisphereLight args={['#ffd2a8', '#1c1614', 0.28]} />
+          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.22} color="#8aa4c8" />
         </>
       ) : (
         <>
@@ -235,8 +235,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       )}
       <directionalLight
         position={street ? [6.2, 8.4, 2.4] : [2.6, 7, 3.2]}
-        intensity={street ? 2.6 : 2.3}
-        color={street ? '#ffd0a0' : '#ffe9c7'}
+        intensity={street ? 3.4 : 2.3}
+        color={street ? '#ffe2b0' : '#ffe9c7'}
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}
         shadow-camera-left={wide ? -6 : -3}

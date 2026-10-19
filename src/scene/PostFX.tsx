@@ -40,7 +40,10 @@ let sceneStats: SceneStats | null = null;
 function streetLut(): DataTexture {
   const size = 16;
   const data = new Uint8Array(size * size * size * 4);
-  const grade = (c: number) => Math.min(1, Math.pow(c, 0.96));
+  const grade = (c: number) => {
+    const contrasted = (c - 0.5) * 1.22 + 0.5;
+    return Math.min(1, Math.max(0, contrasted));
+  };
   for (let b = 0; b < size; b++) {
     for (let g = 0; g < size; g++) {
       for (let r = 0; r < size; r++) {

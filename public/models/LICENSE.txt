@@ -1,3 +1,6 @@
+See also public/models/LICENSE for the realistic v4 player, Poly Haven
+court textures and the sunset HDRI.
+
 kickole_player_v2.glb and kickole_player_v3.glb
 ------------------------------------------------
 Derived from the Quaternius Universal Base Characters (Standard), used under

@@ -1,0 +1,45 @@
+Kickolé realistic assets
+========================
+
+kickole_player_v4.glb and kickole_player_v4_lod1.glb
+----------------------------------------------------
+The body, head, face and helper meshes (eyes, teeth, eyelashes, hair shells)
+are derived from the MakeHuman hm08 base mesh, released under CC0 1.0
+Universal in September 2020 by MakeHuman (Data Collection AB / Palmius /
+Hauquier). The source file is vendored at
+tools/realistic/sources/makehuman-hm08-base.obj.
+
+https://creativecommons.org/publicdomain/zero/1.0/
+http://www.makehumancommunity.org/
+
+The shirt, shorts, socks, boots, skin/cloth/leather textures, skeleton and
+animation clips (Idle, KickLeft, KickRight, Miss, Celebrate) are original
+works created for this repository and may be redistributed with the game,
+including as a binary glTF inside a web build. No club, league or real-player
+likeness is included. Rebuild with `npm run build:player`.
+
+This project does not ship Sketchfab or Mixamo characters.
+
+Court and lighting textures
+---------------------------
+public/textures/street/asphalt_*.jpg
+  Poly Haven asphalt_02, 1K, CC0.
+  https://polyhaven.com/a/asphalt_02
+
+public/textures/street/concrete_*.jpg
+  Poly Haven concrete_wall_001, 1K, CC0.
+  https://polyhaven.com/a/concrete_wall_001
+
+public/textures/street/wall_graffiti.jpg
+  The same concrete photograph with an original mural painted on top.
+  The photograph remains CC0. The mural is original.
+
+public/textures/venice_sunset_1k.hdr
+  Poly Haven venice_sunset, 1K, CC0.
+  https://polyhaven.com/a/venice_sunset
+
+Quaternius sources still in this folder
+---------------------------------------
+kickole_player_v2.glb and kickole_player_v3.glb are derived from the
+Quaternius Universal Base Characters (Standard), CC0 1.0 Universal.
+They are not the default runtime character. See LICENSE.txt.

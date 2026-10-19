@@ -89,6 +89,7 @@ export class GameEngine {
   private gravityScale = 1;
   private listeners = new Set<(e: EngineEvent) => void>();
   private held: Record<Side, boolean> = { left: false, right: false };
+  private heldNeck = false;
 
   constructor(config: Partial<GameConfig> = {}) {
     this.config = {
@@ -145,6 +146,7 @@ export class GameEngine {
     this.gravityScale = 1;
     this.acc = 0;
     this.held = { left: false, right: false };
+    this.heldNeck = false;
   }
 
   /**
@@ -199,15 +201,47 @@ export class GameEngine {
 
   release(side: Side) {
     this.held[side] = false;
-    const neck = this.trick;
-    if (neck && neck.kind === 'neckStall' && (neck.phase === 'contact' || neck.phase === 'execute')) {
-      this.releaseNeckStall();
-      return;
-    }
     const c = this.contact;
     if (c && c.side === side && this.phase === 'playing' && c.held >= this.config.contactDelay) {
       this.completeContact(c.kind === 'stall');
     }
+  }
+
+  /** Direct header attempt from the HEAD control (not a foot tap). */
+  attemptHeader() {
+    if (this.phase !== 'playing') return;
+    if (this.cooldown > 0 || this.contact || this.trickCooldown > 0) return;
+    this.selectedTrick = 'header';
+    this.tryHeader();
+  }
+
+  /** NECK control: press-and-hold catch. */
+  pressNeck() {
+    if (this.phase !== 'playing') return;
+    if (this.heldNeck) return;
+    this.heldNeck = true;
+    if (this.cooldown > 0 || this.contact || this.trickCooldown > 0) return;
+    this.selectedTrick = 'neckStall';
+    this.tryNeckCatch();
+  }
+
+  releaseNeck() {
+    if (!this.heldNeck) return;
+    this.heldNeck = false;
+    const neck = this.trick;
+    if (neck && neck.kind === 'neckStall' && (neck.phase === 'contact' || neck.phase === 'execute')) {
+      this.releaseNeckStall();
+    }
+  }
+
+  /** Arm or cancel a foot-armed trick (ATW / thigh / high flick). */
+  armTrick(kind: Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick'> | null) {
+    if (kind === null) {
+      this.setTrick(null);
+      return true;
+    }
+    if (this.selectedTrick === kind) return this.setTrick(null);
+    return this.setTrick(kind);
   }
 
   private launch(side: Side) {
@@ -538,7 +572,10 @@ export class GameEngine {
       this.trick = null;
       this.selectedTrick = null;
     }
-    if (c.highFlick) this.stats.highFlicks++;
+    if (c.highFlick) {
+      this.stats.highFlicks++;
+      this.lastTrick = { kind: 'highFlick', time: this.time };
+    }
 
     this.streak++;
     this.stats.kickUps++;

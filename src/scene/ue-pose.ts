@@ -17,25 +17,31 @@ export function ueLocalRotation(key: BoneKey, pose: Pose): { x: number; y: numbe
     case 'root':
       return { x: 0, y: pose.bodyYaw, z: 0 };
     case 'spine':
-      return { x: pose.torsoPitch, y: 0, z: pose.torsoRoll };
+      return { x: pose.torsoPitch, y: pose.torsoYaw, z: pose.torsoRoll };
+    case 'neck':
+      return { x: pose.neckPitch, y: pose.neckYaw, z: 0 };
     case 'head':
       return { x: pose.headPitch, y: pose.headYaw, z: 0 };
     case 'armLeft':
       return { x: -pose.armLeftPitch, y: 0, z: hang - pose.armLeft };
     case 'armRight':
       return { x: -pose.armRightPitch, y: 0, z: -hang + pose.armRight };
+    case 'elbowLeft':
+      return { x: pose.elbowLeft, y: 0, z: 0 };
+    case 'elbowRight':
+      return { x: pose.elbowRight, y: 0, z: 0 };
     case 'thighLeft':
-      return { x: pose.legs.left.thigh, y: 0, z: pose.legs.left.abduct };
+      return { x: pose.legs.left.thigh, y: pose.legs.left.twist, z: pose.legs.left.abduct };
     case 'thighRight':
-      return { x: pose.legs.right.thigh, y: 0, z: pose.legs.right.abduct };
+      return { x: pose.legs.right.thigh, y: pose.legs.right.twist, z: pose.legs.right.abduct };
     case 'shinLeft':
       return { x: pose.legs.left.knee, y: 0, z: 0 };
     case 'shinRight':
       return { x: pose.legs.right.knee, y: 0, z: 0 };
     case 'footLeft':
-      return { x: pose.legs.left.foot, y: 0, z: 0 };
+      return { x: pose.legs.left.foot, y: pose.legs.left.ankleYaw, z: pose.legs.left.ankleRoll };
     case 'footRight':
-      return { x: pose.legs.right.foot, y: 0, z: 0 };
+      return { x: pose.legs.right.foot, y: pose.legs.right.ankleYaw, z: pose.legs.right.ankleRoll };
     default: {
       const exhaustive: never = key;
       return exhaustive;

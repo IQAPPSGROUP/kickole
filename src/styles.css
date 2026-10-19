@@ -95,15 +95,75 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   bottom: 0;
   z-index: 6;
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 0 max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+.trick-bar {
+  pointer-events: auto;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.trick-btn {
+  font: inherit;
+  font-weight: 900;
+  font-size: 10px;
+  letter-spacing: 1px;
+  min-height: 40px;
+  min-width: 52px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  color: var(--white);
+  background: linear-gradient(160deg, rgba(255, 255, 255, .22), rgba(20, 45, 53, .4));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  touch-action: none;
+}
+.trick-btn:disabled { opacity: .35; cursor: default; }
+.trick-btn.on {
+  border-color: var(--lime);
+  background: linear-gradient(160deg, rgba(234, 244, 74, .35), rgba(20, 45, 53, .45));
+  color: var(--lime);
+}
+.trick-btn:active:not(:disabled) { transform: scale(.96); }
+.trick-help {
+  margin: 0;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: .6px;
+  opacity: .55;
+  pointer-events: none;
+}
+.trick-armed {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + min(30vw, 120px) + 58px);
+  text-align: center;
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-size: 13px;
+  color: var(--lime);
+  text-shadow: 0 2px 6px #142d35;
+  pointer-events: none;
+}
+.foot-row {
+  display: flex;
   justify-content: space-between;
   align-items: flex-end;
   gap: 24px;
-  padding: 0 max(18px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
   pointer-events: none;
 }
 .foot-btn {
   pointer-events: auto;
   touch-action: none;
+  flex-shrink: 0;
   -webkit-user-select: none;
   user-select: none;
   width: min(30vw, 120px);

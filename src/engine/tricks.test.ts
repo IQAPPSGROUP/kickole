@@ -135,9 +135,8 @@ describe('header', () => {
 describe('neck stall', () => {
   it('catches on the nape, holds, then flicks without foot kick records', () => {
     const e = started();
-    e.setTrick('neckStall');
     fallThrough(e, e.config.contacts.nape.y, e.config.contacts.nape.z, 5);
-    e.press('right');
+    e.pressNeck();
     expect(e.stats.neckStalls).toBe(1);
     expect(e.stats.score).toBe(10);
     expect(e.trick?.kind).toBe('neckStall');
@@ -145,7 +144,7 @@ describe('neck stall', () => {
     stepN(e, 40);
     expect(e.ball.y).toBeCloseTo(y, 5);
     expect(e.ball.y).toBeCloseTo(e.config.contacts.nape.y, 5);
-    e.release('right');
+    e.releaseNeck();
     expect(e.ball.vy).toBeGreaterThan(0);
     expect(e.stats.score).toBe(10); // hold/release does not farm
     expect(e.stats.kickUps).toBe(0);
@@ -153,9 +152,8 @@ describe('neck stall', () => {
 
   it('auto-flicks at the max hold duration', () => {
     const e = started();
-    e.setTrick('neckStall');
     fallThrough(e, e.config.contacts.nape.y, e.config.contacts.nape.z, 5);
-    e.press('left');
+    e.pressNeck();
     const maxSteps = Math.ceil(e.config.tricks.neckMaxHold / e.config.fixedStep) + 5;
     stepN(e, maxSteps);
     expect(e.ball.vy).toBeGreaterThan(0);

@@ -83,7 +83,7 @@ describe('motion rig',()=>{
   it('keeps both authored GLB boots exactly fixed while upper-body accents move through a stall',async()=>{
     const b=readFileSync(new URL('../../public/models/kicky-player-rigged.glb',import.meta.url));
     const gltf=await new GLTFLoader().parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
-    const bones:Partial<Record<BoneKey,Bone>>={};gltf.scene.traverse(o=>{for(const key of Object.keys(BONE_NAMES) as BoneKey[])if(o.name===BONE_NAMES[key])bones[key]=o as Bone;});
+    const bones:Partial<Record<BoneKey,Bone>>={};gltf.scene.traverse(o=>{for(const key of Object.keys(BONE_NAMES) as (keyof typeof BONE_NAMES)[])if(o.name===BONE_NAMES[key])bones[key]=o as Bone;});
     const rig=createMotionRig({root:gltf.scene,spine:bones.spine,head:bones.head,armLeft:bones.armLeft,armRight:bones.armRight,footLeft:bones.footLeft,footRight:bones.footRight});
     const mixer=new AnimationMixer(gltf.scene),e=new GameEngine();
     for(const side of ['left','right'] as const){

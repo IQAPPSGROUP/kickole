@@ -39,21 +39,25 @@ export function Character({ engine, skin, expressive = true }: Props) {
     if (root.current) { root.current.position.y = pose.bodyY; root.current.rotation.y = pose.bodyYaw; }
     if (torso.current) {
       torso.current.rotation.x = pose.torsoPitch;
+      torso.current.rotation.y = pose.torsoYaw;
       torso.current.rotation.z = pose.torsoRoll;
       torso.current.scale.y = 1 + pose.breathe * 0.012;
     }
-    if (head.current) { head.current.rotation.y = pose.headYaw; head.current.rotation.x = pose.headPitch; }
+    if (head.current) {
+      head.current.rotation.y = pose.headYaw + pose.neckYaw;
+      head.current.rotation.x = pose.headPitch + pose.neckPitch;
+    }
     if (armL.current) { armL.current.rotation.z = -pose.armLeft; armL.current.rotation.x = pose.armLeftPitch; }
     if (armR.current) { armR.current.rotation.z = pose.armRight; armR.current.rotation.x = pose.armRightPitch; }
     const apply = (t: Group | null, s: Group | null, f: Group | null, l: typeof pose.legs.left) => {
-      if (t) { t.rotation.x = l.thigh; t.rotation.z = l.abduct; }
+      if (t) { t.rotation.x = l.thigh; t.rotation.y = l.twist; t.rotation.z = l.abduct; }
       if (s) s.rotation.x = l.knee;
-      if (f) f.rotation.x = l.foot;
+      if (f) { f.rotation.x = l.foot; f.rotation.y = l.ankleYaw; f.rotation.z = l.ankleRoll; }
     };
     apply(thighL.current, shinL.current, footL.current, pose.legs.left);
     apply(thighR.current, shinR.current, footR.current, pose.legs.right);
     // The fallback already tracks the ball procedurally; keep its existing head pitch/yaw.
-    if (expressive) motionRig.current?.apply(computePlayerMotion(engine, motion), false);
+    if (expressive && !pose.lockMotion) motionRig.current?.apply(computePlayerMotion(engine, motion), false);
   });
 
   const { clothing, boots, body } = skin;

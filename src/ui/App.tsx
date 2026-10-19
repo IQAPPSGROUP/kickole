@@ -18,29 +18,50 @@ export function App() {
 
   useEffect(() => {
     let spaceDown = false;
+    let neckDown = false;
     const keys: Record<string, 'left' | 'right'> = { KeyA: 'left', KeyD: 'right' };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      if (showSettings) return;
       if (e.code === 'Space') {
         if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
         e.preventDefault();
-        if (!showSettings) { spaceDown = controller.engine.phase === 'ready'; controller.action(); }
-      } else if (keys[e.code] && !showSettings) {
+        spaceDown = controller.engine.phase === 'ready';
+        controller.action();
+      } else if (keys[e.code]) {
         controller.press(keys[e.code]);
+      } else if (e.code === 'KeyH') {
+        controller.attemptHeader();
+      } else if (e.code === 'KeyN') {
+        neckDown = true;
+        controller.pressNeck();
+      } else if (e.code === 'KeyT') {
+        controller.armTrick('thigh');
+      } else if (e.code === 'KeyF') {
+        controller.armTrick('highFlick');
+      } else if (e.code === 'KeyW') {
+        controller.armTrick('aroundTheWorld');
+      } else if (e.code === 'Escape') {
+        controller.armTrick(null);
       }
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         if (spaceDown) controller.release('right');
         spaceDown = false;
+      } else if (keys[e.code]) {
+        controller.release(keys[e.code]);
+      } else if (e.code === 'KeyN' && neckDown) {
+        neckDown = false;
+        controller.releaseNeck();
       }
-      else if (keys[e.code]) controller.release(keys[e.code]);
     };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      if (neckDown) controller.releaseNeck();
     };
   }, [controller, showSettings]);
 

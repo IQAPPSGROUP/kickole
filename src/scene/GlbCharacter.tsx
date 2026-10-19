@@ -11,7 +11,7 @@ import { inspector } from './inspector';
 import { computePlayerMotion, createPlayerMotion } from './motion';
 import { createMotionRig } from './motionRig';
 import {
-  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, animationSampleTime, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, animationSampleTime, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 import { ueDeltaQuaternion } from './ue-pose';
@@ -233,9 +233,13 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       }
     });
     const resolved = rigKind(boneNames);
-    const names: Record<BoneKey, string> = resolved === 'ue' ? UE_BONE_NAMES : BONE_NAMES;
+    const names: Partial<Record<BoneKey, string>> = resolved === 'ue'
+      ? UE_BONE_NAMES
+      : { ...BONE_NAMES, ...EXTRA_BONE_NAMES };
     (Object.keys(names) as BoneKey[]).forEach((k) => {
-      const bone = byName.get(names[k]);
+      const boneName = names[k];
+      if (!boneName) return;
+      const bone = byName.get(boneName);
       if (bone) boneMap[k] = bone;
     });
     return {
@@ -404,13 +408,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
     }
     if (kind === 'ue') {
       computePose(engine, pose);
-      if (expressive) computePlayerMotion(engine, motion);
-      scene.position.x = expressive ? motion.rootX : 0;
-      scene.position.y = pose.bodyY + (expressive ? motion.rootY : 0);
+      const allowMotion = expressive && !pose.lockMotion;
+      if (allowMotion) computePlayerMotion(engine, motion);
+      else { motion.rootX = 0; motion.rootY = 0; }
+      scene.position.x = allowMotion ? motion.rootX : 0;
+      scene.position.y = pose.bodyY + (allowMotion ? motion.rootY : 0);
       (Object.keys(UE_BONE_NAMES) as BoneKey[]).forEach((k) => {
         const b = bones[k];
         const restQ = restQuat.get(k);
-        if (b && restQ) b.quaternion.copy(restQ).multiply(expressive
+        if (b && restQ) b.quaternion.copy(restQ).multiply(allowMotion
           ? ueMovementQuaternion(k, pose, motion, deltaQ) : ueDeltaQuaternion(k, pose, deltaQ));
       });
       if (inspector.active) {
@@ -435,17 +441,20 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       const b = bones[k]; const r = rest.get(k);
       if (b && r) b.rotation.set(r.x + x, r.y + y, r.z + z);
     };
-    set('spine', pose.torsoPitch, 0, pose.torsoRoll);
+    set('spine', pose.torsoPitch, pose.torsoYaw, pose.torsoRoll);
+    set('neck', pose.neckPitch, pose.neckYaw, 0);
     set('head', pose.headPitch, pose.headYaw, 0);
     set('armLeft', pose.armLeftPitch, 0, pose.armLeft);
     set('armRight', pose.armRightPitch, 0, -pose.armRight);
-    set('thighLeft', pose.legs.left.thigh, 0, pose.legs.left.abduct);
-    set('thighRight', pose.legs.right.thigh, 0, pose.legs.right.abduct);
+    set('elbowLeft', pose.elbowLeft, 0, 0);
+    set('elbowRight', pose.elbowRight, 0, 0);
+    set('thighLeft', pose.legs.left.thigh, pose.legs.left.twist, pose.legs.left.abduct);
+    set('thighRight', pose.legs.right.thigh, pose.legs.right.twist, pose.legs.right.abduct);
     set('shinLeft', pose.legs.left.knee, 0, 0);
     set('shinRight', pose.legs.right.knee, 0, 0);
-    set('footLeft', pose.legs.left.foot, 0, 0);
-    set('footRight', pose.legs.right.foot, 0, 0);
-    if (expressive) motionRig.apply(computePlayerMotion(engine, motion), false);
+    set('footLeft', pose.legs.left.foot, pose.legs.left.ankleYaw, pose.legs.left.ankleRoll);
+    set('footRight', pose.legs.right.foot, pose.legs.right.ankleYaw, pose.legs.right.ankleRoll);
+    if (expressive && !pose.lockMotion) motionRig.apply(computePlayerMotion(engine, motion), false);
   });
 
   return <primitive object={scene} />;

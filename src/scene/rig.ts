@@ -37,7 +37,7 @@ export const KICK_CLIP_CONTACT_TIME = 0.3;
  */
 export const KICK_CLIP_START = KICK_CLIP_CONTACT_TIME - KICK_CONTACT_TIME;
 
-/** Bone names the model must provide for procedural (pose-driven) animation. */
+/** Core bones required for procedural (pose-driven) animation. */
 export const BONE_NAMES = {
   root: 'Hips',
   spine: 'Spine',
@@ -51,7 +51,15 @@ export const BONE_NAMES = {
   footLeft: 'Foot_L',
   footRight: 'Foot_R',
 } as const;
-export type BoneKey = keyof typeof BONE_NAMES;
+
+/** Optional expressive bones — present on v2, ignored when missing on the contract rig. */
+export const EXTRA_BONE_NAMES = {
+  neck: 'Neck',
+  elbowLeft: 'LowerArm_L',
+  elbowRight: 'LowerArm_R',
+} as const;
+
+export type BoneKey = keyof typeof BONE_NAMES | keyof typeof EXTRA_BONE_NAMES;
 
 /**
  * Same joints on `kickole_player_v2.glb`.
@@ -61,9 +69,12 @@ export type BoneKey = keyof typeof BONE_NAMES;
 export const UE_BONE_NAMES: Record<BoneKey, string> = {
   root: 'pelvis',
   spine: 'spine_01',
+  neck: 'neck_01',
   head: 'Head',
   armLeft: 'upperarm_r',
   armRight: 'upperarm_l',
+  elbowLeft: 'lowerarm_r',
+  elbowRight: 'lowerarm_l',
   thighLeft: 'thigh_r',
   thighRight: 'thigh_l',
   shinLeft: 'calf_r',
@@ -72,13 +83,17 @@ export const UE_BONE_NAMES: Record<BoneKey, string> = {
   footRight: 'foot_l',
 };
 
+export const UE_CORE_BONE_NAMES = Object.fromEntries(
+  (Object.keys(BONE_NAMES) as (keyof typeof BONE_NAMES)[]).map((k) => [k, UE_BONE_NAMES[k]]),
+) as Record<keyof typeof BONE_NAMES, string>;
+
 export type RigKind = 'contract' | 'ue' | 'unknown';
 
 /** Which naming set a loaded skeleton uses. Contract names win when both are present. */
 export function rigKind(bones: Iterable<string>): RigKind {
   const names = new Set(bones);
   if ((Object.values(BONE_NAMES) as string[]).every((n) => names.has(n))) return 'contract';
-  if ((Object.values(UE_BONE_NAMES) as string[]).every((n) => names.has(n))) return 'ue';
+  if ((Object.values(UE_CORE_BONE_NAMES) as string[]).every((n) => names.has(n))) return 'ue';
   return 'unknown';
 }
 
@@ -119,7 +134,8 @@ export function validateModel(bones: Iterable<string>, clips: Iterable<string>, 
   const b = new Set(bones);
   const c = new Set(clips);
   const m = new Set(materials);
-  const expectedBones = rigKind(b) === 'ue' ? Object.values(UE_BONE_NAMES) : Object.values(BONE_NAMES);
+  // Core joints only — neck/elbows are optional extras on v2.
+  const expectedBones = rigKind(b) === 'ue' ? Object.values(UE_CORE_BONE_NAMES) : Object.values(BONE_NAMES);
   return {
     missingBones: expectedBones.filter((n) => !b.has(n)),
     missingClips: ANIMATION_STATES.filter((n) => !c.has(n)),

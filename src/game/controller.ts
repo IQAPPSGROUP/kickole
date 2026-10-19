@@ -1,8 +1,10 @@
-import { GameEngine, type EngineEvent, type Phase } from '../engine/engine';
+import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import { sfx } from './audio';
 import { getSkin, type Skin } from './skins';
 import { loadSave, loadSettings, saveRun, saveSettings, type SaveData, type Settings } from './storage';
+
+export type ArmedTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick'>;
 
 export interface Feedback {
   id: number;
@@ -18,6 +20,9 @@ export interface Hud {
   streak: number;
   feedback: Feedback | null;
   stalling: boolean;
+  /** Foot-armed trick waiting for L/R, or null. */
+  armedTrick: ArmedTrick | null;
+  neckHolding: boolean;
 }
 
 export interface Result {
@@ -62,6 +67,7 @@ export class GameController {
 
   private build(): Snapshot {
     const e = this.engine;
+    const armed = e.selectedTrick;
     return {
       hud: {
         phase: e.phase,
@@ -70,6 +76,9 @@ export class GameController {
         streak: e.streak,
         feedback: this.feedback,
         stalling: e.contact?.kind === 'stall',
+        armedTrick: armed === 'aroundTheWorld' || armed === 'thigh' || armed === 'highFlick' ? armed : null,
+        neckHolding: e.trick?.kind === 'neckStall'
+          && (e.trick.phase === 'contact' || e.trick.phase === 'execute'),
       },
       save: this.save,
       settings: this.settings,
@@ -161,14 +170,38 @@ export class GameController {
     const e = this.engine;
     if (e.phase === 'menu' || e.phase === 'over' || e.phase === 'dropped') return;
     const before = e.phase;
+    const beforeTrick = e.selectedTrick;
     e.press(side);
-    if (before !== e.phase) this.publish();
+    if (before !== e.phase || beforeTrick !== e.selectedTrick || e.contact || e.trick) this.publish();
   }
 
   release(side: Side) {
     const was = this.engine.contact;
     this.engine.release(side);
     if (was && !this.engine.contact) this.publish();
+  }
+
+  attemptHeader() {
+    if (this.engine.phase !== 'playing') return;
+    this.engine.attemptHeader();
+    this.publish();
+  }
+
+  pressNeck() {
+    if (this.engine.phase !== 'playing') return;
+    this.engine.pressNeck();
+    this.publish();
+  }
+
+  releaseNeck() {
+    this.engine.releaseNeck();
+    this.publish();
+  }
+
+  armTrick(kind: ArmedTrick | null) {
+    if (this.engine.phase !== 'playing' && this.engine.phase !== 'ready') return;
+    this.engine.armTrick(kind);
+    this.publish();
   }
 
   /** Space bar / generic action. */

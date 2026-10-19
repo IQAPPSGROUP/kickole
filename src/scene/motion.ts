@@ -33,6 +33,19 @@ export function computePlayerMotion(engine: GameEngine, out = createPlayerMotion
   out.leftFoot = out.rightFoot = 0;
   out.reactionWeight = 0;
 
+  // Active trick contact owns the body — idle accents and celebrations must not fight it.
+  const trick = engine.trick;
+  if (trick && (trick.phase === 'prep' || trick.phase === 'contact' || trick.phase === 'execute'
+    || (trick.kind === 'aroundTheWorld' && trick.phase === 'recover')
+    || (trick.kind === 'neckStall'))) {
+    out.name = 'ball-tracking';
+    return out;
+  }
+  if (engine.contact?.highFlick || engine.contact?.thigh) {
+    out.name = 'ball-tracking';
+    return out;
+  }
+
   if (phase === 'menu' || phase === 'ready') {
     const ready = phase === 'ready'; out.name = ready ? 'ready-bounce' : 'relaxed-sway';
     const beat = Math.sin(t * (ready ? 4.2 : 2.0)), sway = Math.sin(t * 1.25);

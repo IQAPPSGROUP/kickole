@@ -39,7 +39,6 @@ function leatherNormal(): CanvasTexture {
 export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin; quality: Quality }) {
   const trail = useRef<Array<Mesh | null>>([]);
   const hist = useRef<Vector3[]>(Array.from({ length: TRAIL * 2 }, () => new Vector3()));
-  const flash = useRef<Mesh>(null);
   const showTrail = quality !== 'low';
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
@@ -51,10 +50,10 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     const normal = leatherNormal();
     const material = new MeshPhysicalMaterial({
       color: skin.football.base,
-      roughness: 0.46,
+      roughness: 0.55,
       metalness: 0,
-      clearcoat: 0.62,
-      clearcoatRoughness: 0.26,
+      clearcoat: 0.08,
+      clearcoatRoughness: 0.4,
       normalMap: normal,
       normalScale: new Vector2(0.55, 0.55),
     });
@@ -88,13 +87,8 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     const squash = since >= 0 && since < squashWindow && engine.lastKickGrade !== 'miss'
       ? Math.cos((since / squashWindow) * Math.PI * 0.5)
       : 0;
-    // Depth stays at 1 so the face against the boot does not grow through the leather.
-    if (group.current) group.current.scale.set(1 + 0.045 * squash, 1 - 0.07 * squash, 1);
-    if (flash.current) {
-      flash.current.visible = squash > 0.04;
-      flash.current.scale.setScalar(1 + 0.06 * squash);
-      (flash.current.material as unknown as { opacity: number }).opacity = 0.22 * squash;
-    }
+    // Flatten only. Growing the ball, or wrapping it in a transparent shell, leaves a gap and a glassy ball.
+    if (group.current) group.current.scale.set(1, 1 - 0.035 * squash, 1);
     if (showTrail) {
       const speed = Math.hypot(b.vx, b.vy, b.vz);
       const h = hist.current;
@@ -123,10 +117,6 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
   return (
     <>
       <group ref={group}>
-        <mesh ref={flash} visible={false}>
-          <sphereGeometry args={[r * 1.06, 12, 10]} />
-          <meshBasicMaterial color="#FFF1C9" transparent opacity={0} depthWrite={false} />
-        </mesh>
         <group ref={spin}>
           <mesh castShadow material={leather}>
             <sphereGeometry args={[r, quality === 'low' ? 24 : 40, quality === 'low' ? 16 : 28]} />

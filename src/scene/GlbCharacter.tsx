@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, CanvasTexture, LoopOnce, LoopRepeat, Material, Mesh, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type WebGLRenderer } from 'three';
+import { AnimationMixer, BoxGeometry, CanvasTexture, LinearFilter, LoopOnce, LoopRepeat, Material, Mesh, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
@@ -23,6 +23,30 @@ import { ueMovementQuaternion } from './ue-motion';
 import { HairVariants } from './HairVariants';
 import { measureKickContactAnchors } from './measureFootContact';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
+
+/** glTF images on this skinned head sample as one averaged colour. A canvas copy of the same pixels does not. */
+function photographTexture(source: Texture): CanvasTexture | null {
+  const image = source.image as (CanvasImageSource & { width?: number; height?: number }) | undefined;
+  if (!image?.width || !image.height) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  try {
+    context.drawImage(image, 0, 0);
+  } catch {
+    return null;
+  }
+  const map = new CanvasTexture(canvas);
+  map.colorSpace = SRGBColorSpace;
+  map.flipY = false;
+  map.minFilter = LinearFilter;
+  map.magFilter = LinearFilter;
+  map.generateMipmaps = false;
+  map.needsUpdate = true;
+  return map;
+}
 
 function toonRole(name: string): ToonRole {
   if (name === MATERIAL_NAMES.skin) return 'skin';
@@ -172,7 +196,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
     const byName = new Map<string, Bone>();
-    const mats = new Map<string, MeshToonMaterial | MeshStandardMaterial>();
+    const mats: Array<MeshToonMaterial | MeshStandardMaterial> = [];
     const boneNames: string[] = [];
     const matNames: string[] = [];
     let textured = false;
@@ -191,12 +215,20 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           const source = m as MeshStandardMaterial;
           const keepPbr = Boolean(source.normalMap);
           if (keepPbr) textured = true;
+          // The compressed and glTF copies of the face both sample as one flat colour on
+          // this skinned mesh. A canvas of the same photograph samples the real texels.
+          if ((source.userData.headPhoto || source.name === 'Eyes') && source.map) {
+            const photo = photographTexture(source.map);
+            if (photo) source.map = photo;
+          }
           const next = keepPbr ? source.clone() : toToonMaterial(m, m.name === MATERIAL_NAMES.skin);
           next.name = m.name;
+          // The head photograph is its own Skin material. The wardrobe tint stays off it.
+          if (source.userData.headPhoto) next.userData.headPhoto = true;
           return next;
         });
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
-        cloned.forEach((m) => { matNames.push(m.name); mats.set(m.name, m); });
+        cloned.forEach((m) => { matNames.push(m.name); mats.push(m); });
       }
     });
     const resolved = rigKind(boneNames);
@@ -255,19 +287,23 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
 
   useEffect(() => {
     const colors = skinMaterialColors(skin);
-    materials.forEach((m, name) => {
-      if (colors[name]) m.color.set(colors[name]);
+    for (const m of materials) {
+      const name = m.name;
+      // Every Skin instance gets the wardrobe colour. The head photograph is already
+      // the finished face, so multiplying it by the skin swatch flattens the cheeks.
+      const headPhoto = Boolean(m.userData.headPhoto);
+      if (colors[name]) m.color.set(headPhoto ? '#ffffff' : colors[name]);
       if ((m as MeshToonMaterial).isMeshToonMaterial) {
         const toon = m as MeshToonMaterial;
         // Flat kit swaps. Skin keeps its atlas so the eye texels survive a tone change.
         if (name !== MATERIAL_NAMES.skin) toon.map = null;
         bindSunsetToon(toon, toonRole(name), skin.clothing.shirtTrim);
         setToonTrim(toon, skin.clothing.shirtTrim);
-        return;
+        continue;
       }
       const standard = m as MeshStandardMaterial;
       if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern);
-    });
+    }
   }, [skin, materials]);
 
   useEffect(() => {

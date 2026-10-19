@@ -69,6 +69,8 @@ type Role = (typeof ROLES)[number];
 
 interface Prim {
   role: Role;
+  /** Material name from the prepare step, `Role@@source-image`. */
+  sourceName: string;
   image: Buffer;
   pos: Float32Array;
   nrm: Float32Array;
@@ -84,7 +86,9 @@ function prepareSources() {
   if (!existsSync(join(src, 'source_4.zip')) || !existsSync(join(src, 'source.zip'))) {
     throw new Error(`Fab sources not found in ${src}. Set FAB_PLAYER_SRC to the folder with source_4.zip and source.zip.`);
   }
-  execFileSync('blender', ['--background', '--python', join(ROOT, 'prepare_fab_player.py')], {
+  const blenderArgs = ['--background', '--python', join(ROOT, 'prepare_fab_player.py')];
+  if (process.env.BODY === 'male' || process.env.BODY === 'female') blenderArgs.push('--', process.env.BODY);
+  execFileSync('blender', blenderArgs, {
     stdio: 'inherit',
     env: { ...process.env, FAB_PLAYER_SRC: src, FAB_PREP_DIR: PREP },
   });
@@ -181,6 +185,7 @@ async function readModelAsync(file: string): Promise<{ prims: Prim[]; worldPos: 
       images.set(prim, Buffer.from(image));
       prims.push({
         role,
+        sourceName: material.getName(),
         image: images.get(prim)!,
         pos,
         nrm,
@@ -331,9 +336,10 @@ async function atlas(prims: Prim[], role: Role) {
   const group = prims.filter((prim) => prim.role === role);
   const keys: string[] = [];
   const buffers = new Map<string, Buffer>();
+  const sourceNames = new Map<string, string>();
   for (const prim of group) {
     const key = imageKey(prim.image);
-    if (!buffers.has(key)) { keys.push(key); buffers.set(key, prim.image); }
+    if (!buffers.has(key)) { keys.push(key); buffers.set(key, prim.image); sourceNames.set(key, prim.sourceName); }
   }
   const cell = 1024;
   const cols = keys.length <= 1 ? 1 : 2;
@@ -344,7 +350,13 @@ async function atlas(prims: Prim[], role: Role) {
   const placed = new Map<string, { u0: number; v0: number; su: number; sv: number }>();
   for (let i = 0; i < keys.length; i++) {
     const decoded = await decodeImage(buffers.get(keys[i])!);
-    if (role === 'Skin') correctSkin(decoded.data, decoded.width, decoded.height);
+    // Arm and leg photos have empty borders that mip into the wrists. The head
+    // photograph is a finished face: fill its empty border, but do not recolour it.
+    // Recolouring clamps the cheeks to one value and leaves rectangular patches.
+    if (role === 'Skin' && !opaquePhotograph(decoded.data)) {
+      if (sourceNames.get(keys[i])?.toUpperCase().includes('HEAD')) fillSkinBorders(decoded.data, decoded.width, decoded.height);
+      else correctSkin(decoded.data, decoded.width, decoded.height);
+    }
     const resized = await sharp(decoded.data, { raw: { width: decoded.width, height: decoded.height, channels: 4 } })
       .resize(cell, cell, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
     const col = i % cols;
@@ -360,6 +372,9 @@ async function atlas(prims: Prim[], role: Role) {
     // Source row 0 was copied to the top of this cell, and a single row leaves v unchanged.
     placed.set(keys[i], { u0: col / cols, v0: row / rows, su: 1 / cols, sv: 1 / rows });
   }
+  // A 2×2 pack of three photos used to leave one cell black. Mips then bled that
+  // black into the neighbouring island. Fill any leftover empty texels first.
+  if (hasClearTexel(raw)) fillSkinBorders(raw, width, height);
   for (const prim of group) {
     const cellUv = placed.get(imageKey(prim.image))!;
     const uv = prim.uv;
@@ -390,6 +405,62 @@ function shoulder(x: number) {
  * on the hands and face. Fill those texels from the nearest real skin, then
  * expose each photo on its own so a bright arm cannot blow the head out.
  */
+function hasClearTexel(raw: Buffer): boolean {
+  for (let i = 3; i < raw.length; i += 4) if (raw[i] < 16) return true;
+  return false;
+}
+
+function opaquePhotograph(raw: Buffer): boolean {
+  let clear = 0;
+  const texels = raw.length / 4;
+  for (let i = 3; i < raw.length; i += 4) if (raw[i] < 16) clear++;
+  return clear / texels < 0.02;
+}
+
+/** Copy the nearest opaque texel into empty borders. Leave real texels alone. */
+function fillSkinBorders(raw: Buffer, width: number, height: number) {
+  const count = width * height;
+  const color = Buffer.from(raw);
+  const filled = new Uint8Array(count);
+  const qx = new Int32Array(count);
+  const qy = new Int32Array(count);
+  let qt = 0;
+  for (let y = 0, i = 0, p = 0; y < height; y++) {
+    for (let x = 0; x < width; x++, i++, p += 4) {
+      if (raw[p + 3] < 16) continue;
+      filled[i] = 1;
+      qx[qt] = x;
+      qy[qt] = y;
+      qt++;
+    }
+  }
+  let qh = 0;
+  while (qh < qt) {
+    const x = qx[qh];
+    const y = qy[qh];
+    qh++;
+    const src = (y * width + x) * 4;
+    const neighbors = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+    for (const [dx, dy] of neighbors) {
+      const xx = x + dx;
+      const yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+      const j = yy * width + xx;
+      if (filled[j]) continue;
+      filled[j] = 1;
+      const dst = j * 4;
+      color[dst] = color[src];
+      color[dst + 1] = color[src + 1];
+      color[dst + 2] = color[src + 2];
+      color[dst + 3] = 255;
+      qx[qt] = xx;
+      qy[qt] = yy;
+      qt++;
+    }
+  }
+  raw.set(color);
+}
+
 function correctSkin(raw: Buffer, width: number, height: number) {
   const count = width * height;
   const color = Buffer.from(raw);
@@ -803,7 +874,16 @@ function triCount(prims: Prim[]) {
   return prims.reduce((sum, prim) => sum + prim.idx.length / 3, 0);
 }
 
-async function writeGlb(prims: Prim[], bones: Map<string, Group>, clips: { name: string; times: Float32Array; poses: Pose[] }[], textures: Map<Role, { albedo: Uint8Array; normal: Uint8Array }>, file: string) {
+/** Head skin and the eye split share one photograph. They must not be packed into the body atlas. */
+function usesHeadPhotograph(prim: Prim) {
+  return (prim.role === 'Skin' || prim.role === 'Eyes') && prim.sourceName.toUpperCase().includes('HEAD');
+}
+
+function materialKey(prim: Prim) {
+  return usesHeadPhotograph(prim) ? `${prim.role}:head` : prim.role;
+}
+
+async function writeGlb(prims: Prim[], bones: Map<string, Group>, clips: { name: string; times: Float32Array; poses: Pose[] }[], textures: Map<string, { albedo: Uint8Array; normal: Uint8Array }>, file: string) {
   const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
     'meshopt.decoder': MeshoptDecoder,
     'meshopt.encoder': MeshoptEncoder,
@@ -841,32 +921,40 @@ async function writeGlb(prims: Prim[], bones: Map<string, Group>, clips: { name:
     const key = `${name}:${bytes.byteLength}:${bytes[0]}:${bytes[bytes.length - 1]}`;
     const hit = texCache.get(key);
     if (hit) return hit;
-    const created = doc.createTexture(name).setMimeType('image/ktx2').setImage(bytes);
+    // The head photograph is a PNG. A KTX2 of the same image samples as one flat colour on the skinned face.
+    const png = bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    const created = doc.createTexture(name).setMimeType(png ? 'image/png' : 'image/ktx2').setImage(bytes);
     texCache.set(key, created);
     return created;
   };
-  const materials = new Map<Role, Material>();
-  const present = new Set(prims.map((prim) => prim.role));
-  for (const role of present) {
-    const maps = textures.get(role);
-    if (!maps) throw new Error(`missing texture ${role}`);
+  const materials = new Map<string, Material>();
+  const slots = new Map<string, Role>();
+  for (const prim of prims) slots.set(materialKey(prim), prim.role);
+  for (const [key, role] of slots) {
+    const headPhoto = key.endsWith(':head');
+    const maps = textures.get(headPhoto ? 'HeadPhoto' : role);
+    if (!maps) throw new Error(`missing texture ${key}`);
     // Distinct factors so dedup keeps every kit slot. The runtime tints by material name.
     const rough: Record<Role, number> = {
       Skin: 0.5, Hair: 0.55, Eyes: 0.22, InnerMouth: 0.66,
       Shirt: 0.56, Shirt_Trim: 0.4, Shorts: 0.61, Socks: 0.68,
-      Boots: 0.42, Boots_Sole: 0.88,
     };
+    // The male face is the original photograph on its own texture. Factor stays white.
+    // Baking #E8B48F here, or sampling an unfilled copy for the eyes, paints rectangles.
+    // Female eyes keep their own map, roughness 0.22, and stay double sided.
     const mat = doc.createMaterial(role)
-      .setRoughnessFactor(rough[role])
+      .setRoughnessFactor(headPhoto ? rough.Skin : rough[role])
       .setMetallicFactor(0)
+      .setAlphaMode('OPAQUE')
       .setBaseColorFactor([1, 1, 1, 1])
-      .setBaseColorTexture(texture(`${role}-albedo`, maps.albedo))
-      .setNormalTexture(texture(`${role}-normal`, maps.normal))
-      .setDoubleSided(role === 'Hair' || role === 'Eyes' || role === 'InnerMouth');
+      .setBaseColorTexture(texture(headPhoto ? 'HeadPhoto-albedo' : `${role}-albedo`, maps.albedo))
+      .setNormalTexture(texture(headPhoto ? 'HeadPhoto-normal' : `${role}-normal`, maps.normal))
+      .setDoubleSided(role === 'Hair' || role === 'InnerMouth' || (role === 'Eyes' && !headPhoto));
+    if (headPhoto && role === 'Skin') mat.setExtras({ headPhoto: true });
     if (role === 'Boots') {
       mat.setExtension('KHR_materials_clearcoat', clearExt.createClearcoat().setClearcoatFactor(0.22).setClearcoatRoughnessFactor(0.35));
     }
-    materials.set(role, mat);
+    materials.set(key, mat);
   }
   const mesh = doc.createMesh('Footballer');
   for (const prim of prims) {
@@ -877,7 +965,7 @@ async function writeGlb(prims: Prim[], bones: Map<string, Group>, clips: { name:
       .setAttribute('JOINTS_0', doc.createAccessor().setType('VEC4').setArray(prim.joints).setBuffer(buffer))
       .setAttribute('WEIGHTS_0', doc.createAccessor().setType('VEC4').setArray(prim.weights).setBuffer(buffer))
       .setIndices(doc.createAccessor().setType('SCALAR').setArray(prim.idx).setBuffer(buffer))
-      .setMaterial(materials.get(prim.role)!);
+      .setMaterial(materials.get(materialKey(prim))!);
     mesh.addPrimitive(geo);
   }
   scene.addChild(doc.createNode('FootballerMesh').setMesh(mesh).setSkin(skin));
@@ -907,15 +995,42 @@ async function writeGlb(prims: Prim[], bones: Map<string, Group>, clips: { name:
     anim.addSampler(tSampler).addChannel(doc.createAnimationChannel().setSampler(tSampler).setTargetNode(nodes.get('Hips')!).setTargetPath('translation'));
   }
   resetBind(bones);
-  await doc.transform(prune(), dedup(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
+  // The head normal is a flat PNG. Default prune deletes solid images, and without
+  // that normal the face falls back to the toon shader, which throws the photograph away.
+  await doc.transform(prune({ keepSolidTextures: true }), dedup(), meshopt({ encoder: MeshoptEncoder, level: 'medium' }));
   await io.write(file, doc);
 }
 
+/** One filled photograph, original 0–1 unwrap. Shared by the head skin and the eye split. */
+async function encodeHeadPhotograph(prims: Prim[]) {
+  const source = prims.find((prim) => prim.role === 'Skin') ?? prims[0];
+  const decoded = await decodeImage(source.image);
+  if (!opaquePhotograph(decoded.data)) fillSkinBorders(decoded.data, decoded.width, decoded.height);
+  const size = 1024;
+  const rgba = await sharp(decoded.data, { raw: { width: decoded.width, height: decoded.height, channels: 4 } })
+    .resize(size, size, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
+  const albedo = neutralize(rgba, size, size, 'keep');
+  // The source listing has no normal map. A normal built from the photo's contrast
+  // creases the cheeks, so the face keeps a flat normal and the photograph as colour.
+  const albedoBytes = new Uint8Array(await sharp(albedo, { raw: { width: size, height: size, channels: 3 } }).png({ compressionLevel: 9 }).toBuffer());
+  // Flat normal, stored as a PNG so the face stays on the standard shader without a compressed sample.
+  const flat = Buffer.alloc(8 * 8 * 3);
+  for (let i = 0; i < flat.length; i += 3) {
+    flat[i] = 128;
+    flat[i + 1] = 128;
+    flat[i + 2] = 255;
+  }
+  const normalBytes = new Uint8Array(await sharp(flat, { raw: { width: 8, height: 8, channels: 3 } }).png().toBuffer());
+  return { albedo: albedoBytes, normal: normalBytes };
+}
+
 async function encodeTextures(prims: Prim[]) {
-  const textures = new Map<Role, { albedo: Uint8Array; normal: Uint8Array }>();
-  const present = [...new Set(prims.map((prim) => prim.role))];
+  const textures = new Map<string, { albedo: Uint8Array; normal: Uint8Array }>();
+  const head = prims.filter(usesHeadPhotograph);
+  const body = prims.filter((prim) => !usesHeadPhotograph(prim));
+  const present = [...new Set(body.map((prim) => prim.role))];
   for (const role of present) {
-    const packed = await atlas(prims, role);
+    const packed = await atlas(body, role);
     const kind = role === 'Hair' ? 'hair' : role === 'Eyes' || role === 'InnerMouth' || role === 'Skin' ? 'keep' : 'cloth';
     const albedo = neutralize(packed.raw, packed.width, packed.height, kind);
     const normal = detailNormal(albedo, packed.width, packed.height, role === 'Skin' || role === 'Hair' ? 0.45 : 0.35);
@@ -935,6 +1050,11 @@ async function encodeTextures(prims: Prim[]) {
     );
     textures.set(role, { albedo: albedoBytes, normal: normalBytes });
     console.log(role, `${packed.width}x${packed.height}`, '->', `${albedoW}x${albedoH}`, 'ktx', albedoBytes.byteLength);
+  }
+  if (head.length) {
+    const encoded = await encodeHeadPhotograph(head);
+    textures.set('HeadPhoto', encoded);
+    console.log('HeadPhoto', '1024 png', encoded.albedo.byteLength, 'normal', encoded.normal.byteLength, 'prims', head.length);
   }
   return textures;
 }

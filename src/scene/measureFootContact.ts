@@ -31,7 +31,8 @@ function materialNames(material: { name: string } | Array<{ name: string }>): st
   return list.map((entry) => entry.name);
 }
 
-const LEG_MATERIALS = new Set(['Boots', 'Boots_Sole', 'Socks', 'Boot_Laces', 'Boot_Trim']);
+// Leather only. A sock vertex inside the ankle can satisfy a distance check while the boot still sits clear of the ball.
+const LEG_MATERIALS = new Set(['Boots', 'Boots_Sole', 'Boot_Laces', 'Boot_Trim']);
 
 /** Closest skinned vertex on the named materials. That is the surface the ball would hit first. */
 function closestSkinnedVertex(scene: Object3D, target: Vector3, materials: Set<string>): Vector3 | null {
@@ -126,6 +127,39 @@ function footBoneName(side: Side): 'Foot_L' | 'Foot_R' {
   }
 }
 
+function toeBoneName(side: Side): 'Toe_L' | 'Toe_R' {
+  switch (side) {
+    case 'left': return 'Toe_L';
+    case 'right': return 'Toe_R';
+    default: {
+      const neverSide: never = side;
+      return neverSide;
+    }
+  }
+}
+
+/** Boot vertex on the laces, and the direction from the foot bones out through that vertex. */
+function instepStrike(scene: Object3D, foot: Vector3, toe: Vector3): { point: Vector3; outward: Vector3 } | null {
+  const axis = toe.clone().sub(foot);
+  const length = axis.length();
+  if (length < 1e-4) return null;
+  axis.multiplyScalar(1 / length);
+  const up = new Vector3(0, 1, 0);
+  const instep = up.clone().sub(axis.clone().multiplyScalar(up.dot(axis)));
+  if (instep.lengthSq() < 1e-8) instep.copy(up);
+  instep.normalize();
+  // Front of the instep, just short of the toe, on the upper side of the boot.
+  const probe = foot.clone().addScaledVector(axis, length * 0.78).addScaledVector(instep, 0.045);
+  const point = closestSkinnedVertex(scene, probe, LEG_MATERIALS);
+  if (!point) return null;
+  const along = Math.max(0, Math.min(length, point.clone().sub(foot).dot(axis)));
+  const bone = foot.clone().addScaledVector(axis, along);
+  const outward = point.clone().sub(bone);
+  if (outward.lengthSq() < 1e-8 || outward.dot(instep) < 0) outward.copy(instep);
+  outward.normalize();
+  return { point, outward };
+}
+
 /**
  * Pose one kick clip on its contact frame and return the ball centre that meets the boot.
  * Leaves the scene on that pose so a caller can measure the gap. Null when the clip or the boot is missing.
@@ -137,41 +171,68 @@ export function ballCenterForKick(scene: Object3D, clips: AnimationClip[], side:
     releaseMixer(mixer, scene);
     return null;
   }
-  const sign = side === 'left' ? -1 : 1;
-  const approach = new Vector3(
-    sign * DEFAULT_CONFIG.footX * 0.6,
-    DEFAULT_CONFIG.contactHeight,
-    DEFAULT_CONFIG.ballZ,
-  );
-  const first = closestSkinnedVertex(scene, approach, LEG_MATERIALS);
   const footPosition = foot.getWorldPosition(new Vector3());
+  const toe = boneNamed(scene, toeBoneName(side));
+  const toePosition = toe ? toe.getWorldPosition(new Vector3()) : footPosition.clone().add(new Vector3(0, -0.04, 0.16));
   // Hold the mixer so the contact pose stays posed while the caller measures the boot gap.
   scene.userData.kickContactMixer = mixer;
-  // No boot mesh: sit the ball one radius in front of the foot bone, toward the authored target.
-  const boot = first ?? new Vector3(footPosition.x, footPosition.y, footPosition.z).lerp(approach, 0.35);
   const radius = DEFAULT_CONFIG.ballRadius;
+  const seated = instepStrike(scene, footPosition, toePosition);
   const center = new Vector3();
-  const placed = ballOnBoot(
-    { x: boot.x, y: boot.y, z: boot.z },
-    { x: approach.x, y: approach.y, z: approach.z },
-    radius,
-  );
-  center.set(placed.x, placed.y, placed.z);
-  // The first hit can be the toe while the sole still cuts the bottom of the ball. Push out until every boot vertex is outside.
-  let strike = boot;
-  for (let pass = 0; pass < 6; pass++) {
-    const hit = closestSkinnedVertex(scene, center, LEG_MATERIALS);
-    if (!hit) break;
-    const distance = hit.distanceTo(center);
-    if (distance >= radius - 0.0005) {
-      strike = hit;
+  let strike: Vector3;
+  if (seated) {
+    strike = seated.point;
+    center.copy(strike).addScaledVector(seated.outward, radius);
+    // Stay on the sphere around the instep vertex so that point keeps touching,
+    // and slide until the rest of the boot is outside the leather.
+    for (let pass = 0; pass < 6; pass++) {
+      const hit = closestSkinnedVertex(scene, center, LEG_MATERIALS);
+      if (!hit) break;
+      const distance = hit.distanceTo(center);
+      if (distance >= radius - 0.0005) break;
+      const away = center.clone().sub(hit);
+      if (away.lengthSq() < 1e-10) break;
+      away.normalize();
+      center.addScaledVector(away, radius + 0.001 - distance);
+      const radial = center.clone().sub(strike);
+      if (radial.lengthSq() < 1e-10) radial.copy(seated.outward);
+      radial.setLength(radius);
+      center.copy(strike).add(radial);
+    }
+    // A simplified boot can still nick the leather. Step out, then pull back onto the nearest vertex
+    // so the instep meets the ball instead of stopping a centimetre clear of it.
+    let touching: Vector3 | null = null;
+    for (let pass = 0; pass < 8; pass++) {
+      const hit = closestSkinnedVertex(scene, center, LEG_MATERIALS);
+      if (!hit) break;
+      const distance = hit.distanceTo(center);
+      const away = center.clone().sub(hit);
+      if (away.lengthSq() < 1e-10) break;
+      away.normalize();
+      if (distance < radius - 0.001) {
+        center.copy(hit).addScaledVector(away, radius + 0.001);
+        touching = hit;
+        continue;
+      }
+      if (distance > radius + 0.002) {
+        center.copy(hit).addScaledVector(away, radius);
+        touching = hit;
+        continue;
+      }
+      touching = hit;
       break;
     }
-    const away = center.clone().sub(hit);
-    if (away.lengthSq() < 1e-10) break;
-    away.multiplyScalar((radius + 0.001 - distance) / away.length());
-    center.add(away);
-    strike = hit;
+    if (touching) strike = touching;
+  } else {
+    const sign = side === 'left' ? -1 : 1;
+    const approach = new Vector3(sign * DEFAULT_CONFIG.footX * 0.6, DEFAULT_CONFIG.contactHeight, DEFAULT_CONFIG.ballZ);
+    const placed = ballOnBoot(
+      { x: footPosition.x, y: footPosition.y, z: footPosition.z },
+      { x: approach.x, y: approach.y, z: approach.z },
+      radius,
+    );
+    center.set(placed.x, placed.y, placed.z);
+    strike = footPosition;
   }
   return {
     center: { x: center.x, y: center.y, z: center.z },

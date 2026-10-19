@@ -96,6 +96,49 @@ def meshes():
     return [obj for obj in bpy.data.objects if obj.type == "MESH" and len(obj.data.polygons) > 40 and not obj.name.startswith("Icosphere")]
 
 
+def use_male_head_photograph() -> None:
+    """The FBX ships one UV and one head image. That image is the face.
+
+    Base colour, emission and alpha are three copies of it. Emission washes the
+    cheeks out and the alpha punches holes, so the material keeps a single
+    opaque base-colour sample. The glTF base colour and this image are the same
+    photograph; the second glTF UV set is empty and is not a lightmap.
+    """
+    dest = "/tmp/fab/male-gltf"
+    name = "textures/Material.001_BaseColor.png"
+    path = os.path.join(dest, name)
+    if not os.path.exists(path):
+        os.makedirs(dest, exist_ok=True)
+        with zipfile.ZipFile(os.path.join(SRC, "source_gltf.zip")) as archive:
+            archive.extract(name, dest)
+    photo = bpy.data.images.load(path)
+    photo.name = "HEAD_photograph.png"
+    photo.colorspace_settings.name = "sRGB"
+    photo.alpha_mode = "NONE"
+    for obj in meshes():
+        for slot in obj.material_slots:
+            mat = slot.material
+            image = base_color_image(mat) if mat else None
+            if image is None or "HEAD" not in image.name.upper() or not mat.use_nodes:
+                continue
+            nt = mat.node_tree
+            bsdf = next(node for node in nt.nodes if node.type == "BSDF_PRINCIPLED")
+            for link in list(nt.links):
+                if link.to_node == bsdf and link.to_socket.name in ("Emission Color", "Emission Strength", "Alpha"):
+                    nt.links.remove(link)
+            bsdf.inputs["Emission Strength"].default_value = 0.0
+            bsdf.inputs["Alpha"].default_value = 1.0
+            base = None
+            for node in nt.nodes:
+                if node.type == "TEX_IMAGE" and node.image == image:
+                    node.image = photo
+                    base = node
+            if base is not None:
+                nt.links.new(base.outputs["Color"], bsdf.inputs["Base Color"])
+            mat.blend_method = "OPAQUE"
+            print("head photograph", obj.name, image.name)
+
+
 def base_color_image(mat: bpy.types.Material):
     if not mat or not mat.use_nodes:
         return None
@@ -209,31 +252,6 @@ def delete_extra_bones(arm, keep: dict[str, str]) -> None:
         bone.name = keep[bone.name]
     bpy.ops.object.mode_set(mode="OBJECT")
     print("bones", [b.name for b in arm.data.bones])
-
-
-def pixel_buffer(image):
-    w, h = image.size
-    pixels = list(image.pixels)
-    return w, h, pixels
-
-
-def sample(buf, u: float, v: float):
-    w, h, pixels = buf
-    x = max(0, min(w - 1, int(u * (w - 1))))
-    y = max(0, min(h - 1, int(v * (h - 1))))
-    i = (y * w + x) * 4
-    return pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]
-
-
-def face_uv(obj, poly):
-    uv = obj.data.uv_layers.active
-    if uv is None:
-        return 0.5, 0.5
-    acc = Vector((0, 0))
-    for loop in poly.loop_indices:
-        acc += uv.data[loop].uv
-    acc /= max(1, len(poly.loop_indices))
-    return acc.x, acc.y
 
 
 def make_material(name: str, image, alpha: str) -> bpy.types.Material:
@@ -403,10 +421,6 @@ def classify_body(obj, role: str, split_eyes: bool) -> None:
     images_by_slot = []
     for slot in obj.material_slots:
         images_by_slot.append(base_color_image(slot.material) if slot.material else None)
-    bufs = {}
-    for img in images_by_slot:
-        if img and img.name not in bufs:
-            bufs[img.name] = pixel_buffer(img)
 
     buckets: dict[str, list[int]] = defaultdict(list)
     tex_for: dict[str, object] = {}
@@ -445,19 +459,18 @@ def classify_body(obj, role: str, split_eyes: bool) -> None:
             remember("InnerMouth", img)
             continue
         if kind == "head":
-            u, v = face_uv(obj, poly)
-            lum = 0.5
-            if img is not None and img.name in bufs:
-                r, g, b, _a = sample(bufs[img.name], u, v)
-                lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
             # The face photograph stays on Skin, including beard, brows and neck.
             # Only the scalp, behind the face, becomes Hair, so a dark tint cannot
             # paint a mask across the cheeks.
             front = center.y < -0.02
             back = center.y > 0.02
             scalp = center.z > z0 + (z1 - z0) * 0.72
-            eye_band = z0 + (z1 - z0) * 0.55 < center.z < z0 + (z1 - z0) * 0.82
-            if split_eyes and front and eye_band and 0.012 < abs(center.x) < 0.075 and lum > 0.55:
+            # Bright forehead and cheek texels are skin. Treating them as eyes
+            # (the old lum > 0.55 test) painted those islands a different material.
+            eye_lo = z0 + (z1 - z0) * 0.58
+            eye_hi = z0 + (z1 - z0) * 0.68
+            eye_socket = split_eyes and front and eye_lo < center.z < eye_hi and 0.018 < abs(center.x) < 0.050 and center.y < -0.06
+            if eye_socket:
                 buckets["Eyes"].append(poly.index)
                 remember("Eyes", img)
             elif back and scalp:
@@ -502,7 +515,11 @@ def classify_body(obj, role: str, split_eyes: bool) -> None:
 
     if split_eyes and buckets.get("Eyes") and buckets.get("Skin"):
         claim_irises(obj, buckets)
-    alpha = {"Eyes": "BLEND"}
+    # The male iris is painted into the head photograph. Blending it lets the
+    # empty border of that image show through as a blank eye.
+    eye_image = tex_for.get("Eyes")
+    eyes_opaque = eye_image is not None and "HEAD" in eye_image.name.upper()
+    alpha = {"Eyes": "OPAQUE" if eyes_opaque else "BLEND"}
     if kind_present(buckets, "Shirt", "Shorts", "Hair", "Skin", "Eyes"):
         # Eyes stay as split. Smoothing them into Skin wipes the iris.
         buckets = smooth_regions(obj, buckets, {"Shirt", "Shorts", "Skin", "Hair"})
@@ -656,6 +673,7 @@ def prepare(body: str) -> None:
         keep = FEMALE_KEEP
         roles = {}
         split_eyes = True
+        use_male_head_photograph()
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and (obj.name.startswith("Icosphere") or len(obj.data.polygons) <= 40):
             bpy.data.objects.remove(obj, do_unlink=True)

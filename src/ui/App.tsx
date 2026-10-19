@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { installAudioLifecycle } from '../game/audio';
 import { GameController } from '../game/controller';
 import { GameCanvas } from '../scene/GameCanvas';
 import {
@@ -28,6 +29,17 @@ export function App() {
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
   useEffect(() => { initOpeningIntro(); }, []);
+
+  useEffect(() => {
+    installAudioLifecycle();
+    const prime = () => controller.primeAudio();
+    window.addEventListener('pointerdown', prime, { capture: true });
+    window.addEventListener('keydown', prime, { capture: true });
+    return () => {
+      window.removeEventListener('pointerdown', prime, { capture: true });
+      window.removeEventListener('keydown', prime, { capture: true });
+    };
+  }, [controller]);
 
   const blocking = overlay !== 'none';
 

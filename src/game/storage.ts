@@ -18,7 +18,12 @@ export interface RunRecord {
 export type Quality = 'low' | 'medium' | 'high';
 
 export interface Settings {
+  /** Master mute. Music and effects also have their own switches. */
   sound: boolean;
+  /** Menu and gameplay music. */
+  music: boolean;
+  /** Kicks, cheers and the crowd bed. */
+  sfx: boolean;
   vibration: boolean;
   quality: Quality;
   /** @deprecated Prefer wardrobe kit + appearance; kept for migration. */
@@ -35,6 +40,8 @@ const SETTINGS_KEY = 'kicky.settings.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   sound: true,
+  music: true,
+  sfx: true,
   vibration: true,
   quality: 'high',
   skinId: 'kicky-teal',
@@ -112,6 +119,8 @@ export function loadSettings(): Settings {
   const d = read<Settings>(SETTINGS_KEY) ?? {};
   return {
     sound: typeof d.sound === 'boolean' ? d.sound : DEFAULT_SETTINGS.sound,
+    music: typeof d.music === 'boolean' ? d.music : DEFAULT_SETTINGS.music,
+    sfx: typeof d.sfx === 'boolean' ? d.sfx : DEFAULT_SETTINGS.sfx,
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
     quality: d.quality === 'low' || d.quality === 'medium' || d.quality === 'high' ? d.quality : DEFAULT_SETTINGS.quality,
     skinId: typeof d.skinId === 'string' ? d.skinId : DEFAULT_SETTINGS.skinId,

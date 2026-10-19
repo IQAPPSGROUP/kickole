@@ -12,11 +12,19 @@ tools/realistic/sources/makehuman-hm08-base.obj.
 https://creativecommons.org/publicdomain/zero/1.0/
 http://www.makehumancommunity.org/
 
-The shirt, shorts, socks, boots, skin/cloth/leather textures, skeleton and
-animation clips (Idle, KickLeft, KickRight, Miss, Celebrate) are original
-works created for this repository and may be redistributed with the game,
-including as a binary glTF inside a web build. No club, league or real-player
-likeness is included. Rebuild with `npm run build:player`.
+The street kit is fitted from CC0 MakeHuman clothes, then retinted at runtime:
+
+- crude male t-shirt by Elvaerwyn (CC0), a continuous jersey with sleeves
+- jean shorts by Cortu (CC0), used as the shorts mesh with a neutral albedo
+- Socks2 (CC0)
+- SR Shoes 01 by spamrakuen (CC0)
+- male short hair by abumeqbel (CC0), rendered as an opaque scalp cap
+
+Sources are vendored under tools/realistic/sources/clothes/. The body faces
+under those garments are removed. Skin, cloth and leather textures, the
+skeleton and the clips (Idle, KickLeft, KickRight, Miss, Celebrate) are
+original. No club, league or real-player likeness is included. Rebuild with
+`npm run build:player`.
 
 This project does not ship Sketchfab or Mixamo characters.
 

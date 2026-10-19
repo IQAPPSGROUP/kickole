@@ -22,6 +22,7 @@ import { Euler, Group, Matrix4, Quaternion, Vector3 } from 'three';
 import { GameEngine } from '../src/engine/engine.ts';
 import type { Side } from '../src/engine/config.ts';
 import { computePose, type Pose } from '../src/scene/pose.ts';
+import { loadGarment, type Garment } from './realistic/garments.ts';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const OBJ = join(ROOT, 'realistic/sources/makehuman-hm08-base.obj');
@@ -34,10 +35,8 @@ const GROUPS = new Set([
   'body',
   'helper-l-eye', 'helper-r-eye',
   'helper-upper-teeth', 'helper-lower-teeth',
-  'helper-hair',
-  'helper-l-eyelashes-1', 'helper-r-eyelashes-1',
-  'helper-l-eyelashes-2', 'helper-r-eyelashes-2',
 ]);
+const CLOTHES = join(ROOT, 'realistic/sources/clothes');
 
 type V3 = Vector3;
 
@@ -281,25 +280,51 @@ function emitQuad(prim: Prim, a: Corner, b: Corner, c: Corner, d: Corner, sub: b
   emitQuad(prim, da, m, cd, d, false);
 }
 
-function dominant(c: Corner): string {
-  let best = -1;
-  let name = 'Hips';
-  for (let k = 0; k < 4; k++) if (c.w[k] > best) { best = c.w[k]; name = JOINT_ORDER[c.j[k]] ?? 'Hips'; }
-  return name;
-}
-
-function clothUv(p: V3, y0: number, y1: number): [number, number] {
-  const u = Math.atan2(p.x, p.z) / (Math.PI * 2) + 0.5;
-  const v = (p.y - y0) / Math.max(0.01, y1 - y0);
-  return [u, Math.min(1, Math.max(0, v))];
-}
-
 function skinUv(p: V3): [number, number] {
   return [Math.min(0.82, Math.max(0, p.x * 1.4 + 0.4)), Math.min(0.98, Math.max(0.02, p.y * 0.42))];
 }
 
-function bootUv(p: V3): [number, number] {
-  return [p.x * 6 + 0.5, p.z * 6 + 0.5];
+function subdividePrim(prim: Prim): Prim {
+  const out = emptyPrim(prim.name);
+  out.pos = prim.pos.slice();
+  out.nrm = prim.nrm.slice();
+  out.uv = prim.uv.slice();
+  out.col = prim.col.slice();
+  out.joints = prim.joints.slice();
+  out.weights = prim.weights.slice();
+  const mid = new Map<string, number>();
+  const midpoint = (a: number, b: number) => {
+    const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+    const found = mid.get(key);
+    if (found !== undefined) return found;
+    const i = out.pos.length / 3;
+    for (let k = 0; k < 3; k++) {
+      out.pos.push((prim.pos[a * 3 + k] + prim.pos[b * 3 + k]) / 2);
+      out.nrm.push((prim.nrm[a * 3 + k] + prim.nrm[b * 3 + k]) / 2);
+      out.col.push((prim.col[a * 3 + k] + prim.col[b * 3 + k]) / 2);
+    }
+    for (let k = 0; k < 2; k++) out.uv.push((prim.uv[a * 2 + k] + prim.uv[b * 2 + k]) / 2);
+    const acc = new Map<number, number>();
+    for (const v of [a, b]) for (let k = 0; k < 4; k++) {
+      const joint = prim.joints[v * 4 + k];
+      acc.set(joint, (acc.get(joint) ?? 0) + prim.weights[v * 4 + k] * 0.5);
+    }
+    const ranked = [...acc.entries()].filter(([, weight]) => weight > 0.02).sort((p, q) => q[1] - p[1]).slice(0, 4);
+    const sum = ranked.reduce((s, entry) => s + entry[1], 0) || 1;
+    const joints = [0, 0, 0, 0];
+    const weights = [0, 0, 0, 0];
+    ranked.forEach((entry, n) => { joints[n] = entry[0]; weights[n] = entry[1] / sum; });
+    out.joints.push(...joints);
+    out.weights.push(...weights);
+    mid.set(key, i);
+    return i;
+  };
+  for (let t = 0; t < prim.idx.length; t += 3) {
+    const a = prim.idx[t], b = prim.idx[t + 1], c = prim.idx[t + 2];
+    const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+    out.idx.push(a, ab, ca, ab, b, bc, ca, bc, c, ab, bc, ca);
+  }
+  return out;
 }
 
 interface Built {
@@ -326,8 +351,6 @@ function buildMesh(): Built {
   const head = C('joint-head');
   const headTop = C('joint-head-2');
   const mouth = C('joint-mouth');
-  const browL = C('joint-r-upperlid');
-  const browR = C('joint-l-upperlid');
 
   const src = {
     shL: C('joint-r-shoulder'), elL: C('joint-r-elbow'), wrL: C('joint-r-hand'),
@@ -420,53 +443,187 @@ function buildMesh(): Built {
   };
 
   const bodyFaces = parsed.groups.get('body') ?? [];
-  let yShirt0 = Infinity, yShirt1 = -Infinity;
-  for (const face of bodyFaces) for (const i of face) {
-    yShirt0 = Math.min(yShirt0, warped[i].y);
-    yShirt1 = Math.max(yShirt1, warped[i].y);
+  const shirtG = loadGarment(CLOTHES, 'crude_male_shirt.obj', 'crude_male_shirt.mhclo', parsed.v);
+  const shortsG = loadGarment(CLOTHES, 'jean_shorts.obj', 'jean_shorts.mhclo', parsed.v);
+  const socksG = loadGarment(CLOTHES, 'socks.obj', 'socks.mhclo', parsed.v);
+  const shoesG = loadGarment(CLOTHES, 'sr_shoes_01.obj', 'sr_shoes_01.mhclo', parsed.v);
+  const hairG = loadGarment(CLOTHES, 'hair_short.obj', 'hair_short.mhclo', parsed.v);
+  const hide = new Set<number>([...shirtG.hide, ...shortsG.hide, ...shoesG.hide]);
+  const mouthW = mouth.clone();
+  mouthW.y -= floor;
+  const toWorld = (raw: number[]) => {
+    const scaled = new Vector3(raw[0] * scale, (raw[1] - minY) * scale, raw[2] * scale);
+    const p = warpPoint(scaled, segs);
+    p.y -= floor;
+    return p;
+  };
+  const cover = [shirtG, shortsG, socksG, shoesG].flatMap((garment) => garment.position.map(toWorld));
+  const cell = 0.05;
+  const buckets = new Map<string, V3[]>();
+  for (const point of cover) {
+    const key = `${Math.floor(point.x / cell)}:${Math.floor(point.y / cell)}:${Math.floor(point.z / cell)}`;
+    const list = buckets.get(key);
+    if (list) list.push(point);
+    else buckets.set(key, [point]);
+  }
+  const covered = (p: V3) => {
+    const cx = Math.floor(p.x / cell);
+    const cy = Math.floor(p.y / cell);
+    const cz = Math.floor(p.z / cell);
+    for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+      const list = buckets.get(`${cx + x}:${cy + y}:${cz + z}`);
+      if (!list) continue;
+      for (const q of list) {
+        if (p.distanceToSquared(q) < 0.018 * 0.018) return true;
+      }
+    }
+    return false;
+  };
+  for (const i of used) {
+    const p = warped[i];
+    if (p.y > 1.5) continue;
+    if (covered(p)) hide.add(i);
   }
 
   for (const face of bodyFaces) {
-    const corners = face.map((i) => cornerAt(i, skinUv(warped[i]), [0.92, 0.9, 0.88]));
-    const name = dominant(corners[0]);
-    const py = corners.reduce((s, c) => s + c.p.y, 0) / corners.length;
-    const n = faceNormal(corners[0].p, corners[1].p, corners[2].p);
-    let part = 'Skin';
-    let sub = false;
-    if (name === 'Head' || name === 'Neck' || name === 'Hand_L' || name === 'Hand_R' || name === 'LowerArm_L' || name === 'LowerArm_R') part = 'Skin';
-    else if (name === 'UpperArm_L' || name === 'UpperArm_R' || name === 'Spine' || name === 'Spine2') {
-      const elbowY = name.endsWith('_L') ? byName.get('LowerArm_L')!.dstA.y : byName.get('LowerArm_R')!.dstA.y;
-      const cuff = (name.startsWith('UpperArm') && Math.abs(py - elbowY) < 0.035)
-        || (name === 'Spine2' && py > byName.get('Neck')!.dstA.y - 0.04);
-      part = cuff ? 'Shirt_Trim' : 'Shirt';
-      sub = part === 'Shirt';
-    } else if (name === 'Hips' || name === 'UpperLeg_L' || name === 'UpperLeg_R') {
-      const hipY = (name === 'UpperLeg_L' ? legL.kn.y : name === 'UpperLeg_R' ? legR.kn.y : -1) - (name.startsWith('Upper') ? floor : 0);
-      const shorts = name === 'Hips' || py > hipY + 0.16;
-      part = shorts ? 'Shorts' : 'Skin';
-    } else if (name === 'LowerLeg_L' || name === 'LowerLeg_R') part = 'Socks';
-    else if (name.startsWith('Foot')) {
-      part = n.y < -0.45 ? 'Boots_Sole' : 'Boots';
-      sub = part === 'Boots';
-    }
-    const uvFor = (c: Corner): [number, number] => part === 'Skin' ? skinUv(c.p) : part.startsWith('Boot') ? bootUv(c.p) : clothUv(c.p, yShirt0, yShirt1);
-    const painted = corners.map((c) => {
-      const uv = uvFor(c);
-      let color: [number, number, number] = [0.94, 0.91, 0.88];
-      if (part === 'Skin') {
-        const brow = Math.min(c.p.distanceTo(browL.clone().setY(browL.y - floor)), c.p.distanceTo(browR.clone().setY(browR.y - floor)));
-        const lip = c.p.distanceTo(mouth.clone().setY(mouth.y - floor));
-        if (brow < 0.035 && c.p.z > head.z) color = [0.45, 0.38, 0.34];
-        else if (lip < 0.028 && c.p.z > mouth.z) color = [0.72, 0.4, 0.38];
-        else color = [0.93 - Math.max(0, -n.y) * 0.12, 0.9 - Math.max(0, -n.y) * 0.1, 0.86];
-      }
-      const amp = part === 'Shirt' || part === 'Shorts' ? 0.0045 : part === 'Boots' ? 0.0025 : part === 'Socks' ? 0.0015 : 0;
-      const base = part === 'Boots' ? 0.016 : part === 'Boots_Sole' ? 0.02 : part === 'Shirt' || part === 'Shirt_Trim' ? 0.011 : part === 'Shorts' ? 0.012 : part === 'Socks' ? 0.006 : 0;
-      const wave = Math.sin(c.p.y * 48 + c.p.x * 18) * Math.cos(c.p.z * 36);
-      const p = base > 0 ? c.p.clone().addScaledVector(n, base + wave * amp) : c.p;
-      return { ...c, p, uv, color };
+    if (face.some((i) => hide.has(i))) continue;
+    const corners = face.map((i) => {
+      const corner = cornerAt(i, skinUv(warped[i]), [1, 0.98, 0.96]);
+      const lip = corner.p.distanceTo(mouthW);
+      if (lip < 0.02 && corner.p.z > mouthW.z) corner.color = [0.84, 0.52, 0.48];
+      return corner;
     });
-    emitQuad(prim(part), painted[0], painted[1], painted[2], painted[3], sub);
+    if (corners.length === 4) emitQuad(prim('Skin'), corners[0], corners[1], corners[2], corners[3], false);
+    else if (corners.length === 3) emitTri(prim('Skin'), corners[0], corners[1], corners[2]);
+  }
+
+  const white: [number, number, number] = [1, 1, 1];
+  const headJoint = JOINT_ORDER.indexOf('Head');
+  const emitGarment = (garment: Garment, material: string, headOnly: boolean) => {
+    const world = garment.position.map(toWorld);
+    const mesh = prim(material);
+    const cache = new Map<string, number>();
+    const idOf = (vi: number, uvi: number) => {
+      const coord = garment.uv[uvi] ?? garment.uv[vi] ?? [0.5, 0.5];
+      const key = `${vi}:${coord[0].toFixed(5)}:${coord[1].toFixed(5)}`;
+      const hit = cache.get(key);
+      if (hit !== undefined) return hit;
+      const p = world[vi];
+      const skin = headOnly
+        ? { j: [headJoint, 0, 0, 0], w: [1, 0, 0, 0] }
+        : (() => { const s = skinOf(p, segs, false); return { j: remapJoint(s.j), w: s.w }; })();
+      const index = pushVert(mesh, { p, j: skin.j, w: skin.w, uv: [coord[0], coord[1]], color: white }, new Vector3(0, 1, 0));
+      cache.set(key, index);
+      return index;
+    };
+    for (const face of garment.faces) {
+      const ids = face.v.map((vi, k) => idOf(vi, face.uv[k] ?? vi));
+      if (ids.length === 3) mesh.idx.push(ids[0], ids[1], ids[2]);
+      else if (ids.length === 4) mesh.idx.push(ids[0], ids[1], ids[2], ids[0], ids[2], ids[3]);
+    }
+  };
+  emitGarment(shirtG, 'Shirt', false);
+  emitGarment(shortsG, 'Shorts', false);
+  emitGarment(socksG, 'Socks', false);
+  emitGarment(shoesG, 'Boots', false);
+  emitGarment(hairG, 'Hair', true);
+
+  const moveFaces = (sourceName: string, destName: string, take: (ia: number, ib: number, ic: number, src: Prim) => boolean) => {
+    const src = prims.get(sourceName);
+    if (!src || src.idx.length === 0) return;
+    const dest = prim(destName);
+    const keep: number[] = [];
+    const copy = (i: number) => {
+      const n = dest.pos.length / 3;
+      dest.pos.push(src.pos[i * 3], src.pos[i * 3 + 1], src.pos[i * 3 + 2]);
+      dest.nrm.push(src.nrm[i * 3], src.nrm[i * 3 + 1], src.nrm[i * 3 + 2]);
+      dest.uv.push(src.uv[i * 2], src.uv[i * 2 + 1]);
+      dest.col.push(src.col[i * 3], src.col[i * 3 + 1], src.col[i * 3 + 2]);
+      dest.joints.push(src.joints[i * 4], src.joints[i * 4 + 1], src.joints[i * 4 + 2], src.joints[i * 4 + 3]);
+      dest.weights.push(src.weights[i * 4], src.weights[i * 4 + 1], src.weights[i * 4 + 2], src.weights[i * 4 + 3]);
+      return n;
+    };
+    for (let t = 0; t < src.idx.length; t += 3) {
+      const ia = src.idx[t], ib = src.idx[t + 1], ic = src.idx[t + 2];
+      if (take(ia, ib, ic, src)) dest.idx.push(copy(ia), copy(ib), copy(ic));
+      else keep.push(ia, ib, ic);
+    }
+    src.idx = keep;
+  };
+  const shirtEdges = new Map<string, number>();
+  const shirt = prims.get('Shirt');
+  if (shirt) {
+    for (let t = 0; t < shirt.idx.length; t += 3) {
+      const tri = [shirt.idx[t], shirt.idx[t + 1], shirt.idx[t + 2]];
+      for (let e = 0; e < 3; e++) {
+        const a = tri[e], b = tri[(e + 1) % 3];
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        shirtEdges.set(key, (shirtEdges.get(key) ?? 0) + 1);
+      }
+    }
+  }
+  const shirtBoundary = new Set<number>();
+  for (const [key, count] of shirtEdges) {
+    if (count !== 1) continue;
+    const [a, b] = key.split(':').map(Number);
+    shirtBoundary.add(a);
+    shirtBoundary.add(b);
+  }
+  moveFaces('Shirt', 'Shirt_Trim', (ia, ib, ic) => {
+    const hits = [ia, ib, ic].filter((i) => shirtBoundary.has(i)).length;
+    return hits >= 2;
+  });
+  moveFaces('Boots', 'Boots_Sole', (ia, ib, ic, src) => {
+    const n = faceNormal(
+      new Vector3(src.pos[ia * 3], src.pos[ia * 3 + 1], src.pos[ia * 3 + 2]),
+      new Vector3(src.pos[ib * 3], src.pos[ib * 3 + 1], src.pos[ib * 3 + 2]),
+      new Vector3(src.pos[ic * 3], src.pos[ic * 3 + 1], src.pos[ic * 3 + 2]),
+    );
+    return n.y < -0.45;
+  });
+  if ((prims.get('Boots_Sole')?.idx.length ?? 0) === 0) {
+    const boots = prims.get('Boots');
+    if (boots && boots.idx.length >= 3) {
+      const sole = prim('Boots_Sole');
+      let best = 0;
+      let bestY = Infinity;
+      for (let t = 0; t < boots.idx.length; t += 3) {
+        const y = (boots.pos[boots.idx[t] * 3 + 1] + boots.pos[boots.idx[t + 1] * 3 + 1] + boots.pos[boots.idx[t + 2] * 3 + 1]) / 3;
+        if (y < bestY) { bestY = y; best = t; }
+      }
+      for (let k = 0; k < 3; k++) {
+        const i = boots.idx[best + k];
+        const n = sole.pos.length / 3;
+        sole.pos.push(boots.pos[i * 3], boots.pos[i * 3 + 1] - 0.004, boots.pos[i * 3 + 2]);
+        sole.nrm.push(0, -1, 0);
+        sole.uv.push(boots.uv[i * 2], boots.uv[i * 2 + 1]);
+        sole.col.push(1, 1, 1);
+        sole.joints.push(boots.joints[i * 4], boots.joints[i * 4 + 1], boots.joints[i * 4 + 2], boots.joints[i * 4 + 3]);
+        sole.weights.push(boots.weights[i * 4], boots.weights[i * 4 + 1], boots.weights[i * 4 + 2], boots.weights[i * 4 + 3]);
+        sole.idx.push(n);
+      }
+    }
+  }
+
+  const times: Record<string, number> = { Shirt: 1, Shirt_Trim: 1, Shorts: 1, Boots: 1, Boots_Sole: 1, Socks: 1, Hair: 1 };
+  for (const [name, count] of Object.entries(times)) {
+    let mesh = prims.get(name);
+    if (!mesh || mesh.idx.length === 0) continue;
+    for (let i = 0; i < count; i++) mesh = subdividePrim(mesh);
+    prims.set(name, mesh);
+  }
+  for (const name of ['Shirt', 'Shirt_Trim'] as const) {
+    const mesh = prims.get(name);
+    if (!mesh) continue;
+    for (let i = 0; i < mesh.pos.length; i += 3) {
+      const x = mesh.pos[i], y = mesh.pos[i + 1], z = mesh.pos[i + 2];
+      const len = Math.hypot(x, z) || 1;
+      const torso = Math.abs(x) < 0.16;
+      const amp = (torso ? 0.006 : 0.002) * Math.sin(y * 46) + Math.sin(x * 16 + y * 8) * 0.003;
+      mesh.pos[i] += (x / len) * amp;
+      mesh.pos[i + 2] += (z / len) * amp;
+      if (!torso && y < 1.08) mesh.pos[i + 1] -= 0.03;
+    }
   }
 
   const addHelper = (group: string, material: string, headOnly: boolean, uv: (p: V3, nrm: V3) => [number, number], inflate: number) => {
@@ -491,11 +648,6 @@ function buildMesh(): Built {
   addHelper('helper-r-eye', 'Skin', true, eyeUv, 0.001);
   addHelper('helper-upper-teeth', 'Skin', true, () => [0.9, 0.22], 0);
   addHelper('helper-lower-teeth', 'Skin', true, () => [0.9, 0.22], 0);
-  addHelper('helper-hair', 'Hair', true, (p) => clothUv(p, head.y - floor - 0.05, headTop.y - floor + 0.02), 0.004);
-  addHelper('helper-hair', 'Hair', true, (p) => clothUv(p, head.y - floor - 0.05, headTop.y - floor + 0.02), 0.012);
-  for (const g of ['helper-l-eyelashes-1', 'helper-r-eyelashes-1', 'helper-l-eyelashes-2', 'helper-r-eyelashes-2']) {
-    addHelper(g, 'Hair', true, (p) => clothUv(p, 1.4, 1.8), 0.001);
-  }
 
   const list = [...prims.values()].filter((p) => p.idx.length > 0);
   // Place toe bones 8 cm behind the boot tip so the mesh can meet the ball
@@ -518,6 +670,29 @@ function buildMesh(): Built {
     for (const point of world.values()) point.y -= sink;
   }
   smoothNormals(list);
+  const hair = list.find((p) => p.name === 'Hair');
+  if (hair) {
+    let outward = 0;
+    const count = hair.pos.length / 3;
+    for (let i = 0; i < count; i++) {
+      const x = hair.pos[i * 3], y = hair.pos[i * 3 + 1], z = hair.pos[i * 3 + 2];
+      const ox = x, oy = y - (head.y - floor), oz = z - head.z;
+      outward += hair.nrm[i * 3] * ox + hair.nrm[i * 3 + 1] * oy + hair.nrm[i * 3 + 2] * oz;
+    }
+    if (outward < 0) {
+      for (let i = 0; i < hair.nrm.length; i++) hair.nrm[i] *= -1;
+      for (let t = 0; t < hair.idx.length; t += 3) {
+        const tmp = hair.idx[t + 1];
+        hair.idx[t + 1] = hair.idx[t + 2];
+        hair.idx[t + 2] = tmp;
+      }
+    }
+    for (let i = 0; i < hair.pos.length; i += 3) {
+      hair.pos[i] += hair.nrm[i] * 0.006;
+      hair.pos[i + 1] += hair.nrm[i + 1] * 0.006;
+      hair.pos[i + 2] += hair.nrm[i + 2] * 0.006;
+    }
+  }
   const { scene, bones } = actuallyBuildRig(world, byName);
   return {
     prims: list,
@@ -860,8 +1035,8 @@ function paintAtlas(size: number, kind: 'skin' | 'cloth' | 'leather'): Buffer {
       }
       if (u > 0.86 && v > 0.14 && v < 0.28) { r = 236; g = 232; b = 226; }
     } else if (kind === 'cloth') {
-      const weave = ((Math.floor(x / 2) + Math.floor(y / 2)) % 2) ? 8 : 0;
-      r = 236 - weave + n2 * 8; g = 236 - weave; b = 236 - weave;
+      const weave = ((Math.floor(x / 2) + Math.floor(y / 2)) % 2) ? 4 : 0;
+      r = 250 - weave + n2 * 4; g = 250 - weave; b = 250 - weave;
     } else {
       r = 186 + n * 22; g = 176 + n * 18; b = 166 + n * 14;
       const grain = noise(x * 1.7, y * 2.3);
@@ -875,14 +1050,14 @@ function paintAtlas(size: number, kind: 'skin' | 'cloth' | 'leather'): Buffer {
   return px;
 }
 
-function paintData(size: number, rough: number, normal: boolean): Buffer {
+function paintData(size: number, rough: number, normal: boolean, normalAmp = 10): Buffer {
   const px = Buffer.alloc(size * size * 3);
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const n = noise(x * 0.5, y * 0.5) - 0.5;
     const o = (y * size + x) * 3;
     if (normal) {
-      px[o] = 128 + n * 28;
-      px[o + 1] = 128 + (noise(x * 0.5 + 4, y * 0.5) - 0.5) * 28;
+      px[o] = 128 + n * normalAmp;
+      px[o + 1] = 128 + (noise(x * 0.5 + 4, y * 0.5) - 0.5) * normalAmp;
       px[o + 2] = 255;
     } else {
       px[o] = 235;
@@ -998,13 +1173,13 @@ async function writeGlb(built: Built, prims: Prim[], albedo: number, dataSize: n
 
   const images = {
     skin: await ktx(paintAtlas(albedo, 'skin'), albedo, 'srgb', 'uastc', 'skin'),
-    skinN: await ktx(paintData(dataSize, 0, true), dataSize, 'linear', 'uastc', 'skinN'),
+    skinN: await ktx(paintData(dataSize, 0, true, 16), dataSize, 'linear', 'uastc', 'skinN-v2'),
     skinO: await ktx(paintData(dataSize, 150, false), dataSize, 'linear', 'uastc', 'skinO'),
-    cloth: await ktx(paintAtlas(albedo, 'cloth'), albedo, 'srgb', 'etc1s', 'cloth'),
-    clothN: await ktx(paintData(dataSize, 0, true), dataSize, 'linear', 'uastc', 'clothN'),
+    cloth: await ktx(paintAtlas(albedo, 'cloth'), albedo, 'srgb', 'etc1s', 'cloth-v2'),
+    clothN: await ktx(paintData(dataSize, 0, true, 8), dataSize, 'linear', 'uastc', 'clothN-v2'),
     clothO: await ktx(paintData(dataSize, 190, false), dataSize, 'linear', 'uastc', 'clothO'),
     leather: await ktx(paintAtlas(albedo, 'leather'), albedo, 'srgb', 'etc1s', 'leather'),
-    leatherN: await ktx(paintData(dataSize, 0, true), dataSize, 'linear', 'uastc', 'leatherN'),
+    leatherN: await ktx(paintData(dataSize, 0, true, 18), dataSize, 'linear', 'uastc', 'leatherN-v2'),
     leatherO: await ktx(paintData(dataSize, 110, false), dataSize, 'linear', 'uastc', 'leatherO'),
   };
   const tex = (name: string, bytes: Uint8Array) => doc.createTexture(name).setMimeType('image/ktx2').setImage(bytes);
@@ -1033,12 +1208,12 @@ async function writeGlb(built: Built, prims: Prim[], albedo: number, dataSize: n
     return m;
   };
   const materials: Record<string, Material> = {
-    Skin: mat('Skin', [1, 1, 1, 1], 0.52, { base: skinMap, n: skinN, o: skinO }),
-    Hair: mat('Hair', [1, 1, 1, 1], 0.62, { base: clothMap, n: clothN, o: clothO }),
-    Shirt: mat('Shirt', [1, 1, 1, 1], 0.72, { base: clothMap, n: clothN, o: clothO }),
-    Shirt_Trim: mat('Shirt_Trim', [1, 1, 1, 1], 0.6, { base: clothMap, n: clothN, o: clothO }),
-    Shorts: mat('Shorts', [1, 1, 1, 1], 0.74, { base: clothMap, n: clothN, o: clothO }),
-    Socks: mat('Socks', [1, 1, 1, 1], 0.8, { base: clothMap, n: clothN, o: clothO }),
+    Skin: mat('Skin', [1, 1, 1, 1], 0.48, { base: skinMap, n: skinN, o: skinO }),
+    Hair: mat('Hair', [1, 1, 1, 1], 0.48, { base: clothMap, n: clothN, o: clothO }).setDoubleSided(true),
+    Shirt: mat('Shirt', [1, 1, 1, 1], 0.55, { base: clothMap, n: clothN, o: clothO }),
+    Shirt_Trim: mat('Shirt_Trim', [1, 1, 1, 1], 0.42, { base: clothMap, n: clothN, o: clothO }),
+    Shorts: mat('Shorts', [1, 1, 1, 1], 0.58, { base: clothMap, n: clothN, o: clothO }),
+    Socks: mat('Socks', [1, 1, 1, 1], 0.62, { base: clothMap, n: clothN, o: clothO }),
     Boots: mat('Boots', [1, 1, 1, 1], 0.42, { base: leatherMap, n: leatherN, o: leatherO }, 0.28),
     Boots_Sole: mat('Boots_Sole', [1, 1, 1, 1], 0.86, { base: leatherMap, n: leatherN, o: leatherO }),
   };
@@ -1152,6 +1327,20 @@ async function main() {
     clip.poses[frame] = nudgeBoot(computePose(contactEngine(side, 0.04)), side, 1, nudge);
   }
 
+  if (process.env.DUMP) {
+    const lines = ['# kickole fitted'];
+    let base = 1;
+    for (const prim of built.prims) {
+      lines.push(`o ${prim.name}`);
+      for (let i = 0; i < prim.pos.length; i += 3) lines.push(`v ${prim.pos[i]} ${prim.pos[i + 1]} ${prim.pos[i + 2]}`);
+      for (let t = 0; t < prim.idx.length; t += 3) {
+        lines.push(`f ${prim.idx[t] + base} ${prim.idx[t + 1] + base} ${prim.idx[t + 2] + base}`);
+      }
+      base += prim.pos.length / 3;
+    }
+    writeFileSync('/tmp/fitted.obj', lines.join('\n'));
+    console.log('wrote /tmp/fitted.obj');
+  }
   if (process.env.FAST) return;
   // 1K albedo stays inside the 2K cap and the 15MB first-load budget. UASTC normals/ORM are 512.
   console.log('encoding LOD0 (1k albedo)…');

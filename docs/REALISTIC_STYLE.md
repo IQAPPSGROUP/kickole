@@ -4,7 +4,7 @@ Kickolé’s street theme is a mobile-friendly realistic look: a photographed co
 
 ## Character
 
-`kickole_player_v4.glb` is fitted from the CC0 MakeHuman hm08 base. The body keeps human proportions, a face, eyes, teeth and hair. The shirt, shorts, socks and boots are modelled shells with folds. Materials are glTF PBR (base colour, normal, ORM). Kit colours still come from `skinMaterialColors`. A chest decal shows a number derived from the skin id. Eye texels (`u > 0.86`) are not tinted.
+`kickole_player_v4.glb` is fitted from the CC0 MakeHuman hm08 base. The body keeps human proportions, a face, eyes and teeth. Body faces under the kit are deleted. The jersey, shorts, socks, shoes and short hair are continuous CC0 MakeHuman clothes (see `public/models/LICENSE`), warped onto the same rig. Hair is an opaque scalp cap. Materials are glTF PBR (base colour, normal, ORM). Kit and hair colours still come from `skinMaterialColors` multiplied onto a near-white albedo. A chest decal shows a number derived from the skin id. Eye texels (`u > 0.86`) are not tinted.
 
 LOD0 is about 45k triangles. LOD1 is the low-tier mesh, same bones and the same five clips. Bone names stay on the contract in `docs/CHARACTER_GLB.md` (at most 40). There is no `Clavicle_L`, so the runtime stays on the contract Euler path.
 

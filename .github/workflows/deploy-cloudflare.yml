@@ -31,6 +31,8 @@ jobs:
           npm run typecheck
           npm test
       - name: Build production assets
+        env:
+          VITE_ENVIRONMENT_THEME: beach
         run: npm run build
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

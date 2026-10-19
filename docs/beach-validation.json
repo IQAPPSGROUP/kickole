@@ -1,0 +1,458 @@
+{
+  "date": "2026-10-19",
+  "rendering": "Headless Chromium, ANGLE SwiftShader software rendering",
+  "typecheck": "passed",
+  "tests": "76 passed in 8 files",
+  "defaultStreetProductionBuild": "passed",
+  "beachProductionBuild": "passed with VITE_ENVIRONMENT_THEME=beach",
+  "gltf": [
+    {
+      "file": "beach-lod0.glb",
+      "bytes": 3536048,
+      "gzipBytes": 1004170,
+      "triangles": 36470,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "beach-lod1.glb",
+      "bytes": 1091928,
+      "gzipBytes": 498933,
+      "triangles": 9322,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "beach-lod2.glb",
+      "bytes": 758928,
+      "gzipBytes": 437208,
+      "triangles": 5094,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "palm-cluster.glb",
+      "bytes": 964984,
+      "gzipBytes": 496137,
+      "triangles": 7416,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "coconut-kiosk.glb",
+      "bytes": 448836,
+      "gzipBytes": 372158,
+      "triangles": 1128,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "lifeguard-tower.glb",
+      "bytes": 466456,
+      "gzipBytes": 375337,
+      "triangles": 1298,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "umbrella-loungers.glb",
+      "bytes": 457212,
+      "gzipBytes": 376426,
+      "triangles": 1200,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "beach-goal.glb",
+      "bytes": 427420,
+      "gzipBytes": 368941,
+      "triangles": 840,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "fishing-boat.glb",
+      "bytes": 448432,
+      "gzipBytes": 375582,
+      "triangles": 1096,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "boardwalk.glb",
+      "bytes": 456576,
+      "gzipBytes": 373923,
+      "triangles": 1224,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    }
+  ],
+  "gallery": [
+    {
+      "loaded": true,
+      "error": "",
+      "file": "beach-lod0.glb",
+      "triangles": 36472,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -18,
+          -0.4,
+          -34.5
+        ],
+        "max": [
+          18,
+          5.272111432597035,
+          -4.5
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "beach-lod1.glb",
+      "triangles": 9324,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -18,
+          -0.4,
+          -34.5
+        ],
+        "max": [
+          18,
+          5.252989898732233,
+          -4.5
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "beach-lod2.glb",
+      "triangles": 5096,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -18,
+          -0.30000000000000004,
+          -34.5
+        ],
+        "max": [
+          18,
+          5.262487113059643,
+          -4.5
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "palm-cluster.glb",
+      "triangles": 7418,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.4704614786591668,
+          -0.010525695886190617,
+          -2.364589258003767
+        ],
+        "max": [
+          2.985448307631451,
+          4.872111432597036,
+          2.182785895413667
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "coconut-kiosk.glb",
+      "triangles": 1130,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.85,
+          0,
+          -1.6
+        ],
+        "max": [
+          1.85,
+          3.392308108396233,
+          1.86
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "lifeguard-tower.glb",
+      "triangles": 1300,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1,
+          -0.006398345726329449,
+          -1.12
+        ],
+        "max": [
+          1.4,
+          3.9,
+          1.6603317859905957
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "umbrella-loungers.glb",
+      "triangles": 1202,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.25,
+          0,
+          -1.25
+        ],
+        "max": [
+          1.25,
+          2.38,
+          1.3900000000000001
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "beach-goal.glb",
+      "triangles": 842,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.5523081083962333,
+          -0.04,
+          -1.035
+        ],
+        "max": [
+          1.5523081083962333,
+          1.9023081083962334,
+          0.055
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "fishing-boat.glb",
+      "triangles": 1098,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -0.7627685401856674,
+          0.05949611200159123,
+          -1.77
+        ],
+        "max": [
+          0.7627685401856674,
+          0.745,
+          2.007840830461083
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "boardwalk.glb",
+      "triangles": 1226,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -0.925,
+          0,
+          -4.005
+        ],
+        "max": [
+          1.375,
+          0.975,
+          0.2450000000000001
+        ]
+      }
+    }
+  ],
+  "production": [
+    {
+      "quality": "low",
+      "width": 320,
+      "height": 568,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod2.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "low",
+      "width": 390,
+      "height": 844,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod2.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "low",
+      "width": 844,
+      "height": 390,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod2.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "medium",
+      "width": 320,
+      "height": 568,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod1.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "medium",
+      "width": 390,
+      "height": 844,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod1.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "medium",
+      "width": 844,
+      "height": 390,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod1.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 320,
+      "height": 568,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 390,
+      "height": 844,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 844,
+      "height": 390,
+      "phase": "production inputs exercised",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5190/models/beach/beach-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "fallback": "aborted environment model still leaves game canvas and controls usable"
+    },
+    {
+      "qualitySwitch": "LOW / MEDIUM / HIGH / LOW without page errors",
+      "errors": []
+    },
+    {
+      "contextLoss": "a real current-canvas loss still shows the recovery screen"
+    }
+  ],
+  "beachSwitch": [
+    {
+      "qualitySwitch": "LOW / MEDIUM / HIGH / LOW without page errors",
+      "errors": []
+    },
+    {
+      "contextLoss": "a real current-canvas loss still shows the recovery screen"
+    }
+  ],
+  "streetSwitch": [
+    {
+      "qualitySwitch": "LOW / MEDIUM / HIGH / LOW without page errors",
+      "errors": []
+    },
+    {
+      "contextLoss": "a real current-canvas loss still shows the recovery screen"
+    }
+  ]
+}

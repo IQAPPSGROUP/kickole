@@ -54,6 +54,10 @@ Not done: Capacitor projects, purchases (skin `productId` is a placeholder), tun
 
 The court includes a textured hillside GLB selected by the existing graphics quality setting, with the original backdrop as a loading/error fallback. Seven reusable scene modules and three complete hillside detail levels live in `public/models/environment/`. See [`docs/BRAZILIAN_ENVIRONMENT.md`](docs/BRAZILIAN_ENVIRONMENT.md) for budgets, source generation, asset review and limitations. Run the dev server and open `/tools/environment-preview.html` to inspect the kit. Set `VITE_USE_GLB_ENVIRONMENT=false` to retain the built-in hillside.
 
+## Brazilian beach kit
+
+An optional beach theme includes ten textured GLBs, sand court, coastal sky/fog and three quality-selected backdrops. Street remains the default; build with `VITE_ENVIRONMENT_THEME=beach` for a beach release. In development use `/?environment=beach` to play or `/tools/environment-preview.html?theme=beach` to inspect the models. See [`docs/BRAZILIAN_BEACH.md`](docs/BRAZILIAN_BEACH.md) and [`docs/CURSOR_BEACH_HANDOFF.md`](docs/CURSOR_BEACH_HANDOFF.md).
+
 ## Character model
 
 The bundled procedural footballer uses a skinned GLB with five animations and follows [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). It loads from `public/models/kicky-player-rigged.glb` by default. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.

@@ -41,7 +41,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      # v3's default package list includes the removed SDK "tools" package and fails
+      # sdkmanager. v4 installs platform-tools only; pin API 36 to match compileSdk.
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-36'
       - run: npm ci
       - run: npm run build
       - run: npx cap sync android

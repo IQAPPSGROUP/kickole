@@ -123,7 +123,7 @@ export function SettingsScreen({
         <div className="group help">
           <label>Privacy</label>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
-          <p>Music, crowd and cheers are synthesised in the app. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
+          <p>Music is a synthesised steel-pan band. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
           <p>
             Original assets:{' '}
             <a href="https://quaternius.com/packs/universalbasecharacters.html" target="_blank" rel="noopener noreferrer">

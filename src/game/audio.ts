@@ -3,6 +3,7 @@ import { cheerWeight } from './audioPolicy';
 
 /**
  * All game audio is synthesised here. There are no sampled recordings.
+ * The beds are original steel-pan loops (tenor melody, off-beat chords, bass pan).
  * See public/audio/LICENSE.txt.
  */
 
@@ -152,37 +153,64 @@ function tone(at: number, freq: number, dur: number, type: OscillatorType, gain:
   o.stop(at + dur + 0.02);
 }
 
-const CHORDS = [
-  [65.41, 196, 261.63, 329.63],
-  [98, 196, 246.94, 293.66],
-  [110, 220, 261.63, 329.63],
-  [87.31, 174.61, 220, 261.63],
+/** One struck note: fast hammer, inharmonic partials, ringing decay. */
+function steel(at: number, freq: number, dur: number, gain: number, bus: GainNode) {
+  const c = ctx;
+  if (!c || freq <= 0 || gain <= 0) return;
+  burst(at, 0.012, 3200, 0.9, gain * 0.35, bus);
+  const partials = [
+    { ratio: 1, mix: 1, life: 1 },
+    { ratio: 2.01, mix: 0.42, life: 0.62 },
+    { ratio: 2.97, mix: 0.18, life: 0.34 },
+  ];
+  for (const partial of partials) {
+    const o = c.createOscillator();
+    const g = c.createGain();
+    const f = freq * partial.ratio;
+    o.type = 'sine';
+    o.frequency.setValueAtTime(f * 1.02, at);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, f), at + 0.07);
+    g.gain.setValueAtTime(gain * partial.mix, at);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + Math.max(0.08, dur * partial.life));
+    o.connect(g).connect(bus);
+    o.start(at);
+    o.stop(at + dur * partial.life + 0.03);
+  }
+}
+
+/** Four sunny bars: C, F, G, C. Melody on the tenor, chords on the off-beat. */
+const STEEL_BARS: ReadonlyArray<{ bass: number; chord: readonly number[]; melody: readonly number[] }> = [
+  { bass: 130.81, chord: [329.63, 523.25], melody: [659.25, 783.99, 659.25, 523.25] },
+  { bass: 174.61, chord: [349.23, 523.25], melody: [698.46, 880, 1046.5, 880] },
+  { bass: 196, chord: [392, 587.33], melody: [587.33, 783.99, 987.77, 587.33] },
+  { bass: 130.81, chord: [329.63, 523.25], melody: [659.25, 783.99, 1046.5, 659.25] },
 ];
+const MELODY_STEPS = [0, 3, 7, 12];
+const CHORD_STEPS = [2, 6, 10, 14];
 
 function scheduleStep(index: number, at: number) {
   const bus = musicGain;
-  const c = ctx;
-  if (!bus || !c || !bed.music || !foreground) return;
+  if (!bus || !ctx || !bed.music || !foreground) return;
   const play = mode === 'play';
-  const bar = Math.floor(index / 16) % 4;
   const sixteenth = index % 16;
-  const chord = CHORDS[bar % CHORDS.length];
-  if (sixteenth === 0) {
-    tone(at, chord[0], play ? 0.28 : 0.7, 'sine', play ? 0.07 : 0.045, bus);
-    tone(at, chord[2], play ? 0.45 : 0.9, 'triangle', play ? 0.03 : 0.04, bus);
-    tone(at, chord[3], play ? 0.45 : 0.9, 'sine', play ? 0.02 : 0.03, bus);
+  const bar = STEEL_BARS[Math.floor(index / 16) % STEEL_BARS.length];
+  if (sixteenth === 0) steel(at, bar.bass, play ? 0.85 : 1.5, play ? 0.11 : 0.07, bus);
+  if (play && sixteenth === 8) steel(at, bar.bass * 1.5, 0.45, 0.06, bus);
+  const chordAt = play ? CHORD_STEPS : [2, 10];
+  if (chordAt.includes(sixteenth)) {
+    for (const freq of bar.chord) steel(at, freq, play ? 0.42 : 0.9, play ? 0.045 : 0.03, bus);
+  }
+  const melodyAt = MELODY_STEPS.indexOf(sixteenth);
+  if (melodyAt >= 0 && (play || sixteenth === 0)) {
+    steel(at, bar.melody[melodyAt] ?? bar.melody[0], play ? 0.7 : 1.6, play ? 0.07 : 0.05, bus);
   }
   if (!play) return;
-  if (sixteenth % 8 === 0 || sixteenth === 6 || sixteenth === 14) tone(at, 150, 0.1, 'sine', 0.16, bus, 48);
-  if (sixteenth === 4 || sixteenth === 12) {
-    burst(at, 0.07, 1800, 0.7, 0.05, bus);
-    tone(at, chord[1], 0.08, 'triangle', 0.04, bus);
-  }
-  if (sixteenth % 2 === 0) tone(at, 3200, 0.025, 'square', 0.012, bus);
+  if (sixteenth === 0 || sixteenth === 8) tone(at, 120, 0.09, 'sine', 0.1, bus, 46);
+  if (sixteenth % 2 === 0) burst(at, 0.02, 7000, 0.5, 0.012, bus);
 }
 
 function bpm(): number {
-  return mode === 'play' ? 108 : 82;
+  return mode === 'play' ? 112 : 78;
 }
 
 function runScheduler() {
@@ -245,11 +273,10 @@ function playCheerNow(id: string) {
   const at = c.currentTime;
   lastCheer = at;
   const big = cheerWeight(id) >= 2;
-  const root = big ? 392 : 523.25;
-  tone(at, root, big ? 0.42 : 0.22, 'triangle', big ? 0.12 : 0.08, bus);
-  tone(at + 0.08, root * 1.25, big ? 0.36 : 0.18, 'triangle', big ? 0.09 : 0.06, bus);
-  tone(at + 0.16, root * 1.5, big ? 0.4 : 0.2, 'sine', big ? 0.08 : 0.05, bus);
-  if (big) burst(at, 0.35, 900, 0.4, 0.06, bus);
+  const root = big ? 523.25 : 659.25;
+  steel(at, root, big ? 0.7 : 0.4, big ? 0.12 : 0.08, bus);
+  steel(at + 0.09, root * 1.25, big ? 0.6 : 0.32, big ? 0.09 : 0.06, bus);
+  steel(at + 0.18, root * 1.5, big ? 0.7 : 0.36, big ? 0.08 : 0.05, bus);
 }
 
 function flushCheer() {

@@ -44,6 +44,14 @@ export interface WardrobeLocker {
 
 export const WARDROBE_VERSION = 2;
 
+export interface NormalizeLockerOptions {
+  /**
+   * Native builds may trust an apple/google cache until the store answers.
+   * Web must not: a hand-edited source string is not a receipt.
+   */
+  trustStoreCache?: boolean;
+}
+
 export const EMPTY_CHALLENGES: ChallengeProgress = {
   alternateFoot: 0,
   stalls: 0,
@@ -185,7 +193,13 @@ function mapBootId(id: string): string | null {
   return mapped && isBootId(mapped) ? mapped : null;
 }
 
-export function normalizeLocker(raw: RawSaveFields | null | undefined): WardrobeLocker {
+export function normalizeLocker(
+  raw: RawSaveFields | null | undefined,
+  options?: NormalizeLockerOptions,
+): WardrobeLocker {
+  const storedVersion = typeof raw?.wardrobeVersion === 'number' && Number.isFinite(raw.wardrobeVersion)
+    ? Math.floor(raw.wardrobeVersion)
+    : 0;
   const ownedBoots = Array.isArray(raw?.ownedBoots)
     ? [...new Set(raw.ownedBoots
       .filter((id): id is string => typeof id === 'string')
@@ -198,8 +212,10 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
     ? [...new Set(raw.ownedKits.filter((id): id is string => typeof id === 'string' && isKitId(id)))]
     : [];
 
-  // Migrate legacy free skins into owned kits (cosmetic only).
-  const legacy = typeof raw?.legacySkinId === 'string' ? LEGACY_SKIN_MAP[raw.legacySkinId] : undefined;
+  // Legacy skin seeds run once, while the save is still older than the wardrobe schema.
+  const legacy = storedVersion < WARDROBE_VERSION && typeof raw?.legacySkinId === 'string'
+    ? LEGACY_SKIN_MAP[raw.legacySkinId]
+    : undefined;
   if (legacy && !ownedKits.includes(legacy.kit) && isKitId(legacy.kit)) {
     ownedKits = [...ownedKits, legacy.kit];
   }
@@ -245,10 +261,13 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
     ? raw.launchGrantedItemIds.filter((id): id is string => typeof id === 'string')
     : [];
 
-  // Do not honour a bare localStorage boolean without a store source — prevents hand-edited saves
-  // from unlocking paid content. Trusted sources are re-checked by native adapters on launch.
-  const cachedOwned = raw?.launchCollectionOwned === true
-    && (entitlementSource === 'apple' || entitlementSource === 'google' || entitlementSource === 'dev_sim');
+  // A bare boolean is not proof. On web, apple/google strings are not proof either.
+  // Native builds may keep that cache and re-check it with the store.
+  const trustStoreCache = options?.trustStoreCache === true;
+  const cachedOwned = raw?.launchCollectionOwned === true && (
+    entitlementSource === 'dev_sim'
+    || (trustStoreCache && (entitlementSource === 'apple' || entitlementSource === 'google'))
+  );
 
   let locker: WardrobeLocker = {
     coins,

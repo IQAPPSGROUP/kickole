@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import StoreKit
 
@@ -20,6 +21,7 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
     private let productId = "kickole_launch_collection"
     private var products: [Product] = []
     private var updates: Task<Void, Never>?
+    private var foregroundObserver: NSObjectProtocol?
     private var purchaseInFlight = false
 
     public override func load() {
@@ -29,10 +31,21 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
                 await self.handle(transactionUpdate: update)
             }
         }
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { await self.refreshAndNotify() }
+        }
     }
 
     deinit {
         updates?.cancel()
+        if let foregroundObserver {
+            NotificationCenter.default.removeObserver(foregroundObserver)
+        }
     }
 
     @objc func getLaunchProduct(_ call: CAPPluginCall) {
@@ -61,7 +74,7 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func purchaseLaunchCollection(_ call: CAPPluginCall) {
         Task {
             if purchaseInFlight {
-                call.resolve(self.resultPayload(outcome: "busy", owned: false, ref: nil, message: "Purchase already in progress."))
+                call.resolve(self.resultPayload(outcome: "busy", owned: false, source: "none", ref: nil, message: "Purchase already in progress."))
                 return
             }
             purchaseInFlight = true
@@ -72,7 +85,7 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
                     products = try await Product.products(for: [productId])
                 }
                 guard let product = products.first(where: { $0.id == productId }) else {
-                    call.resolve(self.resultPayload(outcome: "unavailable", owned: false, ref: nil, message: "Product is not available in App Store Connect for this build."))
+                    call.resolve(self.resultPayload(outcome: "unavailable", owned: false, source: "none", ref: nil, message: "Product is not available in App Store Connect for this build."))
                     return
                 }
 
@@ -84,16 +97,16 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
                     // Deliver entitlement before finishing.
                     self.notifyEntitlement(owned: true, ref: ref)
                     await transaction.finish()
-                    call.resolve(self.resultPayload(outcome: "purchased", owned: true, ref: ref, message: nil))
+                    call.resolve(self.resultPayload(outcome: "purchased", owned: true, source: "apple", ref: ref, message: nil))
                 case .userCancelled:
-                    call.resolve(self.resultPayload(outcome: "cancelled", owned: false, ref: nil, message: "Purchase cancelled."))
+                    call.resolve(self.resultPayload(outcome: "cancelled", owned: false, source: "none", ref: nil, message: "Purchase cancelled."))
                 case .pending:
-                    call.resolve(self.resultPayload(outcome: "pending", owned: false, ref: nil, message: "Purchase is pending approval. Content unlocks after it completes."))
+                    call.resolve(self.resultPayload(outcome: "pending", owned: false, source: "none", ref: nil, message: "Purchase is pending approval. Content unlocks after it completes."))
                 @unknown default:
-                    call.resolve(self.resultPayload(outcome: "failed", owned: false, ref: nil, message: "Purchase could not be completed."))
+                    call.resolve(self.resultPayload(outcome: "failed", owned: false, source: "none", ref: nil, message: "Purchase could not be completed."))
                 }
             } catch {
-                call.resolve(self.resultPayload(outcome: "failed", owned: false, ref: nil, message: "Purchase could not be completed."))
+                call.resolve(self.resultPayload(outcome: "failed", owned: false, source: "none", ref: nil, message: "Purchase could not be completed."))
             }
         }
     }
@@ -105,12 +118,13 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
                 try await AppStore.sync()
                 if let entitlement = await self.currentEntitlement() {
                     self.notifyEntitlement(owned: true, ref: entitlement.ref)
-                    call.resolve(self.resultPayload(outcome: "restored", owned: true, ref: entitlement.ref, message: "Launch Collection restored for this Apple ID."))
+                    call.resolve(self.resultPayload(outcome: "restored", owned: true, source: "apple", ref: entitlement.ref, message: "Launch Collection restored for this Apple ID."))
                 } else {
-                    call.resolve(self.resultPayload(outcome: "restored", owned: false, ref: nil, message: "No Launch Collection purchase found for this Apple ID."))
+                    self.notifyEntitlement(owned: false, ref: nil)
+                    call.resolve(self.resultPayload(outcome: "restored", owned: false, source: "apple", ref: nil, message: "No Launch Collection purchase found for this Apple ID."))
                 }
             } catch {
-                call.resolve(self.resultPayload(outcome: "failed", owned: false, ref: nil, message: "Could not restore purchases right now."))
+                call.resolve(self.resultPayload(outcome: "failed", owned: false, source: "none", ref: nil, message: "Could not restore purchases right now."))
             }
         }
     }
@@ -143,6 +157,15 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
             }
         }
         return nil
+    }
+
+    /// Foreground re-check. A missing current entitlement is definitive; a thrown sync is not.
+    private func refreshAndNotify() async {
+        if let entitlement = await self.currentEntitlement() {
+            notifyEntitlement(owned: true, ref: entitlement.ref)
+        } else {
+            notifyEntitlement(owned: false, ref: nil)
+        }
     }
 
     private func handle(transactionUpdate: VerificationResult<Transaction>) async {
@@ -185,11 +208,11 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
         ])
     }
 
-    private func resultPayload(outcome: String, owned: Bool, ref: String?, message: String?) -> [String: Any] {
+    private func resultPayload(outcome: String, owned: Bool, source: String, ref: String?, message: String?) -> [String: Any] {
         var payload: [String: Any] = [
             "outcome": outcome,
             "owned": owned,
-            "source": owned ? "apple" : "none",
+            "source": source,
             "verifiedAt": Date().timeIntervalSince1970 * 1000,
             "transactionRef": ref as Any,
         ]

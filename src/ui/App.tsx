@@ -144,6 +144,7 @@ export function App() {
         <ShopScreen
           save={snap.save}
           launchProduct={snap.launchProduct}
+          billingPlatform={snap.billingPlatform}
           billingMessage={snap.billingMessage}
           billingBusy={snap.billingBusy}
           onBuyBoot={(id) => controller.buyBoot(id)}

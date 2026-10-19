@@ -10,12 +10,14 @@ import {
 import {
   BOOTS,
   KITS,
+  LAUNCH_COLLECTION_ITEM_IDS,
   challengeLabel,
   type BootDesign,
   type KitDesign,
 } from '../game/catalogue';
-import type { StoreProduct } from '../billing/types';
+import type { BillingPlatform, StoreProduct } from '../billing/types';
 import { LAUNCH_COLLECTION_DISPLAY_NAME } from '../billing/config';
+import { launchCollectionBlurb, launchPurchaseLabel, launchStoreNote } from '../billing/storeCopy';
 import { challengeValue, meetsChallenge } from '../game/shop';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
@@ -130,6 +132,7 @@ function UnlockHint({ item, save }: { item: BootDesign | KitDesign; save: SaveDa
 export function ShopScreen({
   save,
   launchProduct,
+  billingPlatform,
   billingMessage,
   billingBusy,
   onBuyBoot,
@@ -141,6 +144,7 @@ export function ShopScreen({
 }: {
   save: SaveData;
   launchProduct: StoreProduct | null;
+  billingPlatform: BillingPlatform;
   billingMessage: string | null;
   billingBusy: boolean;
   onBuyBoot: (id: string) => boolean;
@@ -155,6 +159,7 @@ export function ShopScreen({
   const [focusKit, setFocusKit] = useState(save.equippedKit);
   const priceLabel = launchProduct?.priceString ?? null;
   const ownedLaunch = save.launchCollectionOwned;
+  const storeNote = launchStoreNote(billingPlatform, !!priceLabel);
 
   const previewSkin = useMemo(
     () => composePlayerSkin(save.appearance, focusKit, focusBoot),
@@ -184,11 +189,7 @@ export function ShopScreen({
         </div>
         <div className="launch-card">
           <h3>{LAUNCH_COLLECTION_DISPLAY_NAME}</h3>
-          <p>
-            One permanent unlock for <b>this launch collection only</b> — every launch boot and kit listed below.
-            Future collections are sold separately. Free skin tones, hair and basic styling stay free.
-            Achievement challenges still need real play.
-          </p>
+          <p>{launchCollectionBlurb(LAUNCH_COLLECTION_ITEM_IDS.length)}</p>
           {ownedLaunch ? (
             <p className="coin-earn">OWNED · restored with your store account</p>
           ) : (
@@ -198,7 +199,7 @@ export function ShopScreen({
               disabled={billingBusy}
               onClick={onPurchaseLaunch}
             >
-              {billingBusy ? 'PLEASE WAIT…' : priceLabel ? `UNLOCK · ${priceLabel}` : 'UNLOCK ON iOS / ANDROID'}
+              {launchPurchaseLabel(billingPlatform, priceLabel, billingBusy)}
             </button>
           )}
           <button
@@ -210,12 +211,7 @@ export function ShopScreen({
             RESTORE PURCHASES
           </button>
           {billingMessage && <p className="shop-note" role="status">{billingMessage}</p>}
-          {!priceLabel && (
-            <p className="shop-note">
-              Browser builds cannot take real payments. Install the Kickolé iOS or Android app to buy with your local store price
-              (UK list target £2.99). Apple and Google purchases do not transfer between stores.
-            </p>
-          )}
+          {storeNote && <p className="shop-note">{storeNote}</p>}
         </div>
         <PlayerPreview skin={previewSkin} label="Shop preview" />
         <div className="seg">

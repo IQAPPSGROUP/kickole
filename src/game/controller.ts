@@ -1,5 +1,14 @@
-import { createDefaultPurchaseService, PurchaseService } from '../billing/PurchaseService';
-import type { PurchaseResult, StoreProduct } from '../billing/types';
+import {
+  createDefaultPurchaseService,
+  PurchaseService,
+  shouldIgnoreStaleRevoke,
+  shouldKeepRecentGrant,
+} from '../billing/PurchaseService';
+import {
+  shouldRefreshEntitlementsOnResume,
+  STORE_UNAVAILABLE_MESSAGE,
+} from '../billing/storeCopy';
+import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct } from '../billing/types';
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
@@ -57,6 +66,7 @@ export interface Snapshot {
   skin: Skin;
   result: Result | null;
   launchProduct: StoreProduct | null;
+  billingPlatform: BillingPlatform;
   billingMessage: string | null;
   billingBusy: boolean;
 }
@@ -77,23 +87,73 @@ export class GameController {
   private billingMessage: string | null = null;
   private billingBusy = false;
   private billingReady: Promise<void>;
+  /** Bumped when a live store event lands, so an older refresh cannot overwrite it. */
+  private entitlementEpoch = 0;
+  /** Drops a stale not-owned event that arrives just after a grant. */
+  private grantGuardUntil = 0;
+  private readonly onVisibility = () => {
+    if (!shouldRefreshEntitlementsOnResume(this.billing.platform, document.visibilityState)) return;
+    void this.pullEntitlements();
+  };
 
   constructor() {
     this.engine.prepare('menu');
     this.engine.on((e) => this.onEvent(e));
+    this.billing.setEntitlementListener((snapshot) => this.applyBillingSnapshot(snapshot));
     this.snapshot = this.build();
     this.billingReady = this.initBilling();
+    if (this.billing.platform !== 'web' && typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibility);
+    }
   }
 
   private async initBilling() {
     try {
       await this.billing.init();
-      this.save = await this.billing.syncEntitlements(this.save) as SaveData;
-      persistSave(this.save);
-      this.publish();
+      await this.pullEntitlements();
     } catch {
-      // Retain cached verified entitlement on transient failure.
+      this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
     }
+    this.publish();
+  }
+
+  private async pullEntitlements() {
+    const epoch = this.entitlementEpoch;
+    const next = await this.billing.syncEntitlements(this.save) as SaveData;
+    if (epoch !== this.entitlementEpoch) return;
+    if (shouldKeepRecentGrant(this.save.launchCollectionOwned, next.launchCollectionOwned, this.grantGuardUntil, Date.now())) {
+      return;
+    }
+    this.save = { ...this.save, ...next };
+    persistSave(this.save);
+    this.publish();
+  }
+
+  private applyBillingSnapshot(snapshot: EntitlementSnapshot) {
+    if (shouldIgnoreStaleRevoke(snapshot, this.grantGuardUntil, Date.now())) return;
+    if (snapshot.owned && (snapshot.source === 'apple' || snapshot.source === 'google')) {
+      this.grantGuardUntil = Date.now() + 10_000;
+    }
+    this.entitlementEpoch += 1;
+    const before = this.save.launchCollectionOwned;
+    const next = this.billing.applyStoreSnapshot(this.save, snapshot);
+    this.save = { ...this.save, ...next };
+    if (before !== next.launchCollectionOwned) {
+      this.billingMessage = next.launchCollectionOwned
+        ? 'Launch Collection unlocked.'
+        : 'Launch Collection is no longer on this store account.';
+    }
+    persistSave(this.save);
+    this.publish();
+  }
+
+  private failedBilling(): PurchaseResult {
+    this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
+    return {
+      outcome: 'failed',
+      entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null },
+      message: STORE_UNAVAILABLE_MESSAGE,
+    };
   }
 
   subscribe = (fn: () => void) => {
@@ -131,6 +191,7 @@ export class GameController {
       skin: this.liveSkin(preview),
       result: this.result,
       launchProduct: this.billing.launchProduct,
+      billingPlatform: this.billing.platform,
       billingMessage: this.billingMessage,
       billingBusy: this.billingBusy,
     };
@@ -337,7 +398,11 @@ export class GameController {
   }
 
   async purchaseLaunchCollection(): Promise<PurchaseResult> {
-    await this.billingReady;
+    try {
+      await this.billingReady;
+    } catch {
+      return this.failedBilling();
+    }
     if (this.billingBusy) {
       return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Purchase already in progress.' };
     }
@@ -348,10 +413,14 @@ export class GameController {
       const { result, locker } = await this.billing.purchase(this.save);
       this.save = { ...this.save, ...locker };
       if (result.outcome === 'purchased' || result.outcome === 'restored' || result.outcome === 'already_owned') {
+        if (this.save.launchCollectionOwned) this.grantGuardUntil = Date.now() + 10_000;
         persistSave(this.save);
       }
-      this.billingMessage = result.message ?? null;
+      this.billingMessage = result.message
+        ?? (result.outcome === 'failed' || result.outcome === 'unavailable' ? STORE_UNAVAILABLE_MESSAGE : null);
       return result;
+    } catch {
+      return this.failedBilling();
     } finally {
       this.billingBusy = false;
       this.publish();
@@ -359,7 +428,11 @@ export class GameController {
   }
 
   async restorePurchases(): Promise<PurchaseResult> {
-    await this.billingReady;
+    try {
+      await this.billingReady;
+    } catch {
+      return this.failedBilling();
+    }
     if (this.billingBusy) {
       return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Please wait.' };
     }
@@ -369,9 +442,13 @@ export class GameController {
     try {
       const { result, locker } = await this.billing.restore(this.save);
       this.save = { ...this.save, ...locker };
+      if (this.save.launchCollectionOwned) this.grantGuardUntil = Date.now() + 10_000;
       persistSave(this.save);
-      this.billingMessage = result.message ?? null;
+      this.billingMessage = result.message
+        ?? (result.outcome === 'failed' || result.outcome === 'unavailable' ? STORE_UNAVAILABLE_MESSAGE : null);
       return result;
+    } catch {
+      return this.failedBilling();
     } finally {
       this.billingBusy = false;
       this.publish();

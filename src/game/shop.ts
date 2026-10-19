@@ -88,6 +88,8 @@ export function canAfford(locker: WardrobeLocker, unlock: UnlockRequirement): bo
 
 /** @deprecated Prefer grantLaunchCollection from billing/entitlement after store verification. */
 export function applyLaunchCollection(locker: WardrobeLocker): WardrobeLocker {
+  // Development helper only. Production / TestFlight bundles must not grant dev_sim.
+  if (import.meta.env.PROD) return locker;
   return grantLaunchCollection(locker, 'dev_sim', null);
 }
 

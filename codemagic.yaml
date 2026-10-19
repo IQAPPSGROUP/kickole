@@ -1,0 +1,137 @@
+# Kickolé iOS builds run on Codemagic Macs. No certificates, profiles, API keys,
+# or the App Store Apple ID belong in this file. Signing uses the existing
+# Codemagic integration "Amigos App Store Connect" and the env group
+# kickole_app_store (APP_STORE_APPLE_ID only).
+
+workflows:
+  ios-testflight:
+    name: iOS TestFlight
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    # Start from the Codemagic UI. Do not publish on every push.
+    triggering:
+      events: []
+    integrations:
+      app_store_connect: Amigos App Store Connect
+    environment:
+      node: "22"
+      xcode: latest
+      groups:
+        - kickole_app_store
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.iqappsgroup.kickole
+    scripts:
+      - name: Require the Kickolé App Store Apple ID
+        script: |
+          set -euo pipefail
+          if [ -z "${APP_STORE_APPLE_ID:-}" ]; then
+            echo "APP_STORE_APPLE_ID is missing."
+            echo "In Codemagic, create environment group kickole_app_store and add APP_STORE_APPLE_ID."
+            echo "Use the numeric Apple ID from App Store Connect > Kickolé > General > App Information."
+            echo "Do not commit that value, and do not print it in the build log."
+            exit 1
+          fi
+          echo "APP_STORE_APPLE_ID is set."
+      - name: Require Xcode 26 or newer
+        script: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version | awk 'NR==1 { print $2 }')"
+          XCODE_MAJOR="${XCODE_VERSION%%.*}"
+          echo "Xcode ${XCODE_VERSION}"
+          if [ "${XCODE_MAJOR}" -lt 26 ]; then
+            echo "Kickolé requires Xcode 26 or newer. This machine has Xcode ${XCODE_VERSION}."
+            exit 1
+          fi
+      - name: Install npm dependencies
+        script: |
+          set -euo pipefail
+          npm ci
+      - name: Run tests and typecheck
+        script: |
+          set -euo pipefail
+          npm test
+          npm run typecheck
+      - name: Build web assets and sync iOS
+        script: |
+          set -euo pipefail
+          npm run ios:sync
+      - name: Set up code signing on the Xcode project
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Set build number to the latest TestFlight build plus one
+        script: |
+          set -euo pipefail
+          cd ios/App
+          LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")"
+          case "${LATEST_BUILD_NUMBER}" in
+            ''|*[!0-9]*)
+              echo "Could not read a numeric TestFlight build number for this app."
+              exit 1
+              ;;
+          esac
+          NEXT_BUILD_NUMBER="$((LATEST_BUILD_NUMBER + 1))"
+          echo "Next CFBundleVersion: ${NEXT_BUILD_NUMBER}"
+          agvtool new-version -all "${NEXT_BUILD_NUMBER}"
+      - name: Build the App Store IPA
+        script: |
+          set -euo pipefail
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
+            --scheme App \
+            --config Release \
+            --no-show-build-settings
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/xcarchive/**/*.dSYM
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
+
+  ios-simulator:
+    name: iOS Simulator compile check
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    triggering:
+      events: []
+    environment:
+      node: "22"
+      xcode: latest
+    scripts:
+      - name: Require Xcode 26 or newer
+        script: |
+          set -euo pipefail
+          XCODE_VERSION="$(xcodebuild -version | awk 'NR==1 { print $2 }')"
+          XCODE_MAJOR="${XCODE_VERSION%%.*}"
+          echo "Xcode ${XCODE_VERSION}"
+          if [ "${XCODE_MAJOR}" -lt 26 ]; then
+            echo "Kickolé requires Xcode 26 or newer. This machine has Xcode ${XCODE_VERSION}."
+            exit 1
+          fi
+      - name: Install npm dependencies
+        script: |
+          set -euo pipefail
+          npm ci
+      - name: Build web assets and sync iOS
+        script: |
+          set -euo pipefail
+          npm run ios:sync
+      - name: Compile for the iOS Simulator without signing
+        script: |
+          set -euo pipefail
+          xcodebuild \
+            -project "$CM_BUILD_DIR/ios/App/App.xcodeproj" \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log

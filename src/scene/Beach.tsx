@@ -58,10 +58,10 @@ function useSkyTexture() {
     if (g) {
       const wash = g.createLinearGradient(0, 0, 0, 512);
       wash.addColorStop(0, '#2f8fd4');
-      wash.addColorStop(0.38, '#7ec8ef');
-      wash.addColorStop(0.62, '#c9e8f8');
-      wash.addColorStop(0.78, '#f6e2b4');
-      wash.addColorStop(1, '#1a8fb0');
+      wash.addColorStop(0.4, '#7ec8ef');
+      wash.addColorStop(0.68, '#b8dff2');
+      wash.addColorStop(0.86, '#d9eef6');
+      wash.addColorStop(1, '#8ec8d4');
       g.fillStyle = wash;
       g.fillRect(0, 0, 64, 512);
       const random = seededRandom(41);
@@ -118,23 +118,19 @@ function useWaterTexture() {
   }, []);
 }
 
-/** Layered green headlands framing the sea — still procedural, but less blocky. */
+/** Layered green headlands framing the sea — gap kept around the sun; right side stays a low terrace for houses. */
 function CoastalHills({ quality }: { quality: Quality }) {
   const segments = quality === 'low' ? 10 : 16;
   const mounds: Array<{ x: number; y: number; z: number; sx: number; sy: number; sz: number; color: string }> = [
-    { x: -7.4, y: 1.15, z: -8.4, sx: 2.8, sy: 1.55, sz: 1.6, color: '#2f6a45' },
-    { x: -5.2, y: 1.55, z: -8.0, sx: 2.1, sy: 1.85, sz: 1.45, color: '#356f48' },
-    { x: -2.4, y: 1.25, z: -8.6, sx: 1.9, sy: 1.45, sz: 1.35, color: '#24563a' },
-    { x: 0.6, y: 0.95, z: -9.0, sx: 1.6, sy: 1.15, sz: 1.2, color: '#2a5f40' },
-    { x: 3.8, y: 1.35, z: -8.3, sx: 2.2, sy: 1.65, sz: 1.4, color: '#2d6844' },
-    { x: 6.6, y: 1.2, z: -7.9, sx: 2.5, sy: 1.5, sz: 1.5, color: '#275c3d' },
+    { x: -7.6, y: 0.95, z: -7.8, sx: 2.1, sy: 1.15, sz: 1.3, color: '#2f6a45' },
+    { x: -2.8, y: 1.1, z: -7.7, sx: 1.6, sy: 1.15, sz: 1.2, color: '#24563a' },
+    { x: 5.8, y: 1.0, z: -7.5, sx: 1.7, sy: 1.1, sz: 1.15, color: '#275c3d' },
   ];
   if (quality !== 'low') {
     mounds.push(
-      { x: -6.2, y: 2.05, z: -8.7, sx: 1.35, sy: 1.1, sz: 1.1, color: '#1f4d32' },
-      { x: 5.1, y: 2.0, z: -8.6, sx: 1.2, sy: 1.05, sz: 1.05, color: '#214f34' },
-      { x: -3.8, y: 0.55, z: -7.4, sx: 1.4, sy: 0.7, sz: 1.1, color: '#3a7a4f' },
-      { x: 2.2, y: 0.5, z: -7.6, sx: 1.3, sy: 0.65, sz: 1.05, color: '#3a7a4f' },
+      { x: -1.6, y: 0.45, z: -6.9, sx: 1.05, sy: 0.5, sz: 0.9, color: '#3a7a4f' },
+      { x: -8.2, y: 1.5, z: -8.2, sx: 1.35, sy: 0.95, sz: 1.05, color: '#1f4d32' },
+      { x: 6.6, y: 1.6, z: -8.0, sx: 1.1, sy: 0.85, sz: 0.95, color: '#214f34' },
     );
   }
   return (
@@ -145,29 +141,41 @@ function CoastalHills({ quality }: { quality: Quality }) {
           <meshStandardMaterial color={m.color} roughness={1} />
         </mesh>
       ))}
+      {/* Flat green terrace the coastal houses sit on — pulled forward into the phone frame. */}
+      <mesh position={[2.0, 0.75, -5.75]} rotation={[-0.08, 0.06, 0]}>
+        <boxGeometry args={[4.4, 0.45, 1.4]} />
+        <meshStandardMaterial color="#2d6844" roughness={1} fog={false} />
+      </mesh>
+      <mesh position={[2.2, 1.2, -6.2]} rotation={[-0.06, 0.05, 0]}>
+        <boxGeometry args={[3.8, 0.35, 1.0]} />
+        <meshStandardMaterial color="#24563a" roughness={1} fog={false} />
+      </mesh>
     </group>
   );
 }
 
 /**
- * Sparse coastal houses on the left headland — same visual language as the rua hillside,
- * kept thin so the sea and sun stay open in the phone frame.
+ * Sparse coastal houses perched on the right headland (elevated y so they sit on the hill, not under it).
+ * Same visual language as the rua hillside; left/sun pocket stays open.
  */
 function CoastalNeighbourhood({ quality }: { quality: Quality }) {
   const buildings = useMemo(() => {
     const random = seededRandom(2004);
-    const palette = ['#E7A56F', '#D46D62', '#E9C886', '#6AAB9D', '#8BA5B4', '#B987AD', '#F3E4C8'];
-    const count = quality === 'low' ? 6 : 11;
+    // Deeper than cream so faces don't read as a blank white billboard in the phone frame.
+    const palette = ['#D4894F', '#C45A52', '#D4A85A', '#4F9A8C', '#6A8FA0', '#A66F9A', '#C4A070'];
+    const count = quality === 'low' ? 8 : 12;
     return Array.from({ length: count }, (_, i) => {
-      const row = i < (quality === 'low' ? 4 : 6) ? 0 : 1;
-      const index = row === 0 ? i : i - (quality === 'low' ? 4 : 6);
-      const x = -7.1 + index * (row === 0 ? 0.72 : 0.88) + random() * 0.12;
-      const z = row === 0 ? -7.55 - random() * 0.35 : -8.35 - random() * 0.4;
-      const width = 0.42 + random() * 0.28;
-      const height = (row === 0 ? 0.85 : 1.15) + random() * 0.75;
-      const depth = 0.38 + random() * 0.28;
+      const row = i < (quality === 'low' ? 5 : 7) ? 0 : 1;
+      const index = row === 0 ? i : i - (quality === 'low' ? 5 : 7);
+      const x = 0.85 + index * (row === 0 ? 0.62 : 0.72) + random() * 0.04;
+      const z = row === 0 ? -5.4 - random() * 0.1 : -5.9 - random() * 0.12;
+      const baseY = row === 0 ? 0.9 + random() * 0.06 : 1.55 + random() * 0.1;
+      const width = 0.58 + random() * 0.28;
+      const height = (row === 0 ? 1.15 : 1.4) + random() * 0.65;
+      const depth = 0.45 + random() * 0.22;
       return {
         x,
+        y: baseY,
         z,
         width,
         height,
@@ -183,51 +191,49 @@ function CoastalNeighbourhood({ quality }: { quality: Quality }) {
   return (
     <group>
       {buildings.map((b, i) => (
-        <group key={i} position={[b.x, 0.35, b.z]}>
+        <group key={i} position={[b.x, b.y, b.z]}>
           <mesh position={[0, b.height / 2, 0]}>
             <boxGeometry args={[b.width, b.height, b.depth]} />
-            <meshLambertMaterial color={b.color} />
+            <meshBasicMaterial color={b.color} fog={false} />
           </mesh>
           <mesh position={[0, b.height + 0.04, 0]}>
             <boxGeometry args={[b.width + 0.08, 0.08, b.depth + 0.08]} />
-            <meshLambertMaterial color="#D8C6AA" />
+            <meshBasicMaterial color="#BFA888" fog={false} />
           </mesh>
-          {[-0.18, 0.18].map((u, k) => (
-            <mesh key={k} position={[u * b.width, b.height * 0.62, b.depth / 2 + 0.006]}>
+          {[-0.16, 0.16].map((u, k) => (
+            <mesh key={k} position={[u * b.width, b.height * 0.58, b.depth / 2 + 0.006]}>
               <planeGeometry args={[0.09, 0.14]} />
-              <meshBasicMaterial color="#294854" />
+              <meshBasicMaterial color="#1e3540" fog={false} />
             </mesh>
           ))}
           {b.roof && (
-            <mesh position={[b.width * 0.2, b.height + 0.18, 0]}>
-              <boxGeometry args={[0.06, 0.26, 0.06]} />
-              <meshLambertMaterial color="#56616A" />
+            <mesh position={[b.width * 0.18, b.height + 0.16, 0]}>
+              <boxGeometry args={[0.06, 0.22, 0.06]} />
+              <meshBasicMaterial color="#3A454E" fog={false} />
             </mesh>
           )}
           {b.balcony && (
-            <mesh position={[0, b.height * 0.42, b.depth / 2 + 0.08]}>
-              <boxGeometry args={[b.width * 0.7, 0.045, 0.16]} />
-              <meshLambertMaterial color="#E3D4BB" />
+            <mesh position={[0, b.height * 0.4, b.depth / 2 + 0.07]}>
+              <boxGeometry args={[b.width * 0.7, 0.045, 0.14]} />
+              <meshBasicMaterial color="#C9B896" fog={false} />
             </mesh>
           )}
           {b.tank && (
-            <group position={[-b.width * 0.18, b.height + 0.22, 0]}>
-              <mesh>
-                <cylinderGeometry args={[0.11, 0.12, 0.28, 7]} />
-                <meshLambertMaterial color="#283C43" />
-              </mesh>
-            </group>
+            <mesh position={[-b.width * 0.16, b.height + 0.18, 0]}>
+              <cylinderGeometry args={[0.1, 0.11, 0.24, 7]} />
+              <meshBasicMaterial color="#1C2C33" fog={false} />
+            </mesh>
           )}
           {b.laundry && (
-            <group position={[0, b.height * 0.42 + 0.14, b.depth / 2 + 0.1]}>
+            <group position={[0, b.height * 0.4 + 0.12, b.depth / 2 + 0.09]}>
               <mesh rotation={[0.18, 0, 0]}>
-                <boxGeometry args={[b.width * 0.8, 0.025, 0.22]} />
-                <meshLambertMaterial color={i % 2 ? '#E5BD71' : '#D16F56'} />
+                <boxGeometry args={[b.width * 0.78, 0.025, 0.18]} />
+                <meshBasicMaterial color={i % 2 ? '#D4A85A' : '#C45A52'} fog={false} />
               </mesh>
-              {[-0.16, 0.16].map((u, j) => (
-                <mesh key={j} position={[u * b.width, -0.12, 0.1]}>
-                  <planeGeometry args={[0.1, 0.18]} />
-                  <meshBasicMaterial color={['#F5E9C9', '#5E9FBC'][j]} side={DoubleSide} />
+              {[-0.14, 0.14].map((u, j) => (
+                <mesh key={j} position={[u * b.width, -0.11, 0.09]}>
+                  <planeGeometry args={[0.1, 0.16]} />
+                  <meshBasicMaterial color={['#E8D9B0', '#4F9A8C'][j]} side={DoubleSide} fog={false} />
                 </mesh>
               ))}
             </group>
@@ -349,16 +355,20 @@ function Bunting({ x, z }: { x: number; z: number }) {
   );
 }
 
-function Barraca({ x, z, cloth, yaw = 0.5 }: { x: number; z: number; cloth: CanvasTexture | null; yaw?: number }) {
+function Barraca({ x, z, cloth, yaw = 0.5, warm = false }: { x: number; z: number; cloth: CanvasTexture | null; yaw?: number; warm?: boolean }) {
   return (
     <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
       <mesh position={[0, 0.55, 0]} castShadow>
         <boxGeometry args={[1.5, 1.1, 0.85]} />
-        <meshStandardMaterial color="#f3efe4" roughness={0.88} />
+        <meshStandardMaterial color={warm ? '#e8b86a' : '#e7d7b8'} roughness={0.88} />
       </mesh>
       <mesh position={[0, 0.35, 0.44]}>
         <boxGeometry args={[1.2, 0.55, 0.06]} />
-        <meshStandardMaterial color="#d9c4a0" roughness={0.85} />
+        <meshStandardMaterial color="#c9a878" roughness={0.85} />
+      </mesh>
+      <mesh position={[0.35, 0.62, 0.44]}>
+        <planeGeometry args={[0.28, 0.32]} />
+        <meshBasicMaterial color="#2a4550" />
       </mesh>
       <mesh position={[0, 1.22, 0.2]} rotation={[0.4, 0, 0]} castShadow>
         <boxGeometry args={[1.85, 0.08, 1.25]} />
@@ -543,9 +553,8 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
   const awning = useArtTexture(ART.awning, false);
   const gull = useArtTexture(ART.seagull, true);
   const beachBallArt = useArtTexture(ART.ball, false);
-  const clouds = useArtTexture(ART.clouds, true);
-  const coastalHill = useArtTexture(ART.coastalHill, true);
   const towel = useArtTexture(ART.towel, false);
+  const clouds = useArtTexture(ART.clouds, true);
   const sea = useRef<Mesh>(null);
   const sandMat = useRef<MeshStandardMaterial>(null);
   const skyDim = useRef<Mesh>(null);
@@ -574,34 +583,21 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
         <meshStandardMaterial color="#1c3348" transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {quality !== 'low' && (
+      {quality !== 'low' && clouds && (
         <>
-          <mesh position={[-3.2, 6.4, -12.2]} scale={[4.2, 1.6, 1]}>
+          <mesh position={[-2.2, 6.6, -11.2]} scale={[2.6, 1.0, 1]}>
             <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial map={clouds ?? undefined} color={clouds ? '#ffffff' : '#f7f5ed'} transparent alphaTest={0.2} depthWrite={false} fog={false} />
+            <meshBasicMaterial map={clouds} transparent alphaTest={0.4} depthWrite={false} fog={false} />
           </mesh>
-          <mesh position={[3.8, 5.9, -11.6]} scale={[3.4, 1.35, 1]}>
+          <mesh position={[2.4, 6.2, -10.8]} scale={[2.2, 0.9, 1]}>
             <planeGeometry args={[1, 1]} />
-            <meshBasicMaterial map={clouds ?? undefined} color={clouds ? '#ffffff' : '#f7f5ed'} transparent alphaTest={0.2} depthWrite={false} fog={false} />
+            <meshBasicMaterial map={clouds} transparent alphaTest={0.4} depthWrite={false} fog={false} />
           </mesh>
         </>
       )}
 
       <CoastalHills quality={quality} />
       <CoastalNeighbourhood quality={quality} />
-
-      {/* Painted coastal silhouette — right headland, keeps left sun open. */}
-      <mesh position={[5.6, 2.15, -7.7]} scale={[4.6, 2.5, 1]}>
-        <planeGeometry args={[1, 1]} />
-        <meshStandardMaterial map={coastalHill ?? undefined} color={coastalHill ? '#ffffff' : '#2f6a45'} transparent alphaTest={0.28} side={DoubleSide} roughness={0.9} fog={false} />
-      </mesh>
-      {quality !== 'low' && (
-        <mesh position={[-6.8, 2.35, -8.1]} scale={[-3.2, 1.9, 1]}>
-          <planeGeometry args={[1, 1]} />
-          <meshStandardMaterial map={coastalHill ?? undefined} color={coastalHill ? '#ffffff' : '#2f6a45'} transparent alphaTest={0.28} side={DoubleSide} roughness={0.9} fog={false} />
-        </mesh>
-      )}
-
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.4]} receiveShadow={shadows}>
         <planeGeometry args={[22, 16]} />
         <meshStandardMaterial ref={sandMat} map={sand} color="#f3d7a4" roughness={1} />
@@ -610,29 +606,35 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
         <planeGeometry args={[22, 2.8]} />
         <meshStandardMaterial color="#b99462" roughness={0.55} metalness={0.04} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -4.55]}>
-        <planeGeometry args={[22, 0.9]} />
-        <meshStandardMaterial color="#8ec8d8" roughness={0.35} metalness={0.12} transparent opacity={0.55} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -4.45]}>
+        <planeGeometry args={[22, 1.1]} />
+        <meshStandardMaterial color="#7ec9dc" roughness={0.32} metalness={0.14} transparent opacity={0.62} />
       </mesh>
-      <mesh ref={sea} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, -9.2]}>
-        <planeGeometry args={[36, 14]} />
+      <mesh ref={sea} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, -8.6]}>
+        <planeGeometry args={[36, 12]} />
         <meshStandardMaterial map={water} color="#ffffff" roughness={quality === 'high' ? 0.12 : 0.28} metalness={quality === 'low' ? 0.08 : 0.28} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -4.05]}>
-        <planeGeometry args={[20, 0.7]} />
+      {quality !== 'low' && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.015, -11.4]}>
+          <planeGeometry args={[36, 6]} />
+          <meshStandardMaterial color="#0c5a78" roughness={0.2} metalness={0.35} />
+        </mesh>
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -4.0]}>
+        <planeGeometry args={[20, 0.75]} />
         <meshBasicMaterial color="#f7f5ed" transparent opacity={0.55} />
       </mesh>
 
-      {/* Sun — left of frame, must stay clear of dense hillside props. */}
-      <group position={[-4.6, 1.75, -6.1]}>
+      {/* Sun — left of frame; hills stay clear of this pocket. */}
+      <group position={[-4.55, 2.05, -6.0]}>
         <mesh>
-          <sphereGeometry args={[0.62, quality === 'low' ? 10 : 20, quality === 'low' ? 10 : 16]} />
+          <sphereGeometry args={[0.68, quality === 'low' ? 10 : 20, quality === 'low' ? 10 : 16]} />
           <meshBasicMaterial color="#ffe56a" fog={false} />
         </mesh>
         {quality !== 'low' && (
           <mesh>
-            <sphereGeometry args={[1.25, 16, 12]} />
-            <meshBasicMaterial color="#ffe9a8" transparent opacity={0.32} depthWrite={false} fog={false} />
+            <sphereGeometry args={[1.35, 16, 12]} />
+            <meshBasicMaterial color="#ffe9a8" transparent opacity={0.34} depthWrite={false} fog={false} />
           </mesh>
         )}
       </group>
@@ -655,7 +657,7 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
       <Umbrella x={2.7} z={-2.7} cloth={awning} yaw={-0.25} />
       {quality !== 'low' && <Umbrella x={-3.55} z={-2.55} cloth={towel} yaw={0.55} scale={0.88} />}
       <Barraca x={-2.9} z={-3.05} cloth={awning} />
-      {quality !== 'low' && <Barraca x={3.35} z={-3.25} cloth={towel} yaw={-0.55} />}
+      {quality !== 'low' && <Barraca x={3.1} z={-3.15} cloth={towel} yaw={-1.05} warm />}
       <Pennant x={1.7} z={-2.55} />
       {quality !== 'low' && <Pennant x={-1.95} z={-2.7} yaw={0.4} />}
       <Bunting x={2.05} z={-2.95} />

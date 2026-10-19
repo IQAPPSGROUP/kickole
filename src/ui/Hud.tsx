@@ -30,7 +30,7 @@ export function Hud({ hud }: { hud: HudState }) {
 
 export function TouchZones({ controller }: { controller: GameController }) {
   const bind = (side: Side) => ({
-    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+    onPointerDown: (e: PointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.currentTarget.setPointerCapture?.(e.pointerId);
       controller.press(side);
@@ -41,8 +41,14 @@ export function TouchZones({ controller }: { controller: GameController }) {
   });
   return (
     <div className="zones">
-      <div className="zone left" {...bind('left')}><span>LEFT FOOT</span></div>
-      <div className="zone right" {...bind('right')}><span>RIGHT FOOT</span></div>
+      <button type="button" className="foot-btn left" aria-label="Left foot" {...bind('left')}>
+        <span className="foot-btn-mark">L</span>
+        <span className="foot-btn-label">LEFT</span>
+      </button>
+      <button type="button" className="foot-btn right" aria-label="Right foot" {...bind('right')}>
+        <span className="foot-btn-mark">R</span>
+        <span className="foot-btn-label">RIGHT</span>
+      </button>
     </div>
   );
 }

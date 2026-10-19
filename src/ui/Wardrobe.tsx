@@ -18,12 +18,13 @@ import {
 import type { BillingPlatform, StoreProduct } from '../billing/types';
 import { LAUNCH_COLLECTION_DISPLAY_NAME } from '../billing/config';
 import { launchCollectionBlurb, launchPurchaseLabel, launchStoreNote } from '../billing/storeCopy';
+import { DANCES, dancePriceString, type DanceDesign } from '../game/dances';
 import { challengeValue, meetsChallenge } from '../game/shop';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
 import { PlayerPreview } from './PlayerPreview';
 
-type ShopTab = 'boots' | 'kits';
+type ShopTab = 'boots' | 'kits' | 'dances';
 
 function SwatchRow({
   colours,
@@ -111,6 +112,45 @@ export function CustomiseScreen({
   );
 }
 
+function DanceRow({
+  dance,
+  save,
+  focused,
+  onFocus,
+  onEquip,
+}: {
+  dance: DanceDesign;
+  save: SaveData;
+  focused: boolean;
+  onFocus: () => void;
+  onEquip: () => void;
+}) {
+  const owned = save.ownedDances.includes(dance.id);
+  const equipped = save.equippedDance === dance.id;
+  const price = dancePriceString(dance, []);
+  return (
+    <div className={`shop-item ${focused ? 'focus' : ''} ${equipped ? 'on' : ''}`}>
+      <button type="button" className="shop-item-main" onClick={onFocus}>
+        <i className={`dance-swatch dance-${dance.id}`} />
+        <span>
+          <b>{dance.name}</b>
+          <em>Cosmetic · {dance.milestone === 0 ? 'Starter' : `Milestone ${dance.milestone}`}</em>
+          <small>{dance.note}</small>
+          {price && <small className="dance-price">{price}</small>}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="btn ghost shop-action"
+        disabled={equipped || !owned}
+        onClick={onEquip}
+      >
+        {equipped ? 'EQUIPPED' : owned ? 'EQUIP' : 'LOCKED'}
+      </button>
+    </div>
+  );
+}
+
 function UnlockHint({ item, save }: { item: BootDesign | KitDesign; save: SaveData }) {
   const owned = 'main' in item
     ? save.ownedBoots.includes(item.id)
@@ -137,6 +177,7 @@ export function ShopScreen({
   billingBusy,
   onBuyBoot,
   onBuyKit,
+  onEquipDance,
   onPurchaseLaunch,
   onRestorePurchases,
   onPreview,
@@ -149,6 +190,7 @@ export function ShopScreen({
   billingBusy: boolean;
   onBuyBoot: (id: string) => boolean;
   onBuyKit: (id: string) => boolean;
+  onEquipDance: (id: string) => boolean;
   onPurchaseLaunch: () => void;
   onRestorePurchases: () => void;
   onPreview: (opts: { kitId?: string | null; bootId?: string | null }) => void;
@@ -157,6 +199,7 @@ export function ShopScreen({
   const [tab, setTab] = useState<ShopTab>('boots');
   const [focusBoot, setFocusBoot] = useState(save.equippedBoot);
   const [focusKit, setFocusKit] = useState(save.equippedKit);
+  const [focusDance, setFocusDance] = useState(save.equippedDance);
   const priceLabel = launchProduct?.priceString ?? null;
   const ownedLaunch = save.launchCollectionOwned;
   const storeNote = launchStoreNote(billingPlatform, !!priceLabel);
@@ -213,10 +256,15 @@ export function ShopScreen({
           {billingMessage && <p className="shop-note" role="status">{billingMessage}</p>}
           {storeNote && <p className="shop-note">{storeNote}</p>}
         </div>
-        <PlayerPreview skin={previewSkin} label="Shop preview" />
+        <PlayerPreview
+          skin={previewSkin}
+          label="Shop preview"
+          dance={tab === 'dances' ? focusDance : null}
+        />
         <div className="seg">
           <button type="button" className={tab === 'boots' ? 'on' : ''} onClick={() => setTab('boots')}>BOOTS</button>
           <button type="button" className={tab === 'kits' ? 'on' : ''} onClick={() => setTab('kits')}>KITS</button>
+          <button type="button" className={tab === 'dances' ? 'on' : ''} onClick={() => setTab('dances')}>DANCES</button>
         </div>
         <div className="shop-list">
           {tab === 'boots' && BOOTS.map((boot) => {
@@ -275,6 +323,16 @@ export function ShopScreen({
               </div>
             );
           })}
+          {tab === 'dances' && DANCES.map((dance) => (
+            <DanceRow
+              key={dance.id}
+              dance={dance}
+              save={save}
+              focused={focusDance === dance.id}
+              onFocus={() => setFocusDance(dance.id)}
+              onEquip={() => { setFocusDance(dance.id); onEquipDance(dance.id); }}
+            />
+          ))}
         </div>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>

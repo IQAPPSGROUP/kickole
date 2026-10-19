@@ -1,4 +1,11 @@
 import type { Grade } from '../engine/config';
+import {
+  DEFAULT_OUTPUT_LATENCY_SEC,
+  GAMEPLAY_BPM,
+  MENU_BPM,
+  readBeat,
+  type BeatClock,
+} from './beat';
 import { cheerWeight } from './audioPolicy';
 
 /**
@@ -20,8 +27,11 @@ let crowdDepth: GainNode | null = null;
 let noise: AudioBuffer | null = null;
 
 let scheduler: ReturnType<typeof setInterval> | null = null;
-let nextNote = 0;
 let step = 0;
+/** Audio-clock time of sixteenth 0. Beat 0 is this origin; quarter notes are every 4 steps. */
+let gridOrigin = 0;
+/** Performance-clock origin used for the visual pulse before the audio graph is running. */
+let visualOrigin = 0;
 let mode: 'menu' | 'play' = 'menu';
 
 let bed = { mode: 'menu' as 'menu' | 'play', music: true, sfx: true, crowd: 0 };
@@ -210,18 +220,26 @@ function scheduleStep(index: number, at: number) {
 }
 
 function bpm(): number {
-  return mode === 'play' ? 112 : 78;
+  return mode === 'play' ? GAMEPLAY_BPM : MENU_BPM;
+}
+
+function clockSeconds(): number {
+  if (typeof performance !== 'undefined') return performance.now() / 1000;
+  return Date.now() / 1000;
 }
 
 function runScheduler() {
   const c = ctx;
   if (!c || !bed.music || !foreground || !unlocked) return;
-  const horizon = c.currentTime + 0.25;
   const stepLength = 60 / bpm() / 4;
-  if (nextNote < c.currentTime) nextNote = c.currentTime + 0.05;
-  while (nextNote < horizon) {
-    scheduleStep(step % 64, nextNote);
-    nextNote += stepLength;
+  if (gridOrigin <= 0) gridOrigin = c.currentTime + 0.05;
+  const scheduled = gridOrigin + step * stepLength;
+  const behind = c.currentTime - scheduled;
+  if (behind > 0.3) step += Math.floor(behind / stepLength);
+  const horizon = c.currentTime + 0.25;
+  while (gridOrigin + step * stepLength < horizon) {
+    const at = gridOrigin + step * stepLength;
+    if (at >= c.currentTime - 0.02) scheduleStep(step % 64, at);
     step += 1;
   }
 }
@@ -314,12 +332,36 @@ export function setBed(next: AudioBed) {
   bed = next;
   if (modeChanged) {
     step = 0;
-    nextNote = 0;
+    gridOrigin = 0;
+    visualOrigin = 0;
   }
   applyBed();
 }
 
 /** Browser autoplay: create and resume the context from a user gesture. */
+/**
+ * Quarter-note clock for groove scoring and the on-screen beat pulse.
+ * `music` is false while the bed is muted; `phase` and `pulse` still advance.
+ */
+export function beatClock(): BeatClock {
+  const bpmNow = bpm();
+  const c = ctx;
+  const latency = c
+    ? Math.min(0.12, c.outputLatency || c.baseLatency || DEFAULT_OUTPUT_LATENCY_SEC)
+    : DEFAULT_OUTPUT_LATENCY_SEC;
+  const now = c && unlocked ? c.currentTime : clockSeconds();
+  let origin = gridOrigin;
+  if (!(origin > 0)) {
+    if (!(visualOrigin > 0)) visualOrigin = now;
+    origin = visualOrigin;
+  }
+  const music = unlocked && foreground && bed.music;
+  const raw = readBeat({ now, origin, bpm: bpmNow, latency, music });
+  // The ring peaks when the note is heard, not when it was scheduled.
+  const heard = readBeat({ now: now - latency, origin, bpm: bpmNow, latency, music });
+  return { ...raw, phase: heard.phase, pulse: heard.pulse };
+}
+
 export function unlockAudio() {
   unlocked = true;
   applyBed();
@@ -349,7 +391,9 @@ function setForeground(active: boolean) {
     return;
   }
   void c.resume().then(() => {
-    nextNote = 0;
+    gridOrigin = 0;
+    visualOrigin = 0;
+    step = 0;
     master?.gain.setTargetAtTime(1, c.currentTime, 0.08);
     applyBed();
   });

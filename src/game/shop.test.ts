@@ -163,7 +163,7 @@ describe('shop economy', () => {
     const migrated = normalizeLocker({ legacySkinId: 'coral-flash' });
     expect(migrated.appearance.skinTone).toBe('#8D5A3C');
     expect(migrated.appearance.clothing.shirt).toBe('#FF805D');
-    expect(migrated.wardrobeVersion).toBe(2);
+    expect(migrated.wardrobeVersion).toBe(3);
     const custom = {
       skinTone: '#F2CDAA',
       hairColor: '#C9822B',

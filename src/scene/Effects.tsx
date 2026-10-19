@@ -4,52 +4,70 @@ import { Color, DynamicDrawUsage, InstancedMesh, Object3D, type Mesh } from 'thr
 import type { GameEngine } from '../engine/engine';
 import type { Quality } from '../game/storage';
 import { fx } from './fx';
+import { JUICE_PALETTE, particleBudget, prefersReducedMotion } from './juice';
 
 interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; color: Color; gravity: number }
 
-const PALETTE = ['#FF4F9A', '#FFD93D', '#F8F9FB', '#6C5CE7'].map((c) => new Color(c));
+const PALETTE = [JUICE_PALETTE.pink, JUICE_PALETTE.gold, JUICE_PALETTE.white, JUICE_PALETTE.violet, JUICE_PALETTE.teal, JUICE_PALETTE.coral].map((c) => new Color(c));
 const DUST = new Color('#9fb3b8');
 const dummy = new Object3D();
 const scratch = new Color();
 
+function spawnInto(
+  list: Particle[],
+  cap: number,
+  n: number,
+  x: number,
+  y: number,
+  z: number,
+  speed: number,
+  gravity: number,
+  life: number,
+  dust = false,
+) {
+  for (let i = 0; i < n && list.length < cap; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const up = dust ? 0.2 + Math.random() * 0.5 : Math.random() * 1.2 - 0.2;
+    const s = speed * (0.4 + Math.random() * 0.6);
+    list.push({
+      x, y, z, vx: Math.cos(a) * s, vy: up * s, vz: Math.sin(a) * s,
+      life: life * (0.6 + Math.random() * 0.4), max: life, size: dust ? 0.05 + Math.random() * 0.05 : 0.03 + Math.random() * 0.03,
+      color: dust ? DUST : PALETTE[(Math.random() * PALETTE.length) | 0], gravity,
+    });
+  }
+}
+
 /** Particle bursts, ring pulse and camera feedback driven by engine events. */
 export function Effects({ engine, quality }: { engine: GameEngine; quality: Quality }) {
-  const max = quality === 'high' ? 160 : quality === 'medium' ? 80 : 30;
+  const reduced = prefersReducedMotion();
+  const max = particleBudget(quality, reduced);
   const mesh = useRef<InstancedMesh>(null);
   const ring = useRef<Mesh>(null);
+  const flash = useRef<Mesh>(null);
   const parts = useRef<Particle[]>([]);
   const ringT = useRef(1);
   const colors = useMemo(() => new Float32Array(max * 3), [max]);
 
   useEffect(() => {
-    const spawn = (n: number, x: number, y: number, z: number, speed: number, gravity: number, life: number, dust = false) => {
-      for (let i = 0; i < n && parts.current.length < max; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const up = dust ? 0.2 + Math.random() * 0.5 : Math.random() * 1.2 - 0.2;
-        const s = speed * (0.4 + Math.random() * 0.6);
-        parts.current.push({
-          x, y, z, vx: Math.cos(a) * s, vy: up * s, vz: Math.sin(a) * s,
-          life: life * (0.6 + Math.random() * 0.4), max: life, size: dust ? 0.05 + Math.random() * 0.05 : 0.03 + Math.random() * 0.03,
-          color: dust ? DUST : PALETTE[(Math.random() * PALETTE.length) | 0], gravity,
-        });
-      }
-    };
     return engine.on((e) => {
       const b = engine.ball;
+      const list = parts.current;
       if (e.type === 'kick') {
         ringT.current = 0;
         fx.push = Math.max(fx.push, e.grade === 'perfect' ? 1 : 0.35);
         if (e.grade === 'perfect') {
           fx.shake = 1;
-          spawn(quality === 'low' ? 8 : 18, b.x, b.y, b.z, 2.2, 6, 0.7);
+          spawnInto(list, max, quality === 'low' ? 8 : 14, b.x, b.y, b.z, 2.2, 6, 0.7);
         }
-        if (e.streak > 0 && e.streak % 10 === 0) spawn(quality === 'low' ? 15 : 60, b.x, b.y + 0.3, b.z, 3.2, 5, 1.4);
+        if (e.streak > 0 && e.streak % 10 === 0 && !reduced) {
+          spawnInto(list, max, Math.min(18, max), b.x, b.y + 0.3, b.z, 3.2, 5, 1.2);
+        }
       } else if (e.type === 'drop') {
         fx.shake = 0.7;
-        spawn(quality === 'low' ? 6 : 14, b.x, 0.05, b.z, 1.1, 0.5, 0.6, true);
+        spawnInto(list, max, quality === 'low' ? 6 : 12, b.x, 0.05, b.z, 1.1, 0.5, 0.6, true);
       }
     });
-  }, [engine, quality, max]);
+  }, [engine, quality, max, reduced]);
 
   useFrame((_, dt) => {
     const d = Math.min(dt, 0.05);
@@ -81,6 +99,17 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
+    if (fx.confetti > 0) {
+      const burst = reduced ? 0 : Math.min(24, max);
+      fx.confetti = 0;
+      if (burst > 0) spawnInto(list, max, burst, engine.ball.x, Math.max(1.2, engine.ball.y), engine.ball.z, 3.4, 4.5, 1.3);
+    }
+    if (flash.current) {
+      fx.flash = Math.max(0, fx.flash - d * (reduced ? 3.2 : 1.5));
+      const mat = flash.current.material as unknown as { opacity: number };
+      flash.current.visible = fx.flash > 0.02;
+      mat.opacity = fx.flash * (reduced ? 0.12 : 0.28);
+    }
     const r = ring.current;
     if (r) {
       ringT.current = Math.min(1, ringT.current + d / 0.45);
@@ -104,8 +133,12 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
         <meshBasicMaterial />
       </instancedMesh>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
-        <ringGeometry args={[0.16, 0.2, 40]} />
+        <ringGeometry args={[0.16, 0.2, quality === 'low' ? 20 : 40]} />
         <meshBasicMaterial color="#FF4F9A" transparent depthWrite={false} />
+      </mesh>
+      <mesh ref={flash} position={[0, 1.6, 1.15]} visible={false}>
+        <planeGeometry args={[7, 5]} />
+        <meshBasicMaterial color="#FFD93D" transparent opacity={0} depthWrite={false} />
       </mesh>
     </>
   );

@@ -1,3 +1,5 @@
+import type { BeatGrade } from '../game/beat';
+import { groovePoints } from '../game/beat';
 import { DEFAULT_CONFIG, type GameConfig, type Grade, type Side } from './config';
 import {
   createComboTracker,
@@ -49,8 +51,18 @@ export interface RunStats {
   neckStalls: number;
   aroundTheWorlds: number;
   highFlicks: number;
+  grooves: number;
   combos: number;
 }
+
+export interface CelebrationState {
+  danceId: string;
+  reason: string;
+  startedAt: number;
+  until: number;
+}
+
+export type GroovePart = 'knee' | 'chest';
 
 export interface Contact {
   kind: 'pending' | 'stall';
@@ -92,6 +104,17 @@ export class GameEngine {
   trick: TrickState | null = null;
   /** Next trick intent. `null` keeps classic foot-only controls. */
   selectedTrick: TrickKind | null = null;
+  /** Short milestone dance. Physics holds the ball while this is set during play. */
+  celebration: CelebrationState | null = null;
+  /** Equipped cosmetic dance. Scoring never reads it. */
+  equippedDance = 'samba';
+  /** 0 on the music beat. Null until the audio clock is known. */
+  beatPhase: number | null = null;
+  /** Last groove tap versus the heard beat. */
+  lastBeatGrade: BeatGrade = 'off';
+  groovePart: GroovePart = 'knee';
+  /** Shrinks dance amplitude when the player prefers reduced motion. */
+  reducedMotion = false;
   private acc = 0;
   private cooldown = 0;
   private trickCooldown = 0;
@@ -115,6 +138,7 @@ export class GameEngine {
         thigh: { ...DEFAULT_CONFIG.contacts.thigh, ...config.contacts?.thigh },
         forehead: { ...DEFAULT_CONFIG.contacts.forehead, ...config.contacts?.forehead },
         nape: { ...DEFAULT_CONFIG.contacts.nape, ...config.contacts?.nape },
+        chest: { ...DEFAULT_CONFIG.contacts.chest, ...config.contacts?.chest },
       },
     };
     // Keep legacy foot fields aligned with the contact table.
@@ -150,6 +174,8 @@ export class GameEngine {
     this.contact = null;
     this.trick = null;
     this.selectedTrick = null;
+    this.celebration = null;
+    this.lastBeatGrade = 'off';
     this.cooldown = 0;
     this.trickCooldown = 0;
     this.lastKick = { left: -10, right: -10 };
@@ -263,8 +289,51 @@ export class GameEngine {
     }
   }
 
-  /** Arm or cancel a foot-armed trick (ATW / thigh / high flick). */
-  armTrick(kind: Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick'> | null) {
+  /** Grade of the latest tap against the heard beat. Groove scoring reads this. */
+  setBeatGrade(grade: BeatGrade) {
+    this.lastBeatGrade = grade;
+  }
+
+  /**
+   * Hold the ball and play a short dance. A second call while one is running is ignored.
+   * Passing a non-positive duration does nothing.
+   */
+  startCelebration(danceId: string, reason: string, duration: number) {
+    if (this.celebration || duration <= 0) return;
+    this.celebration = {
+      danceId,
+      reason,
+      startedAt: this.time,
+      until: this.time + duration,
+    };
+    if (this.phase === 'playing') {
+      this.ball.vx = 0;
+      this.ball.vy = 0;
+      this.ball.vz = 0;
+    }
+  }
+
+  /** End the dance early and leave a descending ball when the run is still live. */
+  skipCelebration(): boolean {
+    if (!this.celebration) return false;
+    this.finishCelebration(this.phase === 'playing');
+    return true;
+  }
+
+  private finishCelebration(resumeBall: boolean) {
+    this.celebration = null;
+    if (!resumeBall || this.phase !== 'playing') return;
+    const c = this.config;
+    this.ball.x *= 0.25;
+    this.ball.y = Math.max(this.ball.y, c.contactHeight + 0.48);
+    this.ball.z = c.ballZ;
+    this.ball.vx = 0;
+    this.ball.vy = -1.35;
+    this.ball.vz = 0;
+  }
+
+  /** Arm or cancel a foot-armed trick (ATW / thigh / high flick / groove). */
+  armTrick(kind: Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick' | 'groove'> | null) {
     if (kind === null) {
       this.setTrick(null);
       return true;
@@ -302,6 +371,10 @@ export class GameEngine {
     }
     if (intent === 'thigh') {
       this.tryThigh(side);
+      return;
+    }
+    if (intent === 'groove') {
+      this.tryGroove(side);
       return;
     }
     // highFlick or null → classic foot trap; highFlick flags the pending contact.
@@ -358,6 +431,77 @@ export class GameEngine {
     b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.45;
     this.trick = createTrickState('thigh', side, this.time, 'contact');
     this.emit({ type: 'trick', kind: 'thigh', phase: 'contact', points: 0, side });
+  }
+
+  private tryGroove(side: Side) {
+    if (this.trick && this.trick.kind !== 'groove' && this.trick.phase !== 'recover' && this.trick.phase !== 'fail') {
+      this.rejectTrick('groove', 'busy');
+      return;
+    }
+    const choice = this.grooveTarget();
+    if (!choice) {
+      this.rejectTrick('groove', 'window');
+      return;
+    }
+    const deltaMs = this.timingDeltaMs(choice.target.y);
+    const grade = this.gradeFor(deltaMs, this.config.tricks.grooveWindowMs);
+    if (grade === 'miss') {
+      this.rejectTrick('groove', 'timing');
+      this.streak = 0;
+      this.cooldown = this.config.missCooldown;
+      return;
+    }
+    const { scoring } = this.config;
+    const beat = this.lastBeatGrade;
+    const points = groovePoints(scoring.groove, beat, scoring.grooveBeatPerfect, scoring.grooveBeatGood);
+    this.stats.grooves++;
+    this.stats.score += points;
+    this.streak++;
+    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
+    this.lastKickGrade = grade;
+    if (grade === 'perfect') this.lastPerfectTime = this.time;
+    this.lastKick[side] = this.time;
+    this.lastContact[side] = this.time;
+    this.lastSide = side;
+    this.groovePart = choice.part;
+    const b = this.ball;
+    b.x = (side === 'left' ? -1 : 1) * this.config.footX * (choice.part === 'knee' ? 0.4 : 0.12);
+    b.y = choice.target.y;
+    b.z = choice.target.z;
+    b.vx = 0;
+    b.vz = 0;
+    const apex = choice.part === 'chest' ? 1.58 : 1.48;
+    b.vy = impulseForApex(apex, b.y, this.gravity);
+    b.wx = 4;
+    b.wy = side === 'left' ? 2 : -2;
+    b.wz = 1;
+    const trick = createTrickState('groove', side, this.time, 'recover');
+    trick.awarded = true;
+    this.trick = trick;
+    this.lastTrick = { kind: 'groove', time: this.time };
+    this.emit({ type: 'trick', kind: 'groove', phase: 'execute', points, side });
+  }
+
+  /** Knee or chest, whichever the descending ball will meet sooner. */
+  private grooveTarget(): { target: { y: number; z: number; x?: number }; part: GroovePart } | null {
+    if (this.ball.vy >= 0) return null;
+    const options: Array<{ target: { y: number; z: number; x?: number }; part: GroovePart }> = [
+      { target: this.config.contacts.chest, part: 'chest' },
+      { target: this.config.contacts.thigh, part: 'knee' },
+    ];
+    let best: { target: { y: number; z: number; x?: number }; part: GroovePart } | null = null;
+    let bestAbs = Infinity;
+    for (const option of options) {
+      if (!this.inContactBand(option.target)) continue;
+      const eta = this.timeToContact(this.ball.y, this.ball.vy, option.target.y);
+      if (!Number.isFinite(eta)) continue;
+      const abs = Math.abs(eta);
+      if (abs < bestAbs) {
+        bestAbs = abs;
+        best = option;
+      }
+    }
+    return best;
   }
 
   private tryHeader() {
@@ -673,9 +817,21 @@ export class GameEngine {
     this.time += h;
     if (this.cooldown > 0) this.cooldown = Math.max(0, this.cooldown - h);
     if (this.trickCooldown > 0) this.trickCooldown = Math.max(0, this.trickCooldown - h);
+    if (this.celebration && this.time >= this.celebration.until) {
+      this.finishCelebration(this.phase === 'playing');
+    }
     const b = this.ball;
 
     if (this.phase === 'menu' || this.phase === 'ready') return;
+
+    // Milestone dance: keep the ball where it is so the juggle can resume.
+    if (this.celebration && this.phase === 'playing' && !this.contact) {
+      b.vx = 0;
+      b.vy = 0;
+      b.vz = 0;
+      b.rx += h * 1.2;
+      return;
+    }
 
     // Neck stall hold (logical upper-back contact).
     if (this.trick?.kind === 'neckStall' && (this.trick.phase === 'contact' || this.trick.phase === 'execute')) {
@@ -780,6 +936,7 @@ function emptyStats(): RunStats {
     neckStalls: 0,
     aroundTheWorlds: 0,
     highFlicks: 0,
+    grooves: 0,
     combos: 0,
   };
 }

@@ -12,6 +12,8 @@ import { Court } from './Court';
 import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
+import { cameraSway, prefersReducedMotion } from './juice';
+import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
@@ -62,7 +64,7 @@ function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
 }
 
 /** Three-quarter front camera that fits the play area in portrait and landscape, with kick push-in and shake. */
-function CameraRig({ shake }: { shake: boolean }) {
+function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
   const { camera, size } = useThree();
   useEffect(() => {
     const cam = camera as PerspectiveCamera;
@@ -103,17 +105,44 @@ function CameraRig({ shake }: { shake: boolean }) {
     }
     fx.push = Math.max(0, fx.push - dt * 3);
     fx.shake = Math.max(0, fx.shake - dt * 4);
+    const reduced = prefersReducedMotion();
+    if (reduced) fx.swoop = 0;
+    fx.swoop = Math.max(0, fx.swoop - dt * 0.72);
     if (BASE.lengthSq() === 0) gameplayCameraPosition(aspect, BASE);
-    if (!shake) {
+    const swoop = fx.swoop;
+    const swayStill = cameraSway(state.clock.elapsedTime, quality, reduced);
+    if (!shake && swoop <= 0 && swayStill.x === 0 && swayStill.y === 0) {
+      if (cam.fov !== FOV) {
+        cam.fov = FOV;
+        cam.updateProjectionMatrix();
+      }
       cam.position.copy(BASE);
       cam.lookAt(TARGET);
       return;
     }
     const t = state.clock.elapsedTime;
+    const sway = cameraSway(t, quality, reduced);
     LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
     camera.position.copy(BASE).add(LOOK);
-    camera.position.x += Math.sin(t * 55) * 0.015 * fx.shake;
-    camera.position.y += Math.cos(t * 63) * 0.015 * fx.shake;
+    camera.position.x += sway.x;
+    camera.position.y += sway.y;
+    if (shake) {
+      camera.position.x += Math.sin(t * 55) * 0.015 * fx.shake;
+      camera.position.y += Math.cos(t * 63) * 0.015 * fx.shake;
+    }
+    if (swoop > 0) {
+      camera.position.x += Math.sin(swoop * 1.15) * 0.62;
+      camera.position.y += swoop * 0.32;
+      camera.position.z -= swoop * 0.38;
+      const nextFov = FOV - swoop * 5.5;
+      if (Math.abs(cam.fov - nextFov) > 0.05) {
+        cam.fov = nextFov;
+        cam.updateProjectionMatrix();
+      }
+    } else if (cam.fov !== FOV) {
+      cam.fov = FOV;
+      cam.updateProjectionMatrix();
+    }
     camera.lookAt(TARGET);
   });
   return null;
@@ -164,11 +193,23 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
     <>
       <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#8dc5cb' : '#6C5CE7']} />
       <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#8dc5cb', 24, 52] : ['#FF8A5B', 11, 28]} />
-      <CameraRig shake={quality !== 'low'} />
+      <CameraRig shake={quality !== 'low'} quality={quality} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
       <hemisphereLight args={ENVIRONMENT_THEME === 'beach' ? ['#fff1dc', '#12363f', 0.95] : ['#FF8A5B', '#1E2A5A', 0.72]} />
       {ENVIRONMENT_THEME === 'beach' && <ambientLight intensity={0.32} />}
+      <directionalLight
+        position={[-2.8, 2.6, -1.4]}
+        intensity={quality === 'low' ? 0.25 : 0.55}
+        color="#FF4F9A"
+      />
+      {quality !== 'low' && (
+        <directionalLight position={[0.4, 3.2, -2.6]} intensity={0.32} color="#FFD93D" />
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0.12]}>
+        <circleGeometry args={[0.48, quality === 'low' ? 14 : 28]} />
+        <meshBasicMaterial color="#222831" transparent opacity={quality === 'low' ? 0.32 : 0.48} depthWrite={false} />
+      </mesh>
       <directionalLight
         position={[2.6, 7, 3.2]}
         intensity={ENVIRONMENT_THEME === 'beach' ? 2.3 : 2.5}
@@ -186,6 +227,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       />
       {ENVIRONMENT_THEME !== 'beach' && <SunsetSky />}
       <Court shadows={shadows} quality={quality} />
+      <SceneLife engine={controller.engine} quality={quality} />
       {shadows && quality === 'high' && (
         <ContactShadows position={[0, 0.006, 0.2]} opacity={0.38} scale={4} blur={2.2} far={1.2} resolution={256} color="#1E2A5A" />
       )}

@@ -147,5 +147,23 @@ describe('storage', () => {
     expect(s.skinId).toBe('coral-flash');
     saveSettings({ ...s, quality: 'low' });
     expect(loadSettings().quality).toBe('low');
+    expect(s.hints).toBe(true);
+    saveSettings({ ...s, hints: false });
+    expect(loadSettings().hints).toBe(false);
+  });
+
+  it('persists learned tricks and drops unknown ids', async () => {
+    const raw = JSON.stringify({
+      best: 0,
+      leaderboard: [],
+      wardrobeVersion: 3,
+      learnedTricks: ['groove', 'forged', 'groove', 'rainbow'],
+    });
+    const { loadSave, persistSave, ls } = await load({ 'kicky.save.v1': raw });
+    const save = loadSave();
+    expect(save.learnedTricks).toEqual(['groove', 'rainbow']);
+    const next = { ...save, learnedTricks: [...save.learnedTricks, 'header'] as typeof save.learnedTricks };
+    persistSave(next);
+    expect(JSON.parse(ls.data['kicky.save.v1']).learnedTricks).toEqual(['groove', 'rainbow', 'header']);
   });
 });

@@ -3,4 +3,10 @@ export const fx = {
   /** Camera kick (0..1), decays each frame. */
   shake: 0,
   push: 0,
+  /** Slow-mo camera swoop (0..1) on a big combo. */
+  swoop: 0,
+  /** Crowd flash (0..1) at a milestone. */
+  flash: 0,
+  /** Set to 1 to spawn one confetti burst. Effects clears it. */
+  confetti: 0,
 };

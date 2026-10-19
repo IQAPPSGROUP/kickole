@@ -273,5 +273,73 @@ describe('trick safety and determinism', () => {
     expect(e.stats.headers).toBe(0);
     expect(e.selectedTrick).toBeNull();
     expect(e.trick).toBeNull();
+    expect(e.celebration).toBeNull();
+  });
+});
+
+describe('groove trick', () => {
+  it('pops the ball and pays the on-beat bonus without leaving groove', () => {
+    const e = started();
+    expect(e.armTrick('groove')).toBe(true);
+    e.setBeatGrade('perfect');
+    fallThrough(e, e.config.contacts.chest.y, e.config.contacts.chest.z, 20);
+    e.press('left');
+    expect(e.stats.grooves).toBe(1);
+    expect(e.stats.score).toBe(e.config.scoring.groove + e.config.scoring.grooveBeatPerfect);
+    expect(e.ball.vy).toBeGreaterThan(1);
+    expect(e.selectedTrick).toBe('groove');
+    expect(e.stats.kickUps).toBe(0);
+  });
+
+  it('still scores the touch when the tap misses the beat', () => {
+    const e = started();
+    e.setTrick('groove');
+    e.setBeatGrade('off');
+    fallThrough(e, e.config.contacts.thigh.y, e.config.contacts.thigh.z, 15);
+    e.press('right');
+    expect(e.stats.grooves).toBe(1);
+    expect(e.stats.score).toBe(e.config.scoring.groove);
+    expect(e.lastBeatGrade).toBe('off');
+  });
+
+  it('leaves classic kicks alone until groove is armed', () => {
+    const e = started();
+    runUntilContactDelta(e, 8);
+    e.press('right');
+    e.release('right');
+    stepN(e, 6);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.stats.grooves).toBe(0);
+  });
+});
+
+describe('milestone celebration', () => {
+  it('holds the ball, can be skipped, and leaves a catchable descent', () => {
+    const e = started();
+    e.ball.y = 1.4;
+    e.ball.vy = 1.2;
+    e.ball.vx = 0.4;
+    e.startCelebration('samba', 'streak:10', 0.5);
+    const held = e.ball.y;
+    stepN(e, 8);
+    expect(e.celebration?.danceId).toBe('samba');
+    expect(e.ball.y).toBeCloseTo(held, 5);
+    expect(e.ball.vy).toBe(0);
+    expect(e.skipCelebration()).toBe(true);
+    expect(e.celebration).toBeNull();
+    expect(e.ball.vy).toBeLessThan(0);
+    expect(e.ball.y).toBeGreaterThan(e.config.contactHeight);
+    expect(e.phase).toBe('playing');
+  });
+
+  it('ends itself and ignores a second dance until the first finishes', () => {
+    const e = started();
+    e.startCelebration('robot', 'juggle:10', 0.15);
+    e.startCelebration('spin', 'perfect:50', 2);
+    expect(e.celebration?.danceId).toBe('robot');
+    stepN(e, Math.ceil(0.2 / e.config.fixedStep) + 2);
+    expect(e.celebration).toBeNull();
+    expect(e.phase).toBe('playing');
+    expect(e.ball.vy).toBeLessThan(0);
   });
 });

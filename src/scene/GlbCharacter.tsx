@@ -17,7 +17,22 @@ import {
 import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
 import { HairVariants } from './HairVariants';
+import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
+
+function liftKickToe(
+  bones: Partial<Record<BoneKey, Bone>>,
+  state: AnimationState | null,
+  clipTime: number,
+  out: Quaternion,
+) {
+  if (state !== 'KickLeft' && state !== 'KickRight') return;
+  const pitch = kickToeClearance(clipTime);
+  if (pitch === 0) return;
+  const foot = bones[state === 'KickLeft' ? 'footLeft' : 'footRight'];
+  if (!foot) return;
+  foot.quaternion.multiply(toeClearanceQuaternion(pitch, out));
+}
 
 function toonRole(name: string): ToonRole {
   if (name === MATERIAL_NAMES.skin) return 'skin';
@@ -223,7 +238,8 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       // so the head — and the skinned hair — still follow the ball.
       if (quaternius) {
         computePose(engine, pose);
-        const trickPose = pose.lockMotion || engine.trick != null;
+        const dancing = engine.celebration != null || engine.selectedTrick === 'groove' || engine.trick?.kind === 'groove';
+        const trickPose = pose.lockMotion || engine.trick != null || dancing;
         if (trickPose) {
           scene.position.set(0, pose.bodyY, 0);
           if (bones.root) bones.root.position.y = hipsRestY;
@@ -235,6 +251,9 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
         } else {
           mixer.update(dt);
           scene.position.set(0, 0, 0);
+          if (act && (next.state === 'KickLeft' || next.state === 'KickRight')) {
+            liftKickToe(bones, next.state, act.time, deltaQ);
+          }
           if (next.state === 'Idle' || next.state.startsWith('Kick')) {
             for (const key of ['head', 'neck'] as const) {
               const b = bones[key];
@@ -245,6 +264,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
         }
       } else {
         mixer.update(dt);
+        if (act) liftKickToe(bones, next.state, act.time, deltaQ);
         if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
       }
       if (inspector.active) {

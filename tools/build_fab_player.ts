@@ -344,6 +344,7 @@ async function atlas(prims: Prim[], role: Role) {
   const placed = new Map<string, { u0: number; v0: number; su: number; sv: number }>();
   for (let i = 0; i < keys.length; i++) {
     const decoded = await decodeImage(buffers.get(keys[i])!);
+    if (role === 'Skin') correctSkin(decoded.data, decoded.width, decoded.height);
     const resized = await sharp(decoded.data, { raw: { width: decoded.width, height: decoded.height, channels: 4 } })
       .resize(cell, cell, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
     const col = i % cols;
@@ -372,37 +373,108 @@ async function atlas(prims: Prim[], role: Role) {
   return { raw, width, height };
 }
 
-function neutralize(raw: Buffer, width: number, height: number, kind: 'keep' | 'cloth' | 'skin' | 'hair') {
-  const out = Buffer.alloc(width * height * 3);
-  const tint = kind === 'skin' ? [0xe8, 0xb4, 0x8f].map(srgbToLinear) : null;
-  let sum = 0;
-  let count = 0;
-  if (tint) {
-    for (let i = 0; i < raw.length; i += 4) {
-      if (raw[i + 3] < 16) continue;
-      sum += 0.2126 * srgbToLinear(raw[i]) + 0.7152 * srgbToLinear(raw[i + 1]) + 0.0722 * srgbToLinear(raw[i + 2]);
-      count++;
+function linearLum(r: number, g: number, b: number) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Keep highlights under 1 so a bright cheek cannot clip to a white mask. */
+function shoulder(x: number) {
+  if (x <= 0.82) return x;
+  const extra = x - 0.82;
+  return 0.82 + 0.16 * (extra / (0.16 + extra));
+}
+
+/**
+ * Arm and leg photos are surrounded by transparent black. Baking that as an
+ * opaque texel, then letting the mip chain sample it, paints black fringes
+ * on the hands and face. Fill those texels from the nearest real skin, then
+ * expose each photo on its own so a bright arm cannot blow the head out.
+ */
+function correctSkin(raw: Buffer, width: number, height: number) {
+  const count = width * height;
+  const color = Buffer.from(raw);
+  const filled = new Uint8Array(count);
+  const hist = new Uint32Array(256);
+  let samples = 0;
+  const qx = new Int32Array(count);
+  const qy = new Int32Array(count);
+  let qt = 0;
+  for (let y = 0, i = 0, p = 0; y < height; y++) {
+    for (let x = 0; x < width; x++, i++, p += 4) {
+      if (raw[p + 3] < 16) continue;
+      const lum = linearLum(srgbToLinear(raw[p]), srgbToLinear(raw[p + 1]), srgbToLinear(raw[p + 2]));
+      if (lum <= 0.02) continue;
+      filled[i] = 1;
+      hist[Math.min(255, Math.floor(lum * 255))]++;
+      samples++;
+      qx[qt] = x;
+      qy[qt] = y;
+      qt++;
     }
   }
-  const mean = count ? sum / count : 0.5;
+  let qh = 0;
+  while (qh < qt) {
+    const x = qx[qh];
+    const y = qy[qh];
+    qh++;
+    const src = (y * width + x) * 4;
+    const neighbors = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+    for (const [dx, dy] of neighbors) {
+      const xx = x + dx;
+      const yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+      const j = yy * width + xx;
+      if (filled[j]) continue;
+      filled[j] = 1;
+      const dst = j * 4;
+      color[dst] = color[src];
+      color[dst + 1] = color[src + 1];
+      color[dst + 2] = color[src + 2];
+      color[dst + 3] = 255;
+      qx[qt] = xx;
+      qy[qt] = yy;
+      qt++;
+    }
+  }
+  let seen = 0;
+  const target = Math.max(1, Math.floor(samples * 0.9));
+  let p90 = 0.4;
+  for (let bucket = 0; bucket < 256; bucket++) {
+    seen += hist[bucket];
+    if (seen >= target) {
+      p90 = (bucket + 0.5) / 255;
+      break;
+    }
+  }
+  const scale = 0.62 / Math.max(0.08, p90);
+  const tint = [0xe8, 0xb4, 0x8f].map(srgbToLinear);
+  for (let p = 0; p < color.length; p += 4) {
+    const r = srgbToLinear(color[p]);
+    const g = srgbToLinear(color[p + 1]);
+    const b = srgbToLinear(color[p + 2]);
+    raw[p] = linearToSrgb(Math.min(0.88, shoulder(r * scale) / tint[0]));
+    raw[p + 1] = linearToSrgb(Math.min(0.88, shoulder(g * scale) / tint[1]));
+    raw[p + 2] = linearToSrgb(Math.min(0.88, shoulder(b * scale) / tint[2]));
+    raw[p + 3] = 255;
+  }
+}
+
+function neutralize(raw: Buffer, width: number, height: number, kind: 'keep' | 'cloth' | 'hair') {
+  const out = Buffer.alloc(width * height * 3);
   for (let p = 0, o = 0; p < raw.length; p += 4, o += 3) {
     const r = srgbToLinear(raw[p]);
     const g = srgbToLinear(raw[p + 1]);
     const b = srgbToLinear(raw[p + 2]);
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    if (kind === 'keep') {
-      out[o] = raw[p]; out[o + 1] = raw[p + 1]; out[o + 2] = raw[p + 2];
-    } else if (kind === 'cloth') {
-      const lift = 0.72 + 0.28 * Math.min(1, lum / 0.55);
-      out[o] = out[o + 1] = out[o + 2] = linearToSrgb(lift);
+    const lum = linearLum(r, g, b);
+    if (kind === 'cloth') {
+      // Flat cloth. The shirt and shorts colours come only from the material tint,
+      // so a source mask cannot leave a shard of the other colour.
+      out[o] = out[o + 1] = out[o + 2] = linearToSrgb(0.92);
     } else if (kind === 'hair') {
       const lift = 0.55 + 0.45 * Math.min(1, lum / 0.35);
       out[o] = out[o + 1] = out[o + 2] = linearToSrgb(lift);
     } else {
-      const scale = 0.45 / Math.max(0.08, mean);
-      out[o] = linearToSrgb(r * scale / tint![0]);
-      out[o + 1] = linearToSrgb(g * scale / tint![1]);
-      out[o + 2] = linearToSrgb(b * scale / tint![2]);
+      out[o] = raw[p]; out[o + 1] = raw[p + 1]; out[o + 2] = raw[p + 2];
     }
   }
   return out;
@@ -844,9 +916,9 @@ async function encodeTextures(prims: Prim[]) {
   const present = [...new Set(prims.map((prim) => prim.role))];
   for (const role of present) {
     const packed = await atlas(prims, role);
-    const kind = role === 'Eyes' || role === 'InnerMouth' ? 'keep' : role === 'Skin' ? 'skin' : role === 'Hair' ? 'hair' : role === 'Boots' || role === 'Boots_Sole' ? 'cloth' : 'cloth';
+    const kind = role === 'Hair' ? 'hair' : role === 'Eyes' || role === 'InnerMouth' || role === 'Skin' ? 'keep' : 'cloth';
     const albedo = neutralize(packed.raw, packed.width, packed.height, kind);
-    const normal = detailNormal(albedo, packed.width, packed.height, role === 'Skin' || role === 'Hair' ? 1.4 : 0.8);
+    const normal = detailNormal(albedo, packed.width, packed.height, role === 'Skin' || role === 'Hair' ? 0.45 : 0.35);
     const hash = createHash('sha1').update(albedo).digest('hex').slice(0, 10);
     let divisor = 1;
     while (Math.max(packed.width, packed.height) / divisor > 1024) divisor *= 2;

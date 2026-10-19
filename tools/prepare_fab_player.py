@@ -290,6 +290,78 @@ def assign_faces(obj, buckets: dict[str, list[int]], images: dict[str, object], 
             obj.data.polygons[face].material_index = slot
 
 
+def kind_present(buckets: dict[str, list[int]], *names: str) -> bool:
+    return any(buckets.get(name) for name in names)
+
+
+def face_neighbors(obj) -> dict[int, set[int]]:
+    edges: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for poly in obj.data.polygons:
+        for key in poly.edge_keys:
+            edges[key].append(poly.index)
+    neighbors: dict[int, set[int]] = defaultdict(set)
+    for faces in edges.values():
+        if len(faces) == 2:
+            neighbors[faces[0]].add(faces[1])
+            neighbors[faces[1]].add(faces[0])
+    return neighbors
+
+
+def smooth_regions(obj, buckets: dict[str, list[int]], names: set[str]) -> dict[str, list[int]]:
+    """Drop one-triangle spikes so a tint cannot speckle the neighbouring piece."""
+    neighbors = face_neighbors(obj)
+    owner: dict[int, str] = {}
+    for name, faces in buckets.items():
+        for face in faces:
+            owner[face] = name
+    for _ in range(5):
+        updated = dict(owner)
+        for face, name in owner.items():
+            if name not in names:
+                continue
+            votes: dict[str, int] = defaultdict(int)
+            for other in neighbors.get(face, ()):
+                other_name = owner.get(other)
+                if other_name in names:
+                    votes[other_name] += 1
+            if not votes:
+                continue
+            best = max(votes, key=votes.get)
+            if best != name and votes[best] >= 2 and votes[best] > votes.get(name, 0):
+                updated[face] = best
+        owner = updated
+    cleaned: dict[str, list[int]] = defaultdict(list)
+    for face, name in owner.items():
+        cleaned[name].append(face)
+    return cleaned
+
+
+def add_clean_trim(obj, buckets: dict[str, list[int]]) -> dict[str, list[int]]:
+    """Collar trim is only triangles that sit entirely above the neckline."""
+    shirt = list(buckets.get("Shirt") or [])
+    if len(shirt) < 40:
+        return buckets
+    world = [obj.matrix_world @ vertex.co for vertex in obj.data.vertices]
+    top = max(max(world[index].z for index in obj.data.polygons[face].vertices) for face in shirt)
+    cut = top - 0.04
+    trim: list[int] = []
+    keep: list[int] = []
+    for face in shirt:
+        poly = obj.data.polygons[face]
+        zs = [world[index].z for index in poly.vertices]
+        xs = [abs(world[index].x) for index in poly.vertices]
+        if min(zs) >= cut and max(xs) < 0.14:
+            trim.append(face)
+        else:
+            keep.append(face)
+    if len(trim) < 16:
+        return buckets
+    buckets = dict(buckets)
+    buckets["Shirt"] = keep
+    buckets["Shirt_Trim"] = list(buckets.get("Shirt_Trim") or []) + trim
+    return buckets
+
+
 def classify_body(obj, role: str, split_eyes: bool) -> None:
     """role is head, cloth, limbs, hands, shorts, shirt, eyes, mouth."""
     image = None
@@ -346,13 +418,17 @@ def classify_body(obj, role: str, split_eyes: bool) -> None:
             if img is not None and img.name in bufs:
                 r, g, b, _a = sample(bufs[img.name], u, v)
                 lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-            # Sclera sits on the front of the head and is much lighter than skin.
-            front = center.y < -0.04
+            # The face photograph stays on Skin, including beard, brows and neck.
+            # Only the scalp, behind the face, becomes Hair, so a dark tint cannot
+            # paint a mask across the cheeks.
+            front = center.y < -0.02
+            back = center.y > 0.02
+            scalp = center.z > z0 + (z1 - z0) * 0.72
             eye_band = z0 + (z1 - z0) * 0.55 < center.z < z0 + (z1 - z0) * 0.82
             if split_eyes and front and eye_band and 0.012 < abs(center.x) < 0.075 and lum > 0.55:
                 buckets["Eyes"].append(poly.index)
                 remember("Eyes", img)
-            elif lum < 0.22:
+            elif back and scalp:
                 buckets["Hair"].append(poly.index)
                 remember("Hair", img)
             else:
@@ -360,17 +436,16 @@ def classify_body(obj, role: str, split_eyes: bool) -> None:
                 remember("Skin", img)
             continue
         if kind == "cloth":
-            if center.z >= 1.05:
-                name = "Shirt_Trim" if center.z > 1.46 and abs(center.x) < 0.12 else "Shirt"
-            else:
-                name = "Shorts"
+            # One clothing shell. A face joins shorts only when every vertex is
+            # below the hem, so a triangle cannot carry shorts colour up the shirt.
+            zs = [(obj.matrix_world @ obj.data.vertices[vi].co).z for vi in poly.vertices]
+            name = "Shorts" if max(zs) < 0.98 else "Shirt"
             buckets[name].append(poly.index)
             remember(name, img)
             continue
         if kind == "shirt":
-            name = "Shirt_Trim" if center.z > z1 - 0.08 and abs(center.x) < 0.12 else "Shirt"
-            buckets[name].append(poly.index)
-            remember(name, img)
+            buckets["Shirt"].append(poly.index)
+            remember("Shirt", img)
             continue
         if kind == "shorts":
             buckets["Shorts"].append(poly.index)
@@ -393,8 +468,129 @@ def classify_body(obj, role: str, split_eyes: bool) -> None:
         remember(name, img)
 
     alpha = {"Eyes": "BLEND"}
+    if kind_present(buckets, "Shirt", "Shorts", "Hair", "Skin", "Eyes"):
+        buckets = smooth_regions(obj, buckets, {"Shirt", "Shorts", "Hair", "Skin", "Eyes"})
+    if "Shirt" in buckets and buckets["Shirt"]:
+        buckets = add_clean_trim(obj, buckets)
+        tex_for.setdefault("Shirt_Trim", tex_for.get("Shirt"))
     assign_faces(obj, buckets, tex_for, alpha)
     print(obj.name, {name: len(faces) for name, faces in buckets.items() if faces})
+
+
+def level_cloth_hem() -> None:
+    """Split torso triangles on one horizontal plane and paint each side a single colour.
+
+    A triangle that crosses the waist used to take the shirt tint for its whole face,
+    so navy and yellow met on a diagonal. The cut is only the torso: sleeves stay shirt.
+    """
+    import bmesh
+
+    cut = 0.96
+    for obj in meshes():
+        def role_of(index: int) -> str:
+            if not obj.material_slots:
+                return ""
+            material = obj.material_slots[index].material
+            return material.name.split("@@")[0] if material else ""
+
+        roles = {role_of(poly.material_index) for poly in obj.data.polygons}
+        if "Shirt" not in roles or "Shorts" not in roles:
+            continue
+        world = obj.matrix_world
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bm.faces.ensure_lookup_table()
+        selected = []
+        for face in bm.faces:
+            if role_of(face.material_index) not in ("Shirt", "Shorts"):
+                continue
+            points = [world @ vertex.co for vertex in face.verts]
+            if max(abs(point.x) for point in points) > 0.27:
+                continue
+            zs = [point.z for point in points]
+            if min(zs) >= cut or max(zs) <= cut:
+                continue
+            selected.append(face)
+        if selected:
+            geom = []
+            seen: set[int] = set()
+            for face in selected:
+                geom.append(face)
+                for edge in face.edges:
+                    if id(edge) not in seen:
+                        seen.add(id(edge))
+                        geom.append(edge)
+                for vertex in face.verts:
+                    if id(vertex) not in seen:
+                        seen.add(id(vertex))
+                        geom.append(vertex)
+            local_co = world.inverted() @ Vector((0.0, 0.0, cut))
+            local_no = (world.inverted().transposed().to_3x3() @ Vector((0.0, 0.0, 1.0))).normalized()
+            bmesh.ops.bisect_plane(bm, geom=geom, dist=0.0001, plane_co=local_co, plane_no=local_no)
+            bm.to_mesh(obj.data)
+            print("bisected hem", obj.name, len(selected))
+        bm.free()
+        obj.data.update()
+        shirt_i = next((i for i, slot in enumerate(obj.material_slots) if role_of(i) == "Shirt"), None)
+        shorts_i = next((i for i, slot in enumerate(obj.material_slots) if role_of(i) == "Shorts"), None)
+        if shirt_i is None or shorts_i is None:
+            continue
+        moved = 0
+        for poly in obj.data.polygons:
+            if role_of(poly.material_index) not in ("Shirt", "Shorts"):
+                continue
+            center = world @ poly.center
+            if abs(center.x) > 0.27:
+                continue
+            target = shirt_i if center.z >= cut else shorts_i
+            if poly.material_index != target:
+                poly.material_index = target
+                moved += 1
+        print("level hem", obj.name, moved, "at", cut)
+
+
+def tuck_shorts_inside_shirt() -> None:
+    """The shorts waistband intersects the shirt and reads as navy shards.
+    Shorts-only vertices that rise into the shirt are pulled inside the hem.
+    Vertices shared with the shirt stay put, so the hem edge itself does not move.
+    """
+    floor = None
+    for obj in meshes():
+        for poly in obj.data.polygons:
+            slot = obj.material_slots[poly.material_index].material if obj.material_slots else None
+            role = slot.name.split("@@")[0] if slot else ""
+            if role != "Shirt":
+                continue
+            for index in poly.vertices:
+                z = (obj.matrix_world @ obj.data.vertices[index].co).z
+                floor = z if floor is None else min(floor, z)
+    if floor is None:
+        return
+    limit = floor - 0.008
+    for obj in meshes():
+        world = obj.matrix_world
+        inverse = world.inverted()
+        roles_for: dict[int, set[str]] = defaultdict(set)
+        for poly in obj.data.polygons:
+            slot = obj.material_slots[poly.material_index].material if obj.material_slots else None
+            role = slot.name.split("@@")[0] if slot else ""
+            for index in poly.vertices:
+                roles_for[index].add(role)
+        moved = 0
+        for index, roles in roles_for.items():
+            if "Shorts" not in roles or "Shirt" in roles or "Shirt_Trim" in roles:
+                continue
+            point = world @ obj.data.vertices[index].co
+            if point.z <= limit:
+                continue
+            point.z = limit
+            point.x *= 0.94
+            point.y *= 0.94
+            obj.data.vertices[index].co = inverse @ point
+            moved += 1
+        if moved:
+            obj.data.update()
+            print("tucked shorts", obj.name, moved, "below", round(limit, 3))
 
 
 def prepare(body: str) -> None:
@@ -446,6 +642,8 @@ def prepare(body: str) -> None:
             else:
                 role = "limbs"
         classify_body(obj, role, split_eyes=body == "female")
+    tuck_shorts_inside_shirt()
+    level_cloth_hem()
     for obj in meshes():
         mods = [m for m in obj.modifiers if m.type == "ARMATURE"]
         if not mods:

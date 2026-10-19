@@ -62,19 +62,6 @@ function patternIndex(pattern: SurfacePattern): number {
   }
 }
 
-/** Eye and teeth texels live past u = 0.86 and must ignore the skin tint. */
-function keepEyes(material: MeshStandardMaterial) {
-  material.onBeforeCompile = (shader) => {
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <map_fragment>',
-      `#include <map_fragment>
-       if (vMapUv.x > 0.86) diffuseColor.rgb = sampledDiffuseColor.rgb;`,
-    );
-  };
-  material.customProgramCacheKey = () => 'kickole-eyes';
-  material.needsUpdate = true;
-}
-
 /** Subtle weave so kit patterns survive a flat colour tint. */
 function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
   const id = patternIndex(pattern);
@@ -264,7 +251,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         return;
       }
       const standard = m as MeshStandardMaterial;
-      if (name === MATERIAL_NAMES.skin) keepEyes(standard);
       if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern);
     });
   }, [skin, materials]);

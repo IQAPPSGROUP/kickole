@@ -5,7 +5,7 @@ import type { Side } from '../engine/config';
 import { beatClock } from '../game/audio';
 import { prefersReducedMotion } from '../scene/juice';
 import { fanLayout } from './fanLayout';
-import { classifyTrickRelease } from './trickInput';
+import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
 
 export function Hud({
   hud,
@@ -314,13 +314,29 @@ export function TouchZones({ controller }: { controller: GameController }) {
   const playing = snap.hud.phase === 'playing';
   const clue = snap.hud.prompt;
   const clueOn = (control: ActivePrompt['control']) => clue?.control === control;
-  const neckPtr = useRef<number | null>(null);
+  const neckPtr = useRef<NeckPointerState>({ pointerId: null });
   const drag = useRef<{ id: number; x: number; y: number; kind: TrickButtonKind } | null>(null);
 
   useEffect(() => {
-    const clear = () => controller.releaseNeck();
+    const clear = () => {
+      neckPtr.current = { pointerId: null };
+      controller.releaseNeck();
+    };
+    const end = (e: PointerEvent) => {
+      const next = applyNeckPointer(neckPtr.current, { type: e.type === 'pointercancel' ? 'pointercancel' : 'pointerup', pointerId: e.pointerId }, controller.engine.phase);
+      if (next.action !== 'release') return;
+      neckPtr.current = next.state;
+      drag.current = null;
+      controller.releaseNeck();
+    };
     window.addEventListener('blur', clear);
-    return () => window.removeEventListener('blur', clear);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    return () => {
+      window.removeEventListener('blur', clear);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
   }, [controller]);
 
   const fire = (kind: TrickButtonKind) => {
@@ -348,11 +364,11 @@ export function TouchZones({ controller }: { controller: GameController }) {
     e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, kind };
-    if (kind === 'neck') {
-      neckPtr.current = e.pointerId;
-      if (!playing) controller.noteLockedTrick();
-      else controller.pressNeck();
-    }
+    if (kind !== 'neck') return;
+    const next = applyNeckPointer(neckPtr.current, { type: 'pointerdown', pointerId: e.pointerId }, controller.engine.phase);
+    neckPtr.current = next.state;
+    if (next.action === 'locked') controller.noteLockedTrick();
+    else if (next.action === 'press') controller.pressNeck();
   };
 
   const onTrickUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -360,17 +376,21 @@ export function TouchZones({ controller }: { controller: GameController }) {
     const start = drag.current;
     drag.current = null;
     if (!start || start.id !== e.pointerId) return;
+    if (start.kind === 'neck') {
+      const next = applyNeckPointer(
+        neckPtr.current,
+        { type: e.type === 'pointercancel' ? 'pointercancel' : 'pointerup', pointerId: e.pointerId },
+        controller.engine.phase,
+      );
+      neckPtr.current = next.state;
+      if (next.action === 'release') controller.releaseNeck();
+      return;
+    }
     const decision = classifyTrickRelease({
       phase: controller.engine.phase,
       dx: e.clientX - start.x,
       dy: e.clientY - start.y,
     });
-    if (start.kind === 'neck') {
-      if (neckPtr.current !== null && e.pointerId !== neckPtr.current) return;
-      neckPtr.current = null;
-      controller.releaseNeck();
-      return;
-    }
     if (decision === 'ignore') return;
     if (decision === 'locked') {
       controller.noteLockedTrick();
@@ -393,10 +413,11 @@ export function TouchZones({ controller }: { controller: GameController }) {
         onPointerDown={onTrickDown(trick.kind)}
         onPointerUp={onTrickUp}
         onPointerCancel={onTrickUp}
-        onLostPointerCapture={() => {
+        onLostPointerCapture={(e) => {
           if (trick.kind === 'neck') {
-            neckPtr.current = null;
-            controller.releaseNeck();
+            const next = applyNeckPointer(neckPtr.current, { type: 'lostpointercapture', pointerId: e.pointerId }, controller.engine.phase);
+            neckPtr.current = next.state;
+            return;
           }
           drag.current = null;
         }}

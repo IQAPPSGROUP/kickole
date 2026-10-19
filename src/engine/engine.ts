@@ -637,7 +637,7 @@ export class GameEngine {
     }
     if (this.trick) this.trick = null;
     const target = this.config.contacts.nape;
-    if (this.ball.vy >= 0 || !this.inContactBand(target)) {
+    if (this.ball.vy >= 0 || !this.neckApproach()) {
       this.rejectTrick('neckStall', 'window');
       return;
     }
@@ -686,8 +686,9 @@ export class GameEngine {
     const b = this.ball;
     const g = this.gravity;
     // Believable flick off the nape toward freestyle height.
-    b.vy = impulseForApex(this.config.contacts.forehead.y + 0.35, b.y, g) * 0.92;
-    b.vz = 0.55;
+    b.vy = impulseForApex(2.35, b.y, g);
+    // Leave backward off the upper back, then the recover step carries it forward once it is above the head.
+    b.vz = -0.7;
     b.vx = 0;
     b.wx = -5; b.wy = 1; b.wz = 3;
     this.emit({ type: 'trick', kind: 'neckStall', phase: 'execute', points: 0, side: null });
@@ -719,14 +720,12 @@ export class GameEngine {
       this.emit({ type: 'miss', side, deltaMs });
       return;
     }
-    // Pin the ball beside the hip so the circling shin never sweeps through it.
+    // Light pop off the foot. The ball drifts out to the hover while the foot
+    // circles; it is not pinned in place on the first frame.
     const b = this.ball;
-    const hoverX = (side === 'left' ? -1 : 1) * this.config.atwHoverX;
-    b.x = hoverX;
-    b.y = this.config.atwHoverY;
-    b.z = this.config.atwHoverZ;
+    b.y = Math.max(b.y, this.config.contactHeight);
+    b.vy = this.config.atwPopSpeed;
     b.vx = 0;
-    b.vy = 0;
     b.vz = 0;
     this.applySpin(side, 0.85);
     this.lastContact[side] = this.time;
@@ -897,11 +896,24 @@ export class GameEngine {
     return this.ball.vy < 0 && this.ball.y < y - 0.2;
   }
 
+  /**
+   * A neck catch is timed on the way down through nape height. The ball is
+   * still in the juggle lane (around ballZ); the catch then settles it on
+   * the back of the neck. Placing the ball on the nape already also qualifies,
+   * so scripted stalls and the live juggle share one window.
+   */
+  private neckApproach(): boolean {
+    const b = this.ball;
+    const lane = this.config.tricks.depthTol * 1.6;
+    const inLane = nearDepth(b.z, this.config.ballZ, lane)
+      || nearDepth(b.z, this.config.contacts.nape.z, this.config.tricks.depthTol);
+    if (!inLane) return false;
+    if (Math.abs(b.x) > this.config.tricks.lateralTol + 0.15) return false;
+    return this.gradeFor(this.timingDeltaMs(this.config.contacts.nape.y), this.config.tricks.neckPrepMs) !== 'miss';
+  }
+
   private neckWindowOpen(): boolean {
-    const target = this.config.contacts.nape;
-    return this.ball.vy < 0
-      && this.inContactBand(target)
-      && this.gradeFor(this.timingDeltaMs(target.y), this.config.tricks.neckPrepMs) !== 'miss';
+    return this.ball.vy < 0 && this.neckApproach();
   }
 
   private neckWindowPassed(): boolean {
@@ -1113,30 +1125,51 @@ export class GameEngine {
     // Clear short recover markers once the ball is airborne again.
     if (this.trick && (this.trick.phase === 'recover' || this.trick.phase === 'fail')
       && this.trick.kind !== 'aroundTheWorld') {
-      if (this.time - this.trick.startedAt > 0.35 || b.vy > 0.2) this.trick = null;
+      if (this.trick.kind === 'neckStall' && this.trick.phase === 'recover') {
+        if (b.y > 2.05 && b.z < this.config.ballZ - 0.08) {
+          b.vz = Math.max(b.vz, 1.35);
+        }
+        if (this.time - this.trick.startedAt > 0.7) this.trick = null;
+      } else if (this.time - this.trick.startedAt > 0.35 || b.vy > 0.2) {
+        this.trick = null;
+      }
     }
 
-    // Around-the-world revolution progresses on simulation time only.
+    // Around-the-world: a short pop, then the ball holds at foot height
+    // while the foot circles outside-in, then it drops for the keep-up.
     if (this.trick?.kind === 'aroundTheWorld' && this.trick.phase === 'execute') {
       this.trick.revolution = Math.min(
         1,
         this.trick.revolution + h / this.config.tricks.atwRevolutionTime,
       );
       const hoverX = (this.trick.side === 'left' ? -1 : 1) * this.config.atwHoverX;
-      b.x = hoverX;
-      b.y = this.config.atwHoverY;
-      b.z = this.config.atwHoverZ;
-      b.vx = 0;
-      b.vz = 0;
-      b.vy = 0;
+      const hoverY = this.config.atwHoverY;
+      const hoverZ = this.config.atwHoverZ;
+      const popping = this.trick.revolution < 0.3;
+      if (!popping && this.trick.revolution < 1 - 1e-9) {
+        const blend = Math.min(1, h * 12);
+        b.x += (hoverX - b.x) * blend;
+        b.y += (hoverY - b.y) * blend;
+        b.z += (hoverZ - b.z) * blend;
+        b.vx = 0;
+        b.vy = 0;
+        b.vz = 0;
+        b.rx += b.wx * h; b.ry += b.wy * h; b.rz += b.wz * h;
+        return;
+      }
       if (this.trick.revolution >= 1 - 1e-9) {
         this.trick.revolution = 1;
         this.trick.phase = 'recover';
+        b.x = hoverX;
+        b.y = hoverY;
+        b.z = hoverZ;
+        b.vx = 0;
+        b.vz = 0;
         b.vy = -this.config.atwDropSpeed;
         this.emit({ type: 'trick', kind: 'aroundTheWorld', phase: 'recover', points: 0, side: this.trick.side });
       } else {
-        b.rx += b.wx * h; b.ry += b.wy * h; b.rz += b.wz * h;
-        return;
+        b.vx = (hoverX - b.x) * 8;
+        b.vz = (hoverZ - b.z) * 8;
       }
     }
 

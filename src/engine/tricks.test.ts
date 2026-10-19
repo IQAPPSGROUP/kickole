@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applyNeckPointer, type NeckPointerState } from '../ui/trickInput';
 import { GameEngine } from './engine';
 import { impulseForApex } from './tricks';
 
@@ -167,6 +168,7 @@ describe('around the world', () => {
     e.setTrick('aroundTheWorld');
     runUntilContactDelta(e, 5);
     e.press('left'); e.release('left');
+    expect(e.ball.vy).toBeGreaterThan(1);
     stepN(e, 5);
     expect(e.stats.aroundTheWorlds).toBe(0);
     expect(e.stats.score).toBe(0);
@@ -373,6 +375,59 @@ describe('one-tap tricks and queues', () => {
     e.attemptHeader();
     stepN(e, 40);
     expect(e.stats.headers).toBe(1);
+  });
+
+  it('a pointer tap on the juggle catches the ball on the back of the neck', () => {
+    const e = started();
+    e.ball.x = -0.08;
+    e.ball.y = e.config.contacts.nape.y + 0.85;
+    e.ball.z = e.config.ballZ;
+    e.ball.vy = 0.3;
+    e.ball.vx = 0;
+    e.ball.vz = 0;
+    let pointer: NeckPointerState = { pointerId: null };
+    const events = [
+      { type: 'pointerdown' as const, pointerId: 3 },
+      { type: 'lostpointercapture' as const, pointerId: 3 },
+      { type: 'pointerup' as const, pointerId: 3 },
+    ];
+    for (const event of events) {
+      const next = applyNeckPointer(pointer, event, e.phase);
+      pointer = next.state;
+      if (next.action === 'press') e.pressNeck();
+      if (next.action === 'release') e.releaseNeck();
+    }
+    expect(pointer.pointerId).toBeNull();
+    expect(e.stats.neckStalls).toBe(0);
+    expect(e.queuedNeck).toBe('tap');
+    for (let i = 0; i < 800 && e.stats.neckStalls === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.ball.z).toBeLessThan(0);
+    expect(e.ball.y).toBeGreaterThan(e.config.contacts.nape.y);
+    expect(e.ball.vy).toBeGreaterThan(0);
+  });
+
+  it('a pointer hold stalls on the nape until pointerup', () => {
+    const e = started();
+    e.ball.y = e.config.contacts.nape.y + 0.7;
+    e.ball.z = e.config.ballZ;
+    e.ball.vy = -0.4;
+    e.ball.x = 0;
+    let pointer: NeckPointerState = { pointerId: null };
+    const down = applyNeckPointer(pointer, { type: 'pointerdown', pointerId: 8 }, e.phase);
+    pointer = down.state;
+    expect(down.action).toBe('press');
+    e.pressNeck();
+    for (let i = 0; i < 800 && e.stats.neckStalls === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.trick?.kind).toBe('neckStall');
+    const y = e.ball.y;
+    stepN(e, 30);
+    expect(e.ball.y).toBeCloseTo(y, 5);
+    const up = applyNeckPointer(pointer, { type: 'pointerup', pointerId: 8 }, e.phase);
+    expect(up.action).toBe('release');
+    e.releaseNeck();
+    expect(e.ball.vy).toBeGreaterThan(0);
   });
 
   it('a neck tap catches and flicks without a second award', () => {

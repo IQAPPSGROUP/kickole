@@ -162,10 +162,9 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
   }
 
   if (trick.kind === 'neckStall') {
-    const hold = trick.phase === 'contact' || trick.phase === 'execute';
     const release = trick.phase === 'recover' || (trick.phase === 'execute' && b.vy > 0.4);
-    // Snap into the hinged catch immediately, then settle with hold time.
-    const k = hold ? clamp(0.65 + trick.held / 0.2, 0, 1) : 1;
+    // Hinge on the first catch frame so the ball is on the back, not inside the chest.
+    const k = 1;
     const rel = release ? clamp((t - trick.startedAt - trick.held) / 0.25, 0, 1) : 0;
     softKnees(out, lerp(0.75, 0.2, rel));
     // Hinge forward, face down — ball sits on upper back behind the neck, not the face.
@@ -188,7 +187,7 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
     const side = trick.side ?? 'left';
     const other: Side = side === 'left' ? 'right' : 'left';
     const rev = clamp(trick.revolution, 0, 1);
-    // Support foot planted. The active leg follows a measured orbit around the hover.
+    // Support foot planted. The active foot travels outside-in around the ball.
     out.legs[other] = { ...REST, knee: 0.08, thigh: 0.05 };
     out.legs[side] = atwLeg(side, rev);
     const angle = rev * Math.PI * 2;

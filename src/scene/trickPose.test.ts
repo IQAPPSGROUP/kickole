@@ -56,7 +56,7 @@ describe('trick poses', () => {
     expect(pose.headYaw).toBe(0);
   });
 
-  it('ATW circles the active foot with hip twist while planting the support foot', () => {
+  it('ATW keeps a bent knee and a planted support foot while the foot circles', () => {
     const e = started();
     e.setTrick('aroundTheWorld');
     for (let i = 0; i < 100000; i++) {
@@ -67,9 +67,11 @@ describe('trick poses', () => {
     stepN(e, Math.ceil(e.config.tricks.atwRevolutionTime / e.config.fixedStep * 0.5));
     const pose = computePose(e);
     expect(pose.lockMotion).toBe(true);
-    expect(Math.abs(pose.legs.left.twist)).toBeGreaterThan(0.2);
+    expect(pose.legs.left.knee).toBeGreaterThan(0.4);
+    expect(pose.legs.left.knee).toBeLessThan(1.2);
+    expect(Math.abs(pose.legs.left.twist)).toBeLessThan(0.45);
+    expect(pose.legs.left.thigh).toBeLessThan(-0.8);
     expect(Math.abs(pose.legs.right.thigh)).toBeLessThan(0.2);
-    expect(pose.legs.left.knee).toBeGreaterThan(0.05);
   });
 
   it('thigh raise keeps the support foot near rest', () => {

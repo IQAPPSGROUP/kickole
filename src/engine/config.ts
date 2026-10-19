@@ -91,7 +91,7 @@ export interface GameConfig {
   kickChargeTime: number;
   /** Charge power (0–1) at which a released kick counts as a high flick for combos. */
   highKickComboPower: number;
-  /** Ball-centre hover while a foot circles around the world. X is mirrored by side. */
+  /** Ball-centre hover while a foot circles outside-in. X is mirrored by side. */
   atwHoverX: number;
   atwHoverY: number;
   atwHoverZ: number;
@@ -137,7 +137,7 @@ export const DEFAULT_CONFIG: GameConfig = {
   tricks: {
     depthTol: 0.22,
     lateralTol: 0.35,
-    neckPrepMs: 140,
+    neckPrepMs: 220,
     neckMaxHold: 1.15,
     atwRevolutionTime: 0.55,
     atwReturnMs: 160,
@@ -149,7 +149,9 @@ export const DEFAULT_CONFIG: GameConfig = {
     foot: FOOT,
     thigh: { y: 1.02, z: 0.56 },
     forehead: { y: 1.68, z: 0.4 },
-    nape: { y: 1.5, z: 0.1 },
+    // Rest pose: ball centre on the upper back, behind the hinged neck.
+    // A juggle in front of the player (ballZ) is still a valid approach.
+    nape: { y: 1.4, z: -0.08 },
     chest: { y: 1.32, z: 0.48 },
   },
   fixedStep: 1 / 120,
@@ -163,11 +165,11 @@ export const DEFAULT_CONFIG: GameConfig = {
   highFlickApex: 3.68,
   kickChargeTime: 0.42,
   highKickComboPower: 0.65,
-  atwHoverX: 0.45,
-  atwHoverY: 1,
-  atwHoverZ: 0.45,
+  atwHoverX: 0.76,
+  atwHoverY: 0.81,
+  atwHoverZ: 0.82,
   atwDropSpeed: 1.15,
-  atwPopSpeed: 4.4,
+  atwPopSpeed: 2.2,
   gravityRamp: 0.012,
   maxGravityScale: 1.45,
   missCooldown: 0.22,

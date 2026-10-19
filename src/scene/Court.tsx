@@ -270,6 +270,40 @@ function HillsideNeighbourhood() {
               <meshLambertMaterial color="#E3D4BB" />
             </mesh>
           )}
+          {/* Rooftop water tanks and solar panels break up the boxy skyline. */}
+          {i % 5 === 0 && (
+            <group position={[-b.width * 0.2, b.height + 0.3, 0]}>
+              <mesh>
+                <cylinderGeometry args={[0.17, 0.19, 0.44, 8]} />
+                <meshLambertMaterial color="#283C43" />
+              </mesh>
+              <mesh position={[0, 0.24, 0]}>
+                <cylinderGeometry args={[0.19, 0.19, 0.035, 8]} />
+                <meshLambertMaterial color="#17262D" />
+              </mesh>
+            </group>
+          )}
+          {i % 6 === 2 && (
+            <mesh position={[0, b.height + 0.21, 0]} rotation={[-0.35, 0, 0]}>
+              <boxGeometry args={[b.width * 0.55, 0.035, 0.37]} />
+              <meshLambertMaterial color="#274A61" />
+            </mesh>
+          )}
+          {/* Sunshades and colourful laundry give the houses lived-in detail. */}
+          {i % 3 === 1 && (
+            <group position={[0, b.height * 0.46 + 0.22, b.depth / 2 + 0.15]}>
+              <mesh rotation={[0.2, 0, 0]}>
+                <boxGeometry args={[b.width * 0.85, 0.035, 0.36]} />
+                <meshLambertMaterial color={i % 2 ? "#E5BD71" : "#D16F56"} />
+              </mesh>
+              {[-0.22, 0, 0.22].map((u, j) => (
+                <mesh key={j} position={[u * b.width, -0.17 - j * 0.02, 0.15]}>
+                  <planeGeometry args={[0.15, 0.28 + j * 0.035]} />
+                  <meshBasicMaterial color={['#F5E9C9', '#5E9FBC', '#D65E62'][j]} side={DoubleSide} />
+                </mesh>
+              ))}
+            </group>
+          )}
         </group>
       ))}
     </group>

@@ -24,6 +24,8 @@ export interface ScoringConfig {
   neckStall: number;
   /** Awarded once when around-the-world completes (pop + revolution + return). */
   aroundTheWorld: number;
+  /** Variety bonus awarded once per completed trick combination. */
+  varietyBonus: number;
 }
 
 export interface TrickTimingConfig {
@@ -40,6 +42,8 @@ export interface TrickTimingConfig {
   atwReturnMs: number;
   /** Cool-down after a rejected / failed trick request (s). */
   trickCooldown: number;
+  /** Seconds between successful combo steps before progress expires. */
+  comboExpirySec: number;
 }
 
 export interface GameConfig {
@@ -107,6 +111,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     thigh: 2,
     neckStall: 10,
     aroundTheWorld: 20,
+    varietyBonus: 5,
   },
   tricks: {
     depthTol: 0.22,
@@ -116,6 +121,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     atwRevolutionTime: 0.55,
     atwReturnMs: 160,
     trickCooldown: 0.2,
+    comboExpirySec: 3.5,
   },
   contacts: {
     foot: FOOT,

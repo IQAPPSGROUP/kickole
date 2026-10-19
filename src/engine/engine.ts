@@ -1,5 +1,12 @@
 import { DEFAULT_CONFIG, type GameConfig, type Grade, type Side } from './config';
 import {
+  createComboTracker,
+  pushComboEvent,
+  resetComboTracker,
+  type ComboEvent,
+  type ComboId,
+} from './combos';
+import {
   createTrickState,
   impulseForApex,
   nearDepth,
@@ -11,6 +18,7 @@ import {
 
 export type Phase = 'menu' | 'ready' | 'playing' | 'dropped' | 'over';
 export type { TrickKind, TrickPhase, TrickState };
+export type { ComboEvent, ComboId };
 
 export interface BallState {
   x: number; y: number; z: number;
@@ -27,6 +35,7 @@ export type EngineEvent =
   | { type: 'stallStart'; side: Side }
   | { type: 'trick'; kind: TrickKind; phase: TrickPhase; points: number; side: Side | null }
   | { type: 'trickFail'; kind: TrickKind; reason: string }
+  | { type: 'combo'; id: ComboId; label: string; points: number }
   | { type: 'drop' }
   | { type: 'over' };
 
@@ -40,6 +49,7 @@ export interface RunStats {
   neckStalls: number;
   aroundTheWorlds: number;
   highFlicks: number;
+  combos: number;
 }
 
 export interface Contact {
@@ -90,6 +100,8 @@ export class GameEngine {
   private listeners = new Set<(e: EngineEvent) => void>();
   private held: Record<Side, boolean> = { left: false, right: false };
   private heldNeck = false;
+  private combos = createComboTracker();
+  private comboSeq = 0;
 
   constructor(config: Partial<GameConfig> = {}) {
     this.config = {
@@ -147,6 +159,23 @@ export class GameEngine {
     this.acc = 0;
     this.held = { left: false, right: false };
     this.heldNeck = false;
+    resetComboTracker(this.combos);
+    this.comboSeq = 0;
+  }
+
+  /** Record a successful scored event for variety combinations. */
+  private noteCombo(event: ComboEvent) {
+    this.comboSeq += 1;
+    const token = `${event}:${this.time.toFixed(4)}:${this.comboSeq}`;
+    const awards = pushComboEvent(this.combos, event, this.time, token, {
+      varietyBonus: this.config.scoring.varietyBonus,
+      expirySec: this.config.tricks.comboExpirySec,
+    });
+    for (const award of awards) {
+      this.stats.combos++;
+      this.stats.score += award.points;
+      this.emit({ type: 'combo', id: award.id, label: award.label, points: award.points });
+    }
   }
 
   /**
@@ -288,6 +317,7 @@ export class GameEngine {
       this.streak = 0;
       this.cooldown = this.config.missCooldown;
       this.lastKickGrade = 'miss';
+      resetComboTracker(this.combos);
       this.emit({ type: 'miss', side, deltaMs });
       return;
     }
@@ -383,15 +413,18 @@ export class GameEngine {
     b.vz = 0.35 * quality;
     b.wx = 6 * quality; b.wy = 0; b.wz = 2;
     this.emit({ type: 'trick', kind: 'header', phase: 'execute', points, side: null });
+    this.noteCombo('header');
     this.selectedTrick = null;
     this.trick = { ...t, phase: 'recover' };
   }
 
   private tryNeckCatch() {
-    if (this.trick) {
+    // Allow a catch once a prior short recover (e.g. header) has finished posing.
+    if (this.trick && this.trick.phase !== 'recover' && this.trick.phase !== 'fail') {
       this.rejectTrick('neckStall', 'busy');
       return;
     }
+    if (this.trick) this.trick = null;
     const target = this.config.contacts.nape;
     if (this.ball.vy >= 0 || !this.inContactBand(target)) {
       this.rejectTrick('neckStall', 'window');
@@ -421,12 +454,14 @@ export class GameEngine {
     this.trick = trick;
     this.selectedTrick = null;
     this.emit({ type: 'trick', kind: 'neckStall', phase: 'contact', points, side: null });
+    this.noteCombo('neckCatch');
   }
 
   private releaseNeckStall() {
     const t = this.trick;
     if (!t || t.kind !== 'neckStall') return;
     if (t.phase !== 'contact' && t.phase !== 'execute') return;
+    const hadCatch = t.awarded;
     t.phase = 'execute';
     const b = this.ball;
     const g = this.gravity;
@@ -437,6 +472,7 @@ export class GameEngine {
     b.wx = -5; b.wy = 1; b.wz = 3;
     this.emit({ type: 'trick', kind: 'neckStall', phase: 'execute', points: 0, side: null });
     t.phase = 'recover';
+    if (hadCatch) this.noteCombo('neckRelease');
   }
 
   private tryAroundTheWorld(side: Side) {
@@ -522,6 +558,7 @@ export class GameEngine {
     this.emit({
       type: 'kick', side, grade, points, alternate, stall: false, streak: this.streak, deltaMs,
     });
+    this.noteCombo('atwComplete');
     this.trick = null;
     this.selectedTrick = null;
   }
@@ -549,6 +586,7 @@ export class GameEngine {
     this.emit({ type: 'trickFail', kind: t.kind, reason });
     this.trick = null;
     this.trickCooldown = this.config.tricks.trickCooldown;
+    resetComboTracker(this.combos);
   }
 
   private completeContact(stall: boolean) {
@@ -607,6 +645,10 @@ export class GameEngine {
     b.vz = c.thigh ? (this.config.ballZ - b.z) / Math.max(flight, 1e-3) : 0;
     this.applySpin(c.side, quality);
     this.emit({ type: 'kick', side: c.side, grade: c.grade, points, alternate, stall, streak: this.streak, deltaMs: c.deltaMs });
+    if (c.highFlick) this.noteCombo('highFlick');
+    else if (c.thigh) this.noteCombo('thighTouch');
+    else if (stall) this.noteCombo('footStall');
+    else this.noteCombo('footTouch');
   }
 
   private applySpin(side: Side, power: number) {
@@ -708,6 +750,7 @@ export class GameEngine {
       b.y = r;
       if (this.phase === 'playing') {
         if (this.trick) this.failTrick('drop');
+        else resetComboTracker(this.combos);
         this.phase = 'dropped';
         this.dropClock = 0;
         this.streak = 0;
@@ -737,5 +780,6 @@ function emptyStats(): RunStats {
     neckStalls: 0,
     aroundTheWorlds: 0,
     highFlicks: 0,
+    combos: 0,
   };
 }

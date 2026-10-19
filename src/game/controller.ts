@@ -109,7 +109,9 @@ export class GameController {
         this.vibrate(15);
         break;
       case 'kick': {
-        const label = e.stall ? 'FOOT STALL!' : e.grade.toUpperCase();
+        const high = this.engine.lastTrick?.kind === 'highFlick'
+          && Math.abs(this.engine.lastTrick.time - this.engine.time) < 0.05;
+        const label = e.stall ? 'FOOT STALL!' : high ? 'HIGH FLICK!' : e.grade.toUpperCase();
         this.show(e.stall ? 'stall' : e.grade, label, e.points);
         if (sound) { if (e.stall) sfx.stall(); sfx.kick(e.grade, e.streak); }
         this.vibrate(e.grade === 'perfect' ? [12, 20, 12] : 10);
@@ -130,12 +132,22 @@ export class GameController {
             : e.kind === 'thigh' ? 'THIGH!'
               : e.kind === 'neckStall' ? 'NECK STALL!'
                 : e.kind === 'aroundTheWorld' ? 'AROUND THE WORLD!'
-                  : 'TRICK!';
+                  : e.kind === 'highFlick' ? 'HIGH FLICK!'
+                    : 'TRICK!';
           this.show('perfect', label, e.points);
+        } else if (e.kind === 'neckStall' && e.phase === 'execute') {
+          this.show('good', 'NECK RELEASE', 0);
         }
         this.publish();
         break;
+      case 'combo':
+        this.show('perfect', `${e.label} +${e.points}`, e.points);
+        if (sound) sfx.kick('perfect', this.engine.streak);
+        this.vibrate([10, 30, 10]);
+        this.publish();
+        break;
       case 'trickFail':
+        this.show('miss', 'TRICK MISS', 0);
         this.publish();
         break;
       case 'drop':

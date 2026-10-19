@@ -99,7 +99,8 @@ export function SettingsScreen({
           <p>Tap <b>left</b> or <b>right</b> of the screen to kick with that foot just as the ball drops to the foot. Perfect timing earns bonus points; alternate feet for +3.</p>
           <p><b>Foot stall:</b> press and hold on a good kick, then release to flick for +10.</p>
           <p>Keyboard: <b>A</b>/<b>D</b> feet · <b>H</b> header · <b>N</b> neck (hold) · <b>W</b> ATW · <b>T</b> thigh · <b>F</b> flick · <b>Esc</b> cancel · <b>Space</b> start.</p>
-          <p>Arm ATW / THIGH / FLICK, then tap left or right. HEAD taps immediately; NECK is press-and-hold.</p>
+          <p>Arm <b>ATW</b> / <b>THIGH</b> / <b>FLICK</b>, then tap left or right. <b>HEAD</b> taps immediately; <b>NECK</b> is press-and-hold, release to flick out.</p>
+          <p><b>Combos +5:</b> flick→header · header→neck→release · stall→ATW · alternating foot↔thigh. Chains expire if you wait too long or miss.</p>
         </div>
         <div className="group help">
           <label>Privacy</label>

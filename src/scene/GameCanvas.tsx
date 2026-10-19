@@ -13,32 +13,74 @@ import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
 import { ENVIRONMENT_THEME } from './environment';
+import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
+import { sampleOpeningCamera } from './openingCamera';
+import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
 
-const TARGET = new Vector3(0, 1.25, 0.3);
-const DIR = new Vector3(0.42, 0.38, 0.82).normalize();
-const FOV = 40;
+const FOV = GAMEPLAY_FOV;
+const TARGET = GAMEPLAY_TARGET;
 
 const BASE = new Vector3();
 const LOOK = new Vector3();
+const INTRO_POS = new Vector3();
+const INTRO_TARGET = new Vector3();
+
+function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
+  cam.fov = FOV;
+  gameplayCameraPosition(aspect, BASE);
+  cam.position.copy(BASE);
+  cam.lookAt(TARGET);
+  cam.updateProjectionMatrix();
+}
 
 /** Three-quarter front camera that fits the play area in portrait and landscape, with kick push-in and shake. */
 function CameraRig({ shake }: { shake: boolean }) {
   const { camera, size } = useThree();
   useEffect(() => {
     const cam = camera as PerspectiveCamera;
-    const aspect = size.width / size.height;
-    const tan = Math.tan((FOV * Math.PI) / 360);
-    const dist = Math.max(2.55 / tan, 1.5 / (tan * aspect)) + 0.4;
-    cam.fov = FOV;
-    BASE.copy(TARGET).addScaledVector(DIR, dist);
-    cam.position.copy(BASE);
-    cam.lookAt(TARGET);
-    cam.updateProjectionMatrix();
+    const aspect = size.width / Math.max(1, size.height);
+    if (isOpeningIntroActive()) {
+      const u = tickOpeningIntro(0);
+      const fov = sampleOpeningCamera(u, aspect, ENVIRONMENT_THEME, INTRO_POS, INTRO_TARGET);
+      cam.fov = fov;
+      cam.position.copy(INTRO_POS);
+      cam.lookAt(INTRO_TARGET);
+      cam.updateProjectionMatrix();
+      gameplayCameraPosition(aspect, BASE);
+      return;
+    }
+    applyGameplayCamera(cam, aspect);
   }, [camera, size]);
   useFrame((state, dt) => {
+    const cam = camera as PerspectiveCamera;
+    const aspect = size.width / Math.max(1, size.height);
+    if (!isOpeningIntroDone()) {
+      // idle/waiting hold the start pose (u=0); playing advances; skip/finish snaps to endpoint.
+      const u = isOpeningIntroActive() ? tickOpeningIntro(dt) : 0;
+      const fov = sampleOpeningCamera(u, aspect, ENVIRONMENT_THEME, INTRO_POS, INTRO_TARGET);
+      if (cam.fov !== fov) {
+        cam.fov = fov;
+        cam.updateProjectionMatrix();
+      }
+      cam.position.copy(INTRO_POS);
+      cam.lookAt(INTRO_TARGET);
+      gameplayCameraPosition(aspect, BASE);
+      fx.push = 0;
+      fx.shake = 0;
+      return;
+    }
+    if (cam.fov !== FOV) {
+      cam.fov = FOV;
+      cam.updateProjectionMatrix();
+    }
     fx.push = Math.max(0, fx.push - dt * 3);
     fx.shake = Math.max(0, fx.shake - dt * 4);
-    if (!shake || BASE.lengthSq() === 0) return;
+    if (BASE.lengthSq() === 0) gameplayCameraPosition(aspect, BASE);
+    if (!shake) {
+      cam.position.copy(BASE);
+      cam.lookAt(TARGET);
+      return;
+    }
     const t = state.clock.elapsedTime;
     LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
     camera.position.copy(BASE).add(LOOK);

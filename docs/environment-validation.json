@@ -1,0 +1,432 @@
+{
+  "date": "2026-10-19",
+  "rendering": "Headless Chromium, ANGLE SwiftShader software rendering",
+  "typecheck": "passed",
+  "tests": "67 passed in 7 files",
+  "productionBuild": "passed",
+  "gltf": [
+    {
+      "file": "hillside-lod0.glb",
+      "bytes": 3186636,
+      "gzipBytes": 805323,
+      "triangles": 34360,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "hillside-lod1.glb",
+      "bytes": 1479272,
+      "gzipBytes": 556730,
+      "triangles": 14720,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "hillside-lod2.glb",
+      "bytes": 1086892,
+      "gzipBytes": 490642,
+      "triangles": 9700,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "townhouse-ochre.glb",
+      "bytes": 563292,
+      "gzipBytes": 415623,
+      "triangles": 2296,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "townhouse-coral.glb",
+      "bytes": 519460,
+      "gzipBytes": 408425,
+      "triangles": 1700,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "townhouse-teal.glb",
+      "bytes": 563288,
+      "gzipBytes": 415619,
+      "triangles": 2296,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "corner-mercearia.glb",
+      "bytes": 577588,
+      "gzipBytes": 417772,
+      "triangles": 2504,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "stepped-alley.glb",
+      "bytes": 498528,
+      "gzipBytes": 407194,
+      "triangles": 1384,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "rooftop-equipment.glb",
+      "bytes": 424756,
+      "gzipBytes": 394686,
+      "triangles": 420,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    },
+    {
+      "file": "street-furniture.glb",
+      "bytes": 427796,
+      "gzipBytes": 396602,
+      "triangles": 488,
+      "errors": 0,
+      "warnings": 0,
+      "messages": []
+    }
+  ],
+  "gallery": [
+    {
+      "loaded": true,
+      "error": "",
+      "file": "hillside-lod0.glb",
+      "triangles": 34362,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -10.4,
+          -0.45999999999999996,
+          -16.6
+        ],
+        "max": [
+          10.44,
+          10.129705210324193,
+          -4.492917985359156
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "hillside-lod1.glb",
+      "triangles": 14722,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -10.4,
+          -0.45999999999999996,
+          -16.6
+        ],
+        "max": [
+          10.44,
+          9.789705210324193,
+          -4.492917985359156
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "hillside-lod2.glb",
+      "triangles": 9702,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -10.4,
+          -0.45999999999999996,
+          -16.6
+        ],
+        "max": [
+          10.44,
+          9.789705210324193,
+          -4.6
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "townhouse-ochre.glb",
+      "triangles": 2298,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.26,
+          0,
+          -1.01
+        ],
+        "max": [
+          1.26,
+          5.449999999999999,
+          1.5699999999999998
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "townhouse-coral.glb",
+      "triangles": 1702,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.288,
+          0,
+          -1.01
+        ],
+        "max": [
+          1.288,
+          5.199999999999999,
+          1.5699999999999998
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "townhouse-teal.glb",
+      "triangles": 2298,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.26,
+          0,
+          -1.01
+        ],
+        "max": [
+          1.26,
+          5.449999999999999,
+          1.5699999999999998
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "corner-mercearia.glb",
+      "triangles": 2506,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.4600000000000002,
+          0,
+          -1.185
+        ],
+        "max": [
+          1.562,
+          5.65,
+          2.25
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "stepped-alley.glb",
+      "triangles": 1386,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -1.4933910445940324,
+          0,
+          -5.109786364139185
+        ],
+        "max": [
+          1.6089999999999998,
+          3.674310807979485,
+          0.19500000000000028
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "rooftop-equipment.glb",
+      "triangles": 422,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -0.9229120413551098,
+          0.024999999999999994,
+          -0.7480000000000001
+        ],
+        "max": [
+          1.01,
+          1.35,
+          0.345
+        ]
+      }
+    },
+    {
+      "loaded": true,
+      "error": "",
+      "file": "street-furniture.glb",
+      "triangles": 490,
+      "draws": 2,
+      "textures": 2,
+      "bounds": {
+        "min": [
+          -2.042797543233282,
+          0,
+          -0.52
+        ],
+        "max": [
+          1.8900000000000001,
+          3.8332869780703303,
+          0.4247800077057069
+        ]
+      }
+    }
+  ],
+  "game": [
+    {
+      "quality": "low",
+      "width": 320,
+      "height": 568,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod2.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "low",
+      "width": 390,
+      "height": 844,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod2.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "low",
+      "width": 844,
+      "height": 390,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod2.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "medium",
+      "width": 320,
+      "height": 568,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod1.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "medium",
+      "width": 390,
+      "height": 844,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod1.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "medium",
+      "width": 844,
+      "height": 390,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod1.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 320,
+      "height": 568,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 390,
+      "height": 844,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 844,
+      "height": 390,
+      "phase": "playing",
+      "overflow": false,
+      "models": [
+        {
+          "url": "http://127.0.0.1:5189/models/environment/hillside-lod0.glb",
+          "status": 200
+        }
+      ],
+      "errors": []
+    },
+    {
+      "fallback": "aborted environment model still leaves game canvas and controls usable"
+    }
+  ]
+}

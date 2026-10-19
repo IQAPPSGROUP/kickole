@@ -1,5 +1,7 @@
 import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
+import type { Quality } from '../game/storage';
+import { EnvironmentBackdrop } from './EnvironmentBackdrop';
 
 const NAVY = '#142D35';
 const TEAL = '#12BFA6';
@@ -310,7 +312,7 @@ function HillsideNeighbourhood() {
   );
 }
 
-export function Court({ shadows }: { shadows: boolean }) {
+export function Court({ shadows, quality }: { shadows: boolean; quality: Quality }) {
   const tex = useCourtTexture();
   const wall = useWallTexture();
   const sign = useSignTexture();
@@ -321,7 +323,7 @@ export function Court({ shadows }: { shadows: boolean }) {
   }, [tex, wall, sign, fence, blob]);
   return (
     <group>
-      <HillsideNeighbourhood />
+      <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow={shadows}>
         <planeGeometry args={[9, 9]} />
         <meshStandardMaterial map={tex} roughness={0.9} />

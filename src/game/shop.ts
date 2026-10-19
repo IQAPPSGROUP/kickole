@@ -1,3 +1,5 @@
+import type { EntitlementSource } from '../billing/types';
+import { grantLaunchCollection, markCoinOwned } from '../billing/entitlement';
 import { normalizeAppearance, type Appearance } from './appearance';
 import {
   BOOTS,
@@ -8,7 +10,6 @@ import {
   isBootId,
   isKitId,
   isLaunchCollectionId,
-  LAUNCH_COLLECTION_ITEM_IDS,
   type ChallengeKind,
   type UnlockRequirement,
 } from './catalogue';
@@ -27,8 +28,16 @@ export interface WardrobeLocker {
   equippedKit: string;
   appearance: Appearance;
   challenges: ChallengeProgress;
-  /** True only after a successful Launch Collection purchase (billing not wired yet). */
+  /**
+   * Cache of paid Launch Collection ownership. Never treat this alone as proof of payment
+   * on web — native adapters re-verify with the store. See docs/BILLING.md.
+   */
   launchCollectionOwned: boolean;
+  /** Item IDs granted by the paid collection that can be revoked on refund (not coin-bought). */
+  launchGrantedItemIds: string[];
+  entitlementSource: EntitlementSource;
+  entitlementVerifiedAt: number;
+  entitlementTransactionRef: string | null;
   /** Save schema version for migrations. */
   wardrobeVersion: number;
 }
@@ -69,33 +78,12 @@ export function canAfford(locker: WardrobeLocker, unlock: UnlockRequirement): bo
   return locker.coins >= unlock.price;
 }
 
-/**
- * Launch Collection: unlocks every launch-catalogue ID without spending coins.
- * Achievement badges / challenge tallies are unchanged. Future SKUs are excluded
- * because only LAUNCH_COLLECTION_ITEM_IDS are granted.
- */
+/** @deprecated Prefer grantLaunchCollection from billing/entitlement after store verification. */
 export function applyLaunchCollection(locker: WardrobeLocker): WardrobeLocker {
-  if (locker.launchCollectionOwned) return locker;
-  const boots = new Set(locker.ownedBoots);
-  const kits = new Set(locker.ownedKits);
-  for (const id of LAUNCH_COLLECTION_ITEM_IDS) {
-    if (isBootId(id)) boots.add(id);
-    if (isKitId(id)) kits.add(id);
-  }
-  return {
-    ...locker,
-    launchCollectionOwned: true,
-    ownedBoots: [...boots],
-    ownedKits: [...kits],
-  };
+  return grantLaunchCollection(locker, 'dev_sim', null);
 }
 
-/** Real-money billing is not available yet — always refuse. */
-export function purchaseLaunchCollection(_locker: WardrobeLocker): { ok: false; reason: 'billing_unavailable' } {
-  return { ok: false, reason: 'billing_unavailable' };
-}
-
-export type ShopFailure = 'unknown' | 'broke' | 'locked' | 'billing_unavailable';
+export type ShopFailure = 'unknown' | 'broke' | 'locked' | 'billing_unavailable' | 'pending';
 
 export type ShopResult =
   | { ok: true; locker: WardrobeLocker }
@@ -111,15 +99,13 @@ export function buyOrEquipBoot(locker: WardrobeLocker, bootId: string): ShopResu
     return { ok: false, locker, reason: 'locked' };
   }
   if (locker.coins < boot.unlock.price) return { ok: false, locker, reason: 'broke' };
-  return {
-    ok: true,
-    locker: {
-      ...locker,
-      coins: locker.coins - boot.unlock.price,
-      ownedBoots: [...locker.ownedBoots, boot.id],
-      equippedBoot: boot.id,
-    },
-  };
+  const next = markCoinOwned({
+    ...locker,
+    coins: locker.coins - boot.unlock.price,
+    ownedBoots: [...locker.ownedBoots, boot.id],
+    equippedBoot: boot.id,
+  }, boot.id);
+  return { ok: true, locker: next };
 }
 
 export function buyOrEquipKit(locker: WardrobeLocker, kitId: string): ShopResult {
@@ -132,15 +118,13 @@ export function buyOrEquipKit(locker: WardrobeLocker, kitId: string): ShopResult
     return { ok: false, locker, reason: 'locked' };
   }
   if (locker.coins < kit.unlock.price) return { ok: false, locker, reason: 'broke' };
-  return {
-    ok: true,
-    locker: {
-      ...locker,
-      coins: locker.coins - kit.unlock.price,
-      ownedKits: [...locker.ownedKits, kit.id],
-      equippedKit: kit.id,
-    },
-  };
+  const next = markCoinOwned({
+    ...locker,
+    coins: locker.coins - kit.unlock.price,
+    ownedKits: [...locker.ownedKits, kit.id],
+    equippedKit: kit.id,
+  }, kit.id);
+  return { ok: true, locker: next };
 }
 
 /** Map legacy boot IDs from the 350/800/1600 shop onto the launch catalogue. */
@@ -181,9 +165,18 @@ export interface RawSaveFields {
   appearance?: unknown;
   challenges?: unknown;
   launchCollectionOwned?: unknown;
+  launchGrantedItemIds?: unknown;
+  entitlementSource?: unknown;
+  entitlementVerifiedAt?: unknown;
+  entitlementTransactionRef?: unknown;
   wardrobeVersion?: unknown;
   /** Legacy settings skin carried during migration. */
   legacySkinId?: string | null;
+}
+
+function parseEntitlementSource(raw: unknown): EntitlementSource {
+  if (raw === 'apple' || raw === 'google' || raw === 'dev_sim' || raw === 'none') return raw;
+  return 'none';
 }
 
 function mapBootId(id: string): string | null {
@@ -241,7 +234,22 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
     appearance = normalizeAppearance({ ...appearance, ...legacy.appearance, clothing: { ...appearance.clothing, ...legacy.appearance.clothing } });
   }
 
-  const launchCollectionOwned = raw?.launchCollectionOwned === true;
+  const entitlementSource = parseEntitlementSource(raw?.entitlementSource);
+  const entitlementVerifiedAt = typeof raw?.entitlementVerifiedAt === 'number' && raw.entitlementVerifiedAt > 0
+    ? Math.floor(raw.entitlementVerifiedAt)
+    : 0;
+  const entitlementTransactionRef = typeof raw?.entitlementTransactionRef === 'string'
+    ? raw.entitlementTransactionRef
+    : null;
+  const launchGrantedItemIds = Array.isArray(raw?.launchGrantedItemIds)
+    ? raw.launchGrantedItemIds.filter((id): id is string => typeof id === 'string')
+    : [];
+
+  // Do not honour a bare localStorage boolean without a store source — prevents hand-edited saves
+  // from unlocking paid content. Trusted sources are re-checked by native adapters on launch.
+  const cachedOwned = raw?.launchCollectionOwned === true
+    && (entitlementSource === 'apple' || entitlementSource === 'google' || entitlementSource === 'dev_sim');
+
   let locker: WardrobeLocker = {
     coins,
     ownedBoots,
@@ -251,9 +259,25 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
     appearance,
     challenges,
     launchCollectionOwned: false,
+    launchGrantedItemIds: [],
+    entitlementSource: 'none',
+    entitlementVerifiedAt: 0,
+    entitlementTransactionRef: null,
     wardrobeVersion: WARDROBE_VERSION,
   };
-  if (launchCollectionOwned) locker = applyLaunchCollection(locker);
+
+  if (cachedOwned) {
+    // In production web builds, ignore dev_sim caches.
+    if (entitlementSource === 'dev_sim' && import.meta.env.PROD) {
+      return locker;
+    }
+    locker = grantLaunchCollection(
+      { ...locker, launchGrantedItemIds },
+      entitlementSource as 'apple' | 'google' | 'dev_sim',
+      entitlementTransactionRef,
+      entitlementVerifiedAt || Date.now(),
+    );
+  }
   return locker;
 }
 

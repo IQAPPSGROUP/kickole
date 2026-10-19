@@ -48,7 +48,7 @@ See `docs/PREVIEW_DEPLOY.md` for preview deployment and the device test checklis
 Working and checked (unit tests, TypeScript, production build, headless-browser run driven by a timing bot): home/game/game-over screens, ball launch, timed kicks, scoring, combo, foot stall, local best, character kick/stall poses.
 Implemented but only lightly checked: settings persistence, top-5 leaderboard UI, skins (3 free, cosmetic only), sound/vibration, WebGL error state.
 
-Not done: Capacitor projects, purchases (skin `productId` is a placeholder), tuning on physical devices.
+Native packaging: Capacitor (`com.iqappsgroup.kickole`) with StoreKit 2 / Play Billing for the Kickolé Launch Collection — see [`docs/BILLING.md`](docs/BILLING.md). Web build remains the Cloudflare Pages target. Live store console configuration and device billing still need your App Store Connect / Play Console setup.
 
 ## Brazilian environment kit
 

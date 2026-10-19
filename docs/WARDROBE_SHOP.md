@@ -27,7 +27,7 @@ Coins = floor(run score) per completed scoring run. Run score, spendable coins a
 
 ## Launch Collection
 
-`LAUNCH_COLLECTION_ITEM_IDS` lists every launch boot/kit ID. A future one-time purchase will call `applyLaunchCollection` and unlock only those IDs. Real-money billing is **not** wired (`purchaseLaunchCollection` returns `billing_unavailable`). Achievement challenges still require play.
+`LAUNCH_COLLECTION_ITEM_IDS` lists every launch boot/kit ID. The one-time **Kickolé Launch Collection** purchase (StoreKit 2 / Play Billing) grants only those IDs after store verification. See [`BILLING.md`](./BILLING.md). Achievement challenges still require play. Browser builds cannot take real payments.
 
 ## Migration
 

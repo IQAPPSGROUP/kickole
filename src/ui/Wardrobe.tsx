@@ -14,6 +14,8 @@ import {
   type BootDesign,
   type KitDesign,
 } from '../game/catalogue';
+import type { StoreProduct } from '../billing/types';
+import { LAUNCH_COLLECTION_DISPLAY_NAME } from '../billing/config';
 import { challengeValue, meetsChallenge } from '../game/shop';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
@@ -127,20 +129,32 @@ function UnlockHint({ item, save }: { item: BootDesign | KitDesign; save: SaveDa
 
 export function ShopScreen({
   save,
+  launchProduct,
+  billingMessage,
+  billingBusy,
   onBuyBoot,
   onBuyKit,
+  onPurchaseLaunch,
+  onRestorePurchases,
   onPreview,
   onClose,
 }: {
   save: SaveData;
+  launchProduct: StoreProduct | null;
+  billingMessage: string | null;
+  billingBusy: boolean;
   onBuyBoot: (id: string) => boolean;
   onBuyKit: (id: string) => boolean;
+  onPurchaseLaunch: () => void;
+  onRestorePurchases: () => void;
   onPreview: (opts: { kitId?: string | null; bootId?: string | null }) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<ShopTab>('boots');
   const [focusBoot, setFocusBoot] = useState(save.equippedBoot);
   const [focusKit, setFocusKit] = useState(save.equippedKit);
+  const priceLabel = launchProduct?.priceString ?? null;
+  const ownedLaunch = save.launchCollectionOwned;
 
   const previewSkin = useMemo(
     () => composePlayerSkin(save.appearance, focusKit, focusBoot),
@@ -167,6 +181,41 @@ export function ShopScreen({
         <div className="economy-row">
           <span className="best-pill">COINS <b>{save.coins.toLocaleString()}</b></span>
           <span className="best-pill ghost">BEST SCORE <b>{save.best}</b></span>
+        </div>
+        <div className="launch-card">
+          <h3>{LAUNCH_COLLECTION_DISPLAY_NAME}</h3>
+          <p>
+            One permanent unlock for <b>this launch collection only</b> — every launch boot and kit listed below.
+            Future collections are sold separately. Free skin tones, hair and basic styling stay free.
+            Achievement challenges still need real play.
+          </p>
+          {ownedLaunch ? (
+            <p className="coin-earn">OWNED · restored with your store account</p>
+          ) : (
+            <button
+              type="button"
+              className="btn primary"
+              disabled={billingBusy}
+              onClick={onPurchaseLaunch}
+            >
+              {billingBusy ? 'PLEASE WAIT…' : priceLabel ? `UNLOCK · ${priceLabel}` : 'UNLOCK ON iOS / ANDROID'}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={billingBusy}
+            onClick={onRestorePurchases}
+          >
+            RESTORE PURCHASES
+          </button>
+          {billingMessage && <p className="shop-note" role="status">{billingMessage}</p>}
+          {!priceLabel && (
+            <p className="shop-note">
+              Browser builds cannot take real payments. Install the Kickolé iOS or Android app to buy with your local store price
+              (UK list target £2.99). Apple and Google purchases do not transfer between stores.
+            </p>
+          )}
         </div>
         <PlayerPreview skin={previewSkin} label="Shop preview" />
         <div className="seg">
@@ -231,9 +280,6 @@ export function ShopScreen({
             );
           })}
         </div>
-        <p className="shop-note">
-          Launch Collection (one-time purchase) will unlock all launch boots &amp; kits — billing arrives with native stores. Achievement challenges still need real play.
-        </p>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

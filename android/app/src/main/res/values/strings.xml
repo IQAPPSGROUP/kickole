@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kickolé</string>
+    <string name="title_activity_main">Kickolé</string>
+    <string name="package_name">com.iqappsgroup.kickole</string>
+    <string name="custom_url_scheme">com.iqappsgroup.kickole</string>
+</resources>

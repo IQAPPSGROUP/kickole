@@ -1,3 +1,5 @@
+import { createDefaultPurchaseService, PurchaseService } from '../billing/PurchaseService';
+import type { PurchaseResult, StoreProduct } from '../billing/types';
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
@@ -54,6 +56,9 @@ export interface Snapshot {
   settings: Settings;
   skin: Skin;
   result: Result | null;
+  launchProduct: StoreProduct | null;
+  billingMessage: string | null;
+  billingBusy: boolean;
 }
 
 /** Glues the engine to storage, audio, haptics and React (via subscribe/getSnapshot). */
@@ -68,11 +73,27 @@ export class GameController {
   private settings = loadSettings();
   /** Per-run challenge tallies flushed into the save on game over. */
   private runChallenges: ChallengeProgress = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
+  private readonly billing: PurchaseService = createDefaultPurchaseService();
+  private billingMessage: string | null = null;
+  private billingBusy = false;
+  private billingReady: Promise<void>;
 
   constructor() {
     this.engine.prepare('menu');
     this.engine.on((e) => this.onEvent(e));
     this.snapshot = this.build();
+    this.billingReady = this.initBilling();
+  }
+
+  private async initBilling() {
+    try {
+      await this.billing.init();
+      this.save = await this.billing.syncEntitlements(this.save) as SaveData;
+      persistSave(this.save);
+      this.publish();
+    } catch {
+      // Retain cached verified entitlement on transient failure.
+    }
   }
 
   subscribe = (fn: () => void) => {
@@ -109,6 +130,9 @@ export class GameController {
       settings: this.settings,
       skin: this.liveSkin(preview),
       result: this.result,
+      launchProduct: this.billing.launchProduct,
+      billingMessage: this.billingMessage,
+      billingBusy: this.billingBusy,
     };
   }
 
@@ -310,5 +334,47 @@ export class GameController {
 
   clearPreview() {
     this.publish();
+  }
+
+  async purchaseLaunchCollection(): Promise<PurchaseResult> {
+    await this.billingReady;
+    if (this.billingBusy) {
+      return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Purchase already in progress.' };
+    }
+    this.billingBusy = true;
+    this.billingMessage = null;
+    this.publish();
+    try {
+      const { result, locker } = await this.billing.purchase(this.save);
+      this.save = { ...this.save, ...locker };
+      if (result.outcome === 'purchased' || result.outcome === 'restored' || result.outcome === 'already_owned') {
+        persistSave(this.save);
+      }
+      this.billingMessage = result.message ?? null;
+      return result;
+    } finally {
+      this.billingBusy = false;
+      this.publish();
+    }
+  }
+
+  async restorePurchases(): Promise<PurchaseResult> {
+    await this.billingReady;
+    if (this.billingBusy) {
+      return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Please wait.' };
+    }
+    this.billingBusy = true;
+    this.billingMessage = null;
+    this.publish();
+    try {
+      const { result, locker } = await this.billing.restore(this.save);
+      this.save = { ...this.save, ...locker };
+      persistSave(this.save);
+      this.billingMessage = result.message ?? null;
+      return result;
+    } finally {
+      this.billingBusy = false;
+      this.publish();
+    }
   }
 }

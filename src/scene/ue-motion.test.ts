@@ -34,8 +34,8 @@ function rig() {
 }
 
 describe('newer Quaternius v2 movement',()=>{
-  it('selects the contract v3 asset derived from the Quaternius source',()=>{
-    expect(CHARACTER_MODEL_URL.endsWith('/models/kickole_player_v3.glb')).toBe(true);
+  it('selects the realistic contract asset',()=>{
+    expect(CHARACTER_MODEL_URL.endsWith('/models/kickole_player_v4.glb')).toBe(true);
   });
 
   it('retains the procedural v2 leg transforms during both touches and held stalls',()=>{

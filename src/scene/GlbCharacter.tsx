@@ -1,17 +1,20 @@
-import { useEffect, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Material, Mesh, MeshToonMaterial, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D } from 'three';
+import { AnimationMixer, BoxGeometry, CanvasTexture, LoopOnce, LoopRepeat, Material, Mesh, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type WebGLRenderer } from 'three';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
+import type { SurfacePattern } from '../game/catalogue';
 import type { Skin } from '../game/skins';
-import { loadSettings } from '../game/storage';
-import { computePose, createPose } from './pose';
+import type { Quality } from '../game/storage';
+import { computePose, createPose, type Pose } from './pose';
 import { inspector } from './inspector';
 import { computePlayerMotion, createPlayerMotion } from './motion';
 import { createMotionRig } from './motionRig';
+import { characterLod } from './qualityTier';
 import {
-  ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, animationSampleTime, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, MATERIAL_NAMES, characterModelUrl, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, animationSampleTime, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 import { ueDeltaQuaternion } from './ue-pose';
@@ -34,21 +37,156 @@ const LACES: ReadonlyArray<{ position: [number, number, number]; size: [number, 
   { position: [0, 0.082, -0.06], size: [0.013, 0.1, 0.01] },
 ];
 
-interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; expressive?: boolean }
+const NUMBERS = [7, 9, 10, 11, 14, 17, 21, 23] as const;
+
+function shirtNumber(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 33 + id.charCodeAt(i)) >>> 0;
+  return NUMBERS[hash % NUMBERS.length];
+}
+
+function patternIndex(pattern: SurfacePattern): number {
+  switch (pattern) {
+    case 'plain': return 0;
+    case 'panels': return 1;
+    case 'wave': return 2;
+    case 'mosaic': return 3;
+    case 'stripe': return 4;
+    case 'gold': return 5;
+    case 'midnight': return 6;
+    case 'carnival': return 7;
+    default: {
+      const neverPattern: never = pattern;
+      return neverPattern;
+    }
+  }
+}
+
+/** Eye and teeth texels live past u = 0.86 and must ignore the skin tint. */
+function keepEyes(material: MeshStandardMaterial) {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+       if (vMapUv.x > 0.86) diffuseColor.rgb = sampledDiffuseColor.rgb;`,
+    );
+  };
+  material.customProgramCacheKey = () => 'kickole-eyes';
+  material.needsUpdate = true;
+}
+
+/** Subtle weave so kit patterns survive a flat colour tint. */
+function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
+  const id = patternIndex(pattern);
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uPattern = { value: id };
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uPattern;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        float weave = 1.0;
+        if (uPattern > 0.5 && uPattern < 1.5) weave = mix(0.78, 1.0, step(0.5, fract(vMapUv.x * 5.0)));
+        else if (uPattern > 1.5 && uPattern < 2.5) weave = 0.82 + 0.18 * sin(vMapUv.y * 36.0 + vMapUv.x * 4.0);
+        else if (uPattern > 2.5 && uPattern < 3.5) weave = mix(0.75, 1.0, step(0.65, fract(sin(dot(floor(vMapUv * 8.0), vec2(12.9898, 78.233))) * 43758.5453)));
+        else if (uPattern > 3.5 && uPattern < 4.5) weave = mix(0.8, 1.0, step(0.55, fract(vMapUv.y * 10.0)));
+        else if (uPattern > 4.5 && uPattern < 5.5) weave = 0.9 + 0.1 * sin(vMapUv.x * 80.0);
+        else if (uPattern > 5.5 && uPattern < 6.5) weave = mix(0.7, 1.0, step(0.5, fract(vMapUv.x * 2.0 + vMapUv.y)));
+        else if (uPattern > 6.5) weave = 0.84 + 0.16 * sin((vMapUv.x + vMapUv.y) * 28.0);
+        diffuseColor.rgb *= weave;`);
+  };
+  material.customProgramCacheKey = () => `kit-${id}`;
+  material.needsUpdate = true;
+}
+
+function applyContractBones(bones: Partial<Record<BoneKey, Bone>>, pose: Pose, hipsRestY: number) {
+  const set = (key: BoneKey, x: number, y: number, z: number) => {
+    const bone = bones[key];
+    if (bone) bone.rotation.set(x, y, z);
+  };
+  if (bones.root) bones.root.position.y = hipsRestY + pose.bodyY;
+  set('root', 0, pose.bodyYaw, 0);
+  set('spine', pose.torsoPitch, pose.torsoYaw, pose.torsoRoll);
+  set('neck', pose.neckPitch, pose.neckYaw, 0);
+  set('head', pose.headPitch, pose.headYaw, 0);
+  set('armLeft', pose.armLeftPitch, 0, -pose.armLeft);
+  set('armRight', pose.armRightPitch, 0, pose.armRight);
+  set('elbowLeft', pose.elbowLeft, 0, 0);
+  set('elbowRight', pose.elbowRight, 0, 0);
+  const leg = (side: 'left' | 'right', thigh: BoneKey, shin: BoneKey, foot: BoneKey) => {
+    const limb = pose.legs[side];
+    set(thigh, limb.thigh, limb.twist, limb.abduct);
+    set(shin, limb.knee, 0, 0);
+    set(foot, limb.foot, limb.ankleYaw, limb.ankleRoll);
+  };
+  leg('left', 'thighLeft', 'shinLeft', 'footLeft');
+  leg('right', 'thighRight', 'shinRight', 'footRight');
+}
+
+const ktxRenderer: { gl: WebGLRenderer | null } = { gl: null };
+
+function extendCharacterLoader(loader: { setKTX2Loader: (ktx2: KTX2Loader) => void }) {
+  const ktx2 = new KTX2Loader();
+  ktx2.setTranscoderPath(`${import.meta.env.BASE_URL}basis/`);
+  if (ktxRenderer.gl) ktx2.detectSupport(ktxRenderer.gl);
+  loader.setKTX2Loader(ktx2);
+}
+
+function ShirtNumber({ bone, id }: { bone: Bone; id: string }) {
+  const group = useRef<Group>(null);
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const g = canvas.getContext('2d');
+    if (g) {
+      g.clearRect(0, 0, 128, 128);
+      g.fillStyle = 'rgba(18, 22, 28, 0.82)';
+      g.fillRect(28, 34, 72, 60);
+      g.fillStyle = '#f4f1ea';
+      g.font = '700 54px sans-serif';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(String(shirtNumber(id)), 64, 66);
+    }
+    const map = new CanvasTexture(canvas);
+    map.colorSpace = SRGBColorSpace;
+    return map;
+  }, [id]);
+  useEffect(() => () => texture.dispose(), [texture]);
+  useLayoutEffect(() => {
+    const node = group.current;
+    if (!node) return;
+    bone.add(node);
+    return () => { bone.remove(node); };
+  }, [bone]);
+  return (
+    <group ref={group} position={[0, 0.02, 0.16]}>
+      <mesh>
+        <planeGeometry args={[0.16, 0.16]} />
+        <meshBasicMaterial map={texture} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+      </mesh>
+    </group>
+  );
+}
+
+interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; expressive?: boolean; quality?: Quality }
 
 /**
  * Rigged GLB footballer (see docs/CHARACTER_GLB.md). Plays the named clips when present, otherwise drives the
  * contract bones from the shared procedural pose. Reports an invalid model so the primitive fallback is used.
  */
-export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Props) {
-  const gltf = useGLTF(CHARACTER_MODEL_URL);
-  const { scene, clips, report, bones, materials, hairMeshes, kind, quaternius } = useMemo(() => {
+export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quality = 'high' }: Props) {
+  const gl = useThree((state) => state.gl);
+  ktxRenderer.gl = gl;
+  // drei types GLTFLoader from three-stdlib, which does not match three's KTX2Loader.
+  const gltf = useGLTF(characterModelUrl(characterLod(quality)), false, true, extendCharacterLoader as never);
+  const { scene, clips, report, bones, materials, hairMeshes, kind, quaternius, pbr, chest } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
     const byName = new Map<string, Bone>();
-    const mats = new Map<string, MeshToonMaterial>();
+    const mats = new Map<string, MeshToonMaterial | MeshStandardMaterial>();
     const boneNames: string[] = [];
     const matNames: string[] = [];
+    let textured = false;
     root.traverse((o) => {
       if ((o as Bone).isBone) {
         boneNames.push(o.name);
@@ -60,7 +198,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;
         const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        const cloned = list.map((m) => toToonMaterial(m, m.name === MATERIAL_NAMES.skin));
+        const cloned = list.map((m) => {
+          const source = m as MeshStandardMaterial;
+          const keepPbr = Boolean(source.normalMap);
+          if (keepPbr) textured = true;
+          const next = keepPbr ? source.clone() : toToonMaterial(m, m.name === MATERIAL_NAMES.skin);
+          next.name = m.name;
+          return next;
+        });
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
         cloned.forEach((m) => { matNames.push(m.name); mats.set(m.name, m); });
       }
@@ -90,6 +235,8 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       hairMeshes,
       kind: resolved,
       quaternius: boneNames.includes('Clavicle_L'),
+      pbr: textured,
+      chest: byName.get('Spine2'),
       report: validateModel(boneNames, gltf.animations.map((a) => a.name), matNames),
     };
   }, [gltf]);
@@ -107,17 +254,23 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
   useEffect(() => {
     const colors = skinMaterialColors(skin);
     materials.forEach((m, name) => {
-      // Skin keeps its atlas so eye texels survive a tone change. Hair and kit are flat swaps.
-      if (name !== MATERIAL_NAMES.skin) m.map = null;
       if (colors[name]) m.color.set(colors[name]);
-      bindSunsetToon(m, toonRole(name), skin.clothing.shirtTrim);
-      setToonTrim(m, skin.clothing.shirtTrim);
+      if ((m as MeshToonMaterial).isMeshToonMaterial) {
+        const toon = m as MeshToonMaterial;
+        // Flat kit swaps. Skin keeps its atlas so the eye texels survive a tone change.
+        if (name !== MATERIAL_NAMES.skin) toon.map = null;
+        bindSunsetToon(toon, toonRole(name), skin.clothing.shirtTrim);
+        setToonTrim(toon, skin.clothing.shirtTrim);
+        return;
+      }
+      const standard = m as MeshStandardMaterial;
+      if (name === MATERIAL_NAMES.skin) keepEyes(standard);
+      if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern);
     });
   }, [skin, materials]);
 
   useEffect(() => {
-    const quality = loadSettings().quality;
-    if (quality === 'low') return;
+    if (pbr || quality === 'low') return;
     const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
     const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
     const laceMat = new MeshToonMaterial({ name: 'Boot_Laces', color: skin.boots.lace ?? '#F8F9FB' });
@@ -151,7 +304,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       for (const geo of laceGeos) geo.dispose();
       heelGeo.dispose();
     };
-  }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim]);
+  }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
   const actions = useMemo(() => {
@@ -244,8 +397,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
           }
         }
       } else {
-        mixer.update(dt);
-        if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
+        computePose(engine, pose);
+        const trickPose = pose.lockMotion || engine.trick != null;
+        if (trickPose) {
+          applyContractBones(bones, pose, hipsRestY);
+          scene.position.set(0, 0, 0);
+        } else {
+          mixer.update(dt);
+          if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
+        }
       }
       if (inspector.active) {
         const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
@@ -321,6 +481,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
         color={skin.body.hair}
         hairMesh={hairMeshes}
       />
+      {pbr && chest && <ShirtNumber bone={chest} id={skin.id} />}
     </>
   );
 }

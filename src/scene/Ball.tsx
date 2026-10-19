@@ -1,22 +1,40 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Euler, Matrix4, MeshBasicMaterial, Quaternion, Vector3, type Group, type Mesh } from 'three';
-import { toonGradient } from './toon';
+import { CanvasTexture, Color, Euler, MeshBasicMaterial, MeshPhysicalMaterial, RepeatWrapping, Vector2, Vector3, type Group, type Mesh } from 'three';
 import type { Quality } from '../game/storage';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 
-const PHI = (1 + Math.sqrt(5)) / 2;
-/** Icosahedron vertices: where the dark pentagon panels sit. */
-const PANEL_DIRS: Vector3[] = (() => {
-  const v: Array<[number, number, number]> = [];
-  for (const a of [-1, 1]) for (const b of [-PHI, PHI]) {
-    v.push([0, a, b], [a, b, 0], [b, 0, a]);
-  }
-  return v.map(([x, y, z]) => new Vector3(x, y, z).normalize());
-})();
-
 const TRAIL = 6;
+
+/** Stitched leather normal. The panel colour is applied in the fragment shader. */
+function leatherNormal(): CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 256;
+  const g = canvas.getContext('2d');
+  if (g) {
+    g.fillStyle = 'rgb(128,128,255)';
+    g.fillRect(0, 0, 256, 256);
+    g.strokeStyle = 'rgb(108,116,255)';
+    g.lineWidth = 3;
+    for (let x = 16; x < 256; x += 42) {
+      g.beginPath();
+      g.moveTo(x, 0);
+      g.lineTo(x, 256);
+      g.stroke();
+    }
+    for (let y = 20; y < 256; y += 64) {
+      g.beginPath();
+      g.moveTo(0, y);
+      g.lineTo(256, y);
+      g.stroke();
+    }
+  }
+  const texture = new CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = RepeatWrapping;
+  texture.repeat.set(2, 1);
+  return texture;
+}
 
 export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin; quality: Quality }) {
   const trail = useRef<Array<Mesh | null>>([]);
@@ -28,15 +46,36 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
   const shadow = useRef<Mesh>(null);
   const r = engine.config.ballRadius;
   const euler = useMemo(() => new Euler(0, 0, 0, 'XYZ'), []);
-
-  const panels = useMemo(() => {
-    const m = new Matrix4();
-    return PANEL_DIRS.map((d) => {
-      m.lookAt(new Vector3(0, 0, 0), d, new Vector3(0, 1, 0));
-      const q = new Quaternion().setFromRotationMatrix(m);
-      return { pos: d.clone().multiplyScalar(r * 1.002), q };
+  const panel = useMemo(() => new Color(skin.football.panels), [skin.football.panels]);
+  const leather = useMemo(() => {
+    const normal = leatherNormal();
+    const material = new MeshPhysicalMaterial({
+      color: skin.football.base,
+      roughness: 0.46,
+      metalness: 0,
+      clearcoat: 0.62,
+      clearcoatRoughness: 0.26,
+      normalMap: normal,
+      normalScale: new Vector2(0.55, 0.55),
     });
-  }, [r]);
+    material.onBeforeCompile = (shader) => {
+      material.userData.shader = shader;
+      shader.uniforms.uPanel = { value: panel };
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uPanel;')
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          float seam = abs(fract(vNormal.x * 3.0 + vNormal.z * 2.0) - 0.5);
+          float band = abs(fract(vNormal.y * 4.0) - 0.5);
+          float leather = smoothstep(0.16, 0.28, min(seam, band));
+          diffuseColor.rgb = mix(uPanel, diffuseColor.rgb, leather);`);
+    };
+    material.customProgramCacheKey = () => 'kickole-leather';
+    return material;
+  }, [panel, skin.football.base]);
+  useEffect(() => () => {
+    leather.normalMap?.dispose();
+    leather.dispose();
+  }, [leather]);
 
   useFrame(() => {
     const b = engine.ball;
@@ -84,16 +123,9 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
           <meshBasicMaterial color="#FFD93D" transparent opacity={0} depthWrite={false} />
         </mesh>
         <group ref={spin}>
-          <mesh castShadow>
-            <sphereGeometry args={[r, 32, 24]} />
-            <meshToonMaterial color={skin.football.base} gradientMap={toonGradient()} />
+          <mesh castShadow material={leather}>
+            <sphereGeometry args={[r, quality === 'low' ? 24 : 40, quality === 'low' ? 16 : 28]} />
           </mesh>
-          {panels.map((p, i) => (
-            <mesh key={i} position={p.pos} quaternion={p.q}>
-              <circleGeometry args={[r * 0.36, 5]} />
-              <meshToonMaterial color={skin.football.panels} gradientMap={toonGradient()} />
-            </mesh>
-          ))}
         </group>
       </group>
       {showTrail && Array.from({ length: TRAIL }, (_, i) => (

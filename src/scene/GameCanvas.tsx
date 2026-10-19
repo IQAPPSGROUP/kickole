@@ -1,8 +1,9 @@
 import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { BackSide, CanvasTexture, PMREMGenerator, PerspectiveCamera, SRGBColorSpace, Vector3 } from 'three';
+import { AgXToneMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
@@ -13,37 +14,11 @@ import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
 import { ENVIRONMENT_THEME } from './environment';
+import { PostFX } from './PostFX';
+import { detectTier, fallbackTier, profileFor, readDevice, startingTier } from './qualityTier';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
 import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
-
-function SunsetSky() {
-  const map = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 8;
-    canvas.height = 256;
-    const g = canvas.getContext('2d');
-    if (g) {
-      const grad = g.createLinearGradient(0, 0, 0, 256);
-      grad.addColorStop(0, '#6C5CE7');
-      grad.addColorStop(0.42, '#FF8A5B');
-      grad.addColorStop(0.7, '#FF4F9A');
-      grad.addColorStop(1, '#FFD93D');
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 8, 256);
-    }
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    return texture;
-  }, []);
-  useEffect(() => () => map.dispose(), [map]);
-  return (
-    <mesh renderOrder={-10} position={[0, 8, -16]} frustumCulled={false}>
-      <planeGeometry args={[90, 48]} />
-      <meshBasicMaterial map={map} side={BackSide} fog={false} depthWrite={false} toneMapped={false} />
-    </mesh>
-  );
-}
 
 const FOV = GAMEPLAY_FOV;
 const TARGET = GAMEPLAY_TARGET;
@@ -156,42 +131,139 @@ interface SceneProps {
   onReady: () => void;
 }
 
+function StreetTone() {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    gl.toneMapping = AgXToneMapping;
+    gl.toneMappingExposure = 1.05;
+  }, [gl]);
+  return null;
+}
+
+/** CC0 sunset IBL. Loaded after the first paint so the character and court colour maps win the initial budget. */
+function SunsetIbl() {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    let alive = true;
+    let env: ReturnType<PMREMGenerator['fromEquirectangular']>['texture'] | null = null;
+    const pm = new PMREMGenerator(gl);
+    const timer = window.setTimeout(() => {
+      new HDRLoader().load(`${import.meta.env.BASE_URL}textures/venice_sunset_1k.hdr`, (hdr) => {
+        if (!alive) { hdr.dispose(); pm.dispose(); return; }
+        env = pm.fromEquirectangular(hdr).texture;
+        scene.environment = env;
+        scene.background = env;
+        scene.backgroundBlurriness = 0.42;
+        scene.environmentIntensity = 0.85;
+        hdr.dispose();
+        pm.dispose();
+      });
+    }, 400);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+      scene.environment = null;
+      scene.background = null;
+      env?.dispose();
+    };
+  }, [gl, scene]);
+  return null;
+}
+
+function FpsWatch({ tier, onTier }: { tier: Quality; onTier: (next: Quality) => void }) {
+  const samples = useMemo(() => [] as number[], []);
+  useFrame((_, dt) => {
+    if (dt <= 0 || dt > 0.5) return;
+    samples.push(1000 / (dt * 1000));
+    if (samples.length < 45) return;
+    const fps = samples.reduce((sum, n) => sum + n, 0) / samples.length;
+    samples.length = 0;
+    const next = fallbackTier(tier, fps);
+    if (next !== tier) onTier(next);
+  });
+  return null;
+}
+
+function PerfProbe() {
+  const gl = useThree((state) => state.gl);
+  useFrame(() => {
+    const info = (gl as WebGLRenderer).info;
+    (globalThis as { __KICKOLE_PERF?: { triangles: number; calls: number; textures: number } }).__KICKOLE_PERF = {
+      triangles: info.render.triangles,
+      calls: info.render.calls,
+      textures: info.memory.textures,
+    };
+  });
+  return null;
+}
+
+function forcedTier(): Quality | null {
+  if (typeof location === 'undefined') return null;
+  const value = new URLSearchParams(location.search).get('tier');
+  if (value === 'low' || value === 'medium' || value === 'high') return value;
+  return null;
+}
+
 function World({ controller, skin, quality, onReady }: SceneProps) {
-  const shadows = quality !== 'low';
+  const street = ENVIRONMENT_THEME !== 'beach';
+  const profile = profileFor(quality);
+  const shadows = street ? profile.shadows !== 'none' : quality !== 'low';
   useEffect(() => { onReady(); }, [onReady]);
-  const mapSize = quality === 'high' ? 1024 : 512;
+  const mapSize = street ? (profile.shadowMap || 512) : quality === 'high' ? 1024 : 512;
+  const wide = street && profile.shadows === 'cascaded';
+  const post = street && (profile.ssao || profile.bloom || profile.dof || profile.fxaa);
   return (
     <>
-      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#8dc5cb' : '#6C5CE7']} />
-      <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#8dc5cb', 24, 52] : ['#FF8A5B', 11, 28]} />
+      {street && <StreetTone />}
+      <color attach="background" args={[street ? '#3a2a28' : '#8dc5cb']} />
+      <fog attach="fog" args={street ? ['#b98362', 16, 42] : ['#8dc5cb', 24, 52]} />
       <CameraRig shake={quality !== 'low'} />
-      {quality === 'high' && <Environment />}
+      {street && profile.ibl && <SunsetIbl />}
+      {!street && quality === 'high' && <Environment />}
       <Simulation controller={controller} />
-      <hemisphereLight args={ENVIRONMENT_THEME === 'beach' ? ['#fff1dc', '#12363f', 0.95] : ['#FF8A5B', '#1E2A5A', 0.72]} />
-      {ENVIRONMENT_THEME === 'beach' && <ambientLight intensity={0.32} />}
+      <PerfProbe />
+      {street ? (
+        <>
+          <hemisphereLight args={['#ffd2a8', '#2a2420', 0.55]} />
+          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.35} color="#8aa4c8" />
+        </>
+      ) : (
+        <>
+          <hemisphereLight args={['#fff1dc', '#12363f', 0.95]} />
+          <ambientLight intensity={0.32} />
+        </>
+      )}
       <directionalLight
-        position={[2.6, 7, 3.2]}
-        intensity={ENVIRONMENT_THEME === 'beach' ? 2.3 : 2.5}
-        color={ENVIRONMENT_THEME === 'beach' ? '#ffe9c7' : '#FFF6E8'}
+        position={street ? [6.2, 8.4, 2.4] : [2.6, 7, 3.2]}
+        intensity={street ? 2.6 : 2.3}
+        color={street ? '#ffd0a0' : '#ffe9c7'}
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}
-        shadow-camera-left={-3}
-        shadow-camera-right={3}
-        shadow-camera-top={4}
-        shadow-camera-bottom={-3}
+        shadow-camera-left={wide ? -6 : -3}
+        shadow-camera-right={wide ? 6 : 3}
+        shadow-camera-top={wide ? 6 : 4}
+        shadow-camera-bottom={wide ? -4 : -3}
         shadow-camera-near={1}
-        shadow-camera-far={14}
+        shadow-camera-far={street ? 22 : 14}
         shadow-bias={-0.0004}
-        shadow-radius={quality === 'high' ? 3 : 1}
+        shadow-radius={wide ? 4 : quality === 'high' ? 3 : 1}
       />
-      {ENVIRONMENT_THEME !== 'beach' && <SunsetSky />}
       <Court shadows={shadows} quality={quality} />
-      {shadows && quality === 'high' && (
-        <ContactShadows position={[0, 0.006, 0.2]} opacity={0.38} scale={4} blur={2.2} far={1.2} resolution={256} color="#1E2A5A" />
+      {((street && profile.contactShadows) || (!street && quality === 'high')) && (
+        <ContactShadows
+          position={[0, 0.006, 0.2]}
+          opacity={street ? 0.45 : 0.38}
+          scale={4}
+          blur={2.2}
+          far={1.2}
+          resolution={256}
+          color={street ? '#1a120e' : '#1E2A5A'}
+        />
       )}
-      <CharacterSwitch engine={controller.engine} skin={skin} />
+      <CharacterSwitch engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
+      {post && <PostFX profile={profile} engine={controller.engine} />}
     </>
   );
 }
@@ -226,26 +298,40 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
+  const street = ENVIRONMENT_THEME !== 'beach';
+  const detected = useMemo(() => readDevice(), []);
+  const forced = useMemo(() => forcedTier(), []);
+  const [tier, setTier] = useState<Quality>(() => forced ?? (street ? startingTier(props.quality, detectTier(detected)) : props.quality));
+  useEffect(() => {
+    setTier(forced ?? (street ? startingTier(props.quality, detectTier(detected)) : props.quality));
+  }, [props.quality, detected, forced, street]);
   const markReady = useCallback(() => setReady(true), []);
   const markLost = useCallback(() => setLost(true), []);
 
   if (!supported) return <GlError message="Your browser or device does not support WebGL. Try updating your browser." />;
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
 
-  const dpr: [number, number] = props.quality === 'low' ? [1, 1] : props.quality === 'medium' ? [1, 1.25] : [1, 1.5];
+  const profile = profileFor(tier);
+  const dpr = street ? profile.dpr : (props.quality === 'low' ? [1, 1] : props.quality === 'medium' ? [1, 1.25] : [1, 1.5]) as [number, number];
+  const shadowsOn = street ? profile.shadows !== 'none' : props.quality !== 'low';
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}
-      {props.quality !== 'low' && <div className="vignette" />}
+      {tier !== 'low' && <div className="vignette" />}
       <Canvas
-        key={props.quality}
-        shadows={props.quality !== 'low' ? 'percentage' : false}
+        key={tier}
+        shadows={shadowsOn ? 'percentage' : false}
         dpr={dpr}
-        gl={{ antialias: props.quality !== 'low', powerPreference: 'high-performance' }}
+        gl={{
+          antialias: street ? !profile.fxaa : props.quality !== 'low',
+          powerPreference: 'high-performance',
+          ...(street ? { toneMapping: AgXToneMapping } : {}),
+        }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >
         <ContextLossGuard onLost={markLost} />
-        <World {...props} onReady={markReady} />
+        {street && !forced && <FpsWatch tier={tier} onTier={setTier} />}
+        <World {...props} quality={tier} onReady={markReady} />
       </Canvas>
     </Boundary>
   );

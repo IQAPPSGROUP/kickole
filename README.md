@@ -1,9 +1,9 @@
 # KICKOLÉ
 
-KICKOLÉ is a mobile-first, stylised 3D football freestyle arcade game by IQ Apps Group.
+KICKOLÉ is a mobile-first 3D street-football freestyle game by IQ Apps Group, with a realistic player, ball and court.
 Tap at the right moment to keep the ball in the air, chase PERFECT timing, alternate feet and land foot stalls.
 
-Stack: React + TypeScript + Vite, Three.js, React Three Fiber and Drei. No backend, API keys or external assets.
+Stack: React + TypeScript + Vite, Three.js, React Three Fiber and Drei. No backend or API keys. Art is bundled CC0 (MakeHuman, Poly Haven) plus original meshes. See `docs/REALISTIC_STYLE.md`.
 
 ## Run locally
 

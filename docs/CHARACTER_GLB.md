@@ -1,17 +1,17 @@
 # Rigged GLB footballer – asset specification
 
-The game loads `public/models/kickole_player_v3.glb` (served as `/models/kickole_player_v3.glb`) by default. v3 is the Quaternius street-footballer from `kickole_player_v2.glb`, renamed onto this contract, simplified under the triangle budget, and given the five clips. `kicky-player-rigged.glb` stays in the repo as the procedural reference that the same contract was written against. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
+The game loads `public/models/kickole_player_v4.glb` (served as `/models/kickole_player_v4.glb`) on medium and high, and `kickole_player_v4_lod1.glb` on low. v4 is a realistic street footballer built from the CC0 MakeHuman hm08 base (`tools/realistic/sources/makehuman-hm08-base.obj`). v2 and v3 stay in the repo as the Quaternius stylised sources. `kicky-player-rigged.glb` stays as the procedural reference. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
 binary glTF, fails to load, or lacks the required rig, the built-in primitive character (`src/scene/Character.tsx`)
 is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene/GlbCharacter.tsx` and
-`src/scene/CharacterSwitch.tsx`. Rebuild v3 with `npx tsx tools/build_player_v3.ts`.
+`src/scene/CharacterSwitch.tsx`. Rebuild v4 with `npm run build:player`. Rebuild v3 with `npx tsx tools/build_player_v3.ts`.
 
 ## Format and licence
 - Binary glTF 2.0 (`.glb`), one skinned mesh set sharing one armature, one scene.
-- Compress for mobile: Draco or Meshopt geometry, KTX2/WebP textures. Target under 1.5 MB.
-- Must be licensed for commercial use. No club logos, real kits, or real player likenesses.
+- v4 is Meshopt geometry plus KTX2/Basis textures (`KHR_texture_basisu`, `EXT_meshopt_compression`). Albedo is 1024 (inside the 2K cap; 2K UASTC does not fit the first-load budget). Normals and ORM are 512, UASTC. Cloth and leather albedo are ETC1S. Each GLB stays under 8 MB. Only the LOD for the active tier is requested.
+- Must be licensed for commercial use and redistributable inside a web bundle. No club logos, real kits, or real player likenesses. See `public/models/LICENSE`.
 
 ## Scale, orientation and origin
-- 1 unit = 1 metre. Standing height about 1.8 m (stylised proportions are fine, but keep feet-to-head height between 1.6 and 1.9).
+- 1 unit = 1 metre. Standing height about 1.8 m (realistic proportions on v4). Keep feet-to-head height between 1.6 and 1.9.
 - Y up, **facing +Z** (the model faces the camera/ball). Apply all transforms before export (scale 1, rotation 0).
 - Origin on the ground at the centre between the feet. Feet touch y = 0 in the idle pose.
 - Rest pose: relaxed A-pose or T-pose, legs straight, facing +Z.
@@ -62,7 +62,9 @@ Use `MeshStandardMaterial`-compatible (glTF PBR metal-rough) materials, one per 
 - Do not bake lighting or shadows; the game lights the model.
 
 ## Budget
-- Under 15k triangles, textures no larger than 1024 x 1024 (total under 2048 x 2048 atlas).
+- LOD0 (`kickole_player_v4.glb`): 35k–50k triangles, at most 40 bones, KTX2 albedo ≤ 2048.
+- LOD1 (`kickole_player_v4_lod1.glb`): 12k–15k triangles for the low tier, same skeleton and clips, KTX2 albedo 1024.
+- v3 remains the stylised asset and keeps its own under-15k budget in `src/scene/player-v3.test.ts`.
 
 ## Acceptance checklist
 1. File loads with no console errors and `validateModel` reports no missing bones, clips or materials.

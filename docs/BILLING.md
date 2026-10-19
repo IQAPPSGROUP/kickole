@@ -119,7 +119,7 @@ Still required before claiming live billing or public release:
 
 1. Confirm `com.iqappsgroup.kickole` matches the **existing** App Store Connect and Play Console apps (change `capacitor.config.ts` if your live id differs — do not create a replacement listing).
 2. Create product `kickole_launch_collection` (non-consumable / one-time) at UK £2.99 in both consoles.
-3. Signing: Apple certificates/profiles on a Mac; Play App Signing / upload keystore (do not commit keystores). Upload to **TestFlight** and Play **internal** only — keep production unpublished.
+3. Signing: Codemagic `ios-testflight` ([`TESTFLIGHT.md`](./TESTFLIGHT.md)) using the existing App Store Connect integration; Play App Signing / upload keystore (do not commit keystores). Upload to **TestFlight** and Play **internal** only — keep production unpublished.
 4. Device tests with StoreKit / sandbox and Play **licence testers** (not production cards): see tester instructions.
 5. Optional: App Store Server API + Play Developer API verification service (documented above).
 

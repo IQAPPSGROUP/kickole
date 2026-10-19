@@ -1,5 +1,5 @@
-# Manual macOS archive when Apple signing secrets exist.
-# Does not publish to production. Does not run on every push.
+# TestFlight uploads run on Codemagic (codemagic.yaml workflow ios-testflight).
+# This GitHub job stays manual and does not publish.
 # App Store uploads have required Xcode 26 since 28 Apr 2026.
 # This job uses the macos-26 image, which includes that toolchain.
 # There is no codemagic.yaml. A Codemagic stack needs `xcode: 26` as well.

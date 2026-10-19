@@ -28,7 +28,7 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 | `npm run typecheck` | **pass** |
 | `npm run build` (`VITE_ENVIRONMENT_THEME=beach`) | **pass** |
 | Android `assembleDebug` (JDK 21 + SDK 36) | **BUILD SUCCESSFUL** (debug APK; Play Billing 9.1.0 compiled; unsigned for Play) |
-| iOS archive / TestFlight upload | **Blocked** — no macOS runner secrets / Apple signing on this host |
+| iOS archive / TestFlight upload | **Codemagic** workflow `ios-testflight` ([`TESTFLIGHT.md`](./TESTFLIGHT.md)). Not run from this host |
 | Play internal AAB upload | **Blocked** — no upload keystore / Play API credentials |
 
 ## Experience validation matrix
@@ -90,7 +90,7 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 
 1. Confirm bundle/application id matches live listings.
 2. Create IAP `kickole_launch_collection` (£2.99 UK) in App Store Connect and Play Console; Paid Apps / merchant setup active.
-3. Apple signing (certs, profiles, App Store Connect API key) on a Mac; archive + upload to TestFlight.
+3. Codemagic TestFlight upload (`ios-testflight`). Hand steps, including the App Store profile for `com.iqappsgroup.kickole`, are in [`TESTFLIGHT.md`](./TESTFLIGHT.md).
 4. Play App Signing + upload keystore; build signed AAB; upload internal track. Configure **licence testers** (internal-track alone may still be charged).
 5. Complete physical purchase matrix on small/large iPhone and Android phones.
 6. Publish privacy policy URL + ASC / Play Data safety from [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md).

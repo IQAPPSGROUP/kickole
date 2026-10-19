@@ -18,7 +18,7 @@ export class BrowserBillingAdapter implements BillingAdapter {
   }
 
   async purchaseLaunchCollection(): Promise<PurchaseResult> {
-    if (import.meta.env.DEV && canDevSimulate()) {
+    if (import.meta.env.DEV && !import.meta.env.PROD && canDevSimulate()) {
       return this.devGrant('purchased');
     }
     return {
@@ -29,7 +29,7 @@ export class BrowserBillingAdapter implements BillingAdapter {
   }
 
   async restorePurchases(): Promise<PurchaseResult> {
-    if (import.meta.env.DEV && canDevSimulate()) {
+    if (import.meta.env.DEV && !import.meta.env.PROD && canDevSimulate()) {
       return this.devGrant('restored');
     }
     return {
@@ -47,6 +47,14 @@ export class BrowserBillingAdapter implements BillingAdapter {
   dispose() { /* no-op */ }
 
   private async devGrant(outcome: 'purchased' | 'restored'): Promise<PurchaseResult> {
+    // Keep the grant body behind the development flag so `vite build` drops it.
+    if (!import.meta.env.DEV || import.meta.env.PROD) {
+      return {
+        outcome: 'unavailable',
+        entitlement: EMPTY_ENTITLEMENT,
+        message: `${LAUNCH_COLLECTION_DISPLAY_NAME} can be bought in the iOS App Store or Google Play app — not in the browser.`,
+      };
+    }
     if (this.busy) {
       return { outcome: 'busy', entitlement: EMPTY_ENTITLEMENT, message: 'Purchase already in progress.' };
     }

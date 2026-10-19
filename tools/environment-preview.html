@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kickolé · Environment workshop</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eee4ce;color:#173e40;font:15px system-ui,sans-serif}header{position:absolute;z-index:2;top:24px;left:28px;right:28px;pointer-events:none}h1{font-size:32px;margin:4px 0;letter-spacing:-1px}p{margin:4px 0;max-width:550px}small{letter-spacing:3px;font-weight:800}nav{position:absolute;z-index:2;bottom:26px;left:28px;right:28px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}select,button{background:#174a48;color:#fff3d6;border:0;border-radius:8px;padding:13px;font:inherit;cursor:pointer}#status{background:#fff8e8e0;border-radius:8px;padding:12px}canvas{display:block}#badge{position:absolute;right:28px;top:34px;font-size:12px;text-align:right;line-height:1.6}@media(max-width:600px){h1{font-size:24px}#badge{display:none}header{left:18px}nav{left:18px;bottom:18px}#status{font-size:12px}}
+</style></head><body>
+<header><small>KICKOLÉ / ART WORKSHOP</small><h1>Life above the court.</h1><p>Brazilian hillside & street-football environment kit</p></header>
+<div id="badge">ORIGINAL GEOMETRY & TEXTURE ART<br>Drag to orbit · Scroll to inspect</div>
+<nav><select id="asset" aria-label="Environment asset"></select><button id="reset">Reset view</button><span id="status">Loading…</span></nav>
+<script type="module" src="./environment-preview.ts"></script>
+</body></html>

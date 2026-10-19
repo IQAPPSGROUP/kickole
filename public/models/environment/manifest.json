@@ -1,0 +1,226 @@
+{
+  "version": 1,
+  "seed": 1962,
+  "units": "metres",
+  "up": "+Y",
+  "front": "+Z",
+  "provenance": "Original assets created for IQ Apps Group; no third-party models or textures.",
+  "texture": {
+    "file": "street-atlas.png",
+    "width": 1024,
+    "height": 1024,
+    "colorSpace": "sRGB"
+  },
+  "assets": [
+    {
+      "file": "hillside-lod0.glb",
+      "lod": 0,
+      "triangles": 34360,
+      "vertices": 74518,
+      "bytes": 3186636,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -10.4,
+          -0.45999999999999996,
+          -16.6
+        ],
+        "max": [
+          10.44,
+          10.129705210324193,
+          -4.492917985359156
+        ]
+      },
+      "sha256": "4234e7a314000bfa95d3c32cb33b12a72b0e31af3bef3e472394769efd65eb52"
+    },
+    {
+      "file": "hillside-lod1.glb",
+      "lod": 1,
+      "triangles": 14720,
+      "vertices": 31288,
+      "bytes": 1479272,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -10.4,
+          -0.45999999999999996,
+          -16.6
+        ],
+        "max": [
+          10.44,
+          9.789705210324193,
+          -4.492917985359156
+        ]
+      },
+      "sha256": "4cef483d4a60862885f177f3aca27dc4e7aa8160ad0ef944588736432110c30e"
+    },
+    {
+      "file": "hillside-lod2.glb",
+      "lod": 2,
+      "triangles": 9700,
+      "vertices": 19968,
+      "bytes": 1086892,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -10.4,
+          -0.45999999999999996,
+          -16.6
+        ],
+        "max": [
+          10.44,
+          9.789705210324193,
+          -4.6
+        ]
+      },
+      "sha256": "3e26f95112f9dd0fe7059cc6b2b82dda38923aafdb230bf294cf1ffac1adca5f"
+    },
+    {
+      "file": "townhouse-ochre.glb",
+      "lod": 0,
+      "triangles": 2296,
+      "vertices": 4994,
+      "bytes": 563292,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.26,
+          0.0,
+          -1.01
+        ],
+        "max": [
+          1.26,
+          5.449999999999999,
+          1.5699999999999998
+        ]
+      },
+      "sha256": "9633b63665d640bd6a1ce5e0107c6aabe0727d9b9f9a2bc6f551dd1d82f5b918"
+    },
+    {
+      "file": "townhouse-coral.glb",
+      "lod": 0,
+      "triangles": 1700,
+      "vertices": 3736,
+      "bytes": 519460,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.288,
+          0.0,
+          -1.01
+        ],
+        "max": [
+          1.288,
+          5.199999999999999,
+          1.5699999999999998
+        ]
+      },
+      "sha256": "e0ffb32ed3f02ffd4c6d541d48632b0ae4fceec47ad23c51c4fc569f94b63c5e"
+    },
+    {
+      "file": "townhouse-teal.glb",
+      "lod": 0,
+      "triangles": 2296,
+      "vertices": 4994,
+      "bytes": 563288,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.26,
+          0.0,
+          -1.01
+        ],
+        "max": [
+          1.26,
+          5.449999999999999,
+          1.5699999999999998
+        ]
+      },
+      "sha256": "b11409c647c8d3444a7a3089db936249a1cde6745a1b2493ff880bb0d71c68b9"
+    },
+    {
+      "file": "corner-mercearia.glb",
+      "lod": 0,
+      "triangles": 2504,
+      "vertices": 5402,
+      "bytes": 577588,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.4600000000000002,
+          0.0,
+          -1.185
+        ],
+        "max": [
+          1.562,
+          5.65,
+          2.25
+        ]
+      },
+      "sha256": "61c23600840f96d479e0548a32258e3696d5c8df062f65c5e461da19a1c6fbf0"
+    },
+    {
+      "file": "stepped-alley.glb",
+      "lod": 0,
+      "triangles": 1384,
+      "vertices": 3140,
+      "bytes": 498528,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -1.4933910445940324,
+          0.0,
+          -5.109786364139185
+        ],
+        "max": [
+          1.6089999999999998,
+          3.674310807979485,
+          0.19500000000000028
+        ]
+      },
+      "sha256": "60a9c1ff23a3fd902f3ee372cbd71b248c60ce4ea2403b3ec38744a91f7fd354"
+    },
+    {
+      "file": "rooftop-equipment.glb",
+      "lod": 0,
+      "triangles": 420,
+      "vertices": 1016,
+      "bytes": 424756,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -0.9229120413551098,
+          0.024999999999999994,
+          -0.7480000000000001
+        ],
+        "max": [
+          1.01,
+          1.35,
+          0.345
+        ]
+      },
+      "sha256": "5233495d1f9765acf440f160dd9b7ae7b22460ef5fee46bf10090927285a556a"
+    },
+    {
+      "file": "street-furniture.glb",
+      "lod": 0,
+      "triangles": 488,
+      "vertices": 1098,
+      "bytes": 427796,
+      "drawCalls": 1,
+      "bounds": {
+        "min": [
+          -2.042797543233282,
+          0.0,
+          -0.52
+        ],
+        "max": [
+          1.8900000000000001,
+          3.8332869780703303,
+          0.4247800077057069
+        ]
+      },
+      "sha256": "7071bf5573671f1060b7f95a00e8ec1e840df4b1cf4dad23f653dcc434aa25d5"
+    }
+  ]
+}

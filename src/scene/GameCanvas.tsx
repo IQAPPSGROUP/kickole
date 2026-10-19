@@ -103,7 +103,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       />
       <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
       {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
-      <Court shadows={shadows} />
+      <Court shadows={shadows} quality={quality} />
       {shadows && quality === 'high' && (
         <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color="#05161b" />
       )}

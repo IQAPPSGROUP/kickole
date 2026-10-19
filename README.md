@@ -60,9 +60,9 @@ An optional beach theme includes ten textured GLBs, sand court, coastal sky/fog 
 
 ## Character model
 
-The bundled procedural footballer uses a skinned GLB with five animations and follows [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). It loads from `public/models/kicky-player-rigged.glb` by default. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
+The default footballer is the newer Quaternius v2 model at `public/models/kickole_player_v2.glb`, with 65 UE-style bones and procedural animation. It has no embedded clips. The older five-clip `kicky-player-rigged.glb` remains the reference for [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). See [`docs/FREDDIE_CHARACTER_MODELS.md`](docs/FREDDIE_CHARACTER_MODELS.md) for v2 asset details and licensing. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
 
-Both character renderers add expressive idle/ready movement, ball tracking, three touch gestures, stall balancing and varied reactions while retaining the authored contact pose. See [`docs/PLAYER_MOVEMENT.md`](docs/PLAYER_MOVEMENT.md) for validation and `/tools/movement-preview.html` on the dev server for a side-by-side motion review.
+Both character renderers add expressive idle/ready movement, ball tracking, three touch gestures, stall balancing and varied reactions. V2 uses rig-specific complete arm poses for distinct reactions while retaining main's procedural leg transforms during live play. See [`docs/PLAYER_MOVEMENT.md`](docs/PLAYER_MOVEMENT.md) for validation and `/tools/movement-preview.html` on the dev server for a side-by-side motion review with nine selectable scenarios.
 
 ## Animation inspector (development only)
 Run `VITE_USE_GLB_CHARACTER=true npm run dev` and open `http://localhost:5173/?inspect`. The panel lets you choose the foot,
@@ -72,5 +72,4 @@ clip times. It shows the tap-to-ball-response time, the ball position/velocity, 
 `tools/capture-contact-frames.mjs` captures screenshots at those times (needs puppeteer-core and Chromium; not a project dependency).
 The scene is rebuilt by replaying the real engine, so the frames match gameplay.
 
-Foot contact: the engine responds `contactDelay` (0.04 s) after a tap, and the GLB kick clip is started at 0.26 s so its
-0.30 s contact frame coincides with that response.
+Foot contact: the engine responds `contactDelay` (0.04 s) after a tap. The default v2 rig follows the procedural leg pose at that instant. The older clip-based reference starts its kick clip at 0.26 s so its 0.30 s contact frame coincides with that response. The inspector retains that clip-time scale for kick scrubbing.

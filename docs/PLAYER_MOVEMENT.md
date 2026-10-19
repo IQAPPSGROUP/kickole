@@ -1,69 +1,70 @@
 # Expressive player movement
 
-Branch `graphics/expressive-player-movement`, based on current main at `8089718` (after the street/beach merges and newer hillside framing fix). Both environments and the existing production theme are preserved.
+Branch `graphics/expressive-player-movement` incorporates main `bfe489b`, including the newer Quaternius v2 model, its materials/lighting/laces, both environments and main's deployment configuration.
 
-## What changes
+## Model and distinct movements
 
-The existing five character clips gain a reversible, deterministic motion layer, shared by the GLB and primitive fallback. The character's geometry, skeleton, materials, skins and binary GLB remain unchanged. These are new runtime movement variations, not additional embedded GLB clips or new scoring moves.
+The default game and review model is `public/models/kickole_player_v2.glb`: 65 UE-style bones, 16,889 triangles, 361,448 bytes, Meshopt/WebP, no embedded animation clips. Its binary is unchanged from main. See `FREDDIE_CHARACTER_MODELS.md` for asset/licence details.
 
-| Situation | Added movement |
+The original movement preview used the older five-clip reference character. Simply applying those accents to v2 also made celebrations look similar: they assumed an authored celebration clip that v2 does not have. `ue-motion.ts` now supplies complete arm poses in v2's local axes, retaining its rest-quaternion and arm-hang corrections. It gives the one-arm pump, shoulder shimmy and two-hand salute separate targets and an engine-clock envelope. These are runtime animation variations, not embedded clips or scoring tricks.
+
+| Situation | Movement |
 | --- | --- |
-| Home / idle | Rhythmic weight shift, breathing accent, shoulder sway, small ankle flex and head turns |
+| Home / idle | Weight shift, breathing, shoulder sway, small ankle flex and head turns |
 | Ready | Quicker bounce and counter-swinging arms |
-| Ball in flight | GLB head follows the ball, chest turns toward it, shoulders prepare for descent |
-| Foot touch | Three alternating upper-body styles: open-body turn, opposite counter-turn, compact touch |
-| Foot stall | Counterbalancing arms, subtle chest/shoulder adjustment and head focus |
-| Perfect response | Arm-pump, shoulder-shimmy and two-hand salute variations layered over the authored celebration |
-| Drop / game over | Brief head shake and arm reaction followed by settled recovery |
+| Ball in flight | Head tracks the ball, chest turns, arms anticipate descent |
+| Foot touch | Three alternating upper-body styles: open-body turn, counter-turn, compact touch |
+| Foot stall | Counterbalancing arms and chest/shoulder adjustment |
+| Perfect response | One-arm pump, shoulder shimmy or two-hand salute |
+| Drop / game over | Head shake and arm reaction, then settled recovery |
 
-Motion uses engine time and action counters, without timers, random decisions or writes to the simulation. Touch variants remain stable when points are awarded at the response instant. Idle and reaction clips now sample the same simulation clock as contact clips; frozen review frames do not continue free-running.
+The primitive fallback and original contract-rig support remain. Gestures currently articulate shoulders, chest and head; elbows and fingers retain their rest pose, so the one-arm pump uses an open hand.
 
-## Contact safety and scope
+## Gameplay preservation
 
-The additive layer does not move the root or either foot during live play. Head, arms and chest are downstream of Spine, outside the leg hierarchy. During stalls both authored boot matrices remain exactly unchanged while upper-body balance animates. The existing 0.04-second ball response and 0.30-second authored contact frame, kick selection, held-foot timing and original clip crossfades are retained. The layer restores authored transforms before every mixer/procedural update, preventing cumulative rotation drift and handling repeated frozen samples and StrictMode cleanup.
+Motion reads simulation time and counters without changing the engine. Touch variants remain stable across the score increment. During live play, the extra root and foot movement is zero; v2 leg transforms are exactly the same as the base procedural pose at each sampled time. Upper-body bones sit outside the leg hierarchy. V2 retains main's small procedural stall flex rather than freezing its foot across time. The old clip rig restores base transforms before each additive update to avoid cumulative drift and uses engine time for paused samples.
 
-No engine, controller, scoring, ball physics, inputs, UI, court assets, camera, deployment workflow or dependency changes. This update follows the user's choice of richer freestyle animation. Existing eleven-bone rig proportions limit elbow and finger articulation; the named salute/arm-pump are shoulder/arm gestures rather than newly articulated hands.
+No engine, controller, scoring, ball physics, input, gameplay UI, camera, court or workflow changes. The 0.04-second response and existing kick/stall simulation remain authoritative. This does not retune the newer model's existing boot-to-ball alignment or add movement around the court.
 
 ## Review
 
 Run `npm run dev -- --host 127.0.0.1 --port 5189 --strictPort`, then open:
 
-- `/tools/movement-preview.html`: base clips beside expressive movement, nine staged scenarios, pause/scrub and GLB/fallback choice.
-- `/?inspect&environment=beach`: actual engine kick/stall replay and contact inspector.
+- `/tools/movement-preview.html`: v2 base movement on the left and expressive movement on the right; nine scenarios, pause/scrub and primitive fallback selection.
+- `/?inspect&environment=beach`: actual engine kick/stall replay and contact inspector. Kick times retain the older clip scale; 0.30 means about 0.04 seconds after the tap.
 - `/?environment=beach` or `/?environment=street`: actual game.
 
-The comparison page uses the real renderers. Left/right touch and stall scenarios replay the actual engine. Idle/reaction examples are staged poses; celebration ball meshes are hidden there to keep the gesture visible. The animated GIF is sampled from staged review frames, not a real-time performance recording. The viewer is outside the production build; no movement selector was added to gameplay.
+The comparison uses real character renderers. Selecting a movement restarts playback, including after pausing or scrubbing; it no longer leaves each new choice frozen at its neutral starting pose. Kick/stall examples replay the engine; idle/reaction examples stage engine values. The celebration ball is hidden in the viewer so the arm gesture is visible. The viewer is outside the production build and does not add a gameplay movement menu. Refresh an already-open preview to load the corrected v2 implementation.
 
-![Staged movement comparison](images/player-movement.gif)
-![Held-foot balance comparison](images/player-stall.png)
+![Staged v2 movement comparison](images/player-movement.gif)
+![V2 foot-stall comparison](images/player-stall.png)
 
 ## Verification
 
-- `npm run typecheck`, `npm test`, `npm run build`: passed; 85 tests across nine files. Both default and beach builds were checked during implementation.
-- New tests cover deterministic sampling, idle range, head tracking, gesture coverage, stable touch variants, unchanged simulation state, additive restoration without drift, stable paused clocks and identical GLB boot matrices through left/right stalls. Existing contact/animation/engine tests still pass.
-- Browser review: nine scenarios in both GLB and primitive renderers, 18 captures.
-- Rendered engine inspector: 12 left/right contact/stall samples; held-foot world position stays fixed within 1e-5, and releases send the ball upward.
-- Repeated-juggle browser playback: street/beach at Low/High, normal engine inputs and fixed-step controller ticks; actual GLB joint traces confirmed. This scripted check avoids software-GPU timing jitter and is not a real-time input-latency or performance test.
-- Production smoke: local beach build, Low/High at 390×844 and 844×390, actual keyboard input, character asset request and no page/graphics errors.
-- Character-request failure still displays the animated primitive fallback.
+- Typecheck, 91 tests across 11 files, and a production beach build pass.
+- Unit tests reconstruct the actual v2 node hierarchy and compare both boot world matrices against base procedural motion for left/right kicks and stalls at six times. They also distinguish the three complete v2 reaction poses. Existing engine, old clip-contract, motion restoration and deterministic sampling tests pass.
+- Browser review selects all nine choices through the actual dropdown for v2 and primitive (18 captures). It verifies selection resumes playback from a paused frame, the v2 URL, UE rig, zero embedded clips, nine different rendered v2 joint signatures and identical base/expressive foot positions during live scenarios.
+- Rendered engine inspector checks 12 left/right kick/stall samples, the trapped ball and upward release. This is not a claim of exact boot-to-ball surface alignment.
+- Scripted repeated juggling checks street/beach at Low/High using normal engine inputs and fixed-step controller ticks, with actual v2 joint traces. This avoids software-GPU timing jitter; it is not a latency/performance measurement.
+- Production smoke checks the local beach build at Low/High, portrait 390×844 and landscape 844×390, keyboard input, v2 asset loading and absence of page/graphics errors. Aborting the v2 request checks primitive fallback.
 
-Machine-readable record: `player-movement-validation.json`. Reproduce with the optional tools already used by the environment kits:
+The refreshed record is `player-movement-validation.json`. Reproduce with:
 
 ```sh
 npm run typecheck
 npm test
 npm run build
-# Requires isolated playwright-core in .validation and Chrome/Chromium:
+# Optional isolated playwright-core in .validation plus Chrome/Chromium:
 node tools/check-movement-browser.mjs review
 node tools/check-movement-browser.mjs contact
 node tools/check-movement-browser.mjs game
-# Against a locally served production build, set URL to that preview:
+# Set URL to a locally served production build:
 node tools/check-movement-browser.mjs production
 python tools/make-movement-preview.py
 ```
 
-Outputs are ignored under `movement-shots/`; selected previews and the report are committed. Browser tool accepts `URL` and `CHROMIUM`. Screenshots were reviewed for idle, stall and celebration comparisons and actual game captures; not every saved image was inspected individually.
+Outputs are ignored under `movement-shots/`; selected previews and the report are committed. The browser tool accepts `URL` and `CHROMIUM`. The GIF samples staged comparison frames, not real-time performance. Selected idle, touch, stall, all three celebration and actual game images were visually reviewed; not every saved image was inspected individually.
 
 ## Remaining limits
 
-Headless Chromium uses software rendering. Physical-device smoothness, sustained GPU/battery/thermal behaviour and real-time touch latency remain unverified. No hosted deployment was performed or verified. This branch preserves main's deployment settings; Cursor merge/deploy handoff is in `CURSOR_MOVEMENT_HANDOFF.md`.
+Headless Chromium uses SwiftShader software rendering. Physical-device smoothness, sustained GPU/battery/thermal behaviour, real-time touch latency and hosted deployment remain unverified. Existing v2 surface/contact alignment has not been retargeted or tuned. Merge/deploy instructions preserve the newer model and current theme in `CURSOR_MOVEMENT_HANDOFF.md`.

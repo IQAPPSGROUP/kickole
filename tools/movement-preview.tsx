@@ -1,18 +1,21 @@
 // Development-only comparison, using the actual game character renderers and real kick/stall replays.
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Vector3 } from 'three';
+import { useGLTF } from '@react-three/drei';
+import { Group, Vector3 } from 'three';
 import { GameEngine } from '../src/engine/engine';
 import { SKINS } from '../src/game/skins';
 import { GlbCharacter } from '../src/scene/GlbCharacter';
 import { Character } from '../src/scene/Character';
 import { buildScenario } from '../src/scene/inspector';
 import { computePlayerMotion } from '../src/scene/motion';
+import { CHARACTER_MODEL_URL, UE_BONE_NAMES, rigKind } from '../src/scene/rig';
 
-const scenarios = { idle:'Relaxed idle', ready:'Ready bounce', left:'Left touch', right:'Right touch', stall:'Foot-stall balance', fist:'Fist pump', shimmy:'Shoulder shimmy', salute:'Two-hand salute', miss:'Miss & recovery' };
+const scenarios = { idle:'Relaxed idle', ready:'Ready bounce', left:'Left touch', right:'Right touch', stall:'Foot-stall balance', fist:'One-arm pump', shimmy:'Shoulder shimmy', salute:'Two-hand salute', miss:'Miss & recovery' };
 type Scenario = keyof typeof scenarios;
-const review = { ready:false, error:'', scenario:'idle', time:0, motion:'', renderer:'glb', set: (_:any)=>{}, sample:()=>({}) };
+const review = { ready:false, error:'', scenario:'idle', time:0, motion:'', renderer:'glb', modelUrl:CHARACTER_MODEL_URL, rig:'', clips:0,
+  joints:{base:[] as number[],expressive:[] as number[]},set: (_:any)=>{}, sample:()=>({}) };
 (window as any).__movementReview=review;
 const state={scenario:'idle' as Scenario,time:0,playing:true,renderer:'glb'};
 
@@ -59,32 +62,50 @@ function App(){
     const id=setInterval(()=>setTime(state.time),100);return()=>clearInterval(id);
   },[]);
   return <>
-    <div className="labels"><span>BASE CLIPS</span><span>EXPRESSIVE</span></div>
+    <div className="labels"><span>V2 BASE MOVEMENT</span><span>V2 EXPRESSIVE</span></div>
     <Canvas shadows camera={{position:[2.6,2.4,7.2],fov:37}} onCreated={({camera})=>camera.lookAt(0,1.1,.0)}>
       <color attach="background" args={['#e9ddc4']}/><ambientLight intensity={1.2}/><hemisphereLight args={['#fff4dd','#738b80',1.4]}/>
       <directionalLight position={[-3,7,5]} intensity={2.5} castShadow shadow-mapSize={[1024,1024]}/>
       <Driver engine={engine}/>
       <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.012,0]} receiveShadow><planeGeometry args={[100,100]}/><meshStandardMaterial color="#c8b78d" roughness={1}/></mesh>
       <Suspense fallback={null}>
-        {[false,true].map(expressive=><group key={`${expressive}-${renderer}`} position={[expressive?1.05:-1.05,0,0]}>
-          {renderer==='glb'?<GlbCharacter engine={engine} skin={SKINS[0]} expressive={expressive} onInvalid={()=>{review.error='Character rig failed validation';}}/>:<Character engine={engine} skin={SKINS[0]} expressive={expressive}/>}
-          <ReviewBall engine={engine}/>
-          <Probe engine={engine}/>
-        </group>)}
+        {[false,true].map(expressive=><Actor key={`${expressive}-${renderer}`} engine={engine} expressive={expressive} renderer={renderer}/>)}
       </Suspense>
     </Canvas>
     <div className="controls">
-      <select aria-label="Movement" value={scenario} onChange={e=>review.set({scenario:e.target.value})}>{Object.entries(scenarios).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select>
+      <select aria-label="Movement" value={scenario} onChange={e=>review.set({scenario:e.target.value,playing:true})}>{Object.entries(scenarios).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select>
       <button onClick={()=>review.set({playing:!playing})}>{playing?'Pause':'Play'}</button>
       <input aria-label="Movement time" type="range" min="0" max="2" step=".01" value={time%2} onChange={e=>review.set({time:Number(e.target.value),playing:false})}/>
-      <select aria-label="Character renderer" value={renderer} onChange={e=>review.set({renderer:e.target.value})}><option value="glb">GLB character</option><option value="primitive">Fallback character</option></select>
+      <select aria-label="Character renderer" value={renderer} onChange={e=>review.set({renderer:e.target.value})}><option value="glb">Quaternius v2 model</option><option value="primitive">Primitive fallback</option></select>
       <output>{scenarios[scenario]} · {(time%2).toFixed(2)}s</output>
     </div>
   </>;
 }
 
-function Probe({engine}:{engine:GameEngine}){
-  useEffect(()=>{review.ready=true;},[]);
+function Actor({engine,expressive,renderer}:{engine:GameEngine;expressive:boolean;renderer:string}){
+  const group=useRef<Group>(null);
+  return <group ref={group} position={[expressive?1.05:-1.05,0,0]}>
+    {renderer==='glb'?<GlbCharacter engine={engine} skin={SKINS[0]} expressive={expressive} onInvalid={()=>{review.error='Character rig failed validation';}}/>:<Character engine={engine} skin={SKINS[0]} expressive={expressive}/>}
+    <ReviewBall engine={engine}/><Probe engine={engine} actor={group} expressive={expressive}/>
+  </group>;
+}
+
+function Probe({engine,actor,expressive}:{engine:GameEngine;actor:RefObject<Group|null>;expressive:boolean}){
+  const gltf=useGLTF(CHARACTER_MODEL_URL);
+  const point=useMemo(()=>new Vector3(),[]),origin=useMemo(()=>new Vector3(),[]);
+  useFrame(()=>{
+    const group=actor.current;if(!group)return;
+    group.updateWorldMatrix(true,true);group.getWorldPosition(origin);const joints:number[]=[];
+    for(const key of ['head','armLeft','armRight','footLeft','footRight','root'] as const){
+      const joint=group.getObjectByName(key==='armLeft'?'hand_r':key==='armRight'?'hand_l':UE_BONE_NAMES[key]);
+      if(joint){joint.getWorldPosition(point).sub(origin);joints.push(point.x,point.y,point.z);}
+    }
+    review.joints[expressive?'expressive':'base']=joints;
+  });
+  useEffect(()=>{
+    const names:string[]=[];gltf.scene.traverse(o=>names.push(o.name));
+    review.rig=rigKind(names);review.clips=gltf.animations.length;review.ready=true;
+  },[gltf]);
   review.sample=()=>({phase:engine.phase,ball:{...engine.ball},motion:computePlayerMotion(engine)});
   return null;
 }

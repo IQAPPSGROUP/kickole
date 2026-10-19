@@ -9,6 +9,7 @@ export interface PlayerMotion {
   leftX: number; leftY: number; leftZ: number;
   rightX: number; rightY: number; rightZ: number;
   leftFoot: number; rightFoot: number;
+  reactionWeight: number;
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -18,7 +19,7 @@ function smooth(lo: number, hi: number, n: number) {
 
 export function createPlayerMotion(): PlayerMotion {
   return { name: 'relaxed-sway', rootX: 0, rootY: 0, rootYaw: 0, spineX: 0, spineY: 0, spineZ: 0,
-    headX: 0, headY: 0, headZ: 0, leftX: 0, leftY: 0, leftZ: 0, rightX: 0, rightY: 0, rightZ: 0, leftFoot: 0, rightFoot: 0 };
+    headX: 0, headY: 0, headZ: 0, leftX: 0, leftY: 0, leftZ: 0, rightX: 0, rightY: 0, rightZ: 0, leftFoot: 0, rightFoot: 0, reactionWeight: 0 };
 }
 
 /** Deterministic at an engine time; has no subscriptions, randomness, timers or engine writes. */
@@ -30,6 +31,7 @@ export function computePlayerMotion(engine: GameEngine, out = createPlayerMotion
   out.headX = out.headY = out.headZ = 0;
   out.leftX = out.leftY = out.leftZ = out.rightX = out.rightY = out.rightZ = 0;
   out.leftFoot = out.rightFoot = 0;
+  out.reactionWeight = 0;
 
   if (phase === 'menu' || phase === 'ready') {
     const ready = phase === 'ready'; out.name = ready ? 'ready-bounce' : 'relaxed-sway';
@@ -96,6 +98,7 @@ export function computePlayerMotion(engine: GameEngine, out = createPlayerMotion
   const celebrateAge = t - engine.lastPerfectTime - .35;
   if (celebrateAge >= 0 && celebrateAge < 1.2 && age >= .35) {
     const envelope = Math.sin(celebrateAge / 1.2 * Math.PI), pulse = Math.sin(celebrateAge * Math.PI * 4);
+    out.reactionWeight = envelope;
     out.name = (['fist-pump', 'shoulder-shimmy', 'salute'] as const)[variant];
     if (variant === 0) {
       out.rightX -= .65 * envelope; out.leftZ -= .55 * envelope;

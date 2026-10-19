@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
+import { attachLocalDecoders, DRACO_DECODER_PATH } from './decoders';
 import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Material, Mesh, MeshToonMaterial, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
@@ -42,11 +43,25 @@ function toonRole(name: string): ToonRole {
 
 /** Straps in foot-bone space. On this rig local +Y runs toward the toe and local −Z is the instep. */
 const LACES: ReadonlyArray<{ position: [number, number, number]; size: [number, number, number] }> = [
-  { position: [0, 0.042, -0.05], size: [0.07, 0.008, 0.012] },
-  { position: [0, 0.068, -0.055], size: [0.066, 0.008, 0.012] },
-  { position: [0, 0.094, -0.056], size: [0.06, 0.008, 0.012] },
-  { position: [0, 0.12, -0.05], size: [0.052, 0.008, 0.011] },
-  { position: [0, 0.082, -0.06], size: [0.013, 0.1, 0.01] },
+  { position: [0, 0.042, -0.055], size: [0.074, 0.012, 0.016] },
+  { position: [0, 0.07, -0.06], size: [0.068, 0.012, 0.016] },
+  { position: [0, 0.098, -0.06], size: [0.06, 0.012, 0.015] },
+  { position: [0, 0.124, -0.052], size: [0.05, 0.012, 0.014] },
+  { position: [0, 0.084, -0.068], size: [0.016, 0.11, 0.014] },
+];
+
+/** Local +Y runs toward the toe and local +Z is the sole (opposite the instep). */
+const SOLE: { position: [number, number, number]; size: [number, number, number] } = {
+  position: [0, 0.07, 0.042],
+  size: [0.074, 0.16, 0.018],
+};
+const STUDS: ReadonlyArray<[number, number, number]> = [
+  [-0.022, 0.018, 0.056],
+  [0.022, 0.018, 0.056],
+  [-0.022, 0.07, 0.056],
+  [0.022, 0.07, 0.056],
+  [-0.022, 0.122, 0.054],
+  [0.022, 0.122, 0.054],
 ];
 
 interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; expressive?: boolean }
@@ -56,7 +71,7 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; express
  * contract bones from the shared procedural pose. Reports an invalid model so the primitive fallback is used.
  */
 export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Props) {
-  const gltf = useGLTF(CHARACTER_MODEL_URL);
+  const gltf = useGLTF(CHARACTER_MODEL_URL, DRACO_DECODER_PATH, true, attachLocalDecoders);
   const { scene, clips, report, bones, materials, hairMeshes, kind, quaternius } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
@@ -132,13 +147,18 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
 
   useEffect(() => {
     const quality = loadSettings().quality;
-    if (quality === 'low') return;
     const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
     const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
+    const soleGeo = new BoxGeometry(SOLE.size[0], SOLE.size[1], SOLE.size[2]);
+    const studGeo = new BoxGeometry(0.012, 0.012, 0.014);
     const laceMat = new MeshToonMaterial({ name: 'Boot_Laces', color: skin.boots.lace ?? '#F8F9FB' });
     const trimMat = new MeshToonMaterial({ name: 'Boot_Trim', color: skin.boots.trim ?? skin.boots.main });
+    const soleMat = new MeshToonMaterial({ name: 'Boot_Sole', color: '#1A1A1A' });
+    const studMat = new MeshToonMaterial({ name: 'Boot_Studs', color: '#C4C8D0' });
     bindSunsetToon(laceMat, 'flat', skin.clothing.shirtTrim);
     bindSunsetToon(trimMat, 'flat', skin.clothing.shirtTrim);
+    bindSunsetToon(soleMat, 'flat', skin.clothing.shirtTrim);
+    bindSunsetToon(studMat, 'flat', skin.clothing.shirtTrim);
     const added: Mesh[] = [];
     const attach = (bone: Bone | undefined) => {
       if (!bone) return;
@@ -150,12 +170,23 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
         bone.add(mesh);
         added.push(mesh);
       });
-      // Heel trim panel — distinct finishes without extra GLB weight.
       const heel = new Mesh(heelGeo, trimMat);
       heel.position.set(0, 0.02, -0.05);
       heel.frustumCulled = false;
       bone.add(heel);
       added.push(heel);
+      const sole = new Mesh(soleGeo, soleMat);
+      sole.position.set(SOLE.position[0], SOLE.position[1], SOLE.position[2]);
+      sole.frustumCulled = false;
+      bone.add(sole);
+      added.push(sole);
+      for (const stud of STUDS) {
+        const mesh = new Mesh(studGeo, studMat);
+        mesh.position.set(stud[0], stud[1], stud[2]);
+        mesh.frustumCulled = false;
+        bone.add(mesh);
+        added.push(mesh);
+      }
     };
     attach(bones.footLeft);
     attach(bones.footRight);
@@ -163,8 +194,12 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       for (const mesh of added) mesh.parent?.remove(mesh);
       laceMat.dispose();
       trimMat.dispose();
+      soleMat.dispose();
+      studMat.dispose();
       for (const geo of laceGeos) geo.dispose();
       heelGeo.dispose();
+      soleGeo.dispose();
+      studGeo.dispose();
     };
   }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim]);
 
@@ -252,7 +287,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
           mixer.update(dt);
           scene.position.set(0, 0, 0);
           if (act && (next.state === 'KickLeft' || next.state === 'KickRight')) {
-            liftKickToe(bones, next.state, act.time, deltaQ);
+            const kickSide = next.state === 'KickLeft' ? 'left' : 'right';
+            const legKeys = kickSide === 'left'
+              ? (['thighLeft', 'shinLeft', 'footLeft'] as const)
+              : (['thighRight', 'shinRight', 'footRight'] as const);
+            for (const key of legKeys) {
+              const bone = bones[key];
+              const restQ = restQuat.get(key);
+              if (bone && restQ) bone.quaternion.copy(restQ).multiply(ueDeltaQuaternion(key, pose, deltaQ));
+            }
           }
           if (next.state === 'Idle' || next.state.startsWith('Kick')) {
             for (const key of ['head', 'neck'] as const) {

@@ -4,6 +4,7 @@ import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
 import { beatClock } from '../game/audio';
 import { prefersReducedMotion } from '../scene/juice';
+import { classifyTrickRelease } from './trickInput';
 
 export function Hud({
   hud,
@@ -39,7 +40,9 @@ export function Hud({
       {hud.stalling && <div className="stall-hint">HOLD… RELEASE TO FLICK!</div>}
       {hud.neckHolding && <div className="stall-hint">NECK STALL · RELEASE TO FLICK</div>}
       {hud.armedTrick && hud.phase === 'playing' && (
-        <div className="trick-armed">{armedLabel(hud.armedTrick)} ARMED · TAP L / R</div>
+        <div className="trick-armed">
+          {armedLabel(hud.armedTrick)} {hud.trickQueued ? 'LINING UP' : 'ARMED'}
+        </div>
       )}
       {hud.celebrating && (
         <button
@@ -142,6 +145,97 @@ function BeatRing({ active }: { active: boolean }) {
   return <span ref={ref} className="beat-ring" aria-hidden />;
 }
 
+type TrickButtonKind = 'head' | 'neck' | ArmedTrick;
+
+function TrickIcon({ kind }: { kind: TrickButtonKind }) {
+  const common = { viewBox: '0 0 24 24', 'aria-hidden': true as const, className: 'trick-icon' };
+  switch (kind) {
+    case 'head':
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="8" r="3.2" fill="currentColor" />
+          <path d="M8 20c.4-3 2-4.6 4-4.6s3.6 1.6 4 4.6" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case 'aroundTheWorld':
+      return (
+        <svg {...common}>
+          <path d="M12 5a7 7 0 1 0 6.2 3.8" fill="none" stroke="currentColor" strokeWidth="2" />
+          <path d="M15 4.5h4.2V9" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case 'neck':
+      return (
+        <svg {...common}>
+          <path d="M8 5h8M9 5v6.5c0 2.8 1.3 4.5 3 4.5s3-1.7 3-4.5V5" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case 'highFlick':
+      return (
+        <svg {...common}>
+          <path d="M12 19V7M7.5 11 12 6.5 16.5 11" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    case 'groove':
+      return (
+        <svg {...common}>
+          <path d="M9 18V8l8-2v10" fill="none" stroke="currentColor" strokeWidth="2" />
+          <circle cx="7.2" cy="18" r="1.8" fill="currentColor" />
+          <circle cx="15.2" cy="16" r="1.8" fill="currentColor" />
+        </svg>
+      );
+    case 'thigh':
+      return (
+        <svg {...common}>
+          <path d="M9 4v8l-2 8M15 4v7l3 9" fill="none" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      );
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function trickName(kind: TrickButtonKind): string {
+  switch (kind) {
+    case 'head': return 'HEAD';
+    case 'neck': return 'NECK';
+    case 'aroundTheWorld': return 'ATW';
+    case 'thigh': return 'THIGH';
+    case 'highFlick': return 'FLICK';
+    case 'groove': return 'GROOVE';
+    default: {
+      const exhaustive: never = kind;
+      return exhaustive;
+    }
+  }
+}
+
+function PowerRing({ controller, side }: { controller: GameController; side: Side }) {
+  const ref = useRef<SVGCircleElement>(null);
+  useEffect(() => {
+    let frame = 0;
+    const tick = () => {
+      const charge = controller.engine.kickCharge;
+      const el = ref.current;
+      if (el) {
+        const power = charge?.side === side ? charge.power : 0;
+        el.style.strokeDashoffset = String(100 - power * 100);
+        el.style.opacity = power > 0.02 ? '1' : '0';
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [controller, side]);
+  return (
+    <svg className="power-ring" viewBox="0 0 36 36" aria-hidden>
+      <circle ref={ref} cx="18" cy="18" r="15.5" pathLength={100} />
+    </svg>
+  );
+}
+
 function bindFoot(controller: GameController, side: Side) {
   return {
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -159,6 +253,15 @@ function bindFoot(controller: GameController, side: Side) {
   };
 }
 
+const TRICKS: ReadonlyArray<{ kind: TrickButtonKind; cls: string; label: string; control: ActivePrompt['control'] }> = [
+  { kind: 'head', cls: 'ps-head', label: 'Header', control: 'head' },
+  { kind: 'aroundTheWorld', cls: 'ps-atw', label: 'Around the world', control: 'atw' },
+  { kind: 'neck', cls: 'ps-neck', label: 'Neck stall, tap or hold', control: 'neck' },
+  { kind: 'highFlick', cls: 'ps-flick', label: 'High flick', control: 'flick' },
+  { kind: 'groove', cls: 'ps-groove', label: 'Groove, dance and keep the ball up', control: 'groove' },
+  { kind: 'thigh', cls: 'ps-thigh', label: 'Thigh touch', control: 'thigh' },
+];
+
 export function TouchZones({ controller }: { controller: GameController }) {
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const armed = snap.hud.armedTrick;
@@ -166,26 +269,68 @@ export function TouchZones({ controller }: { controller: GameController }) {
   const clue = snap.hud.prompt;
   const clueOn = (control: ActivePrompt['control']) => clue?.control === control;
   const neckPtr = useRef<number | null>(null);
+  const drag = useRef<{ id: number; x: number; y: number; kind: TrickButtonKind } | null>(null);
 
-  // Ensure a stuck neck hold cannot survive a lost finger / tab blur.
   useEffect(() => {
     const clear = () => controller.releaseNeck();
     window.addEventListener('blur', clear);
     return () => window.removeEventListener('blur', clear);
   }, [controller]);
 
-  const onNeckDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+  const fire = (kind: TrickButtonKind) => {
+    switch (kind) {
+      case 'head':
+        controller.attemptHeader();
+        break;
+      case 'neck':
+        break;
+      case 'aroundTheWorld':
+      case 'thigh':
+      case 'highFlick':
+      case 'groove':
+        controller.playTrick(kind);
+        break;
+      default: {
+        const exhaustive: never = kind;
+        void exhaustive;
+      }
+    }
+  };
+
+  const onTrickDown = (kind: TrickButtonKind) => (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    neckPtr.current = e.pointerId;
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    controller.pressNeck();
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, kind };
+    if (kind === 'neck') {
+      neckPtr.current = e.pointerId;
+      if (!playing) controller.noteLockedTrick();
+      else controller.pressNeck();
+    }
   };
-  const onNeckUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
+
+  const onTrickUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    if (neckPtr.current !== null && e.pointerId !== neckPtr.current) return;
-    neckPtr.current = null;
-    controller.releaseNeck();
+    const start = drag.current;
+    drag.current = null;
+    if (!start || start.id !== e.pointerId) return;
+    const decision = classifyTrickRelease({
+      phase: controller.engine.phase,
+      dx: e.clientX - start.x,
+      dy: e.clientY - start.y,
+    });
+    if (start.kind === 'neck') {
+      if (neckPtr.current !== null && e.pointerId !== neckPtr.current) return;
+      neckPtr.current = null;
+      controller.releaseNeck();
+      return;
+    }
+    if (decision === 'ignore') return;
+    if (decision === 'locked') {
+      controller.noteLockedTrick();
+      return;
+    }
+    fire(start.kind);
   };
 
   return (
@@ -193,89 +338,48 @@ export function TouchZones({ controller }: { controller: GameController }) {
       <p className="trick-help">H header · N neck · T thigh · F flick · W atw · G groove · Esc cancel</p>
       <div className="foot-row">
         <button type="button" className={`foot-btn left${clueOn('feet') ? ' clue' : ''}`} aria-label="Left foot" {...bindFoot(controller, 'left')}>
+          <PowerRing controller={controller} side="left" />
           <span className="foot-btn-mark">L</span>
           <span className="foot-btn-label">LEFT</span>
         </button>
-        <div className="trick-bar" role="toolbar" aria-label="Freestyle tricks">
-          <button
-            type="button"
-            className={`trick-btn ps-head${clueOn('head') ? ' clue' : ''}`}
-            disabled={!playing}
-            aria-label="Header"
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); controller.attemptHeader(); }}
-          >
-            {clueOn('head') && clue && <ClueMark gesture={clue.gesture} />}
-            HEAD
-          </button>
-          <button
-            type="button"
-            className={`trick-btn ps-atw ${armed === 'aroundTheWorld' ? 'on' : ''}${clueOn('atw') ? ' clue' : ''}`}
-            disabled={!playing}
-            aria-label="Around the world"
-            aria-pressed={armed === 'aroundTheWorld'}
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); controller.armTrick('aroundTheWorld'); }}
-          >
-            {clueOn('atw') && clue && <ClueMark gesture={clue.gesture} />}
-            ATW
-          </button>
-          <button
-            type="button"
-            className={`trick-btn ps-neck ${snap.hud.neckHolding ? 'on' : ''}${clueOn('neck') ? ' clue' : ''}`}
-            disabled={!playing}
-            aria-label="Neck stall"
-            onPointerDown={onNeckDown}
-            onPointerUp={onNeckUp}
-            onPointerCancel={onNeckUp}
-            onLostPointerCapture={() => { neckPtr.current = null; controller.releaseNeck(); }}
-          >
-            {clueOn('neck') && clue && <ClueMark gesture={clue.gesture} />}
-            NECK
-          </button>
-          <button
-            type="button"
-            className={`trick-btn ps-flick ${armed === 'highFlick' ? 'on' : ''}${clueOn('flick') ? ' clue' : ''}`}
-            disabled={!playing}
-            aria-label="High flick"
-            aria-pressed={armed === 'highFlick'}
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); controller.armTrick('highFlick'); }}
-          >
-            {clueOn('flick') && clue && <ClueMark gesture={clue.gesture} />}
-            FLICK
-          </button>
-          <button
-            type="button"
-            className={`trick-btn ps-groove ${armed === 'groove' ? 'on' : ''}${clueOn('groove') ? ' clue' : ''}`}
-            disabled={!playing}
-            aria-label="Groove, dance and keep the ball up"
-            aria-pressed={armed === 'groove'}
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); controller.armTrick('groove'); }}
-          >
-            <BeatRing active={playing || Boolean(clue?.beat)} />
-            {clueOn('groove') && clue && <ClueMark gesture={clue.gesture} />}
-            GROOVE
-          </button>
-          <button
-            type="button"
-            className={`trick-btn ps-thigh ${armed === 'thigh' ? 'on' : ''}${clueOn('thigh') ? ' clue' : ''}`}
-            disabled={!playing}
-            aria-label="Thigh touch"
-            aria-pressed={armed === 'thigh'}
-            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-            onClick={(e) => { e.stopPropagation(); controller.armTrick('thigh'); }}
-          >
-            {clueOn('thigh') && clue && <ClueMark gesture={clue.gesture} />}
-            THIGH
-          </button>
-        </div>
         <button type="button" className={`foot-btn right${clueOn('feet') ? ' clue' : ''}`} aria-label="Right foot" {...bindFoot(controller, 'right')}>
+          <PowerRing controller={controller} side="right" />
           {clueOn('feet') && clue && <ClueMark gesture={clue.gesture} />}
           <span className="foot-btn-mark">R</span>
           <span className="foot-btn-label">RIGHT</span>
         </button>
+      </div>
+      <div className="trick-bar" role="toolbar" aria-label="Freestyle tricks">
+        {TRICKS.map((trick) => {
+          const on = trick.kind !== 'head' && trick.kind !== 'neck' && armed === trick.kind;
+          const neckOn = trick.kind === 'neck' && snap.hud.neckHolding;
+          return (
+            <button
+              key={trick.kind}
+              type="button"
+              className={`trick-btn ${trick.cls}${on || neckOn ? ' on' : ''}${!playing ? ' locked' : ''}${clueOn(trick.control) ? ' clue' : ''}`}
+              aria-disabled={!playing}
+              aria-pressed={trick.kind === 'head' ? undefined : on || neckOn}
+              aria-label={playing ? trick.label : `${trick.label}, locked until you kick`}
+              onPointerDown={onTrickDown(trick.kind)}
+              onPointerUp={onTrickUp}
+              onPointerCancel={onTrickUp}
+              onLostPointerCapture={() => {
+                if (trick.kind === 'neck') {
+                  neckPtr.current = null;
+                  controller.releaseNeck();
+                }
+                drag.current = null;
+              }}
+            >
+              {trick.kind === 'groove' && <BeatRing active={playing || Boolean(clue?.beat)} />}
+              {clueOn(trick.control) && clue && <ClueMark gesture={clue.gesture} />}
+              <TrickIcon kind={trick.kind} />
+              <span className="trick-label">{playing ? trickName(trick.kind) : 'LOCKED'}</span>
+              {trick.kind === 'neck' && playing && <small className="trick-sub">HOLD</small>}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

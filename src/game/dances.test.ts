@@ -16,17 +16,17 @@ import {
 import { normalizeLocker } from './shop';
 
 describe('dance unlocks', () => {
-  it('starts with the samba shuffle and nothing else', () => {
+  it('starts with soft sway and nothing else', () => {
     const locker = normalizeDances(null);
     expect(locker.equippedDance).toBe(STARTER_DANCE_ID);
-    expect(locker.ownedDances).toEqual(['samba']);
-    expect(dancesOwnedAt(0)).toEqual(['samba']);
+    expect(locker.ownedDances).toEqual(['sway']);
+    expect(dancesOwnedAt(0)).toEqual(['sway']);
   });
 
-  it('unlocks robot, griddy and spin on the 10/25/50 ladder', () => {
-    expect(dancesOwnedAt(10)).toEqual(['samba', 'robot']);
-    expect(dancesOwnedAt(25)).toEqual(['samba', 'robot', 'griddy']);
-    expect(dancesOwnedAt(50)).toEqual(['samba', 'robot', 'griddy', 'spin']);
+  it('unlocks pendulum, shuffle and heel rock on the 10/25/50 ladder', () => {
+    expect(dancesOwnedAt(10)).toEqual(['sway', 'pendulum']);
+    expect(dancesOwnedAt(25)).toEqual(['sway', 'pendulum', 'shuffle']);
+    expect(dancesOwnedAt(50)).toEqual(['sway', 'pendulum', 'shuffle', 'heelrock']);
     expect(rankFromCheer('streak:10')).toBe(10);
     expect(rankFromCheer('juggle:25')).toBe(25);
     expect(rankFromCheer('perfect:100')).toBe(100);
@@ -37,32 +37,35 @@ describe('dance unlocks', () => {
 
   it('refuses a forged owned id when the rank has not been earned', () => {
     const forged = normalizeDances({ danceRank: 0, ownedDances: ['spin', 'nope', 'griddy'], equippedDance: 'spin' });
-    expect(forged.ownedDances).toEqual(['samba']);
-    expect(forged.equippedDance).toBe('samba');
+    expect(forged.ownedDances).toEqual(['sway']);
+    expect(forged.equippedDance).toBe('sway');
+    const kept = normalizeDances({ danceRank: 50, ownedDances: ['spin', 'griddy'], equippedDance: 'griddy' });
+    expect(kept.equippedDance).toBe('shuffle');
+    expect(kept.ownedDances).toEqual(['sway', 'pendulum', 'shuffle', 'heelrock']);
   });
 
   it('equips only an owned dance and keeps the choice', () => {
     const owned = withDanceRank(normalizeDances(null), 25);
-    expect(owned.ownedDances).toContain('griddy');
-    const locked = equipDance(owned, 'spin');
+    expect(owned.ownedDances).toContain('shuffle');
+    const locked = equipDance(owned, 'heelrock');
     expect(locked.ok).toBe(false);
-    expect(locked.locker.equippedDance).toBe('samba');
-    const equipped = equipDance(owned, 'griddy');
+    expect(locked.locker.equippedDance).toBe('sway');
+    const equipped = equipDance(owned, 'shuffle');
     expect(equipped.ok).toBe(true);
-    expect(equipped.locker.equippedDance).toBe('griddy');
+    expect(equipped.locker.equippedDance).toBe('shuffle');
     const again = normalizeDances(equipped.locker);
-    expect(again.equippedDance).toBe('griddy');
+    expect(again.equippedDance).toBe('shuffle');
     expect(again.danceRank).toBe(25);
   });
 
   it('plays the newly unlocked dance at that milestone and the equipped dance for a new best', () => {
     const owned = dancesOwnedAt(50);
-    expect(celebrationDance('streak:10', 'samba', owned)).toBe('robot');
-    expect(celebrationDance('juggle:25', 'samba', owned)).toBe('griddy');
-    expect(celebrationDance('perfect:50', 'robot', owned)).toBe('spin');
-    expect(celebrationDance('best', 'robot', owned)).toBe('robot');
-    expect(celebrationDance('tier:legend', 'samba', dancesOwnedAt(100))).toBe('spin');
-    expect(celebrationDance('streak:10', 'spin', ['samba'])).toBe('samba');
+    expect(celebrationDance('streak:10', 'sway', owned)).toBe('pendulum');
+    expect(celebrationDance('juggle:25', 'sway', owned)).toBe('shuffle');
+    expect(celebrationDance('perfect:50', 'pendulum', owned)).toBe('heelrock');
+    expect(celebrationDance('best', 'pendulum', owned)).toBe('pendulum');
+    expect(celebrationDance('tier:legend', 'sway', dancesOwnedAt(100))).toBe('heelrock');
+    expect(celebrationDance('streak:10', 'heelrock', ['sway'])).toBe('sway');
   });
 });
 
@@ -85,10 +88,10 @@ describe('dance shop boundaries', () => {
       expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(dance.id);
     }
     const start = normalizeLocker({ coins: 40, danceRank: 10, equippedDance: 'robot' });
-    expect(start.ownedDances).toEqual(['samba', 'robot']);
+    expect(start.ownedDances).toEqual(['sway', 'pendulum']);
     const granted = grantLaunchCollection(start, 'apple', 'apple:opaque');
     expect(granted.ownedDances).toEqual(start.ownedDances);
-    expect(granted.equippedDance).toBe('robot');
+    expect(granted.equippedDance).toBe('pendulum');
     for (const id of LAUNCH_COLLECTION_ITEM_IDS) {
       expect(id.startsWith('dance')).toBe(false);
     }
@@ -105,8 +108,8 @@ describe('dance shop boundaries', () => {
     expect(migrated.wardrobeVersion).toBe(3);
     expect(migrated.coins).toBe(1800);
     expect(migrated.danceRank).toBe(10);
-    expect(migrated.ownedDances).toContain('robot');
-    expect(migrated.equippedDance).toBe('samba');
+    expect(migrated.ownedDances).toContain('pendulum');
+    expect(migrated.equippedDance).toBe('sway');
 
     const forged = normalizeLocker({
       launchCollectionOwned: true,
@@ -116,11 +119,11 @@ describe('dance shop boundaries', () => {
       ownedDances: ['spin', 'griddy'],
       coins: 20,
     });
-    expect(forged.ownedDances).toEqual(['samba']);
+    expect(forged.ownedDances).toEqual(['sway']);
     expect(forged.coins).toBe(20);
     expect(forged.launchGrantedItemIds.some((id) => id.startsWith('dance'))).toBe(false);
     const granted = grantLaunchCollection(forged, 'dev_sim', null);
-    expect(granted.ownedDances).toEqual(['samba']);
-    expect(granted.equippedDance).toBe('samba');
+    expect(granted.ownedDances).toEqual(['sway']);
+    expect(granted.equippedDance).toBe('sway');
   });
 });

@@ -191,20 +191,20 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const mapSize = quality === 'high' ? 1024 : 512;
   return (
     <>
-      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#8dc5cb' : '#6C5CE7']} />
-      <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#8dc5cb', 24, 52] : ['#FF8A5B', 11, 28]} />
+      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#b7e4ea' : '#A89BFF']} />
+      <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#b7e4ea', 28, 60] : ['#E7D7FF', 18, 42]} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
-      <hemisphereLight args={ENVIRONMENT_THEME === 'beach' ? ['#fff1dc', '#12363f', 0.95] : ['#FF8A5B', '#1E2A5A', 0.72]} />
-      {ENVIRONMENT_THEME === 'beach' && <ambientLight intensity={0.32} />}
+      <hemisphereLight args={ENVIRONMENT_THEME === 'beach' ? ['#fff6e8', '#2a6b78', 1.15] : ['#FFF1D6', '#6E7CC4', 1.25]} />
+      <ambientLight intensity={ENVIRONMENT_THEME === 'beach' ? 0.42 : 0.55} />
       <directionalLight
         position={[-2.8, 2.6, -1.4]}
-        intensity={quality === 'low' ? 0.25 : 0.55}
-        color="#FF4F9A"
+        intensity={quality === 'low' ? 0.4 : 0.85}
+        color="#FF8AB8"
       />
       {quality !== 'low' && (
-        <directionalLight position={[0.4, 3.2, -2.6]} intensity={0.32} color="#FFD93D" />
+        <directionalLight position={[0.4, 3.2, -2.6]} intensity={0.55} color="#FFE08A" />
       )}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0.12]}>
         <circleGeometry args={[0.48, quality === 'low' ? 14 : 28]} />
@@ -212,7 +212,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       </mesh>
       <directionalLight
         position={[2.6, 7, 3.2]}
-        intensity={ENVIRONMENT_THEME === 'beach' ? 2.3 : 2.5}
+        intensity={ENVIRONMENT_THEME === 'beach' ? 2.6 : 3.15}
         color={ENVIRONMENT_THEME === 'beach' ? '#ffe9c7' : '#FFF6E8'}
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}

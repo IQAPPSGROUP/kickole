@@ -84,9 +84,19 @@ export interface GameConfig {
   launchSpeed: number;
   /**
    * World-space ball-centre apex used to derive the high-flick impulse from current gravity.
-   * Not applied to normal kicks.
+   * A plain tap stays on kickSpeed. A charged hold eases toward this apex.
    */
   highFlickApex: number;
+  /** Seconds a foot must be held before a charge reaches full loft. */
+  kickChargeTime: number;
+  /** Charge power (0–1) at which a released kick counts as a high flick for combos. */
+  highKickComboPower: number;
+  /** Ball-centre hover while a foot circles around the world. X is mirrored by side. */
+  atwHoverX: number;
+  atwHoverY: number;
+  atwHoverZ: number;
+  /** Downward speed when the ATW hover ends and the return window opens. */
+  atwDropSpeed: number;
   /** Modest pop used to start around-the-world (below a normal kick). */
   atwPopSpeed: number;
   /** Gravity grows by this fraction per kick-up, up to maxGravityScale. */
@@ -144,13 +154,19 @@ export const DEFAULT_CONFIG: GameConfig = {
   },
   fixedStep: 1 / 120,
   gravity: 11,
-  ballRadius: 0.14,
+  ballRadius: 0.11,
   contactHeight: FOOT.y,
   ballZ: FOOT.z,
   footX: 0.17,
   kickSpeed: 5.6,
   launchSpeed: 6.4,
-  highFlickApex: 2.85,
+  highFlickApex: 3.68,
+  kickChargeTime: 0.42,
+  highKickComboPower: 0.65,
+  atwHoverX: 0.45,
+  atwHoverY: 1,
+  atwHoverZ: 0.45,
+  atwDropSpeed: 1.15,
   atwPopSpeed: 4.4,
   gravityRamp: 0.012,
   maxGravityScale: 1.45,

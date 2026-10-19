@@ -1,11 +1,14 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Box3, Matrix4, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
+import { AnimationMixer, Box3, Matrix4, Quaternion, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { DEFAULT_CONFIG } from '../engine/config';
-import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel } from './rig';
+import { GameEngine } from '../engine/engine';
+import { computePose } from './pose';
+import { ueDeltaQuaternion } from './ue-pose';
+import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel, type BoneKey } from './rig';
 
 const MODEL = new URL('../../public/models/kickole_player_v3.glb', import.meta.url);
 
@@ -159,6 +162,37 @@ describe('kickole_player_v3.glb', () => {
       expect(meshGap).toBeLessThan(0.06);
     },
   );
+
+  it('lifts the kicking leg so the instep meets the ball', async () => {
+    const gltf = await load();
+    const { bones } = bonesOf(gltf.scene);
+    const e = new GameEngine();
+    e.prepare('ready');
+    e.phase = 'playing';
+    e.time = 1;
+    e.lastKick.left = 1 - e.config.contactDelay;
+    e.ball.x = -e.config.footX * 0.6;
+    e.ball.y = e.config.contactHeight;
+    e.ball.z = e.config.ballZ;
+    e.ball.vy = 0;
+    e.contact = {
+      kind: 'pending', side: 'left', grade: 'perfect', deltaMs: 0,
+      held: e.config.contactDelay, highFlick: false, kickPower: 0, thigh: false,
+    };
+    const pose = computePose(e);
+    const delta = new Quaternion();
+    const keys: BoneKey[] = ['thighLeft', 'shinLeft', 'footLeft'];
+    for (const key of keys) {
+      const bone = bones[BONE_NAMES[key]];
+      bone.quaternion.multiply(ueDeltaQuaternion(key, pose, delta));
+    }
+    gltf.scene.updateMatrixWorld(true);
+    const foot = bones.Foot_L.getWorldPosition(new Vector3());
+    const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+    expect(foot.y).toBeGreaterThan(0.45);
+    expect(foot.distanceTo(ball)).toBeLessThan(0.28);
+    expect(bootSurfaceGap(gltf.scene, ball)).toBeLessThan(0.08);
+  });
 
   it('skins the authored hair to the head bone', async () => {
     const gltf = await load();

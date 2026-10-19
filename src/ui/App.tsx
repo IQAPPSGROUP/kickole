@@ -68,16 +68,16 @@ export function App() {
         controller.pressNeck();
       } else if (e.code === 'KeyT') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('thigh');
+        controller.playTrick('thigh');
       } else if (e.code === 'KeyF') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('highFlick');
+        controller.playTrick('highFlick');
       } else if (e.code === 'KeyW') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('aroundTheWorld');
+        controller.playTrick('aroundTheWorld');
       } else if (e.code === 'KeyG') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('groove');
+        controller.playTrick('groove');
       } else if (e.code === 'Escape') {
         if (controller.engine.celebration) controller.skipCelebration();
         controller.armTrick(null);

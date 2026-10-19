@@ -1,6 +1,6 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Euler, Matrix4, MeshBasicMaterial, Quaternion, Vector3, type Group, type Mesh } from 'three';
+import { Euler, Matrix4, Quaternion, Vector3, type Group, type Mesh } from 'three';
 import { comboHeat } from './juice';
 import { toonGradient } from './toon';
 import type { Quality } from '../game/storage';
@@ -17,18 +17,17 @@ const PANEL_DIRS: Vector3[] = (() => {
   return v.map(([x, y, z]) => new Vector3(x, y, z).normalize());
 })();
 
-const TRAIL = 6;
-
 export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin; quality: Quality }) {
-  const trail = useRef<Array<Mesh | null>>([]);
-  const hist = useRef<Vector3[]>(Array.from({ length: TRAIL * 2 }, () => new Vector3()));
   const flash = useRef<Mesh>(null);
-  const trailCount = quality === 'low' ? 3 : TRAIL;
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
   const shadow = useRef<Mesh>(null);
+  const streak = useRef<Mesh>(null);
   const r = engine.config.ballRadius;
   const euler = useMemo(() => new Euler(0, 0, 0, 'XYZ'), []);
+  const streakDir = useMemo(() => new Vector3(), []);
+  const streakQuat = useMemo(() => new Quaternion(), []);
+  const up = useMemo(() => new Vector3(0, 1, 0), []);
 
   const panels = useMemo(() => {
     const m = new Matrix4();
@@ -55,28 +54,33 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     {
       const speed = Math.hypot(b.vx, b.vy, b.vz);
       const heat = comboHeat(engine.streak);
-      const h = hist.current;
-      for (let i = h.length - 1; i > 0; i--) h[i].copy(h[i - 1]);
-      h[0].set(b.x, b.y, b.z);
-      for (let i = 0; i < TRAIL; i++) {
-        const m = trail.current[i];
-        if (!m) continue;
-        const p = h[(i + 1) * 2 - 1];
-        const hot = heat.t > 0.35 ? 1.5 : 3.2;
-        m.visible = i < trailCount && speed > hot && engine.phase === 'playing';
-        (m.material as MeshBasicMaterial).color.set(heat.color);
-        m.position.copy(p);
-        const scale = (1 - (i + 1) / (TRAIL + 1)) * (0.85 + heat.t * 0.45);
-        m.scale.setScalar(scale);
-        (m.material as unknown as { opacity: number }).opacity = heat.opacity * (1 - i / TRAIL);
+      const mesh = streak.current;
+      if (mesh) {
+        const len = Math.min(0.38, Math.max(0, speed - 1.4) * 0.05);
+        const show = len > 0.04 && engine.phase === 'playing' && quality !== 'low';
+        mesh.visible = show;
+        if (show) {
+          streakDir.set(b.vx, b.vy, b.vz).normalize();
+          streakQuat.setFromUnitVectors(up, streakDir);
+          mesh.quaternion.copy(streakQuat);
+          mesh.position.set(
+            b.x - streakDir.x * (r + len * 0.45),
+            b.y - streakDir.y * (r + len * 0.45),
+            b.z - streakDir.z * (r + len * 0.45),
+          );
+          mesh.scale.set(1, len, 1);
+          const mat = mesh.material as unknown as { opacity: number; color: { set: (c: string) => void } };
+          mat.color.set(heat.t > 0.35 ? heat.color : '#F7F5ED');
+          mat.opacity = Math.min(0.55, 0.18 + len);
+        }
       }
     }
     if (shadow.current) {
       const h = Math.max(0, b.y - r);
-      const s = 1 / (1 + h * 0.9);
+      const s = 1 / (1 + h * 2.6);
       shadow.current.position.set(b.x, 0.012, b.z);
       shadow.current.scale.set(s, s, s);
-      (shadow.current.material as unknown as { opacity: number }).opacity = 0.4 * s;
+      (shadow.current.material as unknown as { opacity: number }).opacity = 0.62 * s;
     }
   });
 
@@ -94,21 +98,19 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
           </mesh>
           {panels.map((p, i) => (
             <mesh key={i} position={p.pos} quaternion={p.q}>
-              <circleGeometry args={[r * 0.36, 5]} />
-              <meshToonMaterial color={skin.football.panels} gradientMap={toonGradient()} />
+              <circleGeometry args={[r * (i % 2 === 0 ? 0.46 : 0.34), 5]} />
+              <meshToonMaterial color={i % 2 === 0 ? skin.football.panels : '#1E2A5A'} gradientMap={toonGradient()} />
             </mesh>
           ))}
         </group>
       </group>
-      {Array.from({ length: TRAIL }, (_, i) => (
-        <mesh key={i} ref={(m) => { trail.current[i] = m; }} visible={false}>
-          <sphereGeometry args={[r, 12, 10]} />
-          <meshBasicMaterial color={engine.streak >= 4 ? '#FFD93D' : '#FF4F9A'} transparent opacity={0.2} depthWrite={false} />
-        </mesh>
-      ))}
+      <mesh ref={streak} visible={false}>
+        <boxGeometry args={[0.035, 1, 0.035]} />
+        <meshBasicMaterial color="#F7F5ED" transparent opacity={0.35} depthWrite={false} />
+      </mesh>
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[r * 1.25, 24]} />
-        <meshBasicMaterial color="#1E2A5A" transparent opacity={0.4} depthWrite={false} />
+        <circleGeometry args={[r * 1.15, 24]} />
+        <meshBasicMaterial color="#142033" transparent opacity={0.55} depthWrite={false} />
       </mesh>
     </>
   );

@@ -343,3 +343,74 @@ describe('milestone celebration', () => {
     expect(e.ball.vy).toBeLessThan(0);
   });
 });
+
+describe('one-tap tricks and queues', () => {
+  it('plays a thigh touch from a single button press', () => {
+    const e = started();
+    fallThrough(e, e.config.contacts.thigh.y, e.config.contacts.thigh.z, 8);
+    expect(e.requestFootTrick('thigh')).toBe('fired');
+    stepN(e, 6);
+    expect(e.stats.thighs).toBe(1);
+    expect(e.stats.kickUps).toBe(1);
+  });
+
+  it('queues a thigh tap until the ball arrives', () => {
+    const e = started();
+    e.ball.y = 2.4;
+    e.ball.vy = 1;
+    e.ball.z = e.config.contacts.thigh.z;
+    expect(e.requestFootTrick('thigh')).toBe('queued');
+    expect(e.stats.thighs).toBe(0);
+    for (let i = 0; i < 800 && e.stats.thighs === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.thighs).toBe(1);
+  });
+
+  it('queues a header through cooldown and does not farm a second one', () => {
+    const e = started();
+    fallThrough(e, e.config.contacts.forehead.y, e.config.contacts.forehead.z, 8);
+    e.attemptHeader();
+    expect(e.stats.headers).toBe(1);
+    e.attemptHeader();
+    stepN(e, 40);
+    expect(e.stats.headers).toBe(1);
+  });
+
+  it('a neck tap catches and flicks without a second award', () => {
+    const e = started();
+    e.ball.y = e.config.contacts.nape.y + 0.8;
+    e.ball.vy = 0.4;
+    e.ball.z = e.config.contacts.nape.z;
+    e.pressNeck();
+    e.releaseNeck();
+    expect(e.stats.neckStalls).toBe(0);
+    for (let i = 0; i < 800 && e.stats.neckStalls === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.ball.vy).toBeGreaterThan(0);
+    const score = e.stats.score;
+    e.pressNeck();
+    e.releaseNeck();
+    stepN(e, 10);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.stats.score).toBe(score);
+  });
+
+  it('a full charge kicks higher than a tap and counts as a high flick', () => {
+    const tap = started();
+    runUntilContactDelta(tap, 5);
+    tap.press('right');
+    tap.release('right');
+    stepN(tap, 4);
+    const tapVy = tap.ball.vy;
+
+    const held = started();
+    held.press('right');
+    for (let i = 0; i < 4000 && !held.contact && held.phase === 'playing'; i++) held.step(held.config.fixedStep);
+    expect(held.contact?.kickPower).toBeGreaterThanOrEqual(held.config.highKickComboPower);
+    held.release('right');
+    stepN(held, 10);
+    expect(held.ball.vy).toBeGreaterThan(tapVy + 0.4);
+    expect(held.stats.highFlicks).toBe(1);
+    expect(held.stats.stalls).toBe(0);
+    expect(held.stats.kickUps).toBe(1);
+  });
+});

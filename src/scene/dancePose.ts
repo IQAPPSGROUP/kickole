@@ -4,23 +4,24 @@ import type { Pose } from './pose';
 /**
  * In-place dance poses sampled from the steel-band phase (0 on the beat, 1 on the next).
  * Cosmetic only: the ball simulation never reads this.
+ * Moves are original: low sway, a smooth pendulum, a two-footed shuffle, a heel rock.
  */
 export function applyDancePose(out: Pose, dance: DanceId, phase: number, intensity = 1): void {
   const wrapped = ((phase % 1) + 1) % 1;
   const angle = wrapped * Math.PI * 2;
   const k = Math.max(0, Math.min(1, intensity));
   switch (dance) {
-    case 'samba':
-      applySamba(out, angle, k);
+    case 'sway':
+      applySway(out, angle, k);
       break;
-    case 'robot':
-      applyRobot(out, wrapped, k);
+    case 'pendulum':
+      applyPendulum(out, angle, k);
       break;
-    case 'griddy':
-      applyGriddy(out, angle, k);
+    case 'shuffle':
+      applyShuffle(out, angle, k);
       break;
-    case 'spin':
-      applySpin(out, wrapped, angle, k);
+    case 'heelrock':
+      applyHeelRock(out, angle, k);
       break;
     default: {
       const exhaustive: never = dance;
@@ -31,73 +32,66 @@ export function applyDancePose(out: Pose, dance: DanceId, phase: number, intensi
   out.lockMotion = true;
 }
 
-function applySamba(out: Pose, angle: number, k: number) {
+/** Low weight shift. Knees stay under half a bend — not a high march. */
+function applySway(out: Pose, angle: number, k: number) {
   const sway = Math.sin(angle);
-  out.bodyYaw = 0.2 * sway * k;
-  out.torsoRoll = 0.14 * sway * k;
-  out.torsoPitch = 0.05 * k;
-  out.armLeft = 0.45 + 0.4 * Math.sin(angle + 0.6) * k;
-  out.armRight = 0.45 + 0.4 * Math.sin(angle + Math.PI + 0.2) * k;
-  out.elbowLeft = 0.45 * k;
-  out.elbowRight = 0.5 * k;
-  const left = Math.max(0, Math.sin(angle));
-  const right = Math.max(0, Math.sin(angle + Math.PI));
-  out.legs.left.thigh = -0.95 * left * k;
-  out.legs.left.knee = 1.15 * left * k;
-  out.legs.left.foot = 0.35 * left * k;
-  out.legs.right.thigh = -0.95 * right * k;
-  out.legs.right.knee = 1.15 * right * k;
-  out.legs.right.foot = 0.35 * right * k;
-  out.bodyY += 0.045 * Math.abs(sway) * k;
+  out.bodyYaw = 0.12 * sway * k;
+  out.torsoRoll = 0.1 * sway * k;
+  out.armLeft = 0.35 + 0.12 * Math.sin(angle) * k;
+  out.armRight = 0.35 - 0.12 * Math.sin(angle) * k;
+  out.elbowLeft = 0.22 * k;
+  out.elbowRight = 0.24 * k;
+  out.legs.left.knee = 0.16 + 0.22 * Math.max(0, sway) * k;
+  out.legs.right.knee = 0.16 + 0.22 * Math.max(0, -sway) * k;
+  out.legs.left.thigh = -0.1 * Math.max(0, sway) * k;
+  out.legs.right.thigh = -0.1 * Math.max(0, -sway) * k;
+  out.bodyY += 0.015 * Math.abs(sway) * k;
 }
 
-function applyRobot(out: Pose, phase: number, k: number) {
-  const step = Math.min(3, Math.floor(phase * 4));
-  const arm = [0.15, 1.05, 0.15, -0.25][step] ?? 0;
-  out.armLeft = (0.85 + arm) * k;
-  out.armRight = (0.85 - arm) * k;
-  out.elbowLeft = (step % 2 === 0 ? 1.25 : 0.1) * k;
-  out.elbowRight = (step % 2 === 1 ? 1.25 : 0.1) * k;
-  out.torsoPitch = 0.02;
-  out.torsoYaw = (step === 1 ? 0.22 : step === 3 ? -0.22 : 0) * k;
-  out.headYaw = (step - 1.5) * 0.18 * k;
-  out.headPitch = step % 2 === 0 ? -0.08 * k : 0.12 * k;
-  out.legs.left.knee = step === 0 ? 0.95 * k : 0.04;
-  out.legs.right.knee = step === 2 ? 0.95 * k : 0.04;
-  out.legs.left.thigh = step === 0 ? -0.75 * k : 0;
-  out.legs.right.thigh = step === 2 ? -0.75 * k : 0;
-  out.bodyY += step % 2 === 0 ? 0.02 * k : 0;
+/** Smooth sine swing with soft elbows. Not a frozen right-angle pose. */
+function applyPendulum(out: Pose, angle: number, k: number) {
+  const swing = Math.sin(angle);
+  out.armLeft = (0.5 + 0.28 * swing) * k;
+  out.armRight = (0.5 - 0.28 * swing) * k;
+  out.elbowLeft = (0.32 + 0.1 * Math.sin(angle * 2)) * k;
+  out.elbowRight = (0.32 - 0.1 * Math.sin(angle * 2)) * k;
+  out.torsoYaw = 0.08 * swing * k;
+  out.headYaw = 0.1 * swing * k;
+  out.legs.left.knee = 0.1 * k;
+  out.legs.right.knee = 0.1 * k;
 }
 
-function applyGriddy(out: Pose, angle: number, k: number) {
-  const side = Math.sin(angle) >= 0 ? 1 : -1;
-  out.torsoRoll = 0.18 * side * k;
-  out.bodyYaw = 0.14 * side * k;
-  out.legs.left.abduct = 0.28 * side * k;
-  out.legs.right.abduct = 0.22 * side * k;
-  out.legs.left.thigh = side > 0 ? -1.1 * k : -0.08 * k;
-  out.legs.left.knee = side > 0 ? 1.4 * k : 0.12 * k;
-  out.legs.right.thigh = side < 0 ? -1.1 * k : -0.08 * k;
-  out.legs.right.knee = side < 0 ? 1.4 * k : 0.12 * k;
-  out.armLeft = 0.25 * k;
-  out.armRight = 1.35 * k;
-  out.armLeftPitch = 0.55 * Math.sin(angle) * k;
-  out.armRightPitch = -0.35 * k;
-  out.elbowRight = 0.4 * k;
+/** Both feet stay low and neither arm sticks up. */
+function applyShuffle(out: Pose, angle: number, k: number) {
+  const step = Math.sin(angle);
+  out.torsoRoll = 0.05 * step * k;
+  out.legs.left.thigh = -0.14 * k;
+  out.legs.right.thigh = -0.14 * k;
+  out.legs.left.knee = (0.2 + 0.18 * Math.max(0, step)) * k;
+  out.legs.right.knee = (0.2 + 0.18 * Math.max(0, -step)) * k;
+  out.legs.left.foot = 0.1 * step * k;
+  out.legs.right.foot = -0.1 * step * k;
+  out.armLeft = 0.38 * k;
+  out.armRight = 0.4 * k;
+  out.armLeftPitch = 0.06 * step * k;
+  out.armRightPitch = -0.06 * step * k;
 }
 
-function applySpin(out: Pose, phase: number, angle: number, k: number) {
-  out.bodyYaw = phase * Math.PI * 2 * k;
-  out.armLeft = 2.45 * k;
-  out.armRight = 2.45 * k;
-  out.elbowLeft = 0.15 * k;
-  out.elbowRight = 0.15 * k;
-  out.torsoPitch = -0.06 * k;
-  out.legs.left.knee = 0.28 * k;
-  out.legs.right.knee = 0.28 * k;
-  out.legs.left.thigh = -0.12 * k;
-  out.legs.right.thigh = -0.12 * k;
-  out.bodyY += 0.07 * Math.abs(Math.sin(angle)) * k;
+/** Small heel rock with crossed bent arms. The body does not spin a full turn. */
+function applyHeelRock(out: Pose, angle: number, k: number) {
+  const rock = Math.sin(angle);
+  out.bodyYaw = 0.4 * rock * k;
+  out.armLeft = 0.65 * k;
+  out.armRight = 0.65 * k;
+  out.elbowLeft = 1.1 * k;
+  out.elbowRight = 1.1 * k;
+  out.armLeftPitch = 0.4 * k;
+  out.armRightPitch = -0.4 * k;
+  out.legs.left.foot = 0.32 * Math.max(0, rock) * k;
+  out.legs.right.foot = 0.32 * Math.max(0, -rock) * k;
+  out.legs.left.knee = 0.18 * k;
+  out.legs.right.knee = 0.18 * k;
+  out.bodyY += 0.02 * Math.abs(rock) * k;
 }
 
 /** Extra knee or chest shape on the beat of a groove touch. */

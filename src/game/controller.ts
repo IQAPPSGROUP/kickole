@@ -68,6 +68,8 @@ export interface Hud {
   feedback: Feedback | null;
   stalling: boolean;
   armedTrick: ArmedTrick | null;
+  /** Foot trick is waiting for the ball, so the button already did its job. */
+  trickQueued: boolean;
   neckHolding: boolean;
   celebrating: boolean;
   celebrationLabel: string | null;
@@ -216,6 +218,7 @@ export class GameController {
         feedback: this.feedback,
         stalling: e.contact?.kind === 'stall',
         armedTrick: armed === 'aroundTheWorld' || armed === 'thigh' || armed === 'highFlick' || armed === 'groove' ? armed : null,
+        trickQueued: e.queuedFoot != null,
         neckHolding: e.trick?.kind === 'neckStall'
           && (e.trick.phase === 'contact' || e.trick.phase === 'execute'),
         celebrating: e.celebration != null,
@@ -502,14 +505,26 @@ export class GameController {
     if (was && !this.engine.contact) this.publish();
   }
 
+  noteLockedTrick() {
+    if (this.engine.phase === 'playing') return;
+    this.show('poor', 'KICK FIRST', 0);
+    this.publish();
+  }
+
   attemptHeader() {
-    if (this.engine.phase !== 'playing') return;
+    if (this.engine.phase !== 'playing') {
+      this.noteLockedTrick();
+      return;
+    }
     this.engine.attemptHeader();
     this.publish();
   }
 
   pressNeck() {
-    if (this.engine.phase !== 'playing') return;
+    if (this.engine.phase !== 'playing') {
+      this.noteLockedTrick();
+      return;
+    }
     this.engine.pressNeck();
     this.publish();
   }
@@ -520,9 +535,24 @@ export class GameController {
   }
 
   armTrick(kind: ArmedTrick | null) {
+    if (kind !== null) {
+      this.playTrick(kind);
+      return;
+    }
     if (this.engine.phase !== 'playing' && this.engine.phase !== 'ready') return;
-    this.engine.armTrick(kind);
+    this.engine.armTrick(null);
     this.publish();
+  }
+
+  /** One tap plays the trick. Before the first kick, say why the button is grey. */
+  playTrick(kind: ArmedTrick): 'fired' | 'queued' | 'locked' {
+    if (this.engine.phase !== 'playing') {
+      this.noteLockedTrick();
+      return 'locked';
+    }
+    const result = this.engine.requestFootTrick(kind);
+    this.publish();
+    return result;
   }
 
   action() {

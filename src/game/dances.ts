@@ -6,10 +6,18 @@ import type { StoreProduct } from '../billing/types';
  * this list is a store product. Prices, when a product exists, come from the
  * store's priceString — this module never invents one.
  */
-export const DANCE_IDS = ['samba', 'robot', 'griddy', 'spin'] as const;
+export const DANCE_IDS = ['sway', 'pendulum', 'shuffle', 'heelrock'] as const;
 export type DanceId = (typeof DANCE_IDS)[number];
 
-export const STARTER_DANCE_ID: DanceId = 'samba';
+export const STARTER_DANCE_ID: DanceId = 'sway';
+
+/** Saves from before the rename. Boot skin id "samba" is unrelated and stays. */
+const LEGACY_DANCE_IDS: Record<string, DanceId> = {
+  samba: 'sway',
+  robot: 'pendulum',
+  griddy: 'shuffle',
+  spin: 'heelrock',
+};
 
 export interface DanceDesign {
   id: DanceId;
@@ -23,29 +31,29 @@ export interface DanceDesign {
 
 export const DANCES: readonly DanceDesign[] = [
   {
-    id: 'samba',
-    name: 'Samba Shuffle',
+    id: 'sway',
+    name: 'Soft Sway',
     milestone: 0,
     productId: null,
-    note: 'Starter dance. Hips and heels follow the steel-pan beat.',
+    note: 'Starter dance. A low weight shift on the steel-pan beat.',
   },
   {
-    id: 'robot',
-    name: 'Robot',
+    id: 'pendulum',
+    name: 'Pendulum',
     milestone: 10,
     productId: null,
     note: 'Unlocks when you cross a 10 combo, juggle or perfect milestone.',
   },
   {
-    id: 'griddy',
-    name: 'Griddy Step',
+    id: 'shuffle',
+    name: 'Shuffle Step',
     milestone: 25,
     productId: null,
     note: 'Unlocks at a 25 milestone.',
   },
   {
-    id: 'spin',
-    name: 'Arms-Up Spin',
+    id: 'heelrock',
+    name: 'Heel Rock',
     milestone: 50,
     productId: null,
     note: 'Unlocks at a 50 milestone.',
@@ -60,6 +68,12 @@ export interface DanceLocker {
 
 export function isDanceId(id: string): id is DanceId {
   return (DANCE_IDS as readonly string[]).includes(id);
+}
+
+/** Map a stored id, including retired names, onto the current set. */
+export function canonicalDanceId(id: string): DanceId | null {
+  if (isDanceId(id)) return id;
+  return LEGACY_DANCE_IDS[id] ?? null;
 }
 
 export function getDance(id: string): DanceDesign | null {
@@ -131,16 +145,17 @@ export function normalizeDances(raw: {
   const owned = new Set<DanceId>(dancesOwnedAt(rank));
   if (Array.isArray(raw?.ownedDances)) {
     for (const id of raw.ownedDances) {
-      if (typeof id !== 'string' || !isDanceId(id)) continue;
-      const dance = getDance(id);
-      if (dance && danceUnlocked(rank, dance)) owned.add(id);
+      if (typeof id !== 'string') continue;
+      const canonical = canonicalDanceId(id);
+      if (!canonical) continue;
+      const dance = getDance(canonical);
+      if (dance && danceUnlocked(rank, dance)) owned.add(canonical);
     }
   }
   owned.add(STARTER_DANCE_ID);
   const ownedDances = DANCES.map((dance) => dance.id).filter((id) => owned.has(id));
-  const equipped = typeof raw?.equippedDance === 'string' && isDanceId(raw.equippedDance) && owned.has(raw.equippedDance)
-    ? raw.equippedDance
-    : STARTER_DANCE_ID;
+  const equippedRaw = typeof raw?.equippedDance === 'string' ? canonicalDanceId(raw.equippedDance) : null;
+  const equipped = equippedRaw && owned.has(equippedRaw) ? equippedRaw : STARTER_DANCE_ID;
   return { danceRank: rank, ownedDances, equippedDance: equipped };
 }
 

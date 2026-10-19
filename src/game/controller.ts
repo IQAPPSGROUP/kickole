@@ -115,6 +115,20 @@ export class GameController {
       case 'stallStart':
         this.publish();
         break;
+      case 'trick':
+        if (e.points > 0) {
+          const label = e.kind === 'header' ? 'HEADER!'
+            : e.kind === 'thigh' ? 'THIGH!'
+              : e.kind === 'neckStall' ? 'NECK STALL!'
+                : e.kind === 'aroundTheWorld' ? 'AROUND THE WORLD!'
+                  : 'TRICK!';
+          this.show('perfect', label, e.points);
+        }
+        this.publish();
+        break;
+      case 'trickFail':
+        this.publish();
+        break;
       case 'drop':
         if (sound) sfx.drop();
         this.vibrate(80);

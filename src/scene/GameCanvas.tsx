@@ -79,13 +79,13 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const mapSize = quality === 'high' ? 2048 : 1024;
   return (
     <>
-      <color attach="background" args={['#234F4B']} />
-      <fog attach="fog" args={['#234F4B', 10, 22]} />
+      <color attach="background" args={['#2f5f5a']} />
+      <fog attach="fog" args={['#2f5f5a', 14, 36]} />
       <CameraRig shake={quality !== 'low'} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
-      <hemisphereLight args={['#fff1dc', '#12363f', 0.8]} />
-      <ambientLight intensity={0.2} />
+      <hemisphereLight args={['#fff1dc', '#12363f', 0.95]} />
+      <ambientLight intensity={0.32} />
       <directionalLight
         position={[2.5, 6, 4]}
         intensity={2.3}
@@ -101,6 +101,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         shadow-bias={-0.0004}
         shadow-radius={4}
       />
+      {/* Soft fill so the textured hillside behind the wall keeps its pastel colour. */}
+      <directionalLight position={[-1.5, 5.5, -6]} intensity={1.15} color="#fff0d8" />
       <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
       {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
       <Court shadows={shadows} quality={quality} />

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ENVIRONMENT_LOD, ENVIRONMENT_SCALE, ENVIRONMENT_OFFSET_Z } from './environment';
+import { ENVIRONMENT_LOD, ENVIRONMENT_SCALE, ENVIRONMENT_OFFSET_Z, ENVIRONMENT_OFFSET_X, ENVIRONMENT_OFFSET_Y } from './environment';
 
 function asset(file: string) {
   const buf = readFileSync(new URL(`../../public/models/environment/${file}.glb`, import.meta.url));
@@ -29,6 +29,8 @@ describe('decorative environment safety and delivery budgets', () => {
       // Behind the wall and side-wall ends; no decorative triangle enters play.
       expect(position.max[2]).toBeLessThan(-4.4);
       expect(position.max[2] * ENVIRONMENT_SCALE + ENVIRONMENT_OFFSET_Z).toBeLessThan(-4.4);
+      expect(Number.isFinite(ENVIRONMENT_OFFSET_X)).toBe(true);
+      expect(Number.isFinite(ENVIRONMENT_OFFSET_Y)).toBe(true);
       expect(g.animations).toBeUndefined();
       expect(g.skins).toBeUndefined();
       expect(g.extensionsRequired).toBeUndefined();

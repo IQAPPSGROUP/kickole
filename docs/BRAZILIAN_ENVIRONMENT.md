@@ -14,7 +14,7 @@ The previous chat's images were not recoverable: its cached history contained te
 
 High → LOD0, Medium → LOD1, Low → LOD2. These are **quality-selected static LODs**, not distance-switched LODs. Only the selected file is downloaded. The original hillside remains visible during loading and on model errors; set `VITE_USE_GLB_ENVIRONMENT=false` at build time to use it throughout.
 
-Game placement is scale `0.65`, offset `[0, 0, -2]`. Every transformed backdrop vertex is behind `z=-4.4`, outside the court walls and play area. The back wall hides lower facades in gameplay; the orbit viewer exposes the entire kit. The backdrop adds one opaque draw call with no shadow casting, animation updates, collision or simulation. `useGLTF` caches resources; switching through all quality levels retains those assets in memory. Standalone prop files are not downloaded by gameplay.
+Game placement is scale `0.9`, offset `[-1.6, -0.7, -1.8]` so pastel facades sit in the phone and desktop camera frame above the fence. Every transformed backdrop vertex is behind `z=-4.4`, outside the court walls and play area. Backdrop materials ignore scene fog so court fog does not wash them into the sky. The back wall hides lower facades in gameplay; the orbit viewer exposes the entire kit. The backdrop adds one opaque draw call with no shadow casting, animation updates, collision or simulation. `useGLTF` caches resources; switching through all quality levels retains those assets in memory. Standalone prop files are not downloaded by gameplay.
 
 ## Asset budgets
 

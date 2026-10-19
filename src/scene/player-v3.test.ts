@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Box3, Vector3, type AnimationClip, type Bone, type Group, type SkinnedMesh } from 'three';
+import { AnimationMixer, Box3, Matrix4, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { DEFAULT_CONFIG } from '../engine/config';
@@ -19,6 +19,49 @@ async function load() {
     loader.setMeshoptDecoder(MeshoptDecoder);
     loader.parse(ab, '', (g) => res(g as never), rej);
   });
+}
+
+function materialNames(material: Material | Material[]): string[] {
+  const list = Array.isArray(material) ? material : [material];
+  return list.map((entry) => entry.name);
+}
+
+const bindPosition = new Vector3();
+const weighted = new Vector3();
+const skinnedWorld = new Vector3();
+const boneWorld = new Matrix4();
+
+/** Closest boot vertex to the ball, as a gap outside the surface. Negative means the mesh is inside. */
+function bootSurfaceGap(scene: Group, ball: Vector3): number {
+  let gap = Number.POSITIVE_INFINITY;
+  let samples = 0;
+  scene.updateMatrixWorld(true);
+  scene.traverse((obj) => {
+    const mesh = obj as SkinnedMesh;
+    if (!mesh.isSkinnedMesh || !mesh.geometry?.attributes.position || !mesh.geometry.attributes.skinIndex) return;
+    if (!materialNames(mesh.material).some((name) => name === 'Boots' || name === 'Boots_Sole')) return;
+    mesh.skeleton.update();
+    const position = mesh.geometry.attributes.position;
+    const skinIndex = mesh.geometry.attributes.skinIndex;
+    const skinWeight = mesh.geometry.attributes.skinWeight;
+    for (let i = 0; i < position.count; i++) {
+      bindPosition.fromBufferAttribute(position, i).applyMatrix4(mesh.bindMatrix);
+      skinnedWorld.set(0, 0, 0);
+      for (let influence = 0; influence < 4; influence++) {
+        const weight = skinWeight.getComponent(i, influence);
+        if (weight === 0) continue;
+        const boneIndex = skinIndex.getComponent(i, influence);
+        const bone = mesh.skeleton.bones[boneIndex];
+        if (!bone) throw new Error(`missing bone ${boneIndex} on ${mesh.name} (${mesh.skeleton.bones.length} bones)`);
+        boneWorld.multiplyMatrices(bone.matrixWorld, mesh.skeleton.boneInverses[boneIndex]);
+        skinnedWorld.addScaledVector(weighted.copy(bindPosition).applyMatrix4(boneWorld), weight);
+      }
+      samples += 1;
+      gap = Math.min(gap, skinnedWorld.distanceTo(ball) - DEFAULT_CONFIG.ballRadius);
+    }
+  });
+  if (samples === 0) throw new Error('no boot vertices');
+  return gap;
 }
 
 function bonesOf(scene: Group) {
@@ -107,8 +150,13 @@ describe('kickole_player_v3.glb', () => {
       const ball = new Vector3(sx * c.footX * 0.6, c.contactHeight, c.ballZ);
       const gap = toe.distanceTo(ball) - c.ballRadius;
       expect(foot.z - restZ).toBeGreaterThan(0.25);
-      expect(gap).toBeLessThan(0.12);
-      expect(gap).toBeGreaterThan(-0.16);
+      expect(gap).toBeLessThan(0.14);
+      expect(gap).toBeGreaterThan(0.06);
+      expect(toe.z).toBeLessThan(ball.z + 0.02);
+      expect(toe.y).toBeGreaterThan(ball.y - 0.1);
+      const meshGap = bootSurfaceGap(gltf.scene, ball);
+      expect(meshGap).toBeGreaterThan(-0.015);
+      expect(meshGap).toBeLessThan(0.06);
     },
   );
 

@@ -282,12 +282,12 @@ function windupPose(side: Side): Pose {
   return pose;
 }
 
-function kickPoses(side: Side): Array<[number, Pose]> {
+function kickPoses(side: Side, nudge: BootNudge): Array<[number, Pose]> {
   const idle = idlePose(0);
   const wind = windupPose(side);
-  const contact = liftBoot(computePose(contactEngine(side, 0.04)), side, 1);
-  const follow = liftBoot(computePose(followEngine(side, 0.16)), side, 0.7);
-  const settle = liftBoot(computePose(followEngine(side, 0.4)), side, 0.25);
+  const contact = nudgeBoot(computePose(contactEngine(side, 0.04)), side, 1, nudge);
+  const follow = nudgeBoot(computePose(followEngine(side, 0.16)), side, 0.7, nudge);
+  const settle = nudgeBoot(computePose(followEngine(side, 0.4)), side, 0.25, nudge);
   return [
     [0, idle],
     [0.16, wind],
@@ -432,29 +432,110 @@ function writeClip(
   anim.addSampler(sampler).addChannel(channel);
 }
 
-/** Extra lift so the modelled boot, not just the ankle, meets the ball. */
-function liftBoot(pose: Pose, side: Side, amount: number): Pose {
-  pose.legs[side].thigh -= 0.4 * amount;
-  pose.legs[side].foot -= 0.6 * amount;
-  pose.legs[side].abduct += (side === 'left' ? 0.15 : -0.15) * amount;
+/** Offsets added to the procedural contact pose so the boot meets the ball. */
+interface BootNudge {
+  thigh: number;
+  knee: number;
+  foot: number;
+  abduct: number;
+}
+
+/** `amount` is 1 at contact and eases off through the follow-through. */
+function nudgeBoot(pose: Pose, side: Side, amount: number, nudge: BootNudge): Pose {
+  const leg = pose.legs[side];
+  leg.thigh += nudge.thigh * amount;
+  leg.knee += nudge.knee * amount;
+  leg.foot += nudge.foot * amount;
+  leg.abduct += (side === 'left' ? nudge.abduct : -nudge.abduct) * amount;
   return pose;
 }
 
-function assertContact(rig: RigView, side: Side): void {
-  const idle = idlePose(0);
-  applyPose(rig, idle);
-  const footName = side === 'left' ? 'footLeft' : 'footRight';
-  const toeName = side === 'left' ? 'Toe_L' : 'Toe_R';
-  const restZ = rig.bones[footName].getWorldPosition(new Vector3()).z;
-  applyPose(rig, liftBoot(computePose(contactEngine(side, 0.04)), side, 1));
-  const foot = rig.bones[footName].getWorldPosition(new Vector3());
-  const toe = rig.scene.getObjectByName(toeName)!.getWorldPosition(new Vector3());
+function ballCenter(side: Side): Vector3 {
   const sign = side === 'left' ? -1 : 1;
-  const ball = new Vector3(sign * 0.17 * 0.6, 0.72, 0.62);
+  return new Vector3(sign * 0.17 * 0.6, 0.72, 0.62);
+}
+
+function sampleContact(rig: RigView, side: Side, nudge: BootNudge): { toe: Vector3; footDz: number } {
+  const footName = side === 'left' ? 'footLeft' : 'footRight';
+  applyPose(rig, idlePose(0));
+  const restZ = rig.bones[footName].getWorldPosition(new Vector3()).z;
+  applyPose(rig, nudgeBoot(computePose(contactEngine(side, 0.04)), side, 1, nudge));
+  const foot = rig.bones[footName].getWorldPosition(new Vector3());
+  const toeName = side === 'left' ? 'Toe_L' : 'Toe_R';
+  const toe = rig.scene.getObjectByName(toeName)!.getWorldPosition(new Vector3());
+  return { toe, footDz: foot.z - restZ };
+}
+
+function contactScore(rig: RigView, nudge: BootNudge): number {
+  let score = 0;
+  for (const side of ['left', 'right'] as const) {
+    const { toe, footDz } = sampleContact(rig, side, nudge);
+    const ball = ballCenter(side);
+    const gap = toe.distanceTo(ball) - 0.14;
+    const pastCenter = Math.max(0, toe.z - (ball.z - 0.01));
+    const tooLow = Math.max(0, ball.y - 0.08 - toe.y);
+    const tooHigh = Math.max(0, toe.y - (ball.y + 0.05));
+    const lateral = Math.abs(Math.abs(toe.x) - Math.abs(ball.x));
+    // The boot mesh sticks about 8 cm past the toe bone, so the bone itself
+    // needs to sit that far outside the ball.
+    const sunk = gap < 0.07 ? (0.07 - gap) * 12 : 0;
+    const shy = gap > 0.13 ? (gap - 0.13) * 6 : 0;
+    const short = footDz < 0.28 ? 4 : 0;
+    score += sunk + shy + pastCenter * 10 + tooLow * 8 + tooHigh * 4 + lateral * 2 + short + Math.abs(gap - 0.095);
+  }
+  return score;
+}
+
+/** Search a small pose grid so the toe meets the near face of the ball. */
+function chooseBootNudge(rig: RigView): BootNudge {
+  const thighs = [-0.55, -0.4, -0.28, -0.15, 0];
+  const knees = [0, 0.2, 0.4, 0.6];
+  const feet = [-0.75, -0.45, -0.2, 0.05];
+  const abducts = [0, 0.12, 0.2];
+  let best: BootNudge = { thigh: -0.4, knee: 0, foot: -0.6, abduct: 0.15 };
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const thigh of thighs) {
+    for (const knee of knees) {
+      for (const foot of feet) {
+        for (const abduct of abducts) {
+          const nudge = { thigh, knee, foot, abduct };
+          const score = contactScore(rig, nudge);
+          if (score < bestScore) {
+            bestScore = score;
+            best = nudge;
+          }
+        }
+      }
+    }
+  }
+  const refine = (value: number, step: number) => [value - step, value, value + step];
+  for (const thigh of refine(best.thigh, 0.06)) {
+    for (const knee of refine(best.knee, 0.08)) {
+      for (const foot of refine(best.foot, 0.08)) {
+        for (const abduct of refine(best.abduct, 0.04)) {
+          const nudge = { thigh, knee, foot, abduct };
+          const score = contactScore(rig, nudge);
+          if (score < bestScore) {
+            bestScore = score;
+            best = nudge;
+          }
+        }
+      }
+    }
+  }
+  console.log('boot nudge', best, 'score', +bestScore.toFixed(3));
+  return best;
+}
+
+function assertContact(rig: RigView, side: Side, nudge: BootNudge): void {
+  const { toe, footDz } = sampleContact(rig, side, nudge);
+  const ball = ballCenter(side);
   const gap = toe.distanceTo(ball) - 0.14;
-  console.log(side, 'foot Δz', (foot.z - restZ).toFixed(3), 'toe', toe.toArray().map((n) => +n.toFixed(3)), 'gap', +gap.toFixed(3));
-  if (foot.z - restZ < 0.2) throw new Error(`${side} kick does not swing forward`);
-  if (gap > 0.12) throw new Error(`${side} toe is ${gap.toFixed(3)}m from the ball surface`);
+  console.log(side, 'foot Δz', footDz.toFixed(3), 'toe', toe.toArray().map((n) => +n.toFixed(3)), 'gap', +gap.toFixed(3));
+  if (footDz < 0.2) throw new Error(`${side} kick does not swing forward`);
+  if (gap < 0.06 || gap > 0.14) throw new Error(`${side} toe is ${gap.toFixed(3)}m from the ball surface`);
+  if (toe.y < ball.y - 0.1) throw new Error(`${side} toe is under the ball`);
+  if (toe.z > ball.z + 0.02) throw new Error(`${side} toe has passed through the ball`);
 }
 
 async function main(): Promise<void> {
@@ -514,12 +595,13 @@ async function main(): Promise<void> {
   await doc.transform(prune(), dedup({ propertyTypes: ['Accessor', 'Texture', 'Mesh'] }));
 
   const rig = buildRig(doc);
+  const bootNudge = chooseBootNudge(rig);
   const idle = sampleClip([[0, idlePose(0)], [1, idlePose(1)], [2, idlePose(2)]], 30);
   writeClip(doc, 'Idle', idle.times, idle.poses, rig);
   for (const side of ['left', 'right'] as const) {
-    const clip = sampleClip(kickPoses(side), 30);
+    const clip = sampleClip(kickPoses(side, bootNudge), 30);
     writeClip(doc, side === 'left' ? 'KickLeft' : 'KickRight', clip.times, clip.poses, rig);
-    assertContact(rig, side);
+    assertContact(rig, side, bootNudge);
   }
   const miss = sampleClip([[0, missPose(0)], [0.35, missPose(0.35)], [1.5, missPose(1.5)]], 30);
   writeClip(doc, 'Miss', miss.times, miss.poses, rig);

@@ -1,3 +1,17 @@
+kickole_player_v2.glb and kickole_player_v3.glb
+------------------------------------------------
+Derived from the Quaternius Universal Base Characters (Standard), used under
+CC0 1.0 Universal. Quaternius retains no copyright in that release; credit
+to Quaternius is appreciated but not required.
+https://creativecommons.org/publicdomain/zero/1.0/
+https://quaternius.com/
+
+v3 is a derivative: bones renamed to the Kickolé contract, finger bones
+removed, the Eyes material folded into the skin atlas, and Idle / KickLeft /
+KickRight / Miss / Celebrate clips authored in this repository from the
+existing procedural pose. No club, league or player likeness is included.
+Rebuild with `npx tsx tools/build_player_v3.ts`.
+
 MIT License
 
 This licence applies to kicky-player-rigged.glb and the procedural generator

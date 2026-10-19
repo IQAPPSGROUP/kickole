@@ -1,9 +1,9 @@
 # Rigged GLB footballer – asset specification
 
-The game loads `public/models/kicky-player-rigged.glb` (served as `/models/kicky-player-rigged.glb`) by default. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
+The game loads `public/models/kickole_player_v3.glb` (served as `/models/kickole_player_v3.glb`) by default. v3 is the Quaternius street-footballer from `kickole_player_v2.glb`, renamed onto this contract, simplified under the triangle budget, and given the five clips. `kicky-player-rigged.glb` stays in the repo as the procedural reference that the same contract was written against. Set `VITE_USE_GLB_CHARACTER=false` to use the primitive character without requesting the GLB. When enabled and the file is missing, is not a
 binary glTF, fails to load, or lacks the required rig, the built-in primitive character (`src/scene/Character.tsx`)
 is used. Contract constants live in `src/scene/rig.ts`; loading is in `src/scene/GlbCharacter.tsx` and
-`src/scene/CharacterSwitch.tsx`.
+`src/scene/CharacterSwitch.tsx`. Rebuild v3 with `npx tsx tools/build_player_v3.ts`.
 
 ## Format and licence
 - Binary glTF 2.0 (`.glb`), one skinned mesh set sharing one armature, one scene.

@@ -1,6 +1,6 @@
 import { Component, Suspense, useLayoutEffect, type ReactNode } from 'react';
 import { useGLTF } from '@react-three/drei';
-import type { Material, Mesh, Object3D } from 'three';
+import { Color, type Material, type Mesh, type Object3D } from 'three';
 import type { Quality } from '../game/storage';
 import {
   ENVIRONMENT_LOD,
@@ -22,7 +22,9 @@ class BackdropBoundary extends Component<{ children: ReactNode; fallback: ReactN
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
-function prepareBackdrop(root: Object3D) {
+const SUNSET = new Color('#6C5CE7');
+
+function prepareBackdrop(root: Object3D, theme: EnvironmentTheme) {
   root.traverse((o) => {
     const mesh = o as Mesh;
     if (!mesh.isMesh) return;
@@ -34,7 +36,9 @@ function prepareBackdrop(root: Object3D) {
       const mat = material as Material & { fog?: boolean; envMapIntensity?: number };
       // Court fog is tuned for the play area; without this the backdrop washes into the sky.
       mat.fog = false;
-      if (typeof mat.envMapIntensity === 'number') mat.envMapIntensity = 0.55;
+      if (typeof mat.envMapIntensity === 'number') mat.envMapIntensity = theme === 'street' ? 0.25 : 0.55;
+      const tinted = material as Material & { color?: Color };
+      if (theme === 'street' && tinted.color?.isColor) tinted.color.lerp(SUNSET, 0.55);
       mat.needsUpdate = true;
     });
   });
@@ -43,7 +47,7 @@ function prepareBackdrop(root: Object3D) {
 function Model({ url, theme }: { url: string; theme: EnvironmentTheme }) {
   const { scene } = useGLTF(url);
   useLayoutEffect(() => {
-    prepareBackdrop(scene);
+    prepareBackdrop(scene, theme);
     notifyEnvironmentReady();
   }, [scene]);
   // One static atlas mesh, no colliders, animations, shadow passes or frame callbacks.

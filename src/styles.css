@@ -1,15 +1,22 @@
 :root {
-  --navy: #142D35;
-  --teal: #12BFA6;
-  --lime: #EAF44A;
-  --coral: #FF805D;
-  --white: #F7F5ED;
+  --navy: #1E2A5A;
+  --teal: #00B8A9;
+  --lime: #FFD93D;
+  --coral: #FF4F9A;
+  --violet: #6C5CE7;
+  --white: #F8F9FB;
   --font: 'Trebuchet MS', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { margin: 0; height: 100%; background: var(--navy); overflow: hidden; }
 body { font-family: var(--font); color: var(--white); user-select: none; -webkit-user-select: none; overscroll-behavior: none; touch-action: manipulation; }
-.app { position: fixed; inset: 0; overflow: hidden; }
+.app {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  --ps-size: min(11.5vw, 46px);
+  --control-lift: calc(var(--ps-size) * 3 + 20px);
+}
 .app canvas { display: block; touch-action: none; }
 
 .opening-skip {
@@ -130,36 +137,71 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   pointer-events: none;
 }
 .trick-bar {
-  pointer-events: auto;
-  display: flex;
-  justify-content: center;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: repeat(3, var(--ps-size));
+  grid-template-rows: repeat(3, var(--ps-size));
   gap: 6px;
-  flex-wrap: nowrap;
+  flex: 0 0 auto;
+  align-self: flex-end;
 }
 .trick-btn {
+  pointer-events: auto;
+  position: relative;
   font: inherit;
   font-weight: 900;
-  font-size: 10px;
-  letter-spacing: 1px;
-  min-height: 40px;
-  min-width: 52px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, .35);
+  font-size: 8px;
+  letter-spacing: .4px;
+  width: var(--ps-size);
+  height: var(--ps-size);
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, .55);
   color: var(--white);
-  background: linear-gradient(160deg, rgba(255, 255, 255, .22), rgba(20, 45, 53, .4));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .78), rgba(255, 255, 255, .16) 34%, transparent 58%),
+    linear-gradient(165deg, color-mix(in srgb, var(--ps-tint, #F8F9FB) 62%, white), color-mix(in srgb, var(--ps-tint, #1E2A5A) 48%, #1E2A5A));
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .75),
+    inset 0 -8px 12px rgba(30, 42, 90, .38),
+    0 6px 14px rgba(0, 0, 0, .3);
   cursor: pointer;
   touch-action: none;
+  display: grid;
+  place-items: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .45);
 }
-.trick-btn:disabled { opacity: .35; cursor: default; }
+.trick-btn::after {
+  content: '';
+  position: absolute;
+  top: 11%;
+  left: 20%;
+  width: 48%;
+  height: 26%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .85), rgba(255, 255, 255, 0));
+  pointer-events: none;
+}
+.ps-head { grid-column: 2; grid-row: 1; --ps-tint: #FFD93D; }
+.ps-atw { grid-column: 1; grid-row: 2; --ps-tint: #6C5CE7; }
+.ps-neck { grid-column: 2; grid-row: 2; --ps-tint: #FF4F9A; }
+.ps-flick { grid-column: 3; grid-row: 2; --ps-tint: #FF8A5B; }
+.ps-thigh { grid-column: 2; grid-row: 3; --ps-tint: #00B8A9; }
+.trick-btn:disabled { opacity: .4; cursor: default; }
 .trick-btn.on {
-  border-color: var(--lime);
-  background: linear-gradient(160deg, rgba(234, 244, 74, .35), rgba(20, 45, 53, .45));
-  color: var(--lime);
+  border-color: var(--ps-tint, var(--lime));
+  color: var(--white);
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .8), rgba(255, 255, 255, .14) 34%, transparent 60%),
+    linear-gradient(165deg, color-mix(in srgb, var(--ps-tint, var(--lime)) 70%, white), color-mix(in srgb, var(--ps-tint, var(--lime)) 55%, #1E2A5A));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .8),
+    inset 0 -8px 12px rgba(30, 42, 90, .28),
+    0 0 16px color-mix(in srgb, var(--ps-tint, var(--lime)) 70%, transparent);
 }
-.trick-btn:active:not(:disabled) { transform: scale(.96); }
+.trick-btn:active:not(:disabled) { transform: scale(.94); }
 .trick-help {
   margin: 0;
   text-align: center;
@@ -172,7 +214,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(max(18px, env(safe-area-inset-bottom)) + min(30vw, 120px) + 58px);
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + var(--control-lift) + 8px);
   text-align: center;
   font-weight: 900;
   letter-spacing: 2px;
@@ -183,9 +225,9 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .foot-row {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: flex-end;
-  gap: 24px;
+  gap: 8px;
   pointer-events: none;
 }
 .foot-btn {
@@ -194,8 +236,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   flex-shrink: 0;
   -webkit-user-select: none;
   user-select: none;
-  width: min(30vw, 120px);
-  height: min(30vw, 120px);
+  width: min(24vw, 104px);
+  height: min(24vw, 104px);
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, .42);
   background:
@@ -268,8 +310,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .feedback { top: 32%; font-size: clamp(30px, 9vw, 52px); }
 .tap-start { bottom: 12%; font-size: clamp(22px, 7vw, 36px); }
 .tap-start small { font-size: 12px; margin-top: 7px; }
-.stall-hint { bottom: calc(max(22px, env(safe-area-inset-bottom)) + min(30vw, 120px) + 16px); font-size: 14px; text-shadow: 0 2px 5px #142d35; }
-.tap-start { bottom: calc(max(22px, env(safe-area-inset-bottom)) + min(30vw, 120px) + 28px); }
+.stall-hint { bottom: calc(max(22px, env(safe-area-inset-bottom)) + var(--control-lift) + 8px); font-size: 14px; text-shadow: 0 2px 5px #142d35; }
+.tap-start { bottom: calc(max(22px, env(safe-area-inset-bottom)) + var(--control-lift) + 28px); }
 button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .screen.settings, .screen.over { padding-top: max(8px, env(safe-area-inset-top)); padding-bottom: max(8px, env(safe-area-inset-bottom)); }
 .card { max-height: 100%; touch-action: pan-y; }
@@ -299,10 +341,11 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
   .score { font-size: 44px; }
   .feedback { left: auto; right: max(12px, env(safe-area-inset-right)); top: 24px; width: 26%; font-size: 28px; }
-  .tap-start { bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(22vw, 88px) + 20px); font-size: 24px; }
-  .foot-btn { width: min(22vw, 88px); height: min(22vw, 88px); }
+  .app { --ps-size: min(9vw, 40px); }
+  .tap-start { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 16px); font-size: 24px; }
+  .foot-btn { width: min(20vw, 84px); height: min(20vw, 84px); }
   .foot-btn-mark { font-size: 26px; }
-  .stall-hint { bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(22vw, 88px) + 12px); }
+  .stall-hint { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -324,12 +367,15 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .final { font-size: 56px; }
   .card { padding: 16px; gap: 8px; }
   /* Keep trick arming + foot cues compact so the player/ball stay visible on iPhone SE/13 mini. */
+  .app { --ps-size: min(13vw, 44px); }
   .zones { gap: 4px; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-  .trick-btn { min-height: 36px; min-width: 44px; padding: 6px 8px; font-size: 9px; }
+  .foot-row { gap: 6px; }
+  .trick-bar { gap: 4px; }
+  .trick-btn { font-size: 7px; }
   .trick-help { display: none; }
-  .foot-btn { width: min(26vw, 96px); height: min(26vw, 96px); }
-  .trick-armed { bottom: calc(max(10px, env(safe-area-inset-bottom)) + min(26vw, 96px) + 48px); font-size: 11px; }
-  .stall-hint { bottom: calc(max(10px, env(safe-area-inset-bottom)) + min(26vw, 96px) + 12px); font-size: 12px; }
+  .foot-btn { width: min(20vw, 80px); height: min(20vw, 80px); }
+  .trick-armed { bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); font-size: 11px; }
+  .stall-hint { bottom: calc(max(10px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); font-size: 12px; }
   .feedback { top: 28%; font-size: clamp(24px, 7vw, 40px); }
 }
 @media (orientation: landscape) and (max-height: 600px) {
@@ -339,9 +385,8 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .card .btn.primary.big { padding-top: 8px; padding-bottom: 8px; }
   .board li { padding: 3px 10px; font-size: 12px; }
   .trick-bar { gap: 4px; }
-  .trick-btn { min-height: 34px; min-width: 48px; font-size: 9px; padding: 6px 8px; }
   .trick-help { display: none; }
-  .trick-armed { bottom: calc(max(12px, env(safe-area-inset-bottom)) + min(22vw, 88px) + 48px); }
+  .trick-armed { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); }
 }
 
 /* Wardrobe / shop */

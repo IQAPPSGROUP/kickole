@@ -12,7 +12,8 @@ import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
-import { sfx } from './audio';
+import { cheer, setBed, sfx, unlockAudio } from './audio';
+import { crowdLevel, loudestCheer, milestoneHits, newlyOpenedTiers, type AudioProgress } from './audioPolicy';
 import { composePlayerSkin, type Skin } from './skins';
 import {
   buyOrEquipBoot,
@@ -83,6 +84,9 @@ export class GameController {
   private settings = loadSettings();
   /** Per-run challenge tallies flushed into the save on game over. */
   private runChallenges: ChallengeProgress = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
+  private perfects = 0;
+  private progress: AudioProgress = { streak: 0, kickUps: 0, perfects: 0 };
+  private pendingCheers: string[] = [];
   private readonly billing: PurchaseService = createDefaultPurchaseService();
   private billingMessage: string | null = null;
   private billingBusy = false;
@@ -198,8 +202,44 @@ export class GameController {
   }
 
   private publish(preview?: { kitId?: string | null; bootId?: string | null }) {
+    this.noteMilestones();
     this.snapshot = this.build(preview);
     this.listeners.forEach((l) => l());
+  }
+
+  private voices(): boolean {
+    return this.settings.sound && this.settings.sfx;
+  }
+
+  private syncBed() {
+    const playing = this.engine.phase === 'playing';
+    setBed({
+      mode: playing ? 'play' : 'menu',
+      music: this.settings.sound && this.settings.music,
+      sfx: this.voices(),
+      crowd: playing && this.voices() ? crowdLevel(this.engine.streak) : 0,
+    });
+  }
+
+  /** Milestone cheers and the crowd/music mix. Scoring is untouched. */
+  private noteMilestones() {
+    const next: AudioProgress = {
+      streak: this.engine.streak,
+      kickUps: this.engine.stats.kickUps,
+      perfects: this.perfects,
+    };
+    const hits = [...milestoneHits(this.progress, next), ...this.pendingCheers];
+    this.progress = next;
+    this.pendingCheers = [];
+    const id = loudestCheer(hits);
+    if (id && this.voices()) cheer(id);
+    this.syncBed();
+  }
+
+  /** Resume the audio graph from a tap or key press. */
+  primeAudio() {
+    this.syncBed();
+    unlockAudio();
   }
 
   private vibrate(ms: number | number[]) {
@@ -213,7 +253,11 @@ export class GameController {
   }
 
   private onEvent(e: EngineEvent) {
-    const sound = this.settings.sound;
+    const sound = this.voices();
+    if (e.type === 'kick' && e.grade === 'perfect') this.perfects += 1;
+    if (e.type === 'trick' && e.kind === 'header' && e.phase === 'execute' && this.engine.lastKickGrade === 'perfect') {
+      this.perfects += 1;
+    }
     switch (e.type) {
       case 'launch':
         this.vibrate(15);
@@ -270,6 +314,7 @@ export class GameController {
         break;
       case 'over': {
         const s = this.engine.stats;
+        const beforeLocker = { coins: this.save.coins, challenges: this.save.challenges };
         const r = s.score > 0
           ? saveRun(
             this.save,
@@ -277,6 +322,8 @@ export class GameController {
             this.runChallenges,
           )
           : { save: this.save, newBest: false, rank: -1, coinsEarned: 0 };
+        if (r.newBest) this.pendingCheers.push('best');
+        for (const tier of newlyOpenedTiers(beforeLocker, r.save)) this.pendingCheers.push(`tier:${tier}`);
         this.save = r.save;
         this.result = {
           score: s.score,
@@ -289,6 +336,10 @@ export class GameController {
         this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
         this.publish();
         break;
+      }
+      default: {
+        const unexpected: never = e;
+        return unexpected;
       }
     }
   }
@@ -349,6 +400,9 @@ export class GameController {
     this.feedback = null;
     this.result = null;
     this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
+    this.perfects = 0;
+    this.progress = { streak: 0, kickUps: 0, perfects: 0 };
+    this.pendingCheers = [];
     this.engine.prepare('ready');
     this.publish();
   }

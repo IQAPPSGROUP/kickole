@@ -98,6 +98,8 @@ export function SettingsScreen({
       <div className="card">
         <h2>SETTINGS</h2>
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
+        <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
+        <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />
         <Toggle label="Vibration" value={settings.vibration} onChange={(vibration) => onChange({ vibration })} />
         <div className="group">
           <label>Graphics quality</label>
@@ -134,6 +136,7 @@ export function SettingsScreen({
             we do not log purchase tokens, receipts or credentials. Store privacy / Data Safety declarations for listings are documented for release builds.
           </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
+          <p>Music is a synthesised steel-pan band. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
           <p>
             Original assets:{' '}
             <a href="https://quaternius.com/packs/universalbasecharacters.html" target="_blank" rel="noopener noreferrer">

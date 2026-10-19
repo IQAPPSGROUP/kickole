@@ -11,12 +11,12 @@ import type { Skin } from '../game/skins';
 export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER !== 'false';
 
 /**
- * Runtime character. `kickole_player_v2.glb` is the Quaternius-based footballer
- * (see docs/FREDDIE_CHARACTER_MODELS.md). The older contract rig remains at
- * `kicky-player-rigged.glb` for the clip-based asset tests.
- * If the file is missing or invalid the primitive character is used.
+ * Runtime character. `kickole_player_v3.glb` is the Quaternius footballer retargeted
+ * onto the contract skeleton (see docs/CHARACTER_GLB.md). v2 stays in the repo as
+ * the unmodified source. `kicky-player-rigged.glb` remains the procedural fallback
+ * reference. If the file is missing or invalid the primitive character is used.
  */
-export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kickole_player_v2.glb`;
+export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kickole_player_v3.glb`;
 
 /** Named animation states. Each maps to an animation clip with exactly this name in the GLB. */
 export const ANIMATION_STATES = ['Idle', 'KickLeft', 'KickRight', 'Miss', 'Celebrate'] as const;

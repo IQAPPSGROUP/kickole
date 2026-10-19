@@ -90,69 +90,69 @@ export function TouchZones({ controller }: { controller: GameController }) {
 
   return (
     <div className="zones">
-      <div className="trick-bar" role="toolbar" aria-label="Freestyle tricks">
-        <button
-          type="button"
-          className="trick-btn"
-          disabled={!playing}
-          aria-label="Header"
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); controller.attemptHeader(); }}
-        >
-          HEAD
-        </button>
-        <button
-          type="button"
-          className={`trick-btn ${snap.hud.neckHolding ? 'on' : ''}`}
-          disabled={!playing}
-          aria-label="Neck stall"
-          onPointerDown={onNeckDown}
-          onPointerUp={onNeckUp}
-          onPointerCancel={onNeckUp}
-          onLostPointerCapture={() => { neckPtr.current = null; controller.releaseNeck(); }}
-        >
-          NECK
-        </button>
-        <button
-          type="button"
-          className={`trick-btn ${armed === 'aroundTheWorld' ? 'on' : ''}`}
-          disabled={!playing}
-          aria-label="Around the world"
-          aria-pressed={armed === 'aroundTheWorld'}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); controller.armTrick('aroundTheWorld'); }}
-        >
-          ATW
-        </button>
-        <button
-          type="button"
-          className={`trick-btn ${armed === 'thigh' ? 'on' : ''}`}
-          disabled={!playing}
-          aria-label="Thigh touch"
-          aria-pressed={armed === 'thigh'}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); controller.armTrick('thigh'); }}
-        >
-          THIGH
-        </button>
-        <button
-          type="button"
-          className={`trick-btn ${armed === 'highFlick' ? 'on' : ''}`}
-          disabled={!playing}
-          aria-label="High flick"
-          aria-pressed={armed === 'highFlick'}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); controller.armTrick('highFlick'); }}
-        >
-          FLICK
-        </button>
-      </div>
       <p className="trick-help">H header · N neck · T thigh · F flick · W atw · Esc cancel</p>
       <div className="foot-row">
         <button type="button" className="foot-btn left" aria-label="Left foot" {...bindFoot(controller, 'left')}>
           <span className="foot-btn-mark">L</span>
           <span className="foot-btn-label">LEFT</span>
         </button>
+        <div className="trick-bar" role="toolbar" aria-label="Freestyle tricks">
+          <button
+            type="button"
+            className="trick-btn ps-head"
+            disabled={!playing}
+            aria-label="Header"
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); controller.attemptHeader(); }}
+          >
+            HEAD
+          </button>
+          <button
+            type="button"
+            className={`trick-btn ps-atw ${armed === 'aroundTheWorld' ? 'on' : ''}`}
+            disabled={!playing}
+            aria-label="Around the world"
+            aria-pressed={armed === 'aroundTheWorld'}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); controller.armTrick('aroundTheWorld'); }}
+          >
+            ATW
+          </button>
+          <button
+            type="button"
+            className={`trick-btn ps-neck ${snap.hud.neckHolding ? 'on' : ''}`}
+            disabled={!playing}
+            aria-label="Neck stall"
+            onPointerDown={onNeckDown}
+            onPointerUp={onNeckUp}
+            onPointerCancel={onNeckUp}
+            onLostPointerCapture={() => { neckPtr.current = null; controller.releaseNeck(); }}
+          >
+            NECK
+          </button>
+          <button
+            type="button"
+            className={`trick-btn ps-flick ${armed === 'highFlick' ? 'on' : ''}`}
+            disabled={!playing}
+            aria-label="High flick"
+            aria-pressed={armed === 'highFlick'}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); controller.armTrick('highFlick'); }}
+          >
+            FLICK
+          </button>
+          <button
+            type="button"
+            className={`trick-btn ps-thigh ${armed === 'thigh' ? 'on' : ''}`}
+            disabled={!playing}
+            aria-label="Thigh touch"
+            aria-pressed={armed === 'thigh'}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); controller.armTrick('thigh'); }}
+          >
+            THIGH
+          </button>
+        </div>
         <button type="button" className="foot-btn right" aria-label="Right foot" {...bindFoot(controller, 'right')}>
           <span className="foot-btn-mark">R</span>
           <span className="foot-btn-label">RIGHT</span>

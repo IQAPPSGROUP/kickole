@@ -7,7 +7,7 @@ import { fx } from './fx';
 
 interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; color: Color; gravity: number }
 
-const PALETTE = ['#EAF44A', '#12BFA6', '#FF805D', '#F7F5ED'].map((c) => new Color(c));
+const PALETTE = ['#FF4F9A', '#FFD93D', '#F8F9FB', '#6C5CE7'].map((c) => new Color(c));
 const DUST = new Color('#9fb3b8');
 const dummy = new Object3D();
 const scratch = new Color();
@@ -105,7 +105,7 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       </instancedMesh>
       <mesh ref={ring} rotation={[-Math.PI / 2, 0, 0]} visible={false}>
         <ringGeometry args={[0.16, 0.2, 40]} />
-        <meshBasicMaterial color="#EAF44A" transparent depthWrite={false} />
+        <meshBasicMaterial color="#FF4F9A" transparent depthWrite={false} />
       </mesh>
     </>
   );

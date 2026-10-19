@@ -1,16 +1,18 @@
 import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
+import { toonGradient } from './toon';
 import type { Quality } from '../game/storage';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
 import { BeachCourt } from './BeachCourt';
 import { ENVIRONMENT_THEME } from './environment';
 
-const NAVY = '#142D35';
-const TEAL = '#12BFA6';
-const LIME = '#EAF44A';
-const CORAL = '#FF805D';
-const WHITE = '#F7F5ED';
-const GOLD = '#F5C94D';
+const NAVY = '#1E2A5A';
+const TEAL = '#00B8A9';
+const LIME = '#FFD93D';
+const CORAL = '#FF4F9A';
+const WHITE = '#F8F9FB';
+const WARM = '#FF8A5B';
+const VIOLET = '#6C5CE7';
 
 // Stable paint wear: reloading or changing quality must not rearrange the court.
 function seededRandom(seed: number) {
@@ -33,7 +35,7 @@ function useCourtTexture() {
   return useMemo(() => {
     const t = makeCanvas(512, (g, n) => {
       const random = seededRandom(81);
-      g.fillStyle = '#26786d';
+      g.fillStyle = TEAL;
       g.fillRect(0, 0, n, n);
       for (let i = 0; i < 5000; i++) {
         g.fillStyle = random() > 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.10)';
@@ -61,10 +63,12 @@ function useCourtTexture() {
 function useWallTexture() {
   return useMemo(() => makeCanvas(1024, (g, n) => {
     const random = seededRandom(1962);
-    g.fillStyle = '#E8CF9C'; g.fillRect(0, 0, n, n);
-    g.fillStyle = GOLD;
+    const sky = g.createLinearGradient(0, 0, 0, n);
+    sky.addColorStop(0, VIOLET); sky.addColorStop(0.55, WARM); sky.addColorStop(1, '#C45C74');
+    g.fillStyle = sky; g.fillRect(0, 0, n, n);
+    g.fillStyle = LIME;
     g.beginPath(); g.arc(n * .74, n * .30, n * .23, 0, Math.PI * 2); g.fill();
-    for (const [color, y] of [['#D76D4B', .53], ['#168F7A', .67], ['#12594F', .84]] as const) {
+    for (const [color, y] of [[VIOLET, .53], [NAVY, .67], ['#171E3A', .84]] as const) {
       g.fillStyle = color; g.beginPath(); g.moveTo(0, n * y);
       g.bezierCurveTo(n * .3, n * (y - .3), n * .55, n * (y + .2), n, n * (y - .1));
       g.lineTo(n, n); g.lineTo(0, n); g.closePath(); g.fill();
@@ -96,12 +100,12 @@ function useSignTexture() {
     const g = c.getContext('2d');
     if (g) {
       g.fillStyle = NAVY; g.fillRect(0, 0, 1024, 256);
-      g.strokeStyle = GOLD; g.lineWidth = 6; g.strokeRect(12, 12, 1000, 232);
+      g.strokeStyle = LIME; g.lineWidth = 6; g.strokeRect(12, 12, 1000, 232);
       g.font = 'italic 900 150px "Trebuchet MS", "Segoe UI", sans-serif';
       g.textAlign = 'center'; g.textBaseline = 'middle';
       g.fillStyle = WHITE; g.fillText('KICKOLÉ', 512, 106, 930);
       g.font = '700 30px "Trebuchet MS", sans-serif';
-      g.fillStyle = GOLD; g.fillText('FUTEBOL DE RUA', 512, 209);
+      g.fillStyle = CORAL; g.fillText('FUTEBOL DE RUA', 512, 209);
     }
     const t = new CanvasTexture(c);
     t.colorSpace = SRGBColorSpace;
@@ -150,11 +154,11 @@ function Bin({ x, z, color }: { x: number; z: number; color: string }) {
       </mesh>
       <mesh position={[0, 0.3, 0]} castShadow>
         <cylinderGeometry args={[0.2, 0.17, 0.6, 14]} />
-        <meshStandardMaterial color={color} roughness={0.6} metalness={0.2} />
+        <meshToonMaterial color={color} gradientMap={toonGradient()} />
       </mesh>
       <mesh position={[0, 0.62, 0]}>
         <cylinderGeometry args={[0.22, 0.22, 0.04, 14]} />
-        <meshStandardMaterial color="#0d1e24" />
+        <meshToonMaterial color={NAVY} gradientMap={toonGradient()} />
       </mesh>
     </group>
   );
@@ -165,15 +169,15 @@ function Poster({ x, y, color, w = 0.7, h = 0.95 }: { x: number; y: number; colo
     <group position={[x, y, -3.47]}>
       <mesh>
         <boxGeometry args={[w, h, 0.02]} />
-        <meshStandardMaterial color={WHITE} roughness={0.9} />
+        <meshToonMaterial color={WHITE} gradientMap={toonGradient()} />
       </mesh>
       <mesh position={[0, 0.08, 0.012]}>
         <boxGeometry args={[w * 0.8, h * 0.55, 0.01]} />
-        <meshStandardMaterial color={color} roughness={0.8} />
+        <meshToonMaterial color={color} gradientMap={toonGradient()} />
       </mesh>
       <mesh position={[0, -h * 0.34, 0.012]}>
         <boxGeometry args={[w * 0.6, 0.06, 0.01]} />
-        <meshStandardMaterial color={NAVY} />
+        <meshToonMaterial color={NAVY} gradientMap={toonGradient()} />
       </mesh>
     </group>
   );
@@ -184,17 +188,17 @@ function Floodlight({ x, z }: { x: number; z: number }) {
     <group position={[x, 0, z]}>
       <mesh position={[0, 1.8, 0]}>
         <cylinderGeometry args={[0.05, 0.07, 3.6, 8]} />
-        <meshStandardMaterial color="#0d1e24" />
+        <meshToonMaterial color={NAVY} gradientMap={toonGradient()} />
       </mesh>
       <mesh position={[0, 3.65, 0]}>
         <boxGeometry args={[0.5, 0.12, 0.2]} />
-        <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={3} />
+        <meshToonMaterial color={WHITE} emissive={WHITE} emissiveIntensity={1.4} gradientMap={toonGradient()} />
       </mesh>
     </group>
   );
 }
 
-const BUNTING_COLORS = ['#1FA85A', '#F5C94D', '#2E6FD0', '#F7F5ED'];
+const BUNTING_COLORS = [CORAL, LIME, TEAL, VIOLET];
 
 /** Festa-style bunting: one instanced draw call, strung across the back of the court. */
 function Bunting() {
@@ -230,7 +234,7 @@ function Bunting() {
 function HillsideNeighbourhood() {
   const buildings = useMemo(() => {
     const random = seededRandom(1969);
-    const palette = ['#E7A56F', '#D46D62', '#E9C886', '#6AAB9D', '#8BA5B4', '#B987AD'];
+    const palette = ['#FF8A5B', '#FF4F9A', '#FFD93D', '#00B8A9', '#6C5CE7', '#1E2A5A'];
     return Array.from({ length: 22 }, (_, i) => {
       const row = i < 12 ? 0 : 1;
       const index = row === 0 ? i : i - 12;
@@ -328,7 +332,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
       <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow={shadows}>
         <planeGeometry args={[9, 9]} />
-        <meshStandardMaterial map={tex} roughness={0.9} />
+        <meshToonMaterial map={tex} gradientMap={toonGradient()} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
         <ringGeometry args={[1.17, 1.24, 64]} />
@@ -352,7 +356,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
       {/* Back wall */}
       <mesh position={[0, 1.3, -3.6]} receiveShadow={shadows}>
         <boxGeometry args={[9, 2.6, 0.2]} />
-        <meshStandardMaterial map={wall} roughness={0.9} />
+        <meshToonMaterial map={wall} gradientMap={toonGradient()} />
       </mesh>
       <mesh position={[-1.6, 2.02, -3.48]}>
         <planeGeometry args={[3.2, 0.8]} />
@@ -363,26 +367,26 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
       {/* Chain-link fence along the top of the wall */}
       <mesh position={[0, 2.9, -3.4]}>
         <planeGeometry args={[9, 0.7]} />
-        <meshStandardMaterial map={fence} transparent alphaTest={0.3} side={DoubleSide} roughness={0.5} metalness={0.5} />
+        <meshToonMaterial map={fence} transparent alphaTest={0.3} side={DoubleSide} gradientMap={toonGradient()} />
       </mesh>
       {[-4, -2, 0, 2, 4].map((x) => (
         <mesh key={x} position={[x, 2.9, -3.4]}>
           <boxGeometry args={[0.06, 0.8, 0.06]} />
-          <meshStandardMaterial color="#9fb3b8" metalness={0.6} roughness={0.4} />
+          <meshToonMaterial color={NAVY} gradientMap={toonGradient()} />
         </mesh>
       ))}
       {/* Low side walls */}
       {[-4.4, 4.4].map((x) => (
         <mesh key={x} position={[x, 0.45, 0]}>
           <boxGeometry args={[0.2, 0.9, 9]} />
-          <meshStandardMaterial color="#D49468" roughness={0.9} />
+          <meshToonMaterial color={NAVY} gradientMap={toonGradient()} />
         </mesh>
       ))}
       {/* Painted court corners; simple geometry adds no texture downloads. */}
       {[-2.6, 2.6].map((x) => (
         <mesh key={`paint-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.004, 1.2]}>
           <planeGeometry args={[0.09, 3.4]} />
-          <meshBasicMaterial color={GOLD} />
+          <meshBasicMaterial color={LIME} />
         </mesh>
       ))}
       {/* Props */}
@@ -390,11 +394,11 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
       <Bin x={-3.1} z={-3.1} color={CORAL} />
       <mesh position={[2.9, 0.3, -2.9]}>
         <boxGeometry args={[1.2, 0.08, 0.35]} />
-        <meshStandardMaterial color={LIME} roughness={0.7} />
+        <meshToonMaterial color={LIME} gradientMap={toonGradient()} />
       </mesh>
       <mesh position={[2.9, 0.15, -2.9]}>
         <boxGeometry args={[1.1, 0.3, 0.3]} />
-        <meshStandardMaterial color={NAVY} />
+        <meshToonMaterial color={NAVY} gradientMap={toonGradient()} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2.9, 0.005, -2.9]}>
         <planeGeometry args={[1.8, 0.9]} />

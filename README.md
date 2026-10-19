@@ -60,7 +60,7 @@ An optional beach theme includes ten textured GLBs, sand court, coastal sky/fog 
 
 ## Character model
 
-The default footballer is the newer Quaternius v2 model at `public/models/kickole_player_v2.glb`, with 65 UE-style bones and procedural animation. It has no embedded clips. The older five-clip `kicky-player-rigged.glb` remains the reference for [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). See [`docs/FREDDIE_CHARACTER_MODELS.md`](docs/FREDDIE_CHARACTER_MODELS.md) for v2 asset details and licensing. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
+The default footballer is `public/models/kickole_player_v3.glb`: the Quaternius model retargeted onto the contract skeleton, with the five named clips. `kickole_player_v2.glb` stays as the unmodified CC0 source, and `kicky-player-rigged.glb` remains the procedural reference for [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). See [`docs/FREDDIE_CHARACTER_MODELS.md`](docs/FREDDIE_CHARACTER_MODELS.md) for the source asset and licensing. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
 
 Both character renderers add expressive idle/ready movement, ball tracking, three touch gestures, stall balancing and varied reactions. V2 uses rig-specific complete arm poses for distinct reactions while retaining main's procedural leg transforms during live play. See [`docs/PLAYER_MOVEMENT.md`](docs/PLAYER_MOVEMENT.md) for validation and `/tools/movement-preview.html` on the dev server for a side-by-side motion review with nine selectable scenarios.
 

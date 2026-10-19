@@ -1,6 +1,6 @@
 # Freddie character models (Quaternius CC0)
 
-Branch `freddie/character-models`. The game loads `public/models/kickole_player_v2.glb`. `kicky-player-rigged.glb` stays in the repo as the clip-based contract reference. v2 has no animation clips, so `src/scene/ue-pose.ts` maps the procedural pose onto the UE bone names (sides swapped).
+Branch `freddie/character-models` added `public/models/kickole_player_v2.glb`. The game now loads `public/models/kickole_player_v3.glb`, built from that file by `tools/build_player_v3.ts` so it matches `docs/CHARACTER_GLB.md` (contract bone names, screen-left `_L`, ≤40 bones, eight materials, <15k triangles, and the five clips). `kicky-player-rigged.glb` stays as the procedural contract reference. v2 itself has no clips; `src/scene/ue-pose.ts` still maps the procedural pose onto the UE bone names (sides swapped) and is what v3's clips and trick overlay use.
 
 Licence: Quaternius Universal Base Characters [Standard], **CC0 1.0** (see `public/models/LICENSE.txt`).
 

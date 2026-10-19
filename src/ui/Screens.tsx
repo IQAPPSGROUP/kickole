@@ -100,6 +100,22 @@ export function SettingsScreen({
           <p><b>Foot stall:</b> press and hold on a good kick, then release to flick for +10.</p>
           <p>Keyboard: <b>A</b> left foot · <b>D</b> right foot · <b>Space</b> start/restart.</p>
         </div>
+        <div className="group help">
+          <label>Privacy</label>
+          <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
+          <p>
+            Original assets:{' '}
+            <a href="https://quaternius.com/packs/universalbasecharacters.html" target="_blank" rel="noopener noreferrer">
+              quaternius.com/packs/universalbasecharacters.html
+            </a>
+          </p>
+          <p>
+            CC0:{' '}
+            <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">
+              creativecommons.org/publicdomain/zero/1.0/
+            </a>
+          </p>
+        </div>
         <button className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

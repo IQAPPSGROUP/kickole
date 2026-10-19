@@ -11,21 +11,25 @@ import {
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { Home, GameOver, SettingsScreen } from './Screens';
+import { CustomiseScreen, ShopScreen } from './Wardrobe';
 
-// Development-only animation inspector; never bundled into production builds.
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
+
+type Overlay = 'none' | 'settings' | 'customise' | 'shop';
 
 export function App() {
   const controller = useMemo(() => new GameController(), []);
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
-  const [showSettings, setShowSettings] = useState(false);
+  const [overlay, setOverlay] = useState<Overlay>('none');
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
   useEffect(() => { initOpeningIntro(); }, []);
+
+  const blocking = overlay !== 'none';
 
   useEffect(() => {
     let spaceDown = false;
@@ -33,7 +37,7 @@ export function App() {
     const keys: Record<string, 'left' | 'right'> = { KeyA: 'left', KeyD: 'right' };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (showSettings) return;
+      if (blocking) return;
       if (e.code === 'Space') {
         if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
         e.preventDefault();
@@ -41,7 +45,6 @@ export function App() {
         spaceDown = controller.engine.phase === 'ready';
         controller.action();
       } else if (keys[e.code]) {
-        // Foot keys only cancel the intro once a run has started (Space / Play already cancel).
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
         controller.press(keys[e.code]);
       } else if (e.code === 'KeyH') {
@@ -82,37 +85,73 @@ export function App() {
       window.removeEventListener('keyup', up);
       if (neckDown) controller.releaseNeck();
     };
-  }, [controller, showSettings]);
+  }, [controller, blocking]);
 
   const startGame = () => {
     cancelOpeningIntroForGameplay();
+    setOverlay('none');
     controller.play();
+  };
+
+  const closeOverlay = () => {
+    controller.clearPreview();
+    setOverlay('none');
   };
 
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} quality={snap.settings.quality} />
       {intro.active && <OpeningSkip onSkip={skipOpeningIntro} />}
-      {phase === 'menu' && !showSettings && !intro.active && (
-        <Home best={snap.save.best} onPlay={startGame} onSettings={() => setShowSettings(true)} />
+      {phase === 'menu' && overlay === 'none' && !intro.active && (
+        <Home
+          best={snap.save.best}
+          coins={snap.save.coins}
+          onPlay={startGame}
+          onSettings={() => setOverlay('settings')}
+          onCustomise={() => setOverlay('customise')}
+          onShop={() => setOverlay('shop')}
+        />
       )}
       {phase !== 'menu' && <Hud hud={snap.hud} />}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
-      {phase === 'over' && snap.result && (
+      {phase === 'over' && snap.result && overlay === 'none' && (
         <GameOver
           result={snap.result}
           best={snap.save.best}
+          coins={snap.save.coins}
           leaderboard={snap.save.leaderboard}
           onAgain={startGame}
           onHome={() => controller.home()}
+          onShop={() => setOverlay('shop')}
         />
       )}
       {InspectorPanel && <Suspense fallback={null}><InspectorPanel controller={controller} /></Suspense>}
-      {showSettings && (
+      {overlay === 'settings' && (
         <SettingsScreen
           settings={snap.settings}
           onChange={(p) => controller.updateSettings(p)}
-          onClose={() => setShowSettings(false)}
+          onClose={closeOverlay}
+        />
+      )}
+      {overlay === 'customise' && (
+        <CustomiseScreen
+          save={snap.save}
+          onChange={(a) => controller.setAppearance(a)}
+          onClose={closeOverlay}
+        />
+      )}
+      {overlay === 'shop' && (
+        <ShopScreen
+          save={snap.save}
+          launchProduct={snap.launchProduct}
+          billingMessage={snap.billingMessage}
+          billingBusy={snap.billingBusy}
+          onBuyBoot={(id) => controller.buyBoot(id)}
+          onBuyKit={(id) => controller.buyKit(id)}
+          onPurchaseLaunch={() => { void controller.purchaseLaunchCollection(); }}
+          onRestorePurchases={() => { void controller.restorePurchases(); }}
+          onPreview={(opts) => controller.previewEquipment(opts)}
+          onClose={closeOverlay}
         />
       )}
     </div>

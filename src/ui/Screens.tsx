@@ -1,5 +1,4 @@
 import type { Result } from '../game/controller';
-import { SKINS } from '../game/skins';
 import type { Quality, RunRecord, Settings } from '../game/storage';
 
 export function Logo() {
@@ -10,7 +9,16 @@ export function Logo() {
   );
 }
 
-export function Home({ best, onPlay, onSettings }: { best: number; onPlay: () => void; onSettings: () => void }) {
+export function Home({
+  best, coins, onPlay, onSettings, onCustomise, onShop,
+}: {
+  best: number;
+  coins: number;
+  onPlay: () => void;
+  onSettings: () => void;
+  onCustomise: () => void;
+  onShop: () => void;
+}) {
   return (
     <div className="screen home">
       <div className="home-top">
@@ -19,8 +27,15 @@ export function Home({ best, onPlay, onSettings }: { best: number; onPlay: () =>
         <p className="tagline">Find your rhythm. Own the court.</p>
       </div>
       <div className="home-bottom">
-        <div className="best-pill">PERSONAL BEST <b>{best}</b></div>
+        <div className="pill-row">
+          <div className="best-pill">BEST <b>{best}</b></div>
+          <div className="best-pill">COINS <b>{coins}</b></div>
+        </div>
         <button className="btn primary big" onClick={onPlay}>LET’S PLAY <span aria-hidden="true">↗</span></button>
+        <div className="home-actions">
+          <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
+          <button className="btn ghost" onClick={onShop}>SHOP</button>
+        </div>
         <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
         <p className="home-help">Tap to juggle · Hold to stall</p>
         <p className="credit">IQ Apps Group · v0.1</p>
@@ -30,13 +45,22 @@ export function Home({ best, onPlay, onSettings }: { best: number; onPlay: () =>
 }
 
 export function GameOver({
-  result, best, leaderboard, onAgain, onHome,
-}: { result: Result; best: number; leaderboard: RunRecord[]; onAgain: () => void; onHome: () => void }) {
+  result, best, coins, leaderboard, onAgain, onHome, onShop,
+}: {
+  result: Result;
+  best: number;
+  coins: number;
+  leaderboard: RunRecord[];
+  onAgain: () => void;
+  onHome: () => void;
+  onShop: () => void;
+}) {
   return (
     <div className="screen over">
       <div className="card">
         <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
         <div className="final">{result.score}</div>
+        <p className="coin-earn">+{result.coinsEarned} COINS · {coins} SAVED</p>
         <div className="stats">
           <div><b>{result.kickUps}</b><span>KICK-UPS</span></div>
           <div><b>{best}</b><span>BEST</span></div>
@@ -50,6 +74,7 @@ export function GameOver({
           ))}
         </ol>
         <button className="btn primary big" onClick={onAgain} autoFocus>PLAY AGAIN</button>
+        <button className="btn ghost" onClick={onShop}>SHOP</button>
         <button className="btn ghost" onClick={onHome}>HOME</button>
       </div>
     </div>
@@ -84,26 +109,30 @@ export function SettingsScreen({
             ))}
           </div>
         </div>
-        <div className="group">
-          <label>Player skin</label>
-          <div className="seg">
-            {SKINS.map((s) => (
-              <button key={s.id} className={settings.skinId === s.id ? 'on' : ''} disabled={!s.unlocked} onClick={() => onChange({ skinId: s.id })}>
-                <i style={{ background: s.clothing.shirt }} />{s.name}
-              </button>
-            ))}
-          </div>
-        </div>
         <div className="group help">
           <label>How to play</label>
           <p>Tap <b>left</b> or <b>right</b> of the screen to kick with that foot just as the ball drops to the foot. Perfect timing earns bonus points; alternate feet for +3.</p>
           <p><b>Foot stall:</b> press and hold on a good kick, then release to flick for +10.</p>
+          <p><b>Coins</b> are earned from run score and spent in the Shop. Customise looks are free. Boots and kits never change timing.</p>
           <p>Keyboard: <b>A</b>/<b>D</b> feet · <b>H</b> header · <b>N</b> neck (hold) · <b>W</b> ATW · <b>T</b> thigh · <b>F</b> flick · <b>Esc</b> cancel · <b>Space</b> start.</p>
           <p>Arm <b>ATW</b> / <b>THIGH</b> / <b>FLICK</b>, then tap left or right. <b>HEAD</b> taps immediately; <b>NECK</b> is press-and-hold, release to flick out.</p>
           <p><b>Combos +5:</b> flick→header · header→neck→release · stall→ATW · alternating foot↔thigh. Chains expire if you wait too long or miss.</p>
         </div>
         <div className="group help">
-          <label>Privacy</label>
+          <label>Purchases &amp; privacy</label>
+          <p>
+            <b>Kickolé Launch Collection</b> is an optional one-time in-app purchase on the iOS App Store and Google Play.
+            It unlocks only the launch boots and kits. There are no subscriptions, loot boxes or consumable coin packs.
+            Free customisation (skin tone, hair, basic colours) stays free. Purchases are processed by Apple or Google;
+            IQ Apps Group does not receive your card details. Restore Purchases reloads entitlement for the same store account.
+            Apple and Google purchases do not transfer between stores. Refunds are handled by the store and may remove paid unlocks
+            without deleting items you earned with coins.
+          </p>
+          <p>
+            Play data (scores, coins, appearance) stays on this device in local storage and is not uploaded to IQ Apps Group servers.
+            We do not collect advertising identifiers for tracking. Purchases are verified with Apple or Google on the device;
+            we do not log purchase tokens, receipts or credentials. Store privacy / Data Safety declarations for listings are documented for release builds.
+          </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>
             Original assets:{' '}

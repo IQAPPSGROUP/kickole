@@ -129,8 +129,9 @@ export function SettingsScreen({
             without deleting items you earned with coins.
           </p>
           <p>
-            Play data (scores, coins, appearance) stays on this device in local storage. We do not log purchase tokens, receipts or credentials.
-            See in-app billing notes in the project docs when building native releases.
+            Play data (scores, coins, appearance) stays on this device in local storage and is not uploaded to IQ Apps Group servers.
+            We do not collect advertising identifiers for tracking. Purchases are verified with Apple or Google on the device;
+            we do not log purchase tokens, receipts or credentials. Store privacy / Data Safety declarations for listings are documented for release builds.
           </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>

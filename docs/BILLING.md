@@ -89,16 +89,16 @@ npx cap open ios
 
 Plugin sources: `plugins/kickole-billing` (StoreKit 2 Swift, Play Billing Library Java).
 
-## Remaining setup (not verified in this environment)
+## Remaining setup (not verified for live billing)
 
-Implementation and automated TS tests are in place. Native projects were generated (`android/`, `ios/`) and `cap sync` registers `kickole-billing`. This agent host could **not** run `gradlew assembleDebug` (no JDK / Android SDK) or Xcode iOS builds (Windows).
+Implementation and automated TS tests are in place. Native projects live under `android/` and `ios/`; `cap sync` registers `kickole-billing`. See [`RELEASE_VALIDATION.md`](./RELEASE_VALIDATION.md) for SDK versions and the purchase test matrix. Tester copy: [`TESTER_INSTRUCTIONS.md`](./TESTER_INSTRUCTIONS.md).
 
-Still required on your machines / consoles:
+Still required before claiming live billing or public release:
 
 1. Confirm `com.iqappsgroup.kickole` matches the **existing** App Store Connect and Play Console apps (change `capacitor.config.ts` if your live id differs — do not create a replacement listing).
 2. Create product `kickole_launch_collection` (non-consumable / one-time) at UK £2.99 in both consoles.
-3. Signing: Apple certificates/profiles; Play App Signing / upload keystore (do not commit keystores).
-4. Device tests: sandbox purchase, cancel, pending (Ask to Buy / pending Play), restore, refund/revoke, offline retain of verified cache.
+3. Signing: Apple certificates/profiles on a Mac; Play App Signing / upload keystore (do not commit keystores). Upload to **TestFlight** and Play **internal** only — keep production unpublished.
+4. Device tests with StoreKit / sandbox and Play **licence testers** (not production cards): see tester instructions.
 5. Optional: App Store Server API + Play Developer API verification service (documented above).
 
-**Live billing has not been verified here.**
+**Live billing and store console uploads are not claimed verified until the above are done on signed device builds.**

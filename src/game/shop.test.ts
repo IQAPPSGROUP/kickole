@@ -100,6 +100,19 @@ describe('shop economy', () => {
     expect(migrated.equippedBoot).toBe('boot-gold');
   });
 
+  it('Launch Collection ownership bypasses coin/challenge gates for launch items', () => {
+    const legend = BOOTS.find((b) => b.id === 'boot-legend-spike')!;
+    const granted = grantLaunchCollection(normalizeLocker(null), 'apple', 'apple:test');
+    expect(granted.coins).toBe(0);
+    expect(meetsChallenge(granted.challenges, legend.unlock)).toBe(false);
+    const equip = buyOrEquipBoot(granted, legend.id);
+    expect(equip.ok).toBe(true);
+    if (equip.ok) {
+      expect(equip.locker.equippedBoot).toBe(legend.id);
+      expect(equip.locker.coins).toBe(0);
+    }
+  });
+
   it('Launch Collection grant/revoke keeps coin-bought items', () => {
     const start = normalizeLocker({ coins: 2500 });
     const club = BOOTS.find((b) => b.id === 'boot-beach-wave')!;

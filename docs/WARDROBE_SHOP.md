@@ -29,6 +29,8 @@ Coins = floor(run score) per completed scoring run. Run score, spendable coins a
 
 `LAUNCH_COLLECTION_ITEM_IDS` lists every launch boot/kit ID. The one-time **Kickolé Launch Collection** purchase (StoreKit 2 / Play Billing) grants only those IDs after store verification. See [`BILLING.md`](./BILLING.md). Achievement challenges still require play. Browser builds cannot take real payments.
 
+Internal testers: [`TESTER_INSTRUCTIONS.md`](./TESTER_INSTRUCTIONS.md). Store Data Safety / privacy answers: [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md). Release matrix: [`RELEASE_VALIDATION.md`](./RELEASE_VALIDATION.md).
+
 ## Migration
 
 `kicky.save.v1` v2 adds coins, boots, kits, appearance and challenges. Legacy `street`/`samba`/`carnival`/`ole` boots and settings `skinId` map into the new catalogue without wiping balances or records.

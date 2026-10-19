@@ -1,0 +1,38 @@
+# Manual macOS archive when Apple signing secrets exist.
+# Does not publish to production. Does not run on every push.
+name: iOS Archive (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Check signing secrets
+        env:
+          ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          IOS_CERT: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          if [ -z "$ASC_KEY" ] || [ -z "$IOS_CERT" ] || [ -z "$IOS_PROFILE" ]; then
+            echo "Missing Apple signing / App Store Connect secrets."
+            echo "Required: APP_STORE_CONNECT_API_KEY, IOS_DISTRIBUTION_CERTIFICATE_BASE64, IOS_PROVISIONING_PROFILE_BASE64"
+            echo "(plus related passphrase / key-id secrets as your pipeline expects)."
+            echo "No TestFlight upload was attempted."
+            exit 1
+          fi
+          echo "Secrets present — extend this job with your existing signing + altool/Transporter steps."
+          exit 1

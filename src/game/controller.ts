@@ -1,8 +1,23 @@
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
+import type { Appearance } from './appearance';
 import { sfx } from './audio';
-import { getSkin, type Skin } from './skins';
-import { loadSave, loadSettings, saveRun, saveSettings, type SaveData, type Settings } from './storage';
+import { composePlayerSkin, type Skin } from './skins';
+import {
+  buyOrEquipBoot,
+  buyOrEquipKit,
+  type ChallengeProgress,
+} from './shop';
+import {
+  loadSave,
+  loadSettings,
+  persistSave,
+  saveRun,
+  saveSettings,
+  updateAppearance,
+  type SaveData,
+  type Settings,
+} from './storage';
 
 export type ArmedTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick'>;
 
@@ -20,7 +35,6 @@ export interface Hud {
   streak: number;
   feedback: Feedback | null;
   stalling: boolean;
-  /** Foot-armed trick waiting for L/R, or null. */
   armedTrick: ArmedTrick | null;
   neckHolding: boolean;
 }
@@ -31,6 +45,7 @@ export interface Result {
   bestStreak: number;
   newBest: boolean;
   rank: number;
+  coinsEarned: number;
 }
 
 export interface Snapshot {
@@ -51,6 +66,8 @@ export class GameController {
   private result: Result | null = null;
   private save = loadSave();
   private settings = loadSettings();
+  /** Per-run challenge tallies flushed into the save on game over. */
+  private runChallenges: ChallengeProgress = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
 
   constructor() {
     this.engine.prepare('menu');
@@ -65,7 +82,15 @@ export class GameController {
 
   getSnapshot = () => this.snapshot;
 
-  private build(): Snapshot {
+  private liveSkin(preview?: { kitId?: string | null; bootId?: string | null }): Skin {
+    return composePlayerSkin(
+      this.save.appearance,
+      preview?.kitId ?? this.save.equippedKit,
+      preview?.bootId ?? this.save.equippedBoot,
+    );
+  }
+
+  private build(preview?: { kitId?: string | null; bootId?: string | null }): Snapshot {
     const e = this.engine;
     const armed = e.selectedTrick;
     return {
@@ -82,13 +107,13 @@ export class GameController {
       },
       save: this.save,
       settings: this.settings,
-      skin: getSkin(this.settings.skinId),
+      skin: this.liveSkin(preview),
       result: this.result,
     };
   }
 
-  private publish() {
-    this.snapshot = this.build();
+  private publish(preview?: { kitId?: string | null; bootId?: string | null }) {
+    this.snapshot = this.build(preview);
     this.listeners.forEach((l) => l());
   }
 
@@ -109,6 +134,9 @@ export class GameController {
         this.vibrate(15);
         break;
       case 'kick': {
+        if (e.alternate) this.runChallenges.alternateFoot += 1;
+        if (e.stall) this.runChallenges.stalls += 1;
+        if (e.grade === 'perfect') this.runChallenges.perfectTouch += 1;
         const high = this.engine.lastTrick?.kind === 'highFlick'
           && Math.abs(this.engine.lastTrick.time - this.engine.time) < 0.05;
         const label = e.stall ? 'FOOT STALL!' : high ? 'HIGH FLICK!' : e.grade.toUpperCase();
@@ -158,20 +186,30 @@ export class GameController {
       case 'over': {
         const s = this.engine.stats;
         const r = s.score > 0
-          ? saveRun(this.save, { score: s.score, kickUps: s.kickUps, date: Date.now() })
-          : { save: this.save, newBest: false, rank: -1 };
+          ? saveRun(
+            this.save,
+            { score: s.score, kickUps: s.kickUps, date: Date.now() },
+            this.runChallenges,
+          )
+          : { save: this.save, newBest: false, rank: -1, coinsEarned: 0 };
         this.save = r.save;
-        this.result = { score: s.score, kickUps: s.kickUps, bestStreak: s.bestStreak, newBest: r.newBest, rank: r.rank };
+        this.result = {
+          score: s.score,
+          kickUps: s.kickUps,
+          bestStreak: s.bestStreak,
+          newBest: r.newBest,
+          rank: r.rank,
+          coinsEarned: r.coinsEarned,
+        };
+        this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
         this.publish();
         break;
       }
     }
   }
 
-  /** Re-publish the snapshot after the engine was changed from outside (dev inspector). */
   refresh() { this.publish(); }
 
-  /** Called on each frame loop; publishes only when the phase-visible state changed. */
   tick(dt: number) {
     const before = this.engine.phase;
     this.engine.update(dt);
@@ -216,7 +254,6 @@ export class GameController {
     this.publish();
   }
 
-  /** Space bar / generic action. */
   action() {
     const p = this.engine.phase;
     if (p === 'menu' || p === 'over') this.play();
@@ -226,6 +263,7 @@ export class GameController {
   play() {
     this.feedback = null;
     this.result = null;
+    this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
     this.engine.prepare('ready');
     this.publish();
   }
@@ -240,6 +278,37 @@ export class GameController {
   updateSettings(patch: Partial<Settings>) {
     this.settings = { ...this.settings, ...patch };
     saveSettings(this.settings);
+    this.publish();
+  }
+
+  setAppearance(appearance: Appearance) {
+    this.save = updateAppearance(this.save, appearance);
+    this.publish();
+  }
+
+  /** Buy or equip a boot. Returns false when broke/locked/unknown. */
+  buyBoot(id: string): boolean {
+    const result = buyOrEquipBoot(this.save, id);
+    this.save = { ...this.save, ...result.locker };
+    if (result.ok) persistSave(this.save);
+    this.publish();
+    return result.ok;
+  }
+
+  buyKit(id: string): boolean {
+    const result = buyOrEquipKit(this.save, id);
+    this.save = { ...this.save, ...result.locker };
+    if (result.ok) persistSave(this.save);
+    this.publish();
+    return result.ok;
+  }
+
+  /** Preview a locked/unowned item without equipping it. */
+  previewEquipment(opts: { kitId?: string | null; bootId?: string | null }) {
+    this.publish(opts);
+  }
+
+  clearPreview() {
     this.publish();
   }
 }

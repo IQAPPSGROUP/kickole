@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { STARTER_BOOT_ID, STARTER_KIT_ID } from './catalogue';
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const data = { ...initial };
@@ -21,14 +22,22 @@ async function load(initial?: Record<string, string>) {
 describe('storage', () => {
   beforeEach(() => { vi.unstubAllGlobals(); });
 
-  it('returns an empty save when nothing is stored', async () => {
+  it('returns a migrated empty wardrobe when nothing is stored', async () => {
     const { loadSave } = await load();
-    expect(loadSave()).toEqual({ best: 0, leaderboard: [] });
+    const save = loadSave();
+    expect(save.best).toBe(0);
+    expect(save.leaderboard).toEqual([]);
+    expect(save.coins).toBe(0);
+    expect(save.ownedBoots).toEqual([STARTER_BOOT_ID]);
+    expect(save.ownedKits).toEqual([STARTER_KIT_ID]);
+    expect(save.equippedBoot).toBe(STARTER_BOOT_ID);
+    expect(save.equippedKit).toBe(STARTER_KIT_ID);
+    expect(save.launchCollectionOwned).toBe(false);
   });
 
   it('survives corrupt JSON', async () => {
     const { loadSave, loadSettings, DEFAULT_SETTINGS } = await load({ 'kicky.save.v1': '{nope', 'kicky.settings.v1': '[[' });
-    expect(loadSave()).toEqual({ best: 0, leaderboard: [] });
+    expect(loadSave().best).toBe(0);
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 
@@ -38,7 +47,7 @@ describe('storage', () => {
     expect(loadSave().leaderboard).toHaveLength(1);
   });
 
-  it('records runs, keeps the best five sorted and persists them', async () => {
+  it('records runs, awards coins, keeps the best five and persists them', async () => {
     const { loadSave, saveRun, ls } = await load();
     let save = loadSave();
     for (let i = 1; i <= 7; i++) {
@@ -46,7 +55,39 @@ describe('storage', () => {
     }
     expect(save.leaderboard.map((r) => r.score)).toEqual([70, 60, 50, 40, 30]);
     expect(save.best).toBe(70);
+    expect(save.coins).toBe(10 + 20 + 30 + 40 + 50 + 60 + 70);
     expect(JSON.parse(ls.data['kicky.save.v1']).best).toBe(70);
+  });
+
+  it('accumulates challenge progress across runs without double-writing score coins oddly', async () => {
+    const { loadSave, saveRun } = await load();
+    const first = saveRun(loadSave(), { score: 20, kickUps: 4, date: 1 }, { alternateFoot: 3, stalls: 1, perfectTouch: 2 });
+    expect(first.coinsEarned).toBe(20);
+    expect(first.save.challenges).toEqual({ alternateFoot: 3, stalls: 1, perfectTouch: 2 });
+    const second = saveRun(first.save, { score: 10, kickUps: 2, date: 2 }, { alternateFoot: 2, stalls: 0, perfectTouch: 4 });
+    expect(second.save.challenges).toEqual({ alternateFoot: 5, stalls: 1, perfectTouch: 6 });
+    expect(second.save.coins).toBe(30);
+  });
+
+  it('migrates legacy boot locker and free skin into kits', async () => {
+    const raw = JSON.stringify({
+      best: 40,
+      leaderboard: [{ score: 40, kickUps: 8, date: 1 }],
+      coins: 1200,
+      ownedBoots: ['street', 'samba'],
+      equippedBoot: 'samba',
+    });
+    const { loadSave } = await load({
+      'kicky.save.v1': raw,
+      'kicky.settings.v1': JSON.stringify({ skinId: 'coral-flash', sound: true, vibration: true, quality: 'high' }),
+    });
+    const save = loadSave();
+    expect(save.coins).toBe(1200);
+    expect(save.ownedBoots).toContain(STARTER_BOOT_ID);
+    expect(save.ownedBoots).toContain('boot-beach-wave');
+    expect(save.equippedBoot).toBe('boot-beach-wave');
+    expect(save.ownedKits).toContain('kit-carnival');
+    expect(save.appearance.skinTone).toBe('#8D5A3C');
   });
 
   it('flags a new personal best and reports the rank', async () => {

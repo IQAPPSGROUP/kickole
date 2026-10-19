@@ -117,12 +117,19 @@ describe('GameController', () => {
     expect(s.hud.phase).toBe('menu');
   });
 
-  it('persists settings changes and rebuilds the skin', async () => {
+  it('persists settings changes and rebuilds the wardrobe skin', async () => {
     const { c, ls } = await make(QUIET);
-    c.updateSettings({ quality: 'low', skinId: 'coral-flash' });
+    c.updateSettings({ quality: 'low' });
     expect(c.getSnapshot().settings.quality).toBe('low');
-    expect(c.getSnapshot().skin.id).toBe('coral-flash');
     expect(JSON.parse(ls.data['kicky.settings.v1']).quality).toBe('low');
+    c.setAppearance({
+      ...c.getSnapshot().save.appearance,
+      skinTone: '#8D5A3C',
+      hairStyle: 'afro',
+    });
+    expect(c.getSnapshot().skin.body.skin).toBe('#8D5A3C');
+    expect(c.getSnapshot().skin.hairStyle).toBe('afro');
+    expect(c.getSnapshot().save.appearance.hairStyle).toBe('afro');
   });
 
   it('vibrates only when vibration is enabled', async () => {

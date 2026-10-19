@@ -123,10 +123,30 @@ export function Character({ engine, skin, expressive = true }: Props) {
               <sphereGeometry args={[0.17, 24, 20]} />
               <meshStandardMaterial color={body.skin} roughness={0.8} />
             </mesh>
-            <mesh position={[0, 0.05, -0.02]} scale={[1, 0.85, 1]}>
-              <sphereGeometry args={[0.18, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
-              <meshStandardMaterial color={body.hair} roughness={0.9} />
-            </mesh>
+            {(skin.hairStyle ?? 'short') === 'short' && (
+              <mesh position={[0, 0.05, -0.02]} scale={[1, 0.85, 1]}>
+                <sphereGeometry args={[0.18, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
+                <meshStandardMaterial color={body.hair} roughness={0.9} />
+              </mesh>
+            )}
+            {(skin.hairStyle ?? 'short') === 'afro' && (
+              <mesh position={[0, 0.12, -0.02]} castShadow>
+                <sphereGeometry args={[0.2, 14, 12]} />
+                <meshStandardMaterial color={body.hair} roughness={0.92} />
+              </mesh>
+            )}
+            {(skin.hairStyle ?? 'short') === 'mohawk' && (
+              <mesh position={[0, 0.18, -0.01]} castShadow>
+                <boxGeometry args={[0.06, 0.22, 0.22]} />
+                <meshStandardMaterial color={body.hair} roughness={0.9} />
+              </mesh>
+            )}
+            {(skin.hairStyle ?? 'short') === 'highTop' && (
+              <mesh position={[0, 0.2, -0.02]} castShadow>
+                <cylinderGeometry args={[0.14, 0.16, 0.18, 12]} />
+                <meshStandardMaterial color={body.hair} roughness={0.9} />
+              </mesh>
+            )}
             <mesh position={[-0.06, 0.02, 0.155]}>
               <sphereGeometry args={[0.022, 8, 8]} />
               <meshStandardMaterial color="#142D35" />

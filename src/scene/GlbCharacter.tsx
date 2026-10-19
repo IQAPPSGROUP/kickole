@@ -16,6 +16,7 @@ import {
 } from './rig';
 import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
+import { HairVariants } from './HairVariants';
 
 type KitPart = 'shirt' | 'trim' | 'shorts' | 'socks' | 'boots' | 'sole';
 
@@ -209,7 +210,7 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; express
  */
 export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Props) {
   const gltf = useGLTF(CHARACTER_MODEL_URL);
-  const { scene, clips, report, bones, materials, kind } = useMemo(() => {
+  const { scene, clips, report, bones, materials, hairMeshes, kind } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
     const byName = new Map<string, Bone>();
@@ -242,11 +243,19 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       const bone = byName.get(boneName);
       if (bone) boneMap[k] = bone;
     });
+    const hairMeshes: Object3D[] = [];
+    root.traverse((o) => {
+      const mesh = o as Mesh;
+      if (!mesh.isMesh || !mesh.material) return;
+      const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      if (list.some((m) => m.name === MATERIAL_NAMES.hair)) hairMeshes.push(mesh);
+    });
     return {
       scene: root,
       clips: gltf.animations,
       bones: boneMap,
       materials: mats,
+      hairMeshes,
       kind: resolved,
       report: validateModel(boneNames, gltf.animations.map((a) => a.name), matNames),
     };
@@ -266,15 +275,18 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
     const colors = skinMaterialColors(skin);
     const quality = loadSettings().quality;
     materials.forEach((m, name) => {
-      // Skin and Hair on the Quaternius model already carry colour textures. Multiplying a skin tint
-      // on top of those maps muddies the face, so only flat kit materials take the skin colours.
-      const textured = !!m.map && (name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair);
-      // The bundled boot map is a flat black image, so a colour multiply stays black. Drop it and use the shop leather.
-      if (name === MATERIAL_NAMES.boots || name === MATERIAL_NAMES.bootsSole) m.map = null;
-      if (!textured && colors[name]) m.color.set(colors[name]);
+      // Free wardrobe tones need flat colour — drop authored albedo maps on skin/hair/boots.
+      if (
+        name === MATERIAL_NAMES.boots
+        || name === MATERIAL_NAMES.bootsSole
+        || name === MATERIAL_NAMES.skin
+        || name === MATERIAL_NAMES.hair
+      ) {
+        m.map = null;
+      }
+      if (colors[name]) m.color.set(colors[name]);
       const part = kitPart(name);
       if (part) {
-        // Colour stays whatever was just written, including a later boot-shop tint of Boots.
         finishKit(m, part, quality);
         return;
       }
@@ -284,27 +296,44 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       m.roughness = hair ? 0.9 : skinMat ? 0.55 : 0.68;
       m.metalness = 0;
       m.envMapIntensity = skinMat ? 0.85 : 0.65;
-      if (m.map) m.emissive.set('#000000');
-      else m.emissive.copy(m.color).multiplyScalar(0.08);
+      m.emissive.copy(m.color).multiplyScalar(0.08);
     });
   }, [skin, materials]);
 
   useEffect(() => {
     const quality = loadSettings().quality;
     if (quality === 'low') return;
-    const geos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
-    const laceMat = new MeshStandardMaterial({ name: 'Boot_Laces', color: '#2a211c', roughness: 0.46, metalness: 0.03 });
+    const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
+    const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
+    const laceMat = new MeshStandardMaterial({
+      name: 'Boot_Laces',
+      color: skin.boots.lace ?? '#2a211c',
+      roughness: 0.46,
+      metalness: 0.03,
+    });
+    const trimMat = new MeshStandardMaterial({
+      name: 'Boot_Trim',
+      color: skin.boots.trim ?? skin.boots.main,
+      roughness: 0.5,
+      metalness: skin.bootPattern === 'gold' ? 0.35 : 0.04,
+    });
     const added: Mesh[] = [];
     const attach = (bone: Bone | undefined) => {
       if (!bone) return;
       LACES.forEach((spec, i) => {
-        const mesh = new Mesh(geos[i], laceMat);
+        const mesh = new Mesh(laceGeos[i], laceMat);
         mesh.position.set(spec.position[0], spec.position[1], spec.position[2]);
         mesh.castShadow = quality === 'high';
         mesh.frustumCulled = false;
         bone.add(mesh);
         added.push(mesh);
       });
+      // Heel trim panel — distinct finishes without extra GLB weight.
+      const heel = new Mesh(heelGeo, trimMat);
+      heel.position.set(0, 0.02, 0.045);
+      heel.frustumCulled = false;
+      bone.add(heel);
+      added.push(heel);
     };
     attach(bones.footLeft);
     attach(bones.footRight);
@@ -319,12 +348,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
     return () => {
       for (const mesh of added) mesh.parent?.remove(mesh);
       laceMat.dispose();
-      for (const geo of geos) geo.dispose();
+      trimMat.dispose();
+      for (const geo of laceGeos) geo.dispose();
+      heelGeo.dispose();
       scene.remove(key);
       key.dispose();
       if (rim) { scene.remove(rim); rim.dispose(); }
     };
-  }, [scene, bones]);
+  }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.bootPattern]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
   const actions = useMemo(() => {
@@ -457,5 +488,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
     if (expressive && !pose.lockMotion) motionRig.apply(computePlayerMotion(engine, motion), false);
   });
 
-  return <primitive object={scene} />;
+  return (
+    <>
+      <primitive object={scene} />
+      <HairVariants
+        head={bones.head}
+        style={skin.hairStyle ?? 'short'}
+        color={skin.body.hair}
+        hairMesh={hairMeshes}
+      />
+    </>
+  );
 }

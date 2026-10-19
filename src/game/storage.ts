@@ -1,3 +1,14 @@
+import type { Appearance } from './appearance';
+import { normalizeAppearance } from './appearance';
+import {
+  bumpChallenges,
+  coinsForScore,
+  normalizeLocker,
+  type ChallengeProgress,
+  type WardrobeLocker,
+  WARDROBE_VERSION,
+} from './shop';
+
 export interface RunRecord {
   score: number;
   kickUps: number;
@@ -10,10 +21,11 @@ export interface Settings {
   sound: boolean;
   vibration: boolean;
   quality: Quality;
+  /** @deprecated Prefer wardrobe kit + appearance; kept for migration. */
   skinId: string;
 }
 
-export interface SaveData {
+export interface SaveData extends WardrobeLocker {
   best: number;
   leaderboard: RunRecord[];
 }
@@ -21,7 +33,12 @@ export interface SaveData {
 const SAVE_KEY = 'kicky.save.v1';
 const SETTINGS_KEY = 'kicky.settings.v1';
 
-export const DEFAULT_SETTINGS: Settings = { sound: true, vibration: true, quality: 'high', skinId: 'kicky-teal' };
+export const DEFAULT_SETTINGS: Settings = {
+  sound: true,
+  vibration: true,
+  quality: 'high',
+  skinId: 'kicky-teal',
+};
 
 function read<T>(key: string): Partial<T> | null {
   try {
@@ -41,23 +58,54 @@ function write(key: string, value: unknown) {
 }
 
 export function loadSave(): SaveData {
-  const d = read<SaveData>(SAVE_KEY);
+  const d = read<SaveData & { ownedBoots?: string[] }>(SAVE_KEY);
+  const settings = read<Settings>(SETTINGS_KEY);
   const lb = Array.isArray(d?.leaderboard)
-    ? d.leaderboard.filter((r) => r && typeof r.score === 'number' && typeof r.kickUps === 'number' && typeof r.date === 'number').slice(0, 5)
+    ? d.leaderboard
+      .filter((r) => r && typeof r.score === 'number' && typeof r.kickUps === 'number' && typeof r.date === 'number')
+      .slice(0, 5)
     : [];
   const best = typeof d?.best === 'number' ? d.best : 0;
-  return { best: Math.max(best, ...lb.map((r) => r.score), 0), leaderboard: lb };
+  const locker = normalizeLocker({
+    ...d,
+    legacySkinId: typeof settings?.skinId === 'string' ? settings.skinId : null,
+  });
+  const save: SaveData = {
+    best: Math.max(best, ...lb.map((r) => r.score), 0),
+    leaderboard: lb,
+    ...locker,
+  };
+  // Persist migrated shape when an older save existed (keep empty installs unwritten).
+  if (d && (d as { wardrobeVersion?: number }).wardrobeVersion !== WARDROBE_VERSION) {
+    write(SAVE_KEY, save);
+  }
+  return save;
 }
 
-/** Records a run; returns the updated save plus whether it is a new personal best. */
-export function saveRun(save: SaveData, run: RunRecord): { save: SaveData; newBest: boolean; rank: number } {
+/** Records a run; awards coins and lifetime challenge tallies from the run result. */
+export function saveRun(
+  save: SaveData,
+  run: RunRecord,
+  challengeDelta: Partial<ChallengeProgress> = {},
+): { save: SaveData; newBest: boolean; rank: number; coinsEarned: number } {
   const newBest = run.score > save.best;
   const all = [...save.leaderboard, run].sort((a, b) => b.score - a.score || b.date - a.date);
   const leaderboard = all.slice(0, 5);
   const rank = leaderboard.indexOf(run);
-  const next = { best: Math.max(save.best, run.score), leaderboard };
+  const coinsEarned = coinsForScore(run.score);
+  const next: SaveData = {
+    ...save,
+    best: Math.max(save.best, run.score),
+    leaderboard,
+    coins: save.coins + coinsEarned,
+    challenges: bumpChallenges(save.challenges, challengeDelta),
+  };
   write(SAVE_KEY, next);
-  return { save: next, newBest, rank };
+  return { save: next, newBest, rank, coinsEarned };
+}
+
+export function persistSave(save: SaveData) {
+  write(SAVE_KEY, save);
 }
 
 export function loadSettings(): Settings {
@@ -73,3 +121,11 @@ export function loadSettings(): Settings {
 export function saveSettings(s: Settings) {
   write(SETTINGS_KEY, s);
 }
+
+export function updateAppearance(save: SaveData, appearance: Appearance): SaveData {
+  const next: SaveData = { ...save, appearance: normalizeAppearance(appearance) };
+  write(SAVE_KEY, next);
+  return next;
+}
+
+export type { Appearance, ChallengeProgress, WardrobeLocker };

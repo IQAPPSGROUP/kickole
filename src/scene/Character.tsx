@@ -4,15 +4,20 @@ import type { Group } from 'three';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
+import { computePlayerMotion, createPlayerMotion } from './motion';
+import { createMotionRig } from './motionRig';
 
 interface Props {
   engine: GameEngine;
   skin: Skin;
+  expressive?: boolean;
 }
 
 /** Placeholder primitive rig. Swap this component for a GLB-based one that consumes the same Pose. */
-export function Character({ engine, skin }: Props) {
+export function Character({ engine, skin, expressive = true }: Props) {
   const pose = useMemo(() => createPose(), []);
+  const motion = useMemo(() => createPlayerMotion(), []);
+  const motionRig = useRef<ReturnType<typeof createMotionRig> | null>(null);
   const root = useRef<Group>(null);
   const torso = useRef<Group>(null);
   const head = useRef<Group>(null);
@@ -26,6 +31,10 @@ export function Character({ engine, skin }: Props) {
   const footR = useRef<Group>(null);
 
   useFrame(() => {
+    if (!motionRig.current && root.current) motionRig.current = createMotionRig({ root: root.current,
+      spine: torso.current ?? undefined, head: head.current ?? undefined, armLeft: armL.current ?? undefined,
+      armRight: armR.current ?? undefined, footLeft: footL.current ?? undefined, footRight: footR.current ?? undefined }, { mirrorArmZ: true });
+    motionRig.current?.restore();
     computePose(engine, pose);
     if (root.current) { root.current.position.y = pose.bodyY; root.current.rotation.y = pose.bodyYaw; }
     if (torso.current) {
@@ -43,6 +52,8 @@ export function Character({ engine, skin }: Props) {
     };
     apply(thighL.current, shinL.current, footL.current, pose.legs.left);
     apply(thighR.current, shinR.current, footR.current, pose.legs.right);
+    // The fallback already tracks the ball procedurally; keep its existing head pitch/yaw.
+    if (expressive) motionRig.current?.apply(computePlayerMotion(engine, motion), false);
   });
 
   const { clothing, boots, body } = skin;

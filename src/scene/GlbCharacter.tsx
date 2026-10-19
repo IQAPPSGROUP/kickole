@@ -7,18 +7,20 @@ import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
+import { computePlayerMotion, createPlayerMotion } from './motion';
+import { createMotionRig } from './motionRig';
 import {
-  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, MATERIAL_NAMES, CHARACTER_MODEL_URL, LOOPING_STATES, selectAnimationState, animationSampleTime, skinMaterialColors, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 
-interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void }
+interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; expressive?: boolean }
 
 /**
  * Rigged GLB footballer (see docs/CHARACTER_GLB.md). Plays the named clips when present, otherwise drives the
  * contract bones from the shared procedural pose. Reports an invalid model so the primitive fallback is used.
  */
-export function GlbCharacter({ engine, skin, onInvalid }: Props) {
+export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Props) {
   const gltf = useGLTF(CHARACTER_MODEL_URL);
   const { scene, clips, report, bones, materials } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
@@ -97,6 +99,9 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   }, [clips, mixer]);
 
   const pose = useMemo(() => createPose(), []);
+  const motion = useMemo(() => createPlayerMotion(), []);
+  const motionRig = useMemo(() => createMotionRig({ root: scene, spine: bones.spine, head: bones.head,
+    armLeft: bones.armLeft, armRight: bones.armRight, footLeft: bones.footLeft, footRight: bones.footRight }), [scene, bones]);
   const rest = useMemo(() => {
     const m = new Map<BoneKey, { x: number; y: number; z: number }>();
     (Object.keys(bones) as BoneKey[]).forEach((k) => { const b = bones[k]!; m.set(k, { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z }); });
@@ -106,14 +111,16 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
 
   useEffect(() => () => {
+    motionRig.restore();
     mixer.stopAllAction();
     // React StrictMode replays effects on mount. Reset the state cache too,
     // otherwise the next frame thinks the stopped action is still playing.
     current.state = null;
     current.token = -1;
-  }, [mixer, current]);
+  }, [mixer, current, motionRig]);
 
   useFrame((_, dt) => {
+    motionRig.restore();
     if (useClips) {
       const next = selectAnimationState(engine);
       if (next.state !== current.state || next.token !== current.token) {
@@ -126,10 +133,11 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
         current.state = next.state;
         current.token = next.token;
       }
-      // Kick clips are positioned explicitly from engine state (physics stays authoritative; no free-running timer).
+      // Sample every clip from simulation time, keeping paused frames and different render rates consistent.
       const act = current.state ? actions.get(current.state) : undefined;
-      if (act && next.clipTime !== undefined) { act.paused = true; act.time = next.clipTime; }
+      if (act) { act.paused = true; act.time = animationSampleTime(engine, next.state, act.getClip().duration); }
       mixer.update(dt);
+      if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
       if (inspector.active) {
         const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
         if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }
@@ -160,6 +168,7 @@ export function GlbCharacter({ engine, skin, onInvalid }: Props) {
     set('shinRight', pose.legs.right.knee, 0, 0);
     set('footLeft', pose.legs.left.foot, 0, 0);
     set('footRight', pose.legs.right.foot, 0, 0);
+    if (expressive) motionRig.apply(computePlayerMotion(engine, motion), false);
   });
 
   return <primitive object={scene} />;

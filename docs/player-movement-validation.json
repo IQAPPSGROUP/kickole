@@ -1,0 +1,686 @@
+{
+  "date": "2026-10-19",
+  "base": "8089718",
+  "rendering": "Headless Chromium, ANGLE SwiftShader software rendering",
+  "typecheck": "passed",
+  "tests": "85 passed in 9 files",
+  "productionBuild": "passed, default and beach",
+  "review": [
+    {
+      "renderer": "glb",
+      "scenario": "idle",
+      "time": 0.8,
+      "motion": "relaxed-sway",
+      "phase": "menu"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "ready",
+      "time": 0.4,
+      "motion": "ready-bounce",
+      "phase": "ready"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "left",
+      "time": 0.14,
+      "motion": "open-touch",
+      "phase": "playing"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "right",
+      "time": 0.26,
+      "motion": "open-touch",
+      "phase": "playing"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "stall",
+      "time": 0.6,
+      "motion": "stall-balance",
+      "phase": "playing"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "fist",
+      "time": 0.35,
+      "motion": "fist-pump",
+      "phase": "playing"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "shimmy",
+      "time": 0.35,
+      "motion": "shoulder-shimmy",
+      "phase": "playing"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "salute",
+      "time": 0.4,
+      "motion": "salute",
+      "phase": "playing"
+    },
+    {
+      "renderer": "glb",
+      "scenario": "miss",
+      "time": 0.3,
+      "motion": "miss-recovery",
+      "phase": "dropped"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "idle",
+      "time": 0.8,
+      "motion": "relaxed-sway",
+      "phase": "menu"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "ready",
+      "time": 0.4,
+      "motion": "ready-bounce",
+      "phase": "ready"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "left",
+      "time": 0.14,
+      "motion": "open-touch",
+      "phase": "playing"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "right",
+      "time": 0.26,
+      "motion": "open-touch",
+      "phase": "playing"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "stall",
+      "time": 0.6,
+      "motion": "stall-balance",
+      "phase": "playing"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "fist",
+      "time": 0.35,
+      "motion": "fist-pump",
+      "phase": "playing"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "shimmy",
+      "time": 0.35,
+      "motion": "shoulder-shimmy",
+      "phase": "playing"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "salute",
+      "time": 0.4,
+      "motion": "salute",
+      "phase": "playing"
+    },
+    {
+      "renderer": "primitive",
+      "scenario": "miss",
+      "time": 0.3,
+      "motion": "miss-recovery",
+      "phase": "dropped"
+    }
+  ],
+  "contact": [
+    {
+      "side": "left",
+      "type": "kick",
+      "t": 0.25,
+      "info": {
+        "sinceTap": 0,
+        "contactAt": null,
+        "ball": {
+          "x": 0.085,
+          "y": 0.7044444444444407,
+          "z": 0.62,
+          "vy": -5.241666666666673
+        },
+        "phase": "playing"
+      },
+      "clip": 0.25,
+      "foot": [
+        0.10000000149011612,
+        0.07999998331069602,
+        0.011875560455625024
+      ],
+      "ball": {
+        "x": 0.085,
+        "y": 0.7044444444444407,
+        "z": 0.62,
+        "vx": 0,
+        "vy": -5.241666666666673,
+        "vz": 0,
+        "rx": -9.524999999999999,
+        "ry": 3.1749999999999927,
+        "rz": -6.349999999999985,
+        "wx": -9,
+        "wy": 3,
+        "wz": -6
+      }
+    },
+    {
+      "side": "left",
+      "type": "kick",
+      "t": 0.3,
+      "info": {
+        "sinceTap": 0.04166666666666652,
+        "contactAt": 0.04166666666666652,
+        "ball": {
+          "x": -0.10045112797619048,
+          "y": 0.7658936111111111,
+          "z": 0.62,
+          "vy": 5.507233333333333
+        },
+        "phase": "playing"
+      },
+      "clip": 0.3,
+      "foot": [
+        -0.09999992320229843,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": -0.10045112797619048,
+        "y": 0.7658936111111111,
+        "z": 0.62,
+        "vx": 0.18586464285714288,
+        "vy": 5.507233333333333,
+        "vz": 0,
+        "rx": -9.844611072,
+        "ry": 3.231537023999993,
+        "rz": -6.463074047999986,
+        "wx": -9,
+        "wy": -3,
+        "wz": 6
+      }
+    },
+    {
+      "side": "left",
+      "type": "kick",
+      "t": 0.35,
+      "info": {
+        "sinceTap": 0.09166666666666634,
+        "contactAt": 0.04166666666666652,
+        "ball": {
+          "x": -0.0911578958333333,
+          "y": 1.025021111111111,
+          "z": 0.62,
+          "vy": 4.950633333333331
+        },
+        "phase": "playing"
+      },
+      "clip": 0.35,
+      "foot": [
+        -0.09999991935548702,
+        0.6968569119170216,
+        0.46684423286903465
+      ],
+      "ball": {
+        "x": -0.0911578958333333,
+        "y": 1.025021111111111,
+        "z": 0.62,
+        "vx": 0.18586464285714288,
+        "vy": 4.950633333333331,
+        "vz": 0,
+        "rx": -10.294611071999995,
+        "ry": 3.0815370239999935,
+        "rz": -6.163074047999987,
+        "wx": -9,
+        "wy": -3,
+        "wz": 6
+      }
+    },
+    {
+      "side": "left",
+      "type": "stall",
+      "t": 0.3,
+      "info": {
+        "sinceTap": 0.29999999999999893,
+        "contactAt": null,
+        "ball": {
+          "x": -0.10200000000000001,
+          "y": 0.72,
+          "z": 0.62,
+          "vy": 0
+        },
+        "phase": "playing"
+      },
+      "clip": 0.3,
+      "foot": [
+        -0.09999992320229843,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": -0.10200000000000001,
+        "y": 0.72,
+        "z": 0.62,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "rx": -10.344633217423246,
+        "ry": 3.4482110724744075,
+        "rz": -6.896422144948815,
+        "wx": -0.447305557322696,
+        "wy": 0.14910185244089869,
+        "wz": -0.29820370488179737
+      }
+    },
+    {
+      "side": "left",
+      "type": "stall",
+      "t": 0.5,
+      "info": {
+        "sinceTap": 0.4999999999999982,
+        "contactAt": null,
+        "ball": {
+          "x": -0.10200000000000001,
+          "y": 0.72,
+          "z": 0.62,
+          "vy": 0
+        },
+        "phase": "playing"
+      },
+      "clip": 0.5,
+      "foot": [
+        -0.09999992320229843,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": -0.10200000000000001,
+        "y": 0.72,
+        "z": 0.62,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "rx": -10.381705329518844,
+        "ry": 3.4605684431729413,
+        "rz": -6.921136886345883,
+        "wx": -0.060466126759935,
+        "wy": 0.020155375586645,
+        "wz": -0.04031075117329
+      }
+    },
+    {
+      "side": "left",
+      "type": "stall",
+      "t": 0.7,
+      "info": {
+        "sinceTap": 0.6999999999999975,
+        "contactAt": 0.5999999999999979,
+        "ball": {
+          "x": -0.08341353571428564,
+          "y": 1.2197016666666665,
+          "z": 0.62,
+          "vy": 4.486799999999997
+        },
+        "phase": "playing"
+      },
+      "clip": 0.7,
+      "foot": [
+        -0.09999992320229843,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": -0.08341353571428564,
+        "y": 1.2197016666666665,
+        "z": 0.62,
+        "vx": 0.18586464285714288,
+        "vy": 4.486799999999997,
+        "vz": 0,
+        "rx": -11.285369494436537,
+        "ry": 3.1617898314788437,
+        "rz": -6.3235796629576875,
+        "wx": -9,
+        "wy": -3,
+        "wz": 6
+      }
+    },
+    {
+      "side": "right",
+      "type": "kick",
+      "t": 0.25,
+      "info": {
+        "sinceTap": 0,
+        "contactAt": null,
+        "ball": {
+          "x": -0.085,
+          "y": 0.7044444444444407,
+          "z": 0.62,
+          "vy": -5.241666666666673
+        },
+        "phase": "playing"
+      },
+      "clip": 0.25,
+      "foot": [
+        -0.09999991831038502,
+        0.7280872806834199,
+        0.4793072524516276
+      ],
+      "ball": {
+        "x": -0.085,
+        "y": 0.7044444444444407,
+        "z": 0.62,
+        "vx": 0,
+        "vy": -5.241666666666673,
+        "vz": 0,
+        "rx": -9.524999999999999,
+        "ry": -3.1749999999999927,
+        "rz": 6.349999999999985,
+        "wx": -9,
+        "wy": -3,
+        "wz": 6
+      }
+    },
+    {
+      "side": "right",
+      "type": "kick",
+      "t": 0.3,
+      "info": {
+        "sinceTap": 0.04166666666666652,
+        "contactAt": 0.04166666666666652,
+        "ball": {
+          "x": 0.10045112797619048,
+          "y": 0.7658936111111111,
+          "z": 0.62,
+          "vy": 5.507233333333333
+        },
+        "phase": "playing"
+      },
+      "clip": 0.3,
+      "foot": [
+        0.1000000797779338,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": 0.10045112797619048,
+        "y": 0.7658936111111111,
+        "z": 0.62,
+        "vx": -0.18586464285714288,
+        "vy": 5.507233333333333,
+        "vz": 0,
+        "rx": -9.844611072,
+        "ry": -3.231537023999993,
+        "rz": 6.463074047999986,
+        "wx": -9,
+        "wy": 3,
+        "wz": -6
+      }
+    },
+    {
+      "side": "right",
+      "type": "kick",
+      "t": 0.35,
+      "info": {
+        "sinceTap": 0.09166666666666634,
+        "contactAt": 0.04166666666666652,
+        "ball": {
+          "x": 0.0911578958333333,
+          "y": 1.025021111111111,
+          "z": 0.62,
+          "vy": 4.950633333333331
+        },
+        "phase": "playing"
+      },
+      "clip": 0.35,
+      "foot": [
+        0.10000008362474522,
+        0.6968569119170216,
+        0.46684423286903465
+      ],
+      "ball": {
+        "x": 0.0911578958333333,
+        "y": 1.025021111111111,
+        "z": 0.62,
+        "vx": -0.18586464285714288,
+        "vy": 4.950633333333331,
+        "vz": 0,
+        "rx": -10.294611071999995,
+        "ry": -3.0815370239999935,
+        "rz": 6.163074047999987,
+        "wx": -9,
+        "wy": 3,
+        "wz": -6
+      }
+    },
+    {
+      "side": "right",
+      "type": "stall",
+      "t": 0.3,
+      "info": {
+        "sinceTap": 0.29999999999999893,
+        "contactAt": null,
+        "ball": {
+          "x": 0.10200000000000001,
+          "y": 0.72,
+          "z": 0.62,
+          "vy": 0
+        },
+        "phase": "playing"
+      },
+      "clip": 0.3,
+      "foot": [
+        0.1000000797779338,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": 0.10200000000000001,
+        "y": 0.72,
+        "z": 0.62,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "rx": -10.344633217423246,
+        "ry": -3.4482110724744075,
+        "rz": 6.896422144948815,
+        "wx": -0.447305557322696,
+        "wy": -0.14910185244089869,
+        "wz": 0.29820370488179737
+      }
+    },
+    {
+      "side": "right",
+      "type": "stall",
+      "t": 0.5,
+      "info": {
+        "sinceTap": 0.4999999999999982,
+        "contactAt": null,
+        "ball": {
+          "x": 0.10200000000000001,
+          "y": 0.72,
+          "z": 0.62,
+          "vy": 0
+        },
+        "phase": "playing"
+      },
+      "clip": 0.5,
+      "foot": [
+        0.1000000797779338,
+        0.6129999125376207,
+        0.42149997755237767
+      ],
+      "ball": {
+        "x": 0.10200000000000001,
+        "y": 0.72,
+        "z": 0.62,
+        "vx": 0,
+        "vy": 0,
+        "vz": 0,
+        "rx": -10.381705329518844,
+        "ry": -3.4605684431729413,
+        "rz": 6.921136886345883,
+        "wx": -0.060466126759935,
+        "wy": -0.020155375586645,
+        "wz": 0.04031075117329
+      }
+    },
+    {
+      "side": "right",
+      "type": "stall",
+      "t": 0.7,
+      "info": {
+        "sinceTap": 0.6999999999999975,
+        "contactAt": 0.5999999999999979,
+        "ball": {
+          "x": 0.08341353571428564,
+          "y": 1.2197016666666665,
+          "z": 0.62,
+          "vy": 4.486799999999997
+        },
+        "phase": "playing"
+      },
+      "clip": 0.7,
+      "foot": [
+        0.10000008466984722,
+        0.7280872806834199,
+        0.4793072524516276
+      ],
+      "ball": {
+        "x": 0.08341353571428564,
+        "y": 1.2197016666666665,
+        "z": 0.62,
+        "vx": -0.18586464285714288,
+        "vy": 4.486799999999997,
+        "vz": 0,
+        "rx": -11.285369494436537,
+        "ry": -3.1617898314788437,
+        "rz": 6.3235796629576875,
+        "wx": -9,
+        "wy": 3,
+        "wz": -6
+      }
+    }
+  ],
+  "gamePlayback": [
+    {
+      "theme": "street",
+      "quality": "low",
+      "stats": {
+        "score": 15,
+        "kickUps": 3,
+        "bestStreak": 3,
+        "stalls": 0
+      },
+      "states": [
+        "Idle",
+        "KickRight",
+        "KickLeft",
+        "Celebrate"
+      ],
+      "frames": 48
+    },
+    {
+      "theme": "street",
+      "quality": "high",
+      "stats": {
+        "score": 27,
+        "kickUps": 5,
+        "bestStreak": 5,
+        "stalls": 0
+      },
+      "states": [
+        "Idle",
+        "KickRight",
+        "Celebrate",
+        "KickLeft"
+      ],
+      "frames": 16
+    },
+    {
+      "theme": "beach",
+      "quality": "low",
+      "stats": {
+        "score": 15,
+        "kickUps": 3,
+        "bestStreak": 3,
+        "stalls": 0
+      },
+      "states": [
+        "Idle",
+        "KickRight",
+        "KickLeft",
+        "Celebrate"
+      ],
+      "frames": 75
+    },
+    {
+      "theme": "beach",
+      "quality": "high",
+      "stats": {
+        "score": 21,
+        "kickUps": 4,
+        "bestStreak": 4,
+        "stalls": 0
+      },
+      "states": [
+        "Idle",
+        "KickRight",
+        "KickLeft",
+        "Celebrate"
+      ],
+      "frames": 25
+    },
+    {
+      "fallback": "character request aborted; primitive animated scene remains usable"
+    }
+  ],
+  "production": [
+    {
+      "quality": "low",
+      "width": 390,
+      "height": 844,
+      "character": [
+        206,
+        200
+      ],
+      "errors": []
+    },
+    {
+      "quality": "low",
+      "width": 844,
+      "height": 390,
+      "character": [
+        206,
+        200
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 390,
+      "height": 844,
+      "character": [
+        206,
+        200
+      ],
+      "errors": []
+    },
+    {
+      "quality": "high",
+      "width": 844,
+      "height": 390,
+      "character": [
+        206,
+        200
+      ],
+      "errors": []
+    }
+  ],
+  "gamePlaybackMethod": "Normal inputs and fixed-step controller ticks, to avoid software-rendering timing jitter; not a latency or performance measurement"
+}

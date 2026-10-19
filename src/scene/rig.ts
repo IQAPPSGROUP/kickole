@@ -118,6 +118,15 @@ export function kickClipTime(engine: GameEngine, side: Side): number {
   return KICK_CLIP_START + Math.max(0, sinceTap);
 }
 
+/** Sample non-contact clips from the same simulation clock as the ball, including paused review frames. */
+export function animationSampleTime(engine: GameEngine, state: AnimationState, duration: number): number {
+  if (state === 'KickLeft' || state === 'KickRight') return kickClipTime(engine, state === 'KickLeft' ? 'left' : 'right');
+  const d = Math.max(.001, duration);
+  if (state === 'Idle') return Math.max(0, engine.time) % d;
+  const since = state === 'Miss' ? engine.time - engine.lastDropTime : engine.time - engine.lastPerfectTime - KICK_POST_CONTACT;
+  return Math.min(d, Math.max(0, since));
+}
+
 /** Choose the animation state from engine state. Deterministic and independent of rendering. */
 export function selectAnimationState(engine: GameEngine): StateResult {
   const t = engine.time;

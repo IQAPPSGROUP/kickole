@@ -62,6 +62,8 @@ An optional beach theme includes ten textured GLBs, sand court, coastal sky/fog 
 
 The bundled procedural footballer uses a skinned GLB with five animations and follows [`docs/CHARACTER_GLB.md`](docs/CHARACTER_GLB.md). It loads from `public/models/kicky-player-rigged.glb` by default. Set `VITE_USE_GLB_CHARACTER=false` to select the primitive character. Invalid or missing models also fall back safely.
 
+Both character renderers add expressive idle/ready movement, ball tracking, three touch gestures, stall balancing and varied reactions while retaining the authored contact pose. See [`docs/PLAYER_MOVEMENT.md`](docs/PLAYER_MOVEMENT.md) for validation and `/tools/movement-preview.html` on the dev server for a side-by-side motion review.
+
 ## Animation inspector (development only)
 Run `VITE_USE_GLB_CHARACTER=true npm run dev` and open `http://localhost:5173/?inspect`. The panel lets you choose the foot,
 switch between a plain kick and a foot stall, pause/play, step one frame (1/30 s) or scrub, and jump to the 0.25 / 0.30 / 0.35 s

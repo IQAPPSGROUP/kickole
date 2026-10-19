@@ -6,4 +6,5 @@ inspect-shots/
 .validation/
 environment-shots/
 beach-shots/
+movement-shots/
 tools/__pycache__/

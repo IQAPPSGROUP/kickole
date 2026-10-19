@@ -8,7 +8,7 @@ import { DEFAULT_CONFIG } from '../engine/config';
 import { GameEngine } from '../engine/engine';
 import { computePose } from './pose';
 import { ueDeltaQuaternion } from './ue-pose';
-import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel, type BoneKey } from './rig';
+import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel } from './rig';
 
 const MODEL = new URL('../../public/models/kickole_player_v3.glb', import.meta.url);
 
@@ -181,7 +181,7 @@ describe('kickole_player_v3.glb', () => {
     };
     const pose = computePose(e);
     const delta = new Quaternion();
-    const keys: BoneKey[] = ['thighLeft', 'shinLeft', 'footLeft'];
+    const keys: (keyof typeof BONE_NAMES)[] = ['thighLeft', 'shinLeft', 'footLeft'];
     for (const key of keys) {
       const bone = bones[BONE_NAMES[key]];
       bone.quaternion.multiply(ueDeltaQuaternion(key, pose, delta));

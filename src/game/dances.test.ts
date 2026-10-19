@@ -23,6 +23,15 @@ describe('dance unlocks', () => {
     expect(dancesOwnedAt(0)).toEqual(['sway']);
   });
 
+  it('shows generic dance names', () => {
+    expect(DANCES.map((dance) => dance.name)).toEqual([
+      'Soft Sway',
+      'Pendulum',
+      'Shuffle Step',
+      'Heel Rock',
+    ]);
+  });
+
   it('unlocks pendulum, shuffle and heel rock on the 10/25/50 ladder', () => {
     expect(dancesOwnedAt(10)).toEqual(['sway', 'pendulum']);
     expect(dancesOwnedAt(25)).toEqual(['sway', 'pendulum', 'shuffle']);

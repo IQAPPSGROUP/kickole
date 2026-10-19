@@ -32,13 +32,13 @@ function useSandTexture() {
       wash.addColorStop(1, '#f3ddb0');
       g.fillStyle = wash;
       g.fillRect(0, 0, n, n);
-      for (let i = 0; i < 28; i++) {
-        g.fillStyle = random() > 0.5 ? 'rgba(255,236,190,0.16)' : 'rgba(150,96,40,0.08)';
+      for (let i = 0; i < 36; i++) {
+        g.fillStyle = random() > 0.5 ? 'rgba(255,236,190,0.18)' : 'rgba(150,96,40,0.09)';
         g.beginPath();
-        g.ellipse(random() * n, random() * n, 18 + random() * 40, 8 + random() * 16, random() * Math.PI, 0, Math.PI * 2);
+        g.ellipse(random() * n, random() * n, 18 + random() * 48, 8 + random() * 18, random() * Math.PI, 0, Math.PI * 2);
         g.fill();
       }
-      for (let i = 0; i < 5000; i++) {
+      for (let i = 0; i < 5600; i++) {
         g.fillStyle = random() > 0.6 ? 'rgba(255,248,220,0.28)' : 'rgba(110,70,28,0.16)';
         g.fillRect(random() * n, random() * n, 1 + random() * 2, 1 + random() * 2);
       }
@@ -52,17 +52,27 @@ function useSandTexture() {
 function useSkyTexture() {
   return useMemo(() => {
     const c = document.createElement('canvas');
-    c.width = 16;
+    c.width = 64;
     c.height = 512;
     const g = c.getContext('2d');
     if (g) {
       const wash = g.createLinearGradient(0, 0, 0, 512);
-      wash.addColorStop(0, '#3aa0dc');
-      wash.addColorStop(0.42, '#8fd4f2');
-      wash.addColorStop(0.72, '#f6e2b4');
+      wash.addColorStop(0, '#2f8fd4');
+      wash.addColorStop(0.38, '#7ec8ef');
+      wash.addColorStop(0.62, '#c9e8f8');
+      wash.addColorStop(0.78, '#f6e2b4');
       wash.addColorStop(1, '#1a8fb0');
       g.fillStyle = wash;
-      g.fillRect(0, 0, 16, 512);
+      g.fillRect(0, 0, 64, 512);
+      const random = seededRandom(41);
+      for (let i = 0; i < 10; i++) {
+        const y = 40 + random() * 180;
+        const soft = g.createRadialGradient(32, y, 2, 32, y, 28 + random() * 20);
+        soft.addColorStop(0, 'rgba(255,255,255,0.22)');
+        soft.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = soft;
+        g.fillRect(0, y - 40, 64, 80);
+      }
     }
     const t = new CanvasTexture(c);
     t.colorSpace = SRGBColorSpace;
@@ -74,17 +84,28 @@ function useWaterTexture() {
   return useMemo(() => {
     const t = makeCanvas(256, (g, n) => {
       const gradient = g.createLinearGradient(0, 0, 0, n);
-      gradient.addColorStop(0, '#3ec0d8');
-      gradient.addColorStop(0.45, '#178fb8');
-      gradient.addColorStop(1, '#0b5678');
+      gradient.addColorStop(0, '#5ad0e4');
+      gradient.addColorStop(0.28, '#2aa8c8');
+      gradient.addColorStop(0.55, '#178fb8');
+      gradient.addColorStop(1, '#0a4a68');
       g.fillStyle = gradient;
       g.fillRect(0, 0, n, n);
-      g.strokeStyle = 'rgba(255,255,255,0.35)';
-      g.lineWidth = 3;
-      for (let y = 30; y < n; y += 28) {
+      g.strokeStyle = 'rgba(255,255,255,0.28)';
+      g.lineWidth = 2.5;
+      for (let y = 22; y < n; y += 22) {
+        g.beginPath();
+        for (let x = 0; x <= n; x += 6) {
+          const wave = y + Math.sin(x / 16 + y * 0.04) * 3.5;
+          if (x === 0) g.moveTo(x, wave); else g.lineTo(x, wave);
+        }
+        g.stroke();
+      }
+      g.strokeStyle = 'rgba(210,255,255,0.18)';
+      g.lineWidth = 1.5;
+      for (let y = 34; y < n; y += 36) {
         g.beginPath();
         for (let x = 0; x <= n; x += 8) {
-          const wave = y + Math.sin(x / 18) * 4;
+          const wave = y + Math.cos(x / 22) * 2.2;
           if (x === 0) g.moveTo(x, wave); else g.lineTo(x, wave);
         }
         g.stroke();
@@ -97,27 +118,177 @@ function useWaterTexture() {
   }, []);
 }
 
-function Palm({ x, z, lean = 0.12, scale = 1, leaves = 7, frond }: { x: number; z: number; lean?: number; scale?: number; leaves?: number; frond: CanvasTexture | null }) {
-  const crown = Array.from({ length: leaves }, (_, i) => (i / leaves) * Math.PI * 2);
+/** Layered green headlands framing the sea — still procedural, but less blocky. */
+function CoastalHills({ quality }: { quality: Quality }) {
+  const segments = quality === 'low' ? 10 : 16;
+  const mounds: Array<{ x: number; y: number; z: number; sx: number; sy: number; sz: number; color: string }> = [
+    { x: -7.4, y: 1.15, z: -8.4, sx: 2.8, sy: 1.55, sz: 1.6, color: '#2f6a45' },
+    { x: -5.2, y: 1.55, z: -8.0, sx: 2.1, sy: 1.85, sz: 1.45, color: '#356f48' },
+    { x: -2.4, y: 1.25, z: -8.6, sx: 1.9, sy: 1.45, sz: 1.35, color: '#24563a' },
+    { x: 0.6, y: 0.95, z: -9.0, sx: 1.6, sy: 1.15, sz: 1.2, color: '#2a5f40' },
+    { x: 3.8, y: 1.35, z: -8.3, sx: 2.2, sy: 1.65, sz: 1.4, color: '#2d6844' },
+    { x: 6.6, y: 1.2, z: -7.9, sx: 2.5, sy: 1.5, sz: 1.5, color: '#275c3d' },
+  ];
+  if (quality !== 'low') {
+    mounds.push(
+      { x: -6.2, y: 2.05, z: -8.7, sx: 1.35, sy: 1.1, sz: 1.1, color: '#1f4d32' },
+      { x: 5.1, y: 2.0, z: -8.6, sx: 1.2, sy: 1.05, sz: 1.05, color: '#214f34' },
+      { x: -3.8, y: 0.55, z: -7.4, sx: 1.4, sy: 0.7, sz: 1.1, color: '#3a7a4f' },
+      { x: 2.2, y: 0.5, z: -7.6, sx: 1.3, sy: 0.65, sz: 1.05, color: '#3a7a4f' },
+    );
+  }
   return (
-    <group position={[x, 0, z]} rotation={[lean, 0, lean * 0.4]} scale={scale}>
-      <mesh position={[0.05, 1.35, 0]} rotation={[0, 0, 0.06]} castShadow>
-        <cylinderGeometry args={[0.07, 0.13, 2.7, 8]} />
-        <meshStandardMaterial color="#6b4228" roughness={0.86} />
-      </mesh>
-      {crown.map((angle) => (
-        <mesh key={angle} position={[Math.sin(angle) * 0.15, 2.72, Math.cos(angle) * 0.08]} rotation={[0.95, angle, 0]}>
-          <planeGeometry args={[0.7, 1.35]} />
-          <meshStandardMaterial map={frond ?? undefined} color={frond ? '#ffffff' : '#2f9a4a'} transparent alphaTest={0.35} side={DoubleSide} roughness={0.7} />
+    <group>
+      {mounds.map((m, i) => (
+        <mesh key={i} position={[m.x, m.y, m.z]} scale={[m.sx, m.sy, m.sz]}>
+          <sphereGeometry args={[1.05, segments, Math.max(8, segments - 4)]} />
+          <meshStandardMaterial color={m.color} roughness={1} />
         </mesh>
       ))}
     </group>
   );
 }
 
-function Umbrella({ x, z, cloth }: { x: number; z: number; cloth: CanvasTexture | null }) {
+/**
+ * Sparse coastal houses on the left headland — same visual language as the rua hillside,
+ * kept thin so the sea and sun stay open in the phone frame.
+ */
+function CoastalNeighbourhood({ quality }: { quality: Quality }) {
+  const buildings = useMemo(() => {
+    const random = seededRandom(2004);
+    const palette = ['#E7A56F', '#D46D62', '#E9C886', '#6AAB9D', '#8BA5B4', '#B987AD', '#F3E4C8'];
+    const count = quality === 'low' ? 6 : 11;
+    return Array.from({ length: count }, (_, i) => {
+      const row = i < (quality === 'low' ? 4 : 6) ? 0 : 1;
+      const index = row === 0 ? i : i - (quality === 'low' ? 4 : 6);
+      const x = -7.1 + index * (row === 0 ? 0.72 : 0.88) + random() * 0.12;
+      const z = row === 0 ? -7.55 - random() * 0.35 : -8.35 - random() * 0.4;
+      const width = 0.42 + random() * 0.28;
+      const height = (row === 0 ? 0.85 : 1.15) + random() * 0.75;
+      const depth = 0.38 + random() * 0.28;
+      return {
+        x,
+        z,
+        width,
+        height,
+        depth,
+        color: palette[i % palette.length],
+        roof: i % 3 === 0,
+        balcony: quality !== 'low' && i % 4 === 0,
+        tank: quality !== 'low' && i % 5 === 0,
+        laundry: quality !== 'low' && i % 3 === 1,
+      };
+    });
+  }, [quality]);
   return (
-    <group position={[x, 0, z]}>
+    <group>
+      {buildings.map((b, i) => (
+        <group key={i} position={[b.x, 0.35, b.z]}>
+          <mesh position={[0, b.height / 2, 0]}>
+            <boxGeometry args={[b.width, b.height, b.depth]} />
+            <meshLambertMaterial color={b.color} />
+          </mesh>
+          <mesh position={[0, b.height + 0.04, 0]}>
+            <boxGeometry args={[b.width + 0.08, 0.08, b.depth + 0.08]} />
+            <meshLambertMaterial color="#D8C6AA" />
+          </mesh>
+          {[-0.18, 0.18].map((u, k) => (
+            <mesh key={k} position={[u * b.width, b.height * 0.62, b.depth / 2 + 0.006]}>
+              <planeGeometry args={[0.09, 0.14]} />
+              <meshBasicMaterial color="#294854" />
+            </mesh>
+          ))}
+          {b.roof && (
+            <mesh position={[b.width * 0.2, b.height + 0.18, 0]}>
+              <boxGeometry args={[0.06, 0.26, 0.06]} />
+              <meshLambertMaterial color="#56616A" />
+            </mesh>
+          )}
+          {b.balcony && (
+            <mesh position={[0, b.height * 0.42, b.depth / 2 + 0.08]}>
+              <boxGeometry args={[b.width * 0.7, 0.045, 0.16]} />
+              <meshLambertMaterial color="#E3D4BB" />
+            </mesh>
+          )}
+          {b.tank && (
+            <group position={[-b.width * 0.18, b.height + 0.22, 0]}>
+              <mesh>
+                <cylinderGeometry args={[0.11, 0.12, 0.28, 7]} />
+                <meshLambertMaterial color="#283C43" />
+              </mesh>
+            </group>
+          )}
+          {b.laundry && (
+            <group position={[0, b.height * 0.42 + 0.14, b.depth / 2 + 0.1]}>
+              <mesh rotation={[0.18, 0, 0]}>
+                <boxGeometry args={[b.width * 0.8, 0.025, 0.22]} />
+                <meshLambertMaterial color={i % 2 ? '#E5BD71' : '#D16F56'} />
+              </mesh>
+              {[-0.16, 0.16].map((u, j) => (
+                <mesh key={j} position={[u * b.width, -0.12, 0.1]}>
+                  <planeGeometry args={[0.1, 0.18]} />
+                  <meshBasicMaterial color={['#F5E9C9', '#5E9FBC'][j]} side={DoubleSide} />
+                </mesh>
+              ))}
+            </group>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function Palm({
+  x, z, lean = 0.12, scale = 1, leaves = 7, frond,
+}: {
+  x: number; z: number; lean?: number; scale?: number; leaves?: number; frond: CanvasTexture | null;
+}) {
+  const crown = Array.from({ length: leaves }, (_, i) => (i / leaves) * Math.PI * 2);
+  return (
+    <group position={[x, 0, z]} rotation={[lean, 0, lean * 0.4]} scale={scale}>
+      <mesh position={[0.04, 0.55, 0]} castShadow>
+        <cylinderGeometry args={[0.1, 0.15, 1.1, 8]} />
+        <meshStandardMaterial color="#6b4228" roughness={0.9} />
+      </mesh>
+      <mesh position={[0.07, 1.55, 0]} rotation={[0, 0, 0.05]} castShadow>
+        <cylinderGeometry args={[0.07, 0.11, 1.15, 8]} />
+        <meshStandardMaterial color="#7a4c2e" roughness={0.88} />
+      </mesh>
+      <mesh position={[0.09, 2.35, 0]} rotation={[0, 0, 0.07]} castShadow>
+        <cylinderGeometry args={[0.055, 0.08, 0.7, 7]} />
+        <meshStandardMaterial color="#8a5834" roughness={0.86} />
+      </mesh>
+      {[0.35, 0.95, 1.55, 2.1].map((y) => (
+        <mesh key={y} position={[0.05 + y * 0.015, y, 0]} rotation={[0, y * 0.7, 0.05]}>
+          <torusGeometry args={[0.11 - y * 0.015, 0.018, 5, 10]} />
+          <meshStandardMaterial color="#5a3820" roughness={1} />
+        </mesh>
+      ))}
+      {[0, 1, 2].map((i) => (
+        <mesh key={i} position={[Math.sin(i * 2.1) * 0.12, 2.55, Math.cos(i * 2.1) * 0.1]}>
+          <sphereGeometry args={[0.09, 7, 6]} />
+          <meshStandardMaterial color="#6b3d1e" roughness={0.75} />
+        </mesh>
+      ))}
+      {crown.map((angle) => (
+        <mesh key={angle} position={[Math.sin(angle) * 0.16, 2.78, Math.cos(angle) * 0.1]} rotation={[0.95, angle, 0.08]}>
+          <planeGeometry args={[0.78, 1.45]} />
+          <meshStandardMaterial map={frond ?? undefined} color={frond ? '#ffffff' : '#2f9a4a'} transparent alphaTest={0.35} side={DoubleSide} roughness={0.7} />
+        </mesh>
+      ))}
+      {crown.filter((_, i) => i % 2 === 0).map((angle) => (
+        <mesh key={`inner-${angle}`} position={[Math.sin(angle + 0.4) * 0.08, 2.7, Math.cos(angle + 0.4) * 0.06]} rotation={[1.15, angle + 0.5, 0]}>
+          <planeGeometry args={[0.55, 1.05]} />
+          <meshStandardMaterial map={frond ?? undefined} color={frond ? '#e8ffe8' : '#3aad55'} transparent alphaTest={0.35} side={DoubleSide} roughness={0.72} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Umbrella({ x, z, cloth, yaw = 0, scale = 1 }: { x: number; z: number; cloth: CanvasTexture | null; yaw?: number; scale?: number }) {
+  return (
+    <group position={[x, 0, z]} rotation={[0, yaw, 0]} scale={scale}>
       <mesh position={[0, 0.95, 0]} castShadow>
         <cylinderGeometry args={[0.03, 0.035, 1.9, 8]} />
         <meshStandardMaterial color="#f7f5ed" />
@@ -126,14 +297,18 @@ function Umbrella({ x, z, cloth }: { x: number; z: number; cloth: CanvasTexture 
         <coneGeometry args={[0.95, 0.38, 16]} />
         <meshStandardMaterial map={cloth ?? undefined} color={cloth ? '#ffffff' : '#1FA85A'} roughness={0.62} />
       </mesh>
+      <mesh position={[0, 1.95, 0]}>
+        <sphereGeometry args={[0.05, 8, 6]} />
+        <meshStandardMaterial color="#F5C94D" roughness={0.5} />
+      </mesh>
     </group>
   );
 }
 
 /** Green cloth with a yellow diamond: beach colours, not a detailed national emblem. */
-function Pennant({ x, z }: { x: number; z: number }) {
+function Pennant({ x, z, yaw = 0 }: { x: number; z: number; yaw?: number }) {
   return (
-    <group position={[x, 0, z]}>
+    <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
       <mesh position={[0, 1.15, 0]}>
         <cylinderGeometry args={[0.025, 0.03, 2.3, 5]} />
         <meshStandardMaterial color="#f4efe4" />
@@ -150,16 +325,103 @@ function Pennant({ x, z }: { x: number; z: number }) {
   );
 }
 
-function Barraca({ x, z, cloth }: { x: number; z: number; cloth: CanvasTexture | null }) {
+function Bunting({ x, z }: { x: number; z: number }) {
+  const flags = [
+    { u: 0.15, color: '#FF805D' },
+    { u: 0.45, color: '#12BFA6' },
+    { u: 0.75, color: '#F5C94D' },
+    { u: 1.05, color: '#EAF44A' },
+    { u: 1.35, color: '#FF805D' },
+  ];
   return (
-    <group position={[x, 0, z]} rotation={[0, 0.5, 0]}>
+    <group position={[x, 0, z]} rotation={[0, 0.35, 0]}>
+      <mesh position={[0.75, 1.85, 0]} rotation={[0, 0, 0.08]}>
+        <boxGeometry args={[1.6, 0.02, 0.02]} />
+        <meshBasicMaterial color="#f4efe4" />
+      </mesh>
+      {flags.map((f) => (
+        <mesh key={f.u} position={[f.u, 1.72, 0]} rotation={[0.15, 0, 0.1]}>
+          <coneGeometry args={[0.1, 0.22, 3]} />
+          <meshBasicMaterial color={f.color} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Barraca({ x, z, cloth, yaw = 0.5 }: { x: number; z: number; cloth: CanvasTexture | null; yaw?: number }) {
+  return (
+    <group position={[x, 0, z]} rotation={[0, yaw, 0]}>
       <mesh position={[0, 0.55, 0]} castShadow>
         <boxGeometry args={[1.5, 1.1, 0.85]} />
         <meshStandardMaterial color="#f3efe4" roughness={0.88} />
       </mesh>
+      <mesh position={[0, 0.35, 0.44]}>
+        <boxGeometry args={[1.2, 0.55, 0.06]} />
+        <meshStandardMaterial color="#d9c4a0" roughness={0.85} />
+      </mesh>
       <mesh position={[0, 1.22, 0.2]} rotation={[0.4, 0, 0]} castShadow>
         <boxGeometry args={[1.85, 0.08, 1.25]} />
         <meshStandardMaterial map={cloth ?? undefined} color={cloth ? '#ffffff' : '#F5C94D'} roughness={0.7} />
+      </mesh>
+      <mesh position={[-0.55, 1.05, 0.55]}>
+        <cylinderGeometry args={[0.03, 0.03, 1.4, 5]} />
+        <meshStandardMaterial color="#c4a878" />
+      </mesh>
+      <mesh position={[0.55, 1.05, 0.55]}>
+        <cylinderGeometry args={[0.03, 0.03, 1.4, 5]} />
+        <meshStandardMaterial color="#c4a878" />
+      </mesh>
+    </group>
+  );
+}
+
+function Towel({ x, z, yaw, art }: { x: number; z: number; yaw: number; art: CanvasTexture | null }) {
+  return (
+    <mesh position={[x, 0.018, z]} rotation={[-Math.PI / 2, 0, yaw]} receiveShadow>
+      <planeGeometry args={[0.72, 1.35]} />
+      <meshStandardMaterial map={art ?? undefined} color={art ? '#ffffff' : '#12BFA6'} roughness={0.92} />
+    </mesh>
+  );
+}
+
+function Cooler({ x, z }: { x: number; z: number }) {
+  return (
+    <group position={[x, 0, z]} rotation={[0, -0.4, 0]}>
+      <mesh position={[0, 0.22, 0]} castShadow>
+        <boxGeometry args={[0.55, 0.42, 0.38]} />
+        <meshStandardMaterial color="#12BFA6" roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 0.44, 0]}>
+        <boxGeometry args={[0.58, 0.06, 0.4]} />
+        <meshStandardMaterial color="#0e9a86" roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0.48, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.12, 0.02, 5, 12, Math.PI]} />
+        <meshStandardMaterial color="#f7f5ed" roughness={0.6} />
+      </mesh>
+      <mesh position={[0.18, 0.22, 0.2]}>
+        <boxGeometry args={[0.12, 0.08, 0.02]} />
+        <meshBasicMaterial color="#EAF44A" />
+      </mesh>
+    </group>
+  );
+}
+
+function RockCluster({ x, z, scale = 1 }: { x: number; z: number; scale?: number }) {
+  return (
+    <group position={[x, 0, z]} scale={scale}>
+      <mesh position={[0, 0.12, 0]} scale={[1, 0.55, 0.85]} castShadow>
+        <sphereGeometry args={[0.28, 8, 6]} />
+        <meshStandardMaterial color="#9a8468" roughness={0.95} />
+      </mesh>
+      <mesh position={[0.22, 0.08, 0.1]} scale={[0.7, 0.4, 0.6]}>
+        <sphereGeometry args={[0.22, 7, 5]} />
+        <meshStandardMaterial color="#8a7458" roughness={1} />
+      </mesh>
+      <mesh position={[-0.18, 0.06, 0.12]} scale={[0.55, 0.32, 0.5]}>
+        <sphereGeometry args={[0.2, 7, 5]} />
+        <meshStandardMaterial color="#b09a78" roughness={0.98} />
       </mesh>
     </group>
   );
@@ -172,15 +434,16 @@ function Waves() {
     if (!group) return;
     const t = clock.elapsedTime;
     group.children.forEach((child, i) => {
-      child.position.z = -4.15 - i * 0.62 + Math.sin(t * 0.9 + i * 1.3) * 0.15;
+      child.position.z = -4.05 - i * 0.55 + Math.sin(t * 0.9 + i * 1.3) * 0.14;
+      child.position.x = Math.sin(t * 0.35 + i) * 0.12;
     });
   });
   return (
     <group ref={ref}>
-      {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, -4.2 - i * 0.6]}>
-          <planeGeometry args={[18, 0.07]} />
-          <meshBasicMaterial color={i % 2 ? '#f7f5ed' : '#d8f7ff'} transparent opacity={0.75} />
+      {[0, 1, 2, 3, 4].map((i) => (
+        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, -4.1 - i * 0.55]}>
+          <planeGeometry args={[20, 0.08 + (i % 2) * 0.04]} />
+          <meshBasicMaterial color={i % 2 ? '#f7f5ed' : '#d8f7ff'} transparent opacity={0.7 - i * 0.08} />
         </mesh>
       ))}
     </group>
@@ -280,10 +543,13 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
   const awning = useArtTexture(ART.awning, false);
   const gull = useArtTexture(ART.seagull, true);
   const beachBallArt = useArtTexture(ART.ball, false);
+  const clouds = useArtTexture(ART.clouds, true);
+  const coastalHill = useArtTexture(ART.coastalHill, true);
+  const towel = useArtTexture(ART.towel, false);
   const sea = useRef<Mesh>(null);
   const sandMat = useRef<MeshStandardMaterial>(null);
   const skyDim = useRef<Mesh>(null);
-  const leaves = quality === 'low' ? 5 : 7;
+  const leaves = quality === 'low' ? 5 : 8;
   useEffect(() => () => { sand.dispose(); water.dispose(); sky.dispose(); }, [sand, water, sky]);
   useFrame(({ clock }) => {
     const material = sea.current?.material;
@@ -299,38 +565,65 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
   });
   return (
     <group>
-      <mesh position={[0, 5.2, -14.2]}>
-        <planeGeometry args={[42, 16]} />
+      <mesh position={[0, 5.4, -14.5]}>
+        <planeGeometry args={[46, 18]} />
         <meshBasicMaterial map={sky} />
       </mesh>
-      <mesh ref={skyDim} position={[0, 5.15, -13.5]} visible={false}>
-        <planeGeometry args={[42, 16]} />
+      <mesh ref={skyDim} position={[0, 5.35, -13.8]} visible={false}>
+        <planeGeometry args={[46, 18]} />
         <meshStandardMaterial color="#1c3348" transparent opacity={0} depthWrite={false} />
       </mesh>
-      <mesh position={[-6.6, 1.4, -7.8]} scale={[2.2, 1.35, 1.4]}>
-        <sphereGeometry args={[1.05, 14, 10]} />
-        <meshStandardMaterial color="#2f6a45" roughness={1} />
+
+      {quality !== 'low' && (
+        <>
+          <mesh position={[-3.2, 6.4, -12.2]} scale={[4.2, 1.6, 1]}>
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial map={clouds ?? undefined} color={clouds ? '#ffffff' : '#f7f5ed'} transparent alphaTest={0.2} depthWrite={false} fog={false} />
+          </mesh>
+          <mesh position={[3.8, 5.9, -11.6]} scale={[3.4, 1.35, 1]}>
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial map={clouds ?? undefined} color={clouds ? '#ffffff' : '#f7f5ed'} transparent alphaTest={0.2} depthWrite={false} fog={false} />
+          </mesh>
+        </>
+      )}
+
+      <CoastalHills quality={quality} />
+      <CoastalNeighbourhood quality={quality} />
+
+      {/* Painted coastal silhouette — right headland, keeps left sun open. */}
+      <mesh position={[5.6, 2.15, -7.7]} scale={[4.6, 2.5, 1]}>
+        <planeGeometry args={[1, 1]} />
+        <meshStandardMaterial map={coastalHill ?? undefined} color={coastalHill ? '#ffffff' : '#2f6a45'} transparent alphaTest={0.28} side={DoubleSide} roughness={0.9} fog={false} />
       </mesh>
-      <mesh position={[-1.15, 1.45, -8.2]} scale={[1.7, 1.55, 1.3]}>
-        <sphereGeometry args={[1.05, 14, 10]} />
-        <meshStandardMaterial color="#24563a" roughness={1} />
-      </mesh>
+      {quality !== 'low' && (
+        <mesh position={[-6.8, 2.35, -8.1]} scale={[-3.2, 1.9, 1]}>
+          <planeGeometry args={[1, 1]} />
+          <meshStandardMaterial map={coastalHill ?? undefined} color={coastalHill ? '#ffffff' : '#2f6a45'} transparent alphaTest={0.28} side={DoubleSide} roughness={0.9} fog={false} />
+        </mesh>
+      )}
+
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.4]} receiveShadow={shadows}>
         <planeGeometry args={[22, 16]} />
         <meshStandardMaterial ref={sandMat} map={sand} color="#f3d7a4" roughness={1} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, -3.5]} receiveShadow={shadows}>
-        <planeGeometry args={[22, 2.4]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, -3.35]} receiveShadow={shadows}>
+        <planeGeometry args={[22, 2.8]} />
         <meshStandardMaterial color="#b99462" roughness={0.55} metalness={0.04} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, -4.55]}>
+        <planeGeometry args={[22, 0.9]} />
+        <meshStandardMaterial color="#8ec8d8" roughness={0.35} metalness={0.12} transparent opacity={0.55} />
       </mesh>
       <mesh ref={sea} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, -9.2]}>
         <planeGeometry args={[36, 14]} />
         <meshStandardMaterial map={water} color="#ffffff" roughness={quality === 'high' ? 0.12 : 0.28} metalness={quality === 'low' ? 0.08 : 0.28} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -4.15]}>
-        <planeGeometry args={[20, 0.55]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -4.05]}>
+        <planeGeometry args={[20, 0.7]} />
         <meshBasicMaterial color="#f7f5ed" transparent opacity={0.55} />
       </mesh>
+
+      {/* Sun — left of frame, must stay clear of dense hillside props. */}
       <group position={[-4.6, 1.75, -6.1]}>
         <mesh>
           <sphereGeometry args={[0.62, quality === 'low' ? 10 : 20, quality === 'low' ? 10 : 16]} />
@@ -343,6 +636,7 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
           </mesh>
         )}
       </group>
+
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]}>
         <ringGeometry args={[1.15, 1.22, 48]} />
         <meshBasicMaterial color="#fff6df" />
@@ -352,12 +646,26 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
       <BeachBall quality={quality} art={beachBallArt} />
       <Rain quality={quality} />
       <Spectators scene="beach" />
+
+      {/* Near / mid props — all outside |x|<1.6, z −0.8..1.6 */}
       <Palm x={-3.6} z={-2.2} lean={0.08} leaves={leaves} frond={frond} />
       <Palm x={3.5} z={-1.6} lean={-0.1} scale={0.92} leaves={leaves} frond={frond} />
       <Palm x={-4.6} z={1.2} lean={0.16} scale={0.8} leaves={leaves} frond={frond} />
-      <Umbrella x={2.7} z={-2.7} cloth={awning} />
+      {quality !== 'low' && <Palm x={4.4} z={-2.9} lean={-0.14} scale={0.72} leaves={leaves} frond={frond} />}
+      <Umbrella x={2.7} z={-2.7} cloth={awning} yaw={-0.25} />
+      {quality !== 'low' && <Umbrella x={-3.55} z={-2.55} cloth={towel} yaw={0.55} scale={0.88} />}
       <Barraca x={-2.9} z={-3.05} cloth={awning} />
+      {quality !== 'low' && <Barraca x={3.35} z={-3.25} cloth={towel} yaw={-0.55} />}
       <Pennant x={1.7} z={-2.55} />
+      {quality !== 'low' && <Pennant x={-1.95} z={-2.7} yaw={0.4} />}
+      <Bunting x={2.05} z={-2.95} />
+      <Towel x={2.15} z={-2.05} yaw={0.35} art={towel} />
+      {quality !== 'low' && <Towel x={-2.45} z={-1.95} yaw={-0.5} art={towel} />}
+      <Cooler x={2.95} z={-2.05} />
+      <RockCluster x={-3.9} z={0.95} scale={1.05} />
+      <RockCluster x={4.15} z={-0.85} scale={0.9} />
+      {quality !== 'low' && <RockCluster x={-4.8} z={-1.4} scale={0.75} />}
+
       <mesh position={[-5.2, -0.15, 1.4]} scale={[2.4, 0.45, 1.6]}>
         <sphereGeometry args={[1, 10, 8]} />
         <meshStandardMaterial color="#efd3a2" roughness={1} />
@@ -366,6 +674,12 @@ export function Beach({ shadows, quality }: { shadows: boolean; quality: Quality
         <sphereGeometry args={[1, 10, 8]} />
         <meshStandardMaterial color="#e8c48a" roughness={1} />
       </mesh>
+      {quality !== 'low' && (
+        <mesh position={[4.6, -0.12, 1.6]} scale={[1.6, 0.32, 1.3]}>
+          <sphereGeometry args={[1, 9, 7]} />
+          <meshStandardMaterial color="#edd0a0" roughness={1} />
+        </mesh>
+      )}
     </group>
   );
 }

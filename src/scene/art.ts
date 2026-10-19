@@ -8,6 +8,9 @@ export const ART = {
   ball: `${import.meta.env.BASE_URL}art/beach-ball.jpg`,
   awning: `${import.meta.env.BASE_URL}art/awning.jpg`,
   spectator: `${import.meta.env.BASE_URL}art/spectator.jpg`,
+  clouds: `${import.meta.env.BASE_URL}art/beach-clouds.jpg`,
+  coastalHill: `${import.meta.env.BASE_URL}art/coastal-hill.jpg`,
+  towel: `${import.meta.env.BASE_URL}art/beach-towel.jpg`,
 } as const;
 
 function nearBackdrop(r: number, g: number, b: number, bgR: number, bgG: number, bgB: number): boolean {

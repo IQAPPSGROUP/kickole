@@ -1,9 +1,10 @@
 :root {
-  --navy: #142D35;
-  --teal: #12BFA6;
-  --lime: #EAF44A;
-  --coral: #FF805D;
-  --white: #F7F5ED;
+  --navy: #1E2A5A;
+  --teal: #00B8A9;
+  --lime: #FFD93D;
+  --coral: #FF4F9A;
+  --violet: #6C5CE7;
+  --white: #F8F9FB;
   --font: 'Trebuchet MS', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }

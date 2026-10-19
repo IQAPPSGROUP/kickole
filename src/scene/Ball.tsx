@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Euler, Matrix4, Quaternion, Vector3, type Group, type Mesh } from 'three';
+import { Euler, Matrix4, MeshBasicMaterial, Quaternion, Vector3, type Group, type Mesh } from 'three';
+import { toonGradient } from './toon';
 import type { Quality } from '../game/storage';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
@@ -60,6 +61,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
         if (!m) continue;
         const p = h[(i + 1) * 2 - 1];
         m.visible = speed > 3.2 && engine.phase === 'playing';
+        (m.material as MeshBasicMaterial).color.set(engine.streak >= 4 ? '#FFD93D' : '#FF4F9A');
         m.position.copy(p);
         m.scale.setScalar(1 - (i + 1) / (TRAIL + 1));
         (m.material as unknown as { opacity: number }).opacity = 0.28 * (1 - i / TRAIL);
@@ -79,17 +81,17 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       <group ref={group}>
         <mesh ref={flash} visible={false}>
           <sphereGeometry args={[r * 1.8, 12, 10]} />
-          <meshBasicMaterial color="#EAF44A" transparent opacity={0} depthWrite={false} />
+          <meshBasicMaterial color="#FFD93D" transparent opacity={0} depthWrite={false} />
         </mesh>
         <group ref={spin}>
           <mesh castShadow>
             <sphereGeometry args={[r, 32, 24]} />
-            <meshStandardMaterial color={skin.football.base} roughness={0.32} metalness={0.05} emissive={skin.football.base} emissiveIntensity={0.08} />
+            <meshToonMaterial color={skin.football.base} gradientMap={toonGradient()} />
           </mesh>
           {panels.map((p, i) => (
             <mesh key={i} position={p.pos} quaternion={p.q}>
               <circleGeometry args={[r * 0.36, 5]} />
-              <meshStandardMaterial color={skin.football.panels} roughness={0.4} />
+              <meshToonMaterial color={skin.football.panels} gradientMap={toonGradient()} />
             </mesh>
           ))}
         </group>
@@ -97,12 +99,12 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       {showTrail && Array.from({ length: TRAIL }, (_, i) => (
         <mesh key={i} ref={(m) => { trail.current[i] = m; }} visible={false}>
           <sphereGeometry args={[r, 12, 10]} />
-          <meshBasicMaterial color="#F5E9A8" transparent opacity={0.2} depthWrite={false} />
+          <meshBasicMaterial color={engine.streak >= 4 ? '#FFD93D' : '#FF4F9A'} transparent opacity={0.2} depthWrite={false} />
         </mesh>
       ))}
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[r * 1.25, 24]} />
-        <meshBasicMaterial color="#05161b" transparent opacity={0.4} depthWrite={false} />
+        <meshBasicMaterial color="#1E2A5A" transparent opacity={0.4} depthWrite={false} />
       </mesh>
     </>
   );

@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Material, Mesh, MeshStandardMaterial, PointLight, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D } from 'three';
+import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Material, Mesh, MeshToonMaterial, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D } from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
-import { loadSettings, type Quality } from '../game/storage';
+import { loadSettings } from '../game/storage';
 import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
 import { computePlayerMotion, createPlayerMotion } from './motion';
@@ -17,10 +17,15 @@ import {
 import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
 import { HairVariants } from './HairVariants';
+import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
-type KitPart = 'shirt' | 'trim' | 'shorts' | 'socks' | 'boots' | 'sole';
+function toonRole(name: string): ToonRole {
+  if (name === MATERIAL_NAMES.skin) return 'skin';
+  if (name === MATERIAL_NAMES.shirt) return 'shirt';
+  return 'flat';
+}
 
-/** Instap straps in foot-bone space. Local +Y runs toward the toe and local −Z is the instep. */
+/** Straps in foot-bone space. On this rig local +Y runs toward the toe and local −Z is the instep. */
 const LACES: ReadonlyArray<{ position: [number, number, number]; size: [number, number, number] }> = [
   { position: [0, 0.042, -0.05], size: [0.07, 0.008, 0.012] },
   { position: [0, 0.068, -0.055], size: [0.066, 0.008, 0.012] },
@@ -28,179 +33,6 @@ const LACES: ReadonlyArray<{ position: [number, number, number]; size: [number, 
   { position: [0, 0.12, -0.05], size: [0.052, 0.008, 0.011] },
   { position: [0, 0.082, -0.06], size: [0.013, 0.1, 0.01] },
 ];
-
-const KIT_GLSL = `
-float kitHash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-float kitWeave(vec2 uv) {
-  vec2 g = uv * 16.0;
-  vec2 f = abs(fract(g) - 0.5);
-  float thread = smoothstep(0.48, 0.2, min(f.x, f.y));
-  float n = kitHash(floor(g));
-  float wear = smoothstep(0.62, 0.95, kitHash(floor(uv * 3.2)));
-  return thread * mix(0.7, 1.0, n) * mix(0.58, 1.0, 1.0 - wear);
-}
-float kitTri(vec3 p, vec3 n) {
-  vec3 w = abs(normalize(n));
-  w /= max(w.x + w.y + w.z, 0.0001);
-  return kitWeave(p.yz) * w.x + kitWeave(p.xz) * w.y + kitWeave(p.xy) * w.z;
-}
-float kitStitch(vec2 uv) {
-  vec2 g = uv * vec2(14.0, 8.0);
-  float dash = step(0.38, fract(g.x + floor(g.y) * 0.35));
-  float row = smoothstep(0.2, 0.04, abs(fract(g.y) - 0.5));
-  return dash * row;
-}
-float kitStitchTri(vec3 p, vec3 n) {
-  vec3 w = abs(normalize(n));
-  w /= max(w.x + w.y + w.z, 0.0001);
-  return kitStitch(p.yz) * w.x + kitStitch(p.xz) * w.y + kitStitch(p.xy) * w.z;
-}
-`;
-
-const KIT_ALBEDO = `
-{
-  vec3 kitN = normalize(vKitN);
-  #ifdef KIT_SHIRT
-    diffuseColor.rgb *= mix(vec3(0.74, 0.7, 0.64), vec3(1.0), clamp(kitTri(vKitPos, kitN), 0.0, 1.0));
-  #elif defined(KIT_SHORTS)
-    diffuseColor.rgb *= mix(vec3(0.7, 0.68, 0.64), vec3(1.0), clamp(kitTri(vKitPos * 0.85, kitN), 0.0, 1.0));
-  #elif defined(KIT_SOCKS)
-    diffuseColor.rgb *= 0.84 + 0.16 * sin(vKitPos.y * 150.0);
-  #elif defined(KIT_TRIM)
-    float stitch = kitStitchTri(vKitPos, kitN);
-    float luma = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));
-    vec3 thread = luma > 0.45 ? vec3(0.16, 0.13, 0.1) : vec3(0.95, 0.92, 0.86);
-    diffuseColor.rgb = mix(diffuseColor.rgb * vec3(0.92, 0.9, 0.84), thread, stitch);
-  #elif defined(KIT_BOOTS)
-    float grain = kitHash(floor(vKitPos.xy * 42.0));
-    float pore = smoothstep(0.72, 1.0, kitHash(vKitPos.zy * 28.0));
-    diffuseColor.rgb *= mix(0.84, 1.05, grain);
-    diffuseColor.rgb *= 1.0 - pore * 0.14;
-  #elif defined(KIT_SOLE)
-    float groove = smoothstep(0.18, 0.0, abs(fract(vKitPos.z * 18.0) - 0.5));
-    diffuseColor.rgb *= mix(1.0, 0.7, groove);
-  #endif
-}
-`;
-
-const KIT_ROUGH = `
-#ifdef KIT_BOOTS
-  roughnessFactor = clamp(roughnessFactor + (kitHash(vKitPos.xz * 30.0) - 0.5) * 0.22, 0.2, 0.85);
-#elif defined(KIT_SHIRT) || defined(KIT_SHORTS) || defined(KIT_SOCKS) || defined(KIT_TRIM)
-  roughnessFactor = clamp(roughnessFactor + (kitTri(vKitPos, normalize(vKitN)) - 0.6) * 0.18, 0.32, 1.0);
-#endif
-`;
-
-function kitPart(name: string): KitPart | null {
-  switch (name) {
-    case MATERIAL_NAMES.shirt: return 'shirt';
-    case MATERIAL_NAMES.shirtTrim: return 'trim';
-    case MATERIAL_NAMES.shorts: return 'shorts';
-    case MATERIAL_NAMES.socks: return 'socks';
-    case MATERIAL_NAMES.boots: return 'boots';
-    case MATERIAL_NAMES.bootsSole: return 'sole';
-    default: return null;
-  }
-}
-
-function kitDefine(part: KitPart): string {
-  switch (part) {
-    case 'shirt': return 'KIT_SHIRT';
-    case 'trim': return 'KIT_TRIM';
-    case 'shorts': return 'KIT_SHORTS';
-    case 'socks': return 'KIT_SOCKS';
-    case 'boots': return 'KIT_BOOTS';
-    case 'sole': return 'KIT_SOLE';
-    default: {
-      const exhaustive: never = part;
-      return exhaustive;
-    }
-  }
-}
-
-function rimStrength(quality: Quality): number {
-  switch (quality) {
-    case 'low': return 0;
-    case 'medium': return 0.14;
-    case 'high': return 0.26;
-    default: {
-      const exhaustive: never = quality;
-      return exhaustive;
-    }
-  }
-}
-
-/** Weave, stitches and leather grain multiply the existing colour. They never replace it. */
-function bindKitShader(m: MeshStandardMaterial, part: KitPart, quality: Quality) {
-  const define = kitDefine(part);
-  const rim = rimStrength(quality);
-  m.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vKitPos;\nvarying vec3 vKitN;')
-      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvKitN = objectNormal;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKitPos = position;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#define ${define}\n#include <common>\nvarying vec3 vKitPos;\nvarying vec3 vKitN;\n${KIT_GLSL}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\n${KIT_ALBEDO}`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${KIT_ROUGH}`)
-      .replace(
-        'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
-        `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;\nfloat kitFacing = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);\noutgoingLight += vec3(1.0, 0.78, 0.55) * pow(1.0 - kitFacing, 2.4) * ${rim.toFixed(3)};`,
-      );
-  };
-  m.customProgramCacheKey = () => `kickole-kit-${define}-${rim}`;
-  m.needsUpdate = true;
-}
-
-function finishKit(m: MeshStandardMaterial, part: KitPart, quality: Quality) {
-  m.flatShading = false;
-  const rich = quality !== 'low';
-  switch (part) {
-    case 'shirt':
-      m.roughness = 0.76;
-      m.metalness = 0;
-      m.envMapIntensity = rich ? 0.75 : 0.5;
-      m.emissive.copy(m.color).multiplyScalar(rich ? 0.035 : 0.1);
-      break;
-    case 'shorts':
-      m.roughness = 0.84;
-      m.metalness = 0;
-      m.envMapIntensity = rich ? 0.7 : 0.45;
-      m.emissive.copy(m.color).multiplyScalar(rich ? 0.03 : 0.08);
-      break;
-    case 'socks':
-      m.roughness = 0.68;
-      m.metalness = 0;
-      m.envMapIntensity = rich ? 0.65 : 0.45;
-      m.emissive.copy(m.color).multiplyScalar(rich ? 0.03 : 0.08);
-      break;
-    case 'trim':
-      m.roughness = 0.55;
-      m.metalness = 0;
-      m.envMapIntensity = rich ? 0.7 : 0.5;
-      m.emissive.copy(m.color).multiplyScalar(rich ? 0.03 : 0.08);
-      break;
-    case 'boots':
-      m.roughness = rich ? 0.42 : 0.38;
-      m.metalness = 0.08;
-      m.envMapIntensity = rich ? 1.15 : 0.7;
-      m.emissive.set('#000000');
-      break;
-    case 'sole':
-      m.roughness = 0.86;
-      m.metalness = 0;
-      m.envMapIntensity = 0.35;
-      m.emissive.set('#000000');
-      break;
-    default: {
-      const exhaustive: never = part;
-      return exhaustive;
-    }
-  }
-  if (rich) bindKitShader(m, part, quality);
-}
 
 interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; expressive?: boolean }
 
@@ -210,11 +42,11 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; express
  */
 export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Props) {
   const gltf = useGLTF(CHARACTER_MODEL_URL);
-  const { scene, clips, report, bones, materials, hairMeshes, kind } = useMemo(() => {
+  const { scene, clips, report, bones, materials, hairMeshes, kind, quaternius } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
     const byName = new Map<string, Bone>();
-    const mats = new Map<string, MeshStandardMaterial>();
+    const mats = new Map<string, MeshToonMaterial>();
     const boneNames: string[] = [];
     const matNames: string[] = [];
     root.traverse((o) => {
@@ -228,9 +60,9 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;
         const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        const cloned = list.map((m) => m.clone());
+        const cloned = list.map((m) => toToonMaterial(m, m.name === MATERIAL_NAMES.skin));
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
-        cloned.forEach((m) => { matNames.push(m.name); if ((m as MeshStandardMaterial).isMeshStandardMaterial) mats.set(m.name, m as MeshStandardMaterial); });
+        cloned.forEach((m) => { matNames.push(m.name); mats.set(m.name, m); });
       }
     });
     const resolved = rigKind(boneNames);
@@ -257,6 +89,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       materials: mats,
       hairMeshes,
       kind: resolved,
+      quaternius: boneNames.includes('Clavicle_L'),
       report: validateModel(boneNames, gltf.animations.map((a) => a.name), matNames),
     };
   }, [gltf]);
@@ -273,30 +106,12 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
 
   useEffect(() => {
     const colors = skinMaterialColors(skin);
-    const quality = loadSettings().quality;
     materials.forEach((m, name) => {
-      // Free wardrobe tones need flat colour — drop authored albedo maps on skin/hair/boots.
-      if (
-        name === MATERIAL_NAMES.boots
-        || name === MATERIAL_NAMES.bootsSole
-        || name === MATERIAL_NAMES.skin
-        || name === MATERIAL_NAMES.hair
-      ) {
-        m.map = null;
-      }
+      // Skin keeps its atlas so eye texels survive a tone change. Hair and kit are flat swaps.
+      if (name !== MATERIAL_NAMES.skin) m.map = null;
       if (colors[name]) m.color.set(colors[name]);
-      const part = kitPart(name);
-      if (part) {
-        finishKit(m, part, quality);
-        return;
-      }
-      const skinMat = name === MATERIAL_NAMES.skin;
-      const hair = name === MATERIAL_NAMES.hair;
-      m.flatShading = false;
-      m.roughness = hair ? 0.9 : skinMat ? 0.55 : 0.68;
-      m.metalness = 0;
-      m.envMapIntensity = skinMat ? 0.85 : 0.65;
-      m.emissive.copy(m.color).multiplyScalar(0.08);
+      bindSunsetToon(m, toonRole(name), skin.clothing.shirtTrim);
+      setToonTrim(m, skin.clothing.shirtTrim);
     });
   }, [skin, materials]);
 
@@ -305,18 +120,10 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
     if (quality === 'low') return;
     const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
     const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
-    const laceMat = new MeshStandardMaterial({
-      name: 'Boot_Laces',
-      color: skin.boots.lace ?? '#2a211c',
-      roughness: 0.46,
-      metalness: 0.03,
-    });
-    const trimMat = new MeshStandardMaterial({
-      name: 'Boot_Trim',
-      color: skin.boots.trim ?? skin.boots.main,
-      roughness: 0.5,
-      metalness: skin.bootPattern === 'gold' ? 0.35 : 0.04,
-    });
+    const laceMat = new MeshToonMaterial({ name: 'Boot_Laces', color: skin.boots.lace ?? '#F8F9FB' });
+    const trimMat = new MeshToonMaterial({ name: 'Boot_Trim', color: skin.boots.trim ?? skin.boots.main });
+    bindSunsetToon(laceMat, 'flat', skin.clothing.shirtTrim);
+    bindSunsetToon(trimMat, 'flat', skin.clothing.shirtTrim);
     const added: Mesh[] = [];
     const attach = (bone: Bone | undefined) => {
       if (!bone) return;
@@ -330,32 +137,21 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       });
       // Heel trim panel — distinct finishes without extra GLB weight.
       const heel = new Mesh(heelGeo, trimMat);
-      heel.position.set(0, 0.02, 0.045);
+      heel.position.set(0, 0.02, -0.05);
       heel.frustumCulled = false;
       bone.add(heel);
       added.push(heel);
     };
     attach(bones.footLeft);
     attach(bones.footRight);
-    const key = new PointLight('#ffd7ae', quality === 'high' ? 1.65 : 0.95, 2.7, 2);
-    key.position.set(0.42, 1.66, 1.08);
-    scene.add(key);
-    const rim = quality === 'high' ? new PointLight('#fff3d6', 1.15, 2.4, 2) : null;
-    if (rim) {
-      rim.position.set(-0.48, 1.48, -0.92);
-      scene.add(rim);
-    }
     return () => {
       for (const mesh of added) mesh.parent?.remove(mesh);
       laceMat.dispose();
       trimMat.dispose();
       for (const geo of laceGeos) geo.dispose();
       heelGeo.dispose();
-      scene.remove(key);
-      key.dispose();
-      if (rim) { scene.remove(rim); rim.dispose(); }
     };
-  }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.bootPattern]);
+  }, [scene, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
   const actions = useMemo(() => {
@@ -385,6 +181,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
     (Object.keys(bones) as BoneKey[]).forEach((k) => { const b = bones[k]; if (b) m.set(k, b.quaternion.clone()); });
     return m;
   }, [bones]);
+  const hipsRestY = useMemo(() => bones.root?.position.y ?? 0, [bones]);
   const deltaQ = useMemo(() => new Quaternion(), []);
   const footPos = useMemo(() => new Vector3(), []);
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
@@ -421,8 +218,35 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true }: Pro
       // Sample every clip from simulation time, keeping paused frames and different render rates consistent.
       const act = current.state ? actions.get(current.state) : undefined;
       if (act) { act.paused = true; act.time = animationSampleTime(engine, next.state, act.getClip().duration); }
-      mixer.update(dt);
-      if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
+      // Quaternius bones keep UE local axes. Tricks that are not one of the five clips
+      // (around the world, header, neck stall, thigh, high flick) reuse the procedural pose
+      // so the head — and the skinned hair — still follow the ball.
+      if (quaternius) {
+        computePose(engine, pose);
+        const trickPose = pose.lockMotion || engine.trick != null;
+        if (trickPose) {
+          scene.position.set(0, pose.bodyY, 0);
+          if (bones.root) bones.root.position.y = hipsRestY;
+          (Object.keys(bones) as BoneKey[]).forEach((k) => {
+            const b = bones[k];
+            const restQ = restQuat.get(k);
+            if (b && restQ) b.quaternion.copy(restQ).multiply(ueDeltaQuaternion(k, pose, deltaQ));
+          });
+        } else {
+          mixer.update(dt);
+          scene.position.set(0, 0, 0);
+          if (next.state === 'Idle' || next.state.startsWith('Kick')) {
+            for (const key of ['head', 'neck'] as const) {
+              const b = bones[key];
+              const restQ = restQuat.get(key);
+              if (b && restQ) b.quaternion.copy(restQ).multiply(ueDeltaQuaternion(key, pose, deltaQ));
+            }
+          }
+        }
+      } else {
+        mixer.update(dt);
+        if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
+      }
       if (inspector.active) {
         const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
         if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }

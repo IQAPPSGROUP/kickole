@@ -62,10 +62,9 @@ export function PlayerPreview({
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
       >
-        <color attach="background" args={['#0f2a32']} />
-        <ambientLight intensity={1.1} />
-        <directionalLight position={[2, 4, 3]} intensity={2.2} />
-        <hemisphereLight args={['#fff4dd', '#3a5a52', 0.9]} />
+        <color attach="background" args={['#6C5CE7']} />
+        <hemisphereLight args={['#FF8A5B', '#1E2A5A', 0.85]} />
+        <directionalLight position={[2, 4, 3]} intensity={2.2} color="#FFF6E8" />
         <Turntable skin={skin} yaw={yaw} />
       </Canvas>
       <span className="preview-hint">Drag to rotate</span>

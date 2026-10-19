@@ -50,7 +50,7 @@ export const HAIR_COLORS: readonly string[] = [
 ];
 
 export const CLOTHING_SWATCHES: readonly string[] = [
-  '#12BFA6', '#FF805D', '#EAF44A', '#F7F5ED', '#142D35', '#3D7EA6', '#F5C94D', '#9B59B6',
+  '#FFD93D', '#1E2A5A', '#FF4F9A', '#00B8A9', '#FF8A5B', '#6C5CE7', '#F8F9FB', '#222831',
 ];
 
 export const DEFAULT_APPEARANCE: Appearance = {
@@ -58,10 +58,10 @@ export const DEFAULT_APPEARANCE: Appearance = {
   hairColor: '#2A1E1A',
   hairStyle: 'short',
   clothing: {
-    shirt: '#12BFA6',
-    shirtTrim: '#F7F5ED',
-    shorts: '#142D35',
-    socks: '#12BFA6',
+    shirt: '#FFD93D',
+    shirtTrim: '#1E2A5A',
+    shorts: '#1E2A5A',
+    socks: '#F8F9FB',
   },
 };
 

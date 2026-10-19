@@ -1,7 +1,7 @@
-import { Component, useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { PMREMGenerator, PerspectiveCamera, Vector3 } from 'three';
+import { BackSide, CanvasTexture, PMREMGenerator, PerspectiveCamera, SRGBColorSpace, Vector3 } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
@@ -16,6 +16,34 @@ import { ENVIRONMENT_THEME } from './environment';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
 import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
+
+function SunsetSky() {
+  const map = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 256;
+    const g = canvas.getContext('2d');
+    if (g) {
+      const grad = g.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#6C5CE7');
+      grad.addColorStop(0.42, '#FF8A5B');
+      grad.addColorStop(0.7, '#FF4F9A');
+      grad.addColorStop(1, '#FFD93D');
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 8, 256);
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    return texture;
+  }, []);
+  useEffect(() => () => map.dispose(), [map]);
+  return (
+    <mesh renderOrder={-10} position={[0, 8, -16]} frustumCulled={false}>
+      <planeGeometry args={[90, 48]} />
+      <meshBasicMaterial map={map} side={BackSide} fog={false} depthWrite={false} toneMapped={false} />
+    </mesh>
+  );
+}
 
 const FOV = GAMEPLAY_FOV;
 const TARGET = GAMEPLAY_TARGET;
@@ -131,20 +159,20 @@ interface SceneProps {
 function World({ controller, skin, quality, onReady }: SceneProps) {
   const shadows = quality !== 'low';
   useEffect(() => { onReady(); }, [onReady]);
-  const mapSize = quality === 'high' ? 2048 : 1024;
+  const mapSize = quality === 'high' ? 1024 : 512;
   return (
     <>
-      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#8dc5cb' : '#2f5f5a']} />
-      <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#8dc5cb', 24, 52] : ['#2f5f5a', 14, 36]} />
+      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#8dc5cb' : '#6C5CE7']} />
+      <fog attach="fog" args={ENVIRONMENT_THEME === 'beach' ? ['#8dc5cb', 24, 52] : ['#FF8A5B', 11, 28]} />
       <CameraRig shake={quality !== 'low'} />
       {quality === 'high' && <Environment />}
       <Simulation controller={controller} />
-      <hemisphereLight args={['#fff1dc', '#12363f', 0.95]} />
-      <ambientLight intensity={0.32} />
+      <hemisphereLight args={ENVIRONMENT_THEME === 'beach' ? ['#fff1dc', '#12363f', 0.95] : ['#FF8A5B', '#1E2A5A', 0.72]} />
+      {ENVIRONMENT_THEME === 'beach' && <ambientLight intensity={0.32} />}
       <directionalLight
-        position={[2.5, 6, 4]}
-        intensity={2.3}
-        color="#ffe9c7"
+        position={[2.6, 7, 3.2]}
+        intensity={ENVIRONMENT_THEME === 'beach' ? 2.3 : 2.5}
+        color={ENVIRONMENT_THEME === 'beach' ? '#ffe9c7' : '#FFF6E8'}
         castShadow={shadows}
         shadow-mapSize={[mapSize, mapSize]}
         shadow-camera-left={-3}
@@ -154,15 +182,12 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         shadow-camera-near={1}
         shadow-camera-far={14}
         shadow-bias={-0.0004}
-        shadow-radius={4}
+        shadow-radius={quality === 'high' ? 3 : 1}
       />
-      {/* Soft fill so the textured hillside behind the wall keeps its pastel colour. */}
-      <directionalLight position={[-1.5, 5.5, -6]} intensity={1.15} color="#fff0d8" />
-      <pointLight position={[-3, 2.5, 1]} intensity={6} color="#12BFA6" distance={9} />
-      {quality !== 'low' && <pointLight position={[3, 2.2, -1.5]} intensity={5} color="#FF805D" distance={8} />}
+      {ENVIRONMENT_THEME !== 'beach' && <SunsetSky />}
       <Court shadows={shadows} quality={quality} />
       {shadows && quality === 'high' && (
-        <ContactShadows position={[0, 0.006, 0.2]} opacity={0.35} scale={4} blur={2.4} far={1.2} resolution={256} color="#05161b" />
+        <ContactShadows position={[0, 0.006, 0.2]} opacity={0.38} scale={4} blur={2.2} far={1.2} resolution={256} color="#1E2A5A" />
       )}
       <CharacterSwitch engine={controller.engine} skin={skin} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
@@ -207,7 +232,7 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
   if (!supported) return <GlError message="Your browser or device does not support WebGL. Try updating your browser." />;
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
 
-  const dpr: [number, number] = props.quality === 'low' ? [1, 1] : props.quality === 'medium' ? [1, 1.5] : [1, 2];
+  const dpr: [number, number] = props.quality === 'low' ? [1, 1] : props.quality === 'medium' ? [1, 1.25] : [1, 1.5];
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}

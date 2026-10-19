@@ -144,6 +144,15 @@ def build_mesh(armature, mats):
     part("Collar", "sphere", (0, -0.013, 1.493),
          (0.112, 0.107, 0.022), "Shirt_Trim", "Spine")
 
+    # Add expressive ears and stronger boot silhouettes, bound to existing bones.
+    for s, x in (("L", -1), ("R", 1)):
+        part(f"Ear_{s}", "sphere", (x * 0.172, -0.006, 1.658),
+             (0.033, 0.043, 0.054), "Skin", "Head")
+        part(f"BootHeel_{s}", "sphere", (x * 0.10, 0.055, 0.059),
+             (0.064, 0.037, 0.045), "Boots_Sole", f"Foot_{s}")
+        part(f"BootToeCap_{s}", "sphere", (x * 0.10, -0.171, 0.054),
+             (0.060, 0.029, 0.037), "Boots_Sole", f"Foot_{s}")
+
     bpy.ops.object.select_all(action="DESELECT")
     for p in parts:
         p.select_set(True)

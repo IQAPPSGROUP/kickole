@@ -12,15 +12,12 @@ workflows:
     triggering:
       events: []
     integrations:
-      app_store_connect: Amigos App Store Connect
+      app_store_connect: IQ APSS
     environment:
       node: "22"
       xcode: latest
       groups:
-        - kickole_app_store
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.iqappsgroup.kickole
+        - app_store
     scripts:
       - name: Require the Kickolé App Store Apple ID
         script: |
@@ -58,6 +55,10 @@ workflows:
           npm run ios:sync
       - name: Set up code signing on the Xcode project
         script: |
+          set -euo pipefail
+          keychain initialize
+          app-store-connect fetch-signing-files com.iqappsgroup.kickole --type IOS_APP_STORE --create
+          keychain add-certificates
           set -euo pipefail
           xcode-project use-profiles --project ios/App/App.xcodeproj
       - name: Set build number to the latest TestFlight build plus one

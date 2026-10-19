@@ -10,10 +10,14 @@ import {
 import {
   BOOTS,
   KITS,
+  LAUNCH_COLLECTION_ITEM_IDS,
   challengeLabel,
   type BootDesign,
   type KitDesign,
 } from '../game/catalogue';
+import type { BillingPlatform, StoreProduct } from '../billing/types';
+import { LAUNCH_COLLECTION_DISPLAY_NAME } from '../billing/config';
+import { launchCollectionBlurb, launchPurchaseLabel, launchStoreNote } from '../billing/storeCopy';
 import { challengeValue, meetsChallenge } from '../game/shop';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
@@ -127,20 +131,35 @@ function UnlockHint({ item, save }: { item: BootDesign | KitDesign; save: SaveDa
 
 export function ShopScreen({
   save,
+  launchProduct,
+  billingPlatform,
+  billingMessage,
+  billingBusy,
   onBuyBoot,
   onBuyKit,
+  onPurchaseLaunch,
+  onRestorePurchases,
   onPreview,
   onClose,
 }: {
   save: SaveData;
+  launchProduct: StoreProduct | null;
+  billingPlatform: BillingPlatform;
+  billingMessage: string | null;
+  billingBusy: boolean;
   onBuyBoot: (id: string) => boolean;
   onBuyKit: (id: string) => boolean;
+  onPurchaseLaunch: () => void;
+  onRestorePurchases: () => void;
   onPreview: (opts: { kitId?: string | null; bootId?: string | null }) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<ShopTab>('boots');
   const [focusBoot, setFocusBoot] = useState(save.equippedBoot);
   const [focusKit, setFocusKit] = useState(save.equippedKit);
+  const priceLabel = launchProduct?.priceString ?? null;
+  const ownedLaunch = save.launchCollectionOwned;
+  const storeNote = launchStoreNote(billingPlatform, !!priceLabel);
 
   const previewSkin = useMemo(
     () => composePlayerSkin(save.appearance, focusKit, focusBoot),
@@ -167,6 +186,32 @@ export function ShopScreen({
         <div className="economy-row">
           <span className="best-pill">COINS <b>{save.coins.toLocaleString()}</b></span>
           <span className="best-pill ghost">BEST SCORE <b>{save.best}</b></span>
+        </div>
+        <div className="launch-card">
+          <h3>{LAUNCH_COLLECTION_DISPLAY_NAME}</h3>
+          <p>{launchCollectionBlurb(LAUNCH_COLLECTION_ITEM_IDS.length)}</p>
+          {ownedLaunch ? (
+            <p className="coin-earn">OWNED · restored with your store account</p>
+          ) : (
+            <button
+              type="button"
+              className="btn primary"
+              disabled={billingBusy}
+              onClick={onPurchaseLaunch}
+            >
+              {launchPurchaseLabel(billingPlatform, priceLabel, billingBusy)}
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={billingBusy}
+            onClick={onRestorePurchases}
+          >
+            RESTORE PURCHASES
+          </button>
+          {billingMessage && <p className="shop-note" role="status">{billingMessage}</p>}
+          {storeNote && <p className="shop-note">{storeNote}</p>}
         </div>
         <PlayerPreview skin={previewSkin} label="Shop preview" />
         <div className="seg">
@@ -231,9 +276,6 @@ export function ShopScreen({
             );
           })}
         </div>
-        <p className="shop-note">
-          Launch Collection (one-time purchase) will unlock all launch boots &amp; kits — billing arrives with native stores. Achievement challenges still need real play.
-        </p>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

@@ -121,7 +121,20 @@ export function SettingsScreen({
           <p><b>Combos +5:</b> flick→header · header→neck→release · stall→ATW · alternating foot↔thigh. Chains expire if you wait too long or miss.</p>
         </div>
         <div className="group help">
-          <label>Privacy</label>
+          <label>Purchases &amp; privacy</label>
+          <p>
+            <b>Kickolé Launch Collection</b> is an optional one-time in-app purchase on the iOS App Store and Google Play.
+            It unlocks only the launch boots and kits. There are no subscriptions, loot boxes or consumable coin packs.
+            Free customisation (skin tone, hair, basic colours) stays free. Purchases are processed by Apple or Google;
+            IQ Apps Group does not receive your card details. Restore Purchases reloads entitlement for the same store account.
+            Apple and Google purchases do not transfer between stores. Refunds are handled by the store and may remove paid unlocks
+            without deleting items you earned with coins.
+          </p>
+          <p>
+            Play data (scores, coins, appearance) stays on this device in local storage and is not uploaded to IQ Apps Group servers.
+            We do not collect advertising identifiers for tracking. Purchases are verified with Apple or Google on the device;
+            we do not log purchase tokens, receipts or credentials. Store privacy / Data Safety declarations for listings are documented for release builds.
+          </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>Music is a synthesised steel-pan band. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
           <p>

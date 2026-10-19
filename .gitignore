@@ -8,3 +8,17 @@ environment-shots/
 beach-shots/
 movement-shots/
 tools/__pycache__/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/captures/
+ios/App/Pods/
+ios/App/Podfile.lock
+ios/DerivedData/
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+GoogleService-Info.plist
+google-services.json

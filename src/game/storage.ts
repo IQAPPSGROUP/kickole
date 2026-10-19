@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import type { Appearance } from './appearance';
 import { normalizeAppearance } from './appearance';
 import {
@@ -47,6 +48,15 @@ export const DEFAULT_SETTINGS: Settings = {
   skinId: 'kicky-teal',
 };
 
+function trustNativeStoreCache(): boolean {
+  try {
+    const platform = Capacitor.getPlatform();
+    return platform === 'ios' || platform === 'android';
+  } catch {
+    return false;
+  }
+}
+
 function read<T>(key: string): Partial<T> | null {
   try {
     const raw = localStorage.getItem(key);
@@ -73,10 +83,13 @@ export function loadSave(): SaveData {
       .slice(0, 5)
     : [];
   const best = typeof d?.best === 'number' ? d.best : 0;
+  const storedVersion = typeof d?.wardrobeVersion === 'number' ? d.wardrobeVersion : 0;
   const locker = normalizeLocker({
     ...d,
-    legacySkinId: typeof settings?.skinId === 'string' ? settings.skinId : null,
-  });
+    legacySkinId: storedVersion < WARDROBE_VERSION && typeof settings?.skinId === 'string'
+      ? settings.skinId
+      : null,
+  }, { trustStoreCache: trustNativeStoreCache() });
   const save: SaveData = {
     best: Math.max(best, ...lb.map((r) => r.score), 0),
     leaderboard: lb,

@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { grantLaunchCollection, revokeLaunchCollection } from '../billing/entitlement';
 import { BOOTS, KITS, LAUNCH_COLLECTION_ITEM_IDS, STARTER_BOOT_ID, STARTER_KIT_ID, UNLOCK_TIERS } from './catalogue';
 import {
-  applyLaunchCollection,
   buyOrEquipBoot,
   buyOrEquipKit,
   coinsForScore,
   meetsChallenge,
   normalizeLocker,
-  purchaseLaunchCollection,
 } from './shop';
 
 describe('shop economy', () => {
@@ -101,18 +100,86 @@ describe('shop economy', () => {
     expect(migrated.equippedBoot).toBe('boot-gold');
   });
 
-  it('Launch Collection grants only launch IDs and billing stays unavailable', () => {
-    const start = normalizeLocker(null);
-    expect(purchaseLaunchCollection(start).reason).toBe('billing_unavailable');
-    const unlocked = applyLaunchCollection(start);
+  it('Launch Collection ownership bypasses coin/challenge gates for launch items', () => {
+    const legend = BOOTS.find((b) => b.id === 'boot-legend-spike')!;
+    const granted = grantLaunchCollection(normalizeLocker(null), 'apple', 'apple:test');
+    expect(granted.coins).toBe(0);
+    expect(meetsChallenge(granted.challenges, legend.unlock)).toBe(false);
+    const equip = buyOrEquipBoot(granted, legend.id);
+    expect(equip.ok).toBe(true);
+    if (equip.ok) {
+      expect(equip.locker.equippedBoot).toBe(legend.id);
+      expect(equip.locker.coins).toBe(0);
+    }
+  });
+
+  it('Launch Collection grant/revoke keeps coin-bought items', () => {
+    const start = normalizeLocker({ coins: 2500 });
+    const club = BOOTS.find((b) => b.id === 'boot-beach-wave')!;
+    const paid = buyOrEquipBoot(start, club.id);
+    expect(paid.ok).toBe(true);
+    const unlocked = grantLaunchCollection(paid.ok ? paid.locker : start, 'apple', 'apple:test');
     expect(unlocked.launchCollectionOwned).toBe(true);
+    expect(unlocked.entitlementSource).toBe('apple');
     for (const id of LAUNCH_COLLECTION_ITEM_IDS) {
       if (id.startsWith('boot-')) expect(unlocked.ownedBoots).toContain(id);
       if (id.startsWith('kit-')) expect(unlocked.ownedKits).toContain(id);
     }
-    expect(unlocked.coins).toBe(0);
-    // Idempotent.
-    expect(applyLaunchCollection(unlocked).ownedBoots).toEqual(unlocked.ownedBoots);
+    // Coin-bought beach wave is no longer in launchGranted after markCoinOwned.
+    expect(unlocked.launchGrantedItemIds).not.toContain('boot-beach-wave');
+    const revoked = revokeLaunchCollection(unlocked);
+    expect(revoked.launchCollectionOwned).toBe(false);
+    expect(revoked.ownedBoots).toContain('boot-beach-wave');
+    expect(revoked.ownedBoots).not.toContain('boot-legend-spike');
+  });
+
+  it('ignores a hand-edited launchCollectionOwned boolean without store source', () => {
+    const forged = normalizeLocker({ launchCollectionOwned: true, coins: 0 });
+    expect(forged.launchCollectionOwned).toBe(false);
+    expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
+  });
+
+  it('does not unlock a hand-edited apple or google entitlement unless the native cache is trusted', () => {
+    const forged = normalizeLocker({
+      launchCollectionOwned: true,
+      entitlementSource: 'apple',
+      entitlementVerifiedAt: 50,
+    });
+    expect(forged.launchCollectionOwned).toBe(false);
+    expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
+
+    const cached = normalizeLocker({
+      launchCollectionOwned: true,
+      entitlementSource: 'google',
+      entitlementVerifiedAt: 40,
+      launchGrantedItemIds: ['boot-gold'],
+    }, { trustStoreCache: true });
+    expect(cached.launchCollectionOwned).toBe(true);
+    expect(cached.entitlementSource).toBe('google');
+    expect(cached.ownedBoots).toContain('boot-gold');
+  });
+
+  it('applies a legacy skin once and then keeps a customised look', () => {
+    const migrated = normalizeLocker({ legacySkinId: 'coral-flash' });
+    expect(migrated.appearance.skinTone).toBe('#8D5A3C');
+    expect(migrated.appearance.clothing.shirt).toBe('#FF805D');
+    expect(migrated.wardrobeVersion).toBe(2);
+    const custom = {
+      skinTone: '#F2CDAA',
+      hairColor: '#C9822B',
+      hairStyle: 'short' as const,
+      clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
+    };
+    const again = normalizeLocker({
+      ...migrated,
+      legacySkinId: 'coral-flash',
+      wardrobeVersion: 2,
+      appearance: custom,
+    });
+    expect(again.appearance).toEqual(custom);
+    const third = normalizeLocker({ ...again, legacySkinId: 'lime-night' });
+    expect(third.appearance).toEqual(custom);
+    expect(third.ownedKits).toEqual(again.ownedKits);
   });
 
   it('catalogue has ~8 boots and ~6 kits including starters', () => {

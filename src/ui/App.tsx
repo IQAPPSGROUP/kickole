@@ -155,8 +155,14 @@ export function App() {
       {overlay === 'shop' && (
         <ShopScreen
           save={snap.save}
+          launchProduct={snap.launchProduct}
+          billingPlatform={snap.billingPlatform}
+          billingMessage={snap.billingMessage}
+          billingBusy={snap.billingBusy}
           onBuyBoot={(id) => controller.buyBoot(id)}
           onBuyKit={(id) => controller.buyKit(id)}
+          onPurchaseLaunch={() => { void controller.purchaseLaunchCollection(); }}
+          onRestorePurchases={() => { void controller.restorePurchases(); }}
           onPreview={(opts) => controller.previewEquipment(opts)}
           onClose={closeOverlay}
         />

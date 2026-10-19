@@ -86,7 +86,7 @@ export function loadSave(): SaveData {
   const storedVersion = typeof d?.wardrobeVersion === 'number' ? d.wardrobeVersion : 0;
   const locker = normalizeLocker({
     ...d,
-    legacySkinId: storedVersion < WARDROBE_VERSION && typeof settings?.skinId === 'string'
+    legacySkinId: storedVersion < 2 && typeof settings?.skinId === 'string'
       ? settings.skinId
       : null,
   }, { trustStoreCache: trustNativeStoreCache() });

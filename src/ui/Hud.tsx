@@ -1,8 +1,10 @@
 import { useEffect, useRef, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
 import type { GameController, Hud as HudState, ArmedTrick } from '../game/controller';
 import type { Side } from '../engine/config';
+import { beatClock } from '../game/audio';
+import { prefersReducedMotion } from '../scene/juice';
 
-export function Hud({ hud }: { hud: HudState }) {
+export function Hud({ hud, onSkipCelebration }: { hud: HudState; onSkipCelebration?: () => void }) {
   const f = hud.feedback;
   return (
     <div className="hud">
@@ -28,6 +30,15 @@ export function Hud({ hud }: { hud: HudState }) {
       {hud.armedTrick && hud.phase === 'playing' && (
         <div className="trick-armed">{armedLabel(hud.armedTrick)} ARMED · TAP L / R</div>
       )}
+      {hud.celebrating && (
+        <button
+          type="button"
+          className="celebrate-skip"
+          onClick={(e) => { e.stopPropagation(); onSkipCelebration?.(); }}
+        >
+          {hud.celebrationLabel} · TAP TO SKIP
+        </button>
+      )}
     </div>
   );
 }
@@ -37,11 +48,39 @@ function armedLabel(kind: ArmedTrick) {
     case 'aroundTheWorld': return 'ATW';
     case 'thigh': return 'THIGH';
     case 'highFlick': return 'FLICK';
+    case 'groove': return 'GROOVE';
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
     }
   }
+}
+
+/** Visual beat, including while the steel band is muted. */
+function BeatRing({ active }: { active: boolean }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!active) return;
+    let frame = 0;
+    const reduced = prefersReducedMotion();
+    const tick = () => {
+      const el = ref.current;
+      if (el) {
+        if (reduced) {
+          el.style.opacity = '0.85';
+          el.style.transform = 'scale(1)';
+        } else {
+          const { pulse } = beatClock();
+          el.style.opacity = String(0.25 + pulse * 0.75);
+          el.style.transform = `scale(${0.72 + pulse * 0.38})`;
+        }
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [active]);
+  return <span ref={ref} className="beat-ring" aria-hidden />;
 }
 
 function bindFoot(controller: GameController, side: Side) {
@@ -90,7 +129,7 @@ export function TouchZones({ controller }: { controller: GameController }) {
 
   return (
     <div className="zones">
-      <p className="trick-help">H header · N neck · T thigh · F flick · W atw · Esc cancel</p>
+      <p className="trick-help">H header · N neck · T thigh · F flick · W atw · G groove · Esc cancel</p>
       <div className="foot-row">
         <button type="button" className="foot-btn left" aria-label="Left foot" {...bindFoot(controller, 'left')}>
           <span className="foot-btn-mark">L</span>
@@ -140,6 +179,18 @@ export function TouchZones({ controller }: { controller: GameController }) {
             onClick={(e) => { e.stopPropagation(); controller.armTrick('highFlick'); }}
           >
             FLICK
+          </button>
+          <button
+            type="button"
+            className={`trick-btn ps-groove ${armed === 'groove' ? 'on' : ''}`}
+            disabled={!playing}
+            aria-label="Groove, dance and keep the ball up"
+            aria-pressed={armed === 'groove'}
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); controller.armTrick('groove'); }}
+          >
+            <BeatRing active={playing} />
+            GROOVE
           </button>
           <button
             type="button"

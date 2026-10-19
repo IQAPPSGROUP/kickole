@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Euler, Matrix4, MeshBasicMaterial, Quaternion, Vector3, type Group, type Mesh } from 'three';
+import { comboHeat } from './juice';
 import { toonGradient } from './toon';
 import type { Quality } from '../game/storage';
 import type { GameEngine } from '../engine/engine';
@@ -22,7 +23,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
   const trail = useRef<Array<Mesh | null>>([]);
   const hist = useRef<Vector3[]>(Array.from({ length: TRAIL * 2 }, () => new Vector3()));
   const flash = useRef<Mesh>(null);
-  const showTrail = quality !== 'low';
+  const trailCount = quality === 'low' ? 3 : TRAIL;
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
   const shadow = useRef<Mesh>(null);
@@ -51,8 +52,9 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       flash.current.scale.setScalar(0.6 + k * 1.4);
       (flash.current.material as unknown as { opacity: number }).opacity = 0.8 * k;
     }
-    if (showTrail) {
+    {
       const speed = Math.hypot(b.vx, b.vy, b.vz);
+      const heat = comboHeat(engine.streak);
       const h = hist.current;
       for (let i = h.length - 1; i > 0; i--) h[i].copy(h[i - 1]);
       h[0].set(b.x, b.y, b.z);
@@ -60,11 +62,13 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
         const m = trail.current[i];
         if (!m) continue;
         const p = h[(i + 1) * 2 - 1];
-        m.visible = speed > 3.2 && engine.phase === 'playing';
-        (m.material as MeshBasicMaterial).color.set(engine.streak >= 4 ? '#FFD93D' : '#FF4F9A');
+        const hot = heat.t > 0.35 ? 1.5 : 3.2;
+        m.visible = i < trailCount && speed > hot && engine.phase === 'playing';
+        (m.material as MeshBasicMaterial).color.set(heat.color);
         m.position.copy(p);
-        m.scale.setScalar(1 - (i + 1) / (TRAIL + 1));
-        (m.material as unknown as { opacity: number }).opacity = 0.28 * (1 - i / TRAIL);
+        const scale = (1 - (i + 1) / (TRAIL + 1)) * (0.85 + heat.t * 0.45);
+        m.scale.setScalar(scale);
+        (m.material as unknown as { opacity: number }).opacity = heat.opacity * (1 - i / TRAIL);
       }
     }
     if (shadow.current) {
@@ -96,7 +100,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
           ))}
         </group>
       </group>
-      {showTrail && Array.from({ length: TRAIL }, (_, i) => (
+      {Array.from({ length: TRAIL }, (_, i) => (
         <mesh key={i} ref={(m) => { trail.current[i] = m; }} visible={false}>
           <sphereGeometry args={[r, 12, 10]} />
           <meshBasicMaterial color={engine.streak >= 4 ? '#FFD93D' : '#FF4F9A'} transparent opacity={0.2} depthWrite={false} />

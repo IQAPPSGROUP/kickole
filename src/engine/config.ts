@@ -26,6 +26,10 @@ export interface ScoringConfig {
   aroundTheWorld: number;
   /** Variety bonus awarded once per completed trick combination. */
   varietyBonus: number;
+  /** Groove knee/chest touch before the on-beat bonus. */
+  groove: number;
+  grooveBeatGood: number;
+  grooveBeatPerfect: number;
 }
 
 export interface TrickTimingConfig {
@@ -44,6 +48,8 @@ export interface TrickTimingConfig {
   trickCooldown: number;
   /** Seconds between successful combo steps before progress expires. */
   comboExpirySec: number;
+  /** Timing window for a groove knee or chest touch (ms). Wider than a foot kick. */
+  grooveWindowMs: number;
 }
 
 export interface GameConfig {
@@ -56,6 +62,8 @@ export interface GameConfig {
     thigh: ContactTarget;
     forehead: ContactTarget;
     nape: ContactTarget;
+    /** Chest centre used by the groove trick. */
+    chest: ContactTarget;
   };
   /** Fixed physics step in seconds. */
   fixedStep: number;
@@ -112,6 +120,9 @@ export const DEFAULT_CONFIG: GameConfig = {
     neckStall: 10,
     aroundTheWorld: 20,
     varietyBonus: 5,
+    groove: 2,
+    grooveBeatGood: 2,
+    grooveBeatPerfect: 4,
   },
   tricks: {
     depthTol: 0.22,
@@ -122,12 +133,14 @@ export const DEFAULT_CONFIG: GameConfig = {
     atwReturnMs: 160,
     trickCooldown: 0.2,
     comboExpirySec: 3.5,
+    grooveWindowMs: 190,
   },
   contacts: {
     foot: FOOT,
     thigh: { y: 1.02, z: 0.56 },
     forehead: { y: 1.68, z: 0.4 },
     nape: { y: 1.5, z: 0.1 },
+    chest: { y: 1.32, z: 0.48 },
   },
   fixedStep: 1 / 120,
   gravity: 11,

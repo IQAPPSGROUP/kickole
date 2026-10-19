@@ -12,12 +12,22 @@ import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
-import { cheer, setBed, sfx, unlockAudio } from './audio';
+import { beatClock, cheer, setBed, sfx, unlockAudio } from './audio';
+import { beatErrorMs, beatsToSeconds, GAMEPLAY_BPM, gradeBeat } from './beat';
 import { crowdLevel, loudestCheer, milestoneHits, newlyOpenedTiers, type AudioProgress } from './audioPolicy';
+import {
+  celebrationDance,
+  getDance,
+  rankFromCheers,
+  withDanceRank,
+} from './dances';
+import { fx } from '../scene/fx';
+import { prefersReducedMotion, swoopStrength } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
 import {
   buyOrEquipBoot,
   buyOrEquipKit,
+  equipOwnedDance,
   type ChallengeProgress,
 } from './shop';
 import {
@@ -31,7 +41,7 @@ import {
   type Settings,
 } from './storage';
 
-export type ArmedTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick'>;
+export type ArmedTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick' | 'groove'>;
 
 export interface Feedback {
   id: number;
@@ -49,6 +59,8 @@ export interface Hud {
   stalling: boolean;
   armedTrick: ArmedTrick | null;
   neckHolding: boolean;
+  celebrating: boolean;
+  celebrationLabel: string | null;
 }
 
 export interface Result {
@@ -87,6 +99,7 @@ export class GameController {
   private perfects = 0;
   private progress: AudioProgress = { streak: 0, kickUps: 0, perfects: 0 };
   private pendingCheers: string[] = [];
+  private queuedCelebration: string | null = null;
   private readonly billing: PurchaseService = createDefaultPurchaseService();
   private billingMessage: string | null = null;
   private billingBusy = false;
@@ -186,9 +199,11 @@ export class GameController {
         streak: e.streak,
         feedback: this.feedback,
         stalling: e.contact?.kind === 'stall',
-        armedTrick: armed === 'aroundTheWorld' || armed === 'thigh' || armed === 'highFlick' ? armed : null,
+        armedTrick: armed === 'aroundTheWorld' || armed === 'thigh' || armed === 'highFlick' || armed === 'groove' ? armed : null,
         neckHolding: e.trick?.kind === 'neckStall'
           && (e.trick.phase === 'contact' || e.trick.phase === 'execute'),
+        celebrating: e.celebration != null,
+        celebrationLabel: e.celebration ? (getDance(e.celebration.danceId)?.name ?? 'Dance') : null,
       },
       save: this.save,
       settings: this.settings,
@@ -233,7 +248,43 @@ export class GameController {
     this.pendingCheers = [];
     const id = loudestCheer(hits);
     if (id && this.voices()) cheer(id);
+    const rank = rankFromCheers(hits);
+    if (rank > this.save.danceRank) {
+      const dances = withDanceRank(this.save, rank);
+      this.save = { ...this.save, ...dances };
+      persistSave(this.save);
+    }
+    if (id) this.queueCelebration(id);
+    this.engine.equippedDance = this.save.equippedDance;
     this.syncBed();
+  }
+
+  private trickBusy(): boolean {
+    const trick = this.engine.trick;
+    return this.engine.contact != null
+      || (trick != null && trick.phase !== 'recover' && trick.phase !== 'fail');
+  }
+
+  private queueCelebration(reason: string) {
+    if (this.engine.celebration) return;
+    if (this.engine.phase === 'playing' && this.trickBusy()) {
+      this.queuedCelebration = reason;
+      return;
+    }
+    this.beginCelebration(reason);
+  }
+
+  private beginCelebration(reason: string) {
+    const dance = celebrationDance(reason, this.save.equippedDance, this.save.ownedDances);
+    const reduced = prefersReducedMotion();
+    const beats = reduced ? 1 : 2;
+    this.engine.reducedMotion = reduced;
+    this.engine.equippedDance = this.save.equippedDance;
+    this.engine.startCelebration(dance, reason, beatsToSeconds(beats, GAMEPLAY_BPM));
+    fx.flash = reduced ? 0.25 : 1;
+    fx.confetti = reduced ? 0 : 1;
+    const big = reason.endsWith(':50') || reason.endsWith(':100') || reason.startsWith('tier:') || reason === 'best';
+    if (big) fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, big ? 5 : 0, reduced));
   }
 
   /** Resume the audio graph from a tap or key press. */
@@ -272,6 +323,7 @@ export class GameController {
         this.show(e.stall ? 'stall' : e.grade, label, e.points);
         if (sound) { if (e.stall) sfx.stall(); sfx.kick(e.grade, e.streak); }
         this.vibrate(e.grade === 'perfect' ? [12, 20, 12] : 10);
+        fx.swoop = Math.max(fx.swoop, swoopStrength(e.streak, 0, prefersReducedMotion()));
         this.publish();
         break;
       }
@@ -285,13 +337,16 @@ export class GameController {
         break;
       case 'trick':
         if (e.points > 0) {
+          const beat = this.engine.lastBeatGrade;
           const label = e.kind === 'header' ? 'HEADER!'
             : e.kind === 'thigh' ? 'THIGH!'
               : e.kind === 'neckStall' ? 'NECK STALL!'
                 : e.kind === 'aroundTheWorld' ? 'AROUND THE WORLD!'
                   : e.kind === 'highFlick' ? 'HIGH FLICK!'
-                    : 'TRICK!';
-          this.show('perfect', label, e.points);
+                    : e.kind === 'groove'
+                      ? (beat === 'perfect' ? 'ON BEAT!' : beat === 'good' ? 'GROOVE!' : 'KEEP UP')
+                      : 'TRICK!';
+          this.show(beat === 'off' && e.kind === 'groove' ? 'good' : 'perfect', label, e.points);
         } else if (e.kind === 'neckStall' && e.phase === 'execute') {
           this.show('good', 'NECK RELEASE', 0);
         }
@@ -301,6 +356,7 @@ export class GameController {
         this.show('perfect', `${e.label} +${e.points}`, e.points);
         if (sound) sfx.kick('perfect', this.engine.streak);
         this.vibrate([10, 30, 10]);
+        fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, e.points, prefersReducedMotion()));
         this.publish();
         break;
       case 'trickFail':
@@ -348,13 +404,32 @@ export class GameController {
 
   tick(dt: number) {
     const before = this.engine.phase;
+    const clock = beatClock();
+    this.engine.beatPhase = clock.phase;
+    this.engine.reducedMotion = prefersReducedMotion();
+    this.engine.equippedDance = this.save.equippedDance;
+    const celebrating = this.engine.celebration != null;
     this.engine.update(dt);
-    if (before !== this.engine.phase) this.publish();
+    if (celebrating && !this.engine.celebration) this.publish();
+    else if (before !== this.engine.phase) this.publish();
+    if (this.queuedCelebration && !this.engine.celebration && !this.trickBusy()) {
+      const reason = this.queuedCelebration;
+      this.queuedCelebration = null;
+      this.beginCelebration(reason);
+      this.publish();
+    }
   }
 
   press(side: Side) {
     const e = this.engine;
+    if (e.celebration) {
+      e.skipCelebration();
+      this.publish();
+      return;
+    }
     if (e.phase === 'menu' || e.phase === 'over' || e.phase === 'dropped') return;
+    const clock = beatClock();
+    e.setBeatGrade(gradeBeat(beatErrorMs(clock.now, clock.origin, clock.bpm, clock.latency)));
     const before = e.phase;
     const beforeTrick = e.selectedTrick;
     e.press(side);
@@ -396,6 +471,22 @@ export class GameController {
     else if (p === 'ready') this.press('right');
   }
 
+  skipCelebration() {
+    if (!this.engine.skipCelebration()) return;
+    this.queuedCelebration = null;
+    this.publish();
+  }
+
+  equipDance(id: string): boolean {
+    const result = equipOwnedDance(this.save, id);
+    if (!result.ok) return false;
+    this.save = { ...this.save, ...result.locker };
+    this.engine.equippedDance = this.save.equippedDance;
+    persistSave(this.save);
+    this.publish();
+    return true;
+  }
+
   play() {
     this.feedback = null;
     this.result = null;
@@ -403,6 +494,7 @@ export class GameController {
     this.perfects = 0;
     this.progress = { streak: 0, kickUps: 0, perfects: 0 };
     this.pendingCheers = [];
+    this.queuedCelebration = null;
     this.engine.prepare('ready');
     this.publish();
   }

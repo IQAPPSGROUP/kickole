@@ -1,5 +1,8 @@
 import type { GameEngine } from '../engine/engine';
 import type { Side } from '../engine/config';
+import { isDanceId } from '../game/dances';
+import { GAMEPLAY_BPM } from '../game/beat';
+import { accentGrooveTouch, applyDancePose } from './dancePose';
 import { V2_LIMBS, visualContactPoint } from './limbCalibration';
 
 export interface LegPose {
@@ -349,11 +352,17 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     const bx = held ? b.x : (side === 'left' ? -1 : 1) * c.footX * 0.6;
     const stallLift = held && engine.contact!.kind === 'stall' ? 0.02 * Math.sin(t * 18) : 0;
     const highScoop = held && engine.contact!.highFlick ? 0.12 : 0;
-    const target = { x: bx, y: c.contactHeight - 0.17 + stallLift + highScoop, z: c.ballZ - 0.2 + (highScoop ? 0.08 : 0) };
+    const target = {
+      x: bx,
+      y: c.contactHeight - c.ballRadius - 0.03 + stallLift + highScoop,
+      z: c.ballZ - 0.26 + (highScoop ? 0.08 : 0),
+    };
     const follow = held ? 0 : (1 - env) * 0.18;
     target.y += follow + (engine.contact?.highFlick || (!held && engine.ball.vy > c.kickSpeed * 1.05) ? follow * 0.8 : 0);
     target.z += follow * 0.5;
     const leg = solveLeg(side, target);
+    // Local +X pitches the boot clear of the ball. The mesh extends past the ankle.
+    leg.foot += 0.22 * Math.min(1, env);
     if (held && engine.contact!.highFlick) {
       leg.foot = -0.4;
       leg.ankleYaw = (side === 'left' ? 1 : -1) * 0.25;
@@ -389,6 +398,20 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     out.armRight = lerp(out.armRight, 0.05, k);
     out.armLeftPitch = out.armRightPitch = 0.2 * k;
     out.bodyY -= 0.04 * k;
+  }
+
+  const dancing = engine.celebration != null
+    || engine.selectedTrick === 'groove'
+    || engine.trick?.kind === 'groove';
+  if (dancing) {
+    const phaseBeat = engine.beatPhase != null ? engine.beatPhase : ((t * GAMEPLAY_BPM) / 60) % 1;
+    const danceId = engine.celebration?.danceId ?? engine.equippedDance;
+    const dance = isDanceId(danceId) ? danceId : 'samba';
+    applyDancePose(out, dance, phaseBeat, engine.reducedMotion ? 0.35 : 1);
+    if (engine.trick?.kind === 'groove' && engine.trick.side) {
+      const amount = Math.max(0, 1 - (t - engine.trick.startedAt) / 0.22);
+      accentGrooveTouch(out, engine.trick.side, engine.groovePart, amount);
+    }
   }
 
   return out;

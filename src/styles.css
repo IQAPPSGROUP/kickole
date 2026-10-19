@@ -189,6 +189,39 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .ps-neck { grid-column: 2; grid-row: 2; --ps-tint: #FF4F9A; }
 .ps-flick { grid-column: 3; grid-row: 2; --ps-tint: #FF8A5B; }
 .ps-thigh { grid-column: 2; grid-row: 3; --ps-tint: #00B8A9; }
+.ps-groove { grid-column: 1; grid-row: 3; --ps-tint: #FFD93D; color: #1E2A5A; }
+.beat-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 2px solid #FFD93D;
+  box-shadow: 0 0 8px #FFD93D;
+  pointer-events: none;
+}
+.celebrate-skip {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  transform: translateX(-50%);
+  z-index: 8;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: #1E2A5A;
+  background: #FFD93D;
+  box-shadow: 0 4px 0 #222831;
+  cursor: pointer;
+}
+.dance-swatch { display: block; width: 36px; height: 36px; border-radius: 10px; }
+.dance-samba { background: linear-gradient(135deg, #FFD93D, #FF4F9A); }
+.dance-robot { background: linear-gradient(135deg, #F8F9FB, #6C5CE7); }
+.dance-griddy { background: linear-gradient(135deg, #00B8A9, #FF8A5B); }
+.dance-spin { background: linear-gradient(135deg, #FF4F9A, #FFD93D); }
+.dance-price { display: block; color: #FFD93D; font-weight: 800; }
 .trick-btn:disabled { opacity: .4; cursor: default; }
 .trick-btn.on {
   border-color: var(--ps-tint, var(--lime));

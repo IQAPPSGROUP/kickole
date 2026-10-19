@@ -1,7 +1,7 @@
 import type { Side } from './config';
 
 /** Playable freestyle tricks. `null` selection keeps classic foot juggling. */
-export type TrickKind = 'header' | 'thigh' | 'neckStall' | 'aroundTheWorld' | 'highFlick';
+export type TrickKind = 'header' | 'thigh' | 'neckStall' | 'aroundTheWorld' | 'highFlick' | 'groove';
 
 export type TrickPhase = 'prep' | 'contact' | 'execute' | 'recover' | 'fail';
 

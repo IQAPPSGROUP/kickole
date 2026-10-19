@@ -10,8 +10,13 @@ import type { Skin } from '../game/skins';
 /** Use the bundled GLB by default; VITE_USE_GLB_CHARACTER=false selects the primitive fallback. */
 export const USE_GLB_CHARACTER = import.meta.env.VITE_USE_GLB_CHARACTER !== 'false';
 
-/** Where the model is expected. If the file is missing or invalid the primitive character is used. */
-export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kicky-player-rigged.glb`;
+/**
+ * Runtime character. `kickole_player_v2.glb` is the Quaternius-based footballer
+ * (see docs/FREDDIE_CHARACTER_MODELS.md). The older contract rig remains at
+ * `kicky-player-rigged.glb` for the clip-based asset tests.
+ * If the file is missing or invalid the primitive character is used.
+ */
+export const CHARACTER_MODEL_URL = `${import.meta.env.BASE_URL}models/kickole_player_v2.glb`;
 
 /** Named animation states. Each maps to an animation clip with exactly this name in the GLB. */
 export const ANIMATION_STATES = ['Idle', 'KickLeft', 'KickRight', 'Miss', 'Celebrate'] as const;
@@ -48,6 +53,35 @@ export const BONE_NAMES = {
 } as const;
 export type BoneKey = keyof typeof BONE_NAMES;
 
+/**
+ * Same joints on `kickole_player_v2.glb`.
+ * Quaternius `_l` is anatomical left (world +X while facing +Z). The game's left
+ * is world −X, so the sides are swapped here.
+ */
+export const UE_BONE_NAMES: Record<BoneKey, string> = {
+  root: 'pelvis',
+  spine: 'spine_01',
+  head: 'Head',
+  armLeft: 'upperarm_r',
+  armRight: 'upperarm_l',
+  thighLeft: 'thigh_r',
+  thighRight: 'thigh_l',
+  shinLeft: 'calf_r',
+  shinRight: 'calf_l',
+  footLeft: 'foot_r',
+  footRight: 'foot_l',
+};
+
+export type RigKind = 'contract' | 'ue' | 'unknown';
+
+/** Which naming set a loaded skeleton uses. Contract names win when both are present. */
+export function rigKind(bones: Iterable<string>): RigKind {
+  const names = new Set(bones);
+  if ((Object.values(BONE_NAMES) as string[]).every((n) => names.has(n))) return 'contract';
+  if ((Object.values(UE_BONE_NAMES) as string[]).every((n) => names.has(n))) return 'ue';
+  return 'unknown';
+}
+
 /** Material names the model must use; skins recolour them. */
 export const MATERIAL_NAMES = {
   shirt: 'Shirt',
@@ -80,13 +114,14 @@ export interface ModelReport {
   missingMaterials: string[];
 }
 
-/** Compare what a loaded model provides with the contract. */
+/** Compare what a loaded model provides with the contract. UE bone names satisfy the bone check. */
 export function validateModel(bones: Iterable<string>, clips: Iterable<string>, materials: Iterable<string>): ModelReport {
   const b = new Set(bones);
   const c = new Set(clips);
   const m = new Set(materials);
+  const expectedBones = rigKind(b) === 'ue' ? Object.values(UE_BONE_NAMES) : Object.values(BONE_NAMES);
   return {
-    missingBones: Object.values(BONE_NAMES).filter((n) => !b.has(n)),
+    missingBones: expectedBones.filter((n) => !b.has(n)),
     missingClips: ANIMATION_STATES.filter((n) => !c.has(n)),
     missingMaterials: Object.values(MATERIAL_NAMES).filter((n) => !m.has(n)),
   };

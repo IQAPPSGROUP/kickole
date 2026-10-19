@@ -2,7 +2,7 @@
 
 Fab Standard licence, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group.
 The raw download is not in this repository. Point FAB_PLAYER_SRC at the folder
-that contains source_4.zip (male, Godot rig) and source.zip (female, FBX rig):
+that contains source_4.zip (female, 21k Godot rig) and source.zip (male, 29k FBX rig):
 
     FAB_PLAYER_SRC=/path/to/kickole-fab-models blender --background --python tools/prepare_fab_player.py
 
@@ -363,7 +363,38 @@ def add_clean_trim(obj, buckets: dict[str, list[int]]) -> dict[str, list[int]]:
     return buckets
 
 
-def classify_body(obj, role: str, split_eyes: bool, crown_hair: bool = False) -> None:
+def claim_irises(obj, buckets: dict[str, list[int]]) -> None:
+    """The bright sclera is already Eyes. Pull the darker pupil in with it.
+
+    One ring of skin faces that sit inside the eye box and touch the sclera
+    stays photographic, so the iris is not left on the skin tint as a blank eye.
+    """
+    eyes = set(buckets.get("Eyes") or [])
+    skin = set(buckets.get("Skin") or [])
+    if len(eyes) < 8 or not skin:
+        return
+    neighbors = face_neighbors(obj)
+    extra: list[int] = []
+    for face in eyes:
+        for other in neighbors.get(face, ()):
+            if other not in skin:
+                continue
+            poly = obj.data.polygons[other]
+            center = obj.matrix_world @ poly.center
+            if abs(center.x) < 0.01 or abs(center.x) > 0.08:
+                continue
+            if center.y > -0.01:
+                continue
+            extra.append(other)
+    if not extra:
+        return
+    extra = list(dict.fromkeys(extra))
+    taken = set(extra)
+    buckets["Eyes"] = list(eyes) + extra
+    buckets["Skin"] = [face for face in buckets["Skin"] if face not in taken]
+
+
+def classify_body(obj, role: str, split_eyes: bool) -> None:
     """role is head, cloth, limbs, hands, shorts, shirt, eyes, mouth."""
     image = None
     if obj.material_slots and obj.material_slots[0].material:
@@ -386,15 +417,6 @@ def classify_body(obj, role: str, split_eyes: bool, crown_hair: bool = False) ->
 
     zs = [(obj.matrix_world @ poly.center).z for poly in obj.data.polygons]
     z0, z1 = (min(zs), max(zs)) if zs else (0, 1)
-    head_z = []
-    for poly in obj.data.polygons:
-        slot_name = ""
-        if obj.material_slots:
-            slot_mat = obj.material_slots[poly.material_index].material
-            slot_name = slot_mat.name if slot_mat else ""
-        if slot_name in ("HEAD", "HEAD.001") or role == "head":
-            head_z.append((obj.matrix_world @ poly.center).z)
-    hz0, hz1 = (min(head_z), max(head_z)) if head_z else (z0, z1)
     for poly in obj.data.polygons:
         center = obj.matrix_world @ poly.center
         img = images_by_slot[poly.material_index] if images_by_slot else None
@@ -438,11 +460,8 @@ def classify_body(obj, role: str, split_eyes: bool, crown_hair: bool = False) ->
             if split_eyes and front and eye_band and 0.012 < abs(center.x) < 0.075 and lum > 0.55:
                 buckets["Eyes"].append(poly.index)
                 remember("Eyes", img)
-            elif crown_hair and center.z > hz0 + (hz1 - hz0) * 0.82 and -0.02 < center.y < 0.03:
-                # Crown only. The photographed face and the back of the skull stay Skin.
-                buckets["Hair"].append(poly.index)
-                remember("Hair", img)
-            elif (not crown_hair) and back and scalp:
+            elif back and scalp:
+                # Rear scalp and ponytail. The photographed face stays Skin.
                 buckets["Hair"].append(poly.index)
                 remember("Hair", img)
             else:
@@ -481,12 +500,12 @@ def classify_body(obj, role: str, split_eyes: bool, crown_hair: bool = False) ->
         buckets[name].append(poly.index)
         remember(name, img)
 
+    if split_eyes and buckets.get("Eyes") and buckets.get("Skin"):
+        claim_irises(obj, buckets)
     alpha = {"Eyes": "BLEND"}
     if kind_present(buckets, "Shirt", "Shorts", "Hair", "Skin", "Eyes"):
-        smooth = {"Shirt", "Shorts", "Skin", "Eyes"}
-        if not crown_hair:
-            smooth.add("Hair")
-        buckets = smooth_regions(obj, buckets, smooth)
+        # Eyes stay as split. Smoothing them into Skin wipes the iris.
+        buckets = smooth_regions(obj, buckets, {"Shirt", "Shorts", "Skin", "Hair"})
     if "Shirt" in buckets and buckets["Shirt"]:
         buckets = add_clean_trim(obj, buckets)
         tex_for.setdefault("Shirt_Trim", tex_for.get("Shirt"))
@@ -612,11 +631,13 @@ def tuck_shorts_inside_shirt() -> None:
 
 def prepare(body: str) -> None:
     clear_scene()
-    if body == "male":
+    # Bone maps follow the source skeleton, not the body. The 21k Godot rig is
+    # the woman. The 29k FBX rig is the man.
+    if body == "female":
         path = "/tmp/fab/GODOT RIG.glb"
         if not os.path.exists(path):
-            ensure_extract("source_4.zip", "/tmp/fab/male-src")
-            path = "/tmp/fab/male-src/GODOT RIG.glb"
+            ensure_extract("source_4.zip", "/tmp/fab/female-src")
+            path = "/tmp/fab/female-src/GODOT RIG.glb"
         bpy.ops.import_scene.gltf(filepath=path)
         keep = MALE_KEEP
         roles = {
@@ -627,12 +648,14 @@ def prepare(body: str) -> None:
             "UPPER JAW": "mouth",
             "TORSO": "cloth",
         }
+        split_eyes = False
     else:
         dest = "/tmp/fab/b"
         ensure_extract("source.zip", dest)
         bpy.ops.import_scene.fbx(filepath=os.path.join(dest, "NORMAL RIG.fbx"))
         keep = FEMALE_KEEP
         roles = {}
+        split_eyes = True
     for obj in list(bpy.data.objects):
         if obj.type == "MESH" and (obj.name.startswith("Icosphere") or len(obj.data.polygons) <= 40):
             bpy.data.objects.remove(obj, do_unlink=True)
@@ -658,7 +681,7 @@ def prepare(body: str) -> None:
                 role = "limbs"
             else:
                 role = "limbs"
-        classify_body(obj, role, split_eyes=body == "female", crown_hair=body == "male")
+        classify_body(obj, role, split_eyes=split_eyes)
     tuck_shorts_inside_shirt()
     level_cloth_hem()
     for obj in meshes():

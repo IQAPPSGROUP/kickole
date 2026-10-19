@@ -3,7 +3,7 @@
  *
  * Fab Standard licence, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group.
  * The raw download is not in the repo. Set FAB_PLAYER_SRC to the folder that
- * contains source_4.zip (male Godot rig) and source.zip (female FBX rig):
+ * contains source_4.zip (female Godot rig) and source.zip (male FBX rig):
  *
  *   FAB_PLAYER_SRC=/path/to/kickole-fab-models npm run build:player
  *
@@ -356,9 +356,9 @@ async function atlas(prims: Prim[], role: Role) {
         raw[dst] = resized[src]; raw[dst + 1] = resized[src + 1]; raw[dst + 2] = resized[src + 2]; raw[dst + 3] = resized[src + 3];
       }
     }
-    // glTF v is bottom-up in the image after sharp's top-left raw. UV v grows with image v
-    // in the source, and we copied rows in the same order, so the cell follows the source.
-    placed.set(keys[i], { u0: col / cols, v0: 1 - (row + 1) / rows, su: 1 / cols, sv: 1 / rows });
+    // Three.js loads glTF textures with flipY false, so v=0 is the top of the image.
+    // Source row 0 was copied to the top of this cell, and a single row leaves v unchanged.
+    placed.set(keys[i], { u0: col / cols, v0: row / rows, su: 1 / cols, sv: 1 / rows });
   }
   for (const prim of group) {
     const cellUv = placed.get(imageKey(prim.image))!;

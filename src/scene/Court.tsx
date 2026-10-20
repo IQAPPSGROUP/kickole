@@ -513,10 +513,10 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         <planeGeometry args={[40.5, 40.5]} />
         <meshStandardMaterial
           map={apron.color ?? undefined}
-          color={apron.color ? '#e4d2b4' : '#c4b49a'}
-          roughness={0.84}
+          color={apron.color ? '#b18452' : '#8d7048'}
+          roughness={0.9}
           metalness={0.02}
-          envMapIntensity={0.35}
+          envMapIntensity={0.18}
         />
       </mesh>
       <mesh position={[0, -0.08, 0]} receiveShadow={shadows}>
@@ -529,10 +529,10 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
           map={court.color ?? undefined}
           normalMap={court.normal ?? undefined}
           roughnessMap={court.rough ?? undefined}
-          color={court.color ? '#d7c4a4' : '#6d6a66'}
-          roughness={court.rough ? 0.9 : 0.72}
+          color={court.color ? '#a56d3c' : '#6d6a66'}
+          roughness={court.rough ? 0.94 : 0.78}
           metalness={0.02}
-          envMapIntensity={0.4}
+          envMapIntensity={0.16}
         />
       </mesh>
       <CourtLines />

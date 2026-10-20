@@ -67,16 +67,6 @@ public/models/environment/street/*.glb
   Original fence, lamp and spectator meshes, EXT_meshopt_compression.
   No downloaded character models. Rebuild with npm run build:street.
 
-Hairstyles
-----------
-public/models/hair/kickole_hair.glb
-  Original alpha-card hair (strand, curl, braid, spike, stubble) and
-  opaque scalp caps, seated on the footballer skulls. Textures and
-  meshes are drawn by tools/build_hair.ts. No downloaded hair model.
-  EXT_meshopt_compression. Rebuild with npm run build:hair.
-  The male cap and the female ponytail stay on the player GLBs above
-  and are used only for the Short style.
-
 Quaternius sources still in this folder
 ---------------------------------------
 kickole_player_v2.glb and kickole_player_v3.glb are derived from the

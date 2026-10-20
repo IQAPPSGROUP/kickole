@@ -98,13 +98,13 @@ describe('storage', () => {
     const appearance = {
       skinTone: '#F2CDAA',
       hairColor: '#C9822B',
-      hairStyle: 'short',
       clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
     };
     const kept = { ...appearance, body: 'male' as const };
+    const stored = { ...appearance, hairStyle: 'short' };
     const raw = JSON.stringify({
       wardrobeVersion: 2,
-      appearance,
+      appearance: stored,
       coins: 10,
       best: 3,
       leaderboard: [],
@@ -117,6 +117,7 @@ describe('storage', () => {
     });
     const first = loadSave();
     expect(first.appearance).toEqual(kept);
+    expect('hairStyle' in first.appearance).toBe(false);
     expect(first.bodyChosen).toBe(true);
     expect(first.ownedKits).not.toContain('kit-carnival');
     const second = loadSave();

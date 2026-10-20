@@ -4,9 +4,8 @@ Cosmetic customisation and soft-currency shop for Kickolé. Physics, timing wind
 
 ## Free customise
 
-- Skin tones, hair colours, hair silhouettes (afro, mohawk, high-top, short curls, braids, spikes, shaved, bald) and basic clothing swatches.
-- Hair variants are procedural meshes parented to the head bone on the Quaternius v2 rig.
-- Boots/kits never change skin tone, hair colour or hair style.
+- Skin tones, hair colours and basic clothing swatches. The footballer keeps the hair that shipped on the purchased model.
+- Boots/kits never change skin tone or hair colour.
 
 ## Shop catalogue (launch)
 

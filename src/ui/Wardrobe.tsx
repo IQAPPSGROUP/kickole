@@ -2,10 +2,8 @@ import { useMemo, useState } from 'react';
 import {
   CLOTHING_SWATCHES,
   HAIR_COLORS,
-  HAIR_STYLES,
   SKIN_TONES,
   type Appearance,
-  type HairStyle,
   type PlayerBody,
 } from '../game/appearance';
 import {
@@ -83,9 +81,6 @@ export function CustomiseScreen({
   onClose: () => void;
 }) {
   const a = save.appearance;
-  const hairStyles = HAIR_STYLES.map((h) => (
-    h.id === 'short' && a.body === 'female' ? { ...h, label: 'Ponytail' } : h
-  ));
   const skin = useMemo(
     () => composePlayerSkin(a, save.equippedKit, save.equippedBoot),
     [a, save.equippedKit, save.equippedBoot],
@@ -124,21 +119,6 @@ export function CustomiseScreen({
         </div>
         <SwatchRow label="Skin tone" colours={SKIN_TONES} value={a.skinTone} onPick={(skinTone) => patch({ skinTone })} />
         <SwatchRow label="Hair colour" colours={HAIR_COLORS} value={a.hairColor} onPick={(hairColor) => patch({ hairColor })} />
-        <div className="group">
-          <label>Hair style</label>
-          <div className="seg wrap">
-            {hairStyles.map((h) => (
-              <button
-                key={h.id}
-                type="button"
-                className={a.hairStyle === h.id ? 'on' : ''}
-                onClick={() => patch({ hairStyle: h.id as HairStyle })}
-              >
-                {h.label}
-              </button>
-            ))}
-          </div>
-        </div>
         <SwatchRow label="Shirt" colours={CLOTHING_SWATCHES} value={a.clothing.shirt} onPick={(shirt) => patch({ clothing: { ...a.clothing, shirt } })} />
         <SwatchRow label="Shorts" colours={CLOTHING_SWATCHES} value={a.clothing.shorts} onPick={(shorts) => patch({ clothing: { ...a.clothing, shorts } })} />
         <p className="shop-note">Clothing swatches apply when you want a free look. Equipped shop kits override shirt/shorts/socks colours in play.</p>

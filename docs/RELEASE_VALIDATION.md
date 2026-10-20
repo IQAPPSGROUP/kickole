@@ -37,8 +37,8 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 
 | Claim | Evidence |
 | --- | --- |
-| Skin tones, colours, hairstyles free | `appearance.ts` + Customise UI; no coin gate |
-| Hair follows head | `HairVariants` parented to head bone |
+| Skin tones, hair colours and clothing colours free | `appearance.ts` + Customise UI; no coin gate |
+| Authored hair follows the head | Purchased `Hair` mesh, skinned to the head bone (`player-v4.test.ts`) |
 | Appearance ≠ kit/boot ownership | Shop buy tests leave appearance unchanged |
 
 ### Shop and progression — automated

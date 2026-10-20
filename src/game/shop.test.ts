@@ -65,13 +65,14 @@ describe('shop economy', () => {
       appearance: { skinTone: '#5C3A2A', hairColor: '#C9822B', hairStyle: 'afro', clothing: startClothing() },
     });
     const skinBefore = start.appearance.skinTone;
-    const hairBefore = start.appearance.hairStyle;
+    const hairBefore = start.appearance.hairColor;
     const result = buyOrEquipKit(start, kit.id);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.locker.equippedKit).toBe(kit.id);
       expect(result.locker.appearance.skinTone).toBe(skinBefore);
-      expect(result.locker.appearance.hairStyle).toBe(hairBefore);
+      expect(result.locker.appearance.hairColor).toBe(hairBefore);
+      expect('hairStyle' in result.locker.appearance).toBe(false);
       expect(result.locker.equippedBoot).toBe(STARTER_BOOT_ID);
     }
   });
@@ -170,7 +171,6 @@ describe('shop economy', () => {
       body: 'male' as const,
       skinTone: '#F2CDAA',
       hairColor: '#C9822B',
-      hairStyle: 'short' as const,
       clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
     };
     const again = normalizeLocker({
@@ -189,7 +189,10 @@ describe('shop economy', () => {
     const migrated = normalizeLocker({ wardrobeVersion: 2, coins: 12, appearance: { skinTone: '#C68642', hairColor: '#16100E', hairStyle: 'braids', clothing: { shirt: '#FFD93D', shirtTrim: '#1E2A5A', shorts: '#1E2A5A', socks: '#F8F9FB' } } });
     expect(migrated.appearance.body).toBe('male');
     expect(migrated.bodyChosen).toBe(true);
-    expect(migrated.appearance.hairStyle).toBe('braids');
+    expect(migrated.appearance.skinTone).toBe('#C68642');
+    expect(migrated.appearance.hairColor).toBe('#16100E');
+    expect(migrated.appearance.clothing.shirt).toBe('#FFD93D');
+    expect('hairStyle' in migrated.appearance).toBe(false);
     const chosen = normalizeLocker({
       ...migrated,
       bodyChosen: true,

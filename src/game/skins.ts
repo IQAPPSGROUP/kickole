@@ -9,7 +9,6 @@ export interface Skin {
   body: { skin: string; hair: string };
   football: { base: string; panels: string };
   playerBody: PlayerBody;
-  hairStyle: Appearance['hairStyle'];
   kitPattern: SurfacePattern;
   bootPattern: SurfacePattern;
   unlocked: boolean;
@@ -29,7 +28,6 @@ export const SKINS: Skin[] = [
     body: { skin: '#E8B48F', hair: '#2A1E1A' },
     football: { base: '#F8F9FB', panels: '#222831' },
     playerBody: 'male',
-    hairStyle: 'short',
     kitPattern: 'plain',
     bootPattern: 'panels',
     unlocked: true,
@@ -43,7 +41,6 @@ export const SKINS: Skin[] = [
     body: { skin: '#8D5A3C', hair: '#16100E' },
     football: { base: '#F7F5ED', panels: '#FF805D' },
     playerBody: 'male',
-    hairStyle: 'short',
     kitPattern: 'carnival',
     bootPattern: 'plain',
     unlocked: true,
@@ -57,7 +54,6 @@ export const SKINS: Skin[] = [
     body: { skin: '#F2CDAA', hair: '#C9822B' },
     football: { base: '#EAF44A', panels: '#142D35' },
     playerBody: 'male',
-    hairStyle: 'short',
     kitPattern: 'midnight',
     bootPattern: 'plain',
     unlocked: true,
@@ -74,7 +70,7 @@ export function getSkin(id: string): Skin {
 
 /**
  * Merge free appearance + equipped kit + equipped boots into a render skin.
- * Boots/kits never change skin tone, hair colour or hair silhouette.
+ * Boots/kits never change skin tone or hair colour.
  */
 export function composePlayerSkin(
   appearance: Appearance,
@@ -87,7 +83,7 @@ export function composePlayerSkin(
   // Starter kit defers to free clothing colours; purchased kits keep their authored palette.
   const clothing = kit.id === STARTER_KIT_ID ? { ...appearance.clothing } : { ...kit.clothing };
   return {
-    id: `live:${kit.id}:${boot.id}:${appearance.body}:${appearance.hairStyle}`,
+    id: `live:${kit.id}:${boot.id}:${appearance.body}`,
     name: `${kit.name} · ${boot.name}`,
     clothing,
     boots: {
@@ -102,7 +98,6 @@ export function composePlayerSkin(
     },
     football: { base: '#F8F9FB', panels: '#222831' },
     playerBody: appearance.body,
-    hairStyle: appearance.hairStyle,
     kitPattern: kit.pattern,
     bootPattern: boot.pattern,
     unlocked: true,

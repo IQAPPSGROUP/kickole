@@ -139,10 +139,10 @@ describe('GameController', () => {
       ...c.getSnapshot().save.appearance,
       skinTone: '#8D5A3C',
       hairStyle: 'afro',
-    });
+    } as Parameters<typeof c.setAppearance>[0]);
     expect(c.getSnapshot().skin.body.skin).toBe('#8D5A3C');
-    expect(c.getSnapshot().skin.hairStyle).toBe('afro');
-    expect(c.getSnapshot().save.appearance.hairStyle).toBe('afro');
+    expect(c.getSnapshot().save.appearance.hairColor).toBe(c.getSnapshot().skin.body.hair);
+    expect('hairStyle' in c.getSnapshot().save.appearance).toBe(false);
   });
 
   it('vibrates only when vibration is enabled', async () => {

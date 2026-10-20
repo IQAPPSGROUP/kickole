@@ -7,6 +7,16 @@
   --white: #F8F9FB;
   --font: 'Trebuchet MS', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
+/* Rubik Wet Paint by The Rubik Filtered Project Authors. SIL Open Font License 1.1.
+   Latin subset. Full licence: /fonts/RubikWetPaint-OFL.txt */
+@font-face {
+  font-family: 'Rubik Wet Paint';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/RubikWetPaint-Regular.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { margin: 0; height: 100%; background: var(--navy); overflow: hidden; }
 body { font-family: var(--font); color: var(--white); user-select: none; -webkit-user-select: none; overscroll-behavior: none; touch-action: manipulation; }
@@ -169,86 +179,118 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   pointer-events: none;
 }
 .prompt-banner {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 18px);
+  transform: translateX(-50%);
   z-index: 7;
-  width: min(94vw, 420px);
+  width: min(94vw, 520px);
   text-align: center;
   background: none;
   color: var(--white);
+  pointer-events: none;
 }
-.prompt-pop {
-  transform-origin: 50% 0;
-  animation: prompt-pop .38s cubic-bezier(.16, 1.35, .32, 1);
+.prompt-filters { position: absolute; width: 0; height: 0; }
+.prompt-bounce {
+  position: relative;
+  transform-origin: 50% 100%;
+  animation: prompt-bounce 1.05s linear both;
 }
-@keyframes prompt-pop {
-  0% { transform: scale(.62); opacity: 0; }
-  64% { transform: scale(1.08); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+.prompt-bounce::before {
+  content: '';
+  position: absolute;
+  left: 2%;
+  right: 2%;
+  top: 8%;
+  bottom: -6%;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, rgba(6, 10, 22, .78) 0%, rgba(6, 10, 22, .42) 48%, transparent 74%);
+  filter: blur(8px);
 }
-.prompt-call {
+@keyframes prompt-bounce {
+  0% { opacity: 0; transform: translateY(-88px) scale(.32, .7) rotate(-10deg); }
+  28% { opacity: 1; transform: translateY(16px) scale(1.28, .62) rotate(6deg); }
+  46% { transform: translateY(-22px) scale(.86, 1.24) rotate(-4deg); }
+  64% { transform: translateY(6px) scale(1.08, .92) rotate(1.5deg); }
+  78% { transform: translateY(0) scale(1) rotate(0); }
+  90% { transform: translateY(-8px) scale(1.18) rotate(-3deg); }
+  100% { opacity: 1; transform: none; }
+}
+.graffiti {
   position: relative;
   display: block;
-  margin: 0;
-  padding-bottom: .24em;
-  font-family: 'Trebuchet MS', 'Segoe UI', Inter, var(--font);
-  font-weight: 900;
-  font-style: italic;
-  font-size: clamp(26px, 7.4vw, 40px);
+  font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
   line-height: .92;
-  letter-spacing: .3px;
 }
-.prompt-call > span { display: block; }
-.prompt-extrude,
-.prompt-stroke {
+.graffiti > span { display: block; }
+.prompt-ch { display: inline-block; }
+.prompt-shine,
+.prompt-ink,
+.prompt-spray {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
 }
-.prompt-violet {
-  color: var(--violet);
-  -webkit-text-stroke: .14em var(--violet);
-  transform: translate(.16em, .2em);
-}
-.prompt-navy {
-  color: var(--navy);
-  -webkit-text-stroke: .14em var(--navy);
-  transform: translate(.08em, .1em);
-}
-.prompt-stroke {
+.prompt-shine {
+  z-index: 0;
   color: #fff;
-  -webkit-text-stroke: .13em #fff;
+  transform: translate(-0.045em, -0.06em);
+}
+.prompt-ink {
+  z-index: 1;
+  color: #140814;
+  -webkit-text-stroke: 0.09em #140814;
 }
 .prompt-face {
   position: relative;
-  background: linear-gradient(180deg, #FF8CC0 0%, #FF4F9A 55%, #E23A86 100%);
+  z-index: 2;
+  background: linear-gradient(180deg, #FFF3B0 0%, #FFE27A 16%, #FF4F9A 46%, #D21B72 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: #FF4F9A;
+  -webkit-text-fill-color: transparent;
+}
+.prompt-face .prompt-ch {
+  background: inherit;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
 }
+.prompt-spray {
+  z-index: 3;
+  color: #fff;
+  opacity: .8;
+  filter: url(#prompt-spray);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.prompt-call {
+  margin: 0;
+  padding-bottom: .16em;
+  font-size: clamp(52px, 15vw, 84px);
+}
+.prompt-call.is-long { font-size: clamp(36px, 9.4vw, 56px); }
 .prompt-tip {
-  display: block;
-  margin-top: 7px;
-  font-family: 'Trebuchet MS', 'Segoe UI', Inter, var(--font);
-  font-style: italic;
-  font-weight: 900;
-  font-size: clamp(13px, 3.5vw, 16px);
-  line-height: 1.05;
-  letter-spacing: .2px;
-  color: #FFE97A;
-  -webkit-text-stroke: 3px var(--navy);
-  paint-order: stroke fill;
-  text-shadow: 2px 3px 0 var(--violet);
+  margin-top: .08em;
+  font-size: clamp(20px, 5.4vw, 30px);
+  line-height: 1;
 }
 .prompt-ring {
-  width: 26px;
-  height: 26px;
-  margin: 0 auto -2px;
-  display: block;
-  filter: drop-shadow(1px 2px 0 var(--navy)) drop-shadow(2px 3px 0 var(--violet));
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 34px;
+  height: 34px;
+  transform: translateX(-50%);
+  z-index: 4;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .65));
 }
-.prompt-ring circle { fill: none; stroke: #fff; stroke-width: 4; }
+.prompt-ring circle { fill: none; stroke: #140814; stroke-width: 5; }
 .prompt-ring circle:last-child {
   stroke: #FFD93D;
   stroke-width: 4;
@@ -628,9 +670,11 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .home-help { font-size: 9px; text-align: center; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
   .hud-coaching { position: absolute; left: 50%; top: 4px; width: min(46vw, 360px); margin: 0; transform: translateX(-50%); }
-  .prompt-call { font-size: 22px; }
-  .prompt-tip { font-size: 12px; -webkit-text-stroke-width: 2px; }
-  .prompt-ring { width: 18px; height: 18px; }
+  .prompt-banner { width: min(54vw, 440px); bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 8px); }
+  .prompt-call { font-size: 34px; }
+  .prompt-call.is-long { font-size: 26px; }
+  .prompt-tip { font-size: 16px; }
+  .prompt-ring { width: 22px; height: 22px; }
   .score { font-size: 44px; }
   .feedback { left: auto; right: max(12px, env(safe-area-inset-right)); top: 24px; width: 26%; font-size: 28px; }
   .tap-start { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 16px); font-size: 24px; }

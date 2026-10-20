@@ -30,9 +30,9 @@ export function Hud({
         </div>
       </div>
       <div className="hud-coaching">
-        {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
         {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
       </div>
+      {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}
@@ -89,20 +89,47 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
   const call = `${prompt.call}${chain}`;
   return (
     <div className="prompt-banner" key={`${prompt.id}:${prompt.startedAt}`}>
-      <div className="prompt-pop">
+      <svg className="prompt-filters" aria-hidden width="0" height="0">
+        <filter id="prompt-spray" x="-8%" y="-20%" width="116%" height="150%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="noise" />
+          <feColorMatrix in="noise" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.4 -0.55" result="speck" />
+          <feComposite in="speck" in2="SourceAlpha" operator="in" />
+        </filter>
+      </svg>
+      <div className="prompt-bounce">
         <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
           <circle cx="18" cy="18" r="14" />
           <circle ref={ring} cx="18" cy="18" r="14" pathLength={100} />
         </svg>
-        <b className="prompt-call">
-          <span className="prompt-extrude prompt-violet" aria-hidden="true">{call}</span>
-          <span className="prompt-extrude prompt-navy" aria-hidden="true">{call}</span>
-          <span className="prompt-stroke" aria-hidden="true">{call}</span>
-          <span className="prompt-face">{call}</span>
-        </b>
-        <small className="prompt-tip">{prompt.tip}</small>
+        <GraffitiText text={call} className={call.length > 16 ? 'graffiti prompt-call is-long' : 'graffiti prompt-call'} />
+        <GraffitiText text={prompt.tip} className="graffiti prompt-tip" />
       </div>
     </div>
+  );
+}
+
+const GRAFFITI_TILT = [-4, 3, -2, 4, -3, 2, -4, 2, 3, -2, 4, -1] as const;
+
+function graffitiGlyphs(text: string) {
+  return [...text].map((ch, index) => {
+    const tilt = GRAFFITI_TILT[index % GRAFFITI_TILT.length] ?? 0;
+    const lift = (index % 3) - 1;
+    return (
+      <span className="prompt-ch" key={`${index}:${ch}`} style={{ transform: `rotate(${tilt}deg) translateY(${lift}px)` }}>
+        {ch === ' ' ? '\u00A0' : ch}
+      </span>
+    );
+  });
+}
+
+function GraffitiText({ text, className }: { text: string; className: string }) {
+  return (
+    <span className={className}>
+      <span className="prompt-shine" aria-hidden="true">{graffitiGlyphs(text)}</span>
+      <span className="prompt-ink" aria-hidden="true">{graffitiGlyphs(text)}</span>
+      <span className="prompt-face">{graffitiGlyphs(text)}</span>
+      <span className="prompt-spray" aria-hidden="true">{graffitiGlyphs(text)}</span>
+    </span>
   );
 }
 

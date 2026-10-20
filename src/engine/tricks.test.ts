@@ -42,7 +42,8 @@ describe('classic foot juggling unchanged without a trick', () => {
     e.release('right');
     stepN(e, 5);
     expect(e.stats.kickUps).toBe(1);
-    expect(e.stats.score).toBe(1 + 2);
+    const { kickUp, perfectBonus } = e.config.scoring;
+    expect(e.stats.score).toBe(kickUp + perfectBonus);
     expect(e.stats.headers).toBe(0);
   });
 
@@ -53,7 +54,8 @@ describe('classic foot juggling unchanged without a trick', () => {
     stepN(e, 60);
     expect(e.contact?.kind).toBe('stall');
     e.release('left');
-    expect(e.stats.score).toBe(1 + 2 + 10);
+    const { kickUp, perfectBonus, footStall } = e.config.scoring;
+    expect(e.stats.score).toBe(kickUp + perfectBonus + footStall);
   });
 });
 
@@ -71,7 +73,8 @@ describe('high flick', () => {
     const expected = impulseForApex(e.config.highFlickApex, e.config.contactHeight, gAtFlick);
     expect(flickVy).toBeCloseTo(expected, 5);
     expect(flickVy).toBeGreaterThan(e.config.kickSpeed);
-    expect(e.stats.score).toBe(1 + 2); // no extra trick bonus
+    const { kickUp, perfectBonus } = e.config.scoring;
+    expect(e.stats.score).toBe(kickUp + perfectBonus);
     expect(e.stats.highFlicks).toBe(1);
     expect(e.selectedTrick).toBeNull();
   });
@@ -246,7 +249,8 @@ describe('thigh touch', () => {
     stepN(e, 5);
     expect(e.stats.thighs).toBe(1);
     expect(e.stats.kickUps).toBe(1);
-    expect(e.stats.score).toBe(1 + 2 + 2); // kickUp + perfect + thigh
+    const { kickUp, perfectBonus, thigh } = e.config.scoring;
+    expect(e.stats.score).toBe(kickUp + perfectBonus + thigh);
     expect(e.ball.vy).toBeGreaterThan(0);
   });
 });

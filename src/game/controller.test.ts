@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { vibratePattern } from './haptics';
 
 function fakeStorage() {
   const data: Record<string, string> = {};
@@ -72,7 +73,7 @@ describe('GameController', () => {
     expect(cb).toHaveBeenCalled();
   });
 
-  it('charges an early tap and shows MISS for a late one', async () => {
+  it('charges an early tap and does not call a late one a miss', async () => {
     const { c } = await make(QUIET);
     c.play(); c.press('left'); c.release('left');
     c.tick(0.02);
@@ -80,16 +81,40 @@ describe('GameController', () => {
     expect(c.engine.kickCharge?.side).toBe('right');
     expect(c.getSnapshot().hud.feedback?.kind).not.toBe('miss');
     c.release('right');
-    // A normal launch is still inside the foot window when it reaches the ground.
-    // A slow drop already below the foot is the late miss.
     c.engine.ball.y = 0.4;
     c.engine.ball.vy = -2.2;
     c.engine.ball.vz = 0;
     c.engine.ball.vx = 0;
     c.engine.ball.z = c.engine.config.ballZ;
     c.press('left');
-    expect(c.getSnapshot().hud.feedback?.kind).toBe('miss');
+    expect(c.engine.kickCharge?.side).toBe('left');
+    expect(c.getSnapshot().hud.feedback?.kind).not.toBe('miss');
     expect(c.engine.phase).toBe('playing');
+  });
+
+  it('play() after game over waits for a real tap instead of launching', async () => {
+    const { c } = await make(QUIET);
+    c.play(); c.press('left'); c.release('left');
+    for (let i = 0; i < 20000 && c.engine.phase !== 'over'; i++) c.tick(0.016);
+    c.play();
+    expect(c.engine.phase).toBe('ready');
+    c.tick(0.3);
+    expect(c.engine.phase).toBe('ready');
+    expect(c.engine.ball.vy).toBe(0);
+    c.press('right');
+    expect(c.engine.phase).toBe('playing');
+  });
+
+  it('a tap during a celebration skips the dance and still registers', async () => {
+    const { c } = await make(QUIET);
+    c.play();
+    c.press('left');
+    c.release('left');
+    c.engine.startCelebration('samba', 'streak:10', 1.2);
+    expect(c.engine.celebration).not.toBeNull();
+    c.press('right', 4);
+    expect(c.engine.celebration).toBeNull();
+    expect(c.engine.kickCharge !== null || c.engine.contact !== null).toBe(true);
   });
 
   it('ends the run, saves the result and exposes it', async () => {
@@ -148,10 +173,28 @@ describe('GameController', () => {
   it('vibrates only when vibration is enabled', async () => {
     const on = await make({ ...QUIET, vibration: true });
     on.c.play(); on.c.press('left');
-    expect((navigator.vibrate as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalled();
+    expect((navigator.vibrate as unknown as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(vibratePattern('launch'));
     const off = await make(QUIET);
     off.c.play(); off.c.press('left');
     expect((navigator.vibrate as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+  });
+
+  it('grades the buzz by the touch', async () => {
+    const { c } = await make({ ...QUIET, vibration: true });
+    const vibrate = navigator.vibrate as unknown as ReturnType<typeof vi.fn>;
+    c.play(); c.press('left'); c.release('left');
+    tickTo(c);
+    vibrate.mockClear();
+    c.press('right'); c.release('right');
+    c.tick(0.05);
+    expect(vibrate).toHaveBeenCalledWith(vibratePattern('perfect'));
+    c.engine.setTrick('highFlick');
+    c.engine.ball.y = 2.5;
+    c.engine.ball.vy = 2;
+    c.engine.ball.z = c.engine.config.ballZ;
+    vibrate.mockClear();
+    c.press('left');
+    expect(vibrate).toHaveBeenCalledWith(vibratePattern('miss'));
   });
 
   it('marks the HUD as stalling while a stall is held, and scores it on release', async () => {

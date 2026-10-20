@@ -10,7 +10,7 @@ import {
   subscribeOpeningIntro,
 } from '../scene/openingIntro';
 import { fanLayout } from './fanLayout';
-import { footSideAt } from './restartTap';
+import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { Home, GameOver, SettingsScreen } from './Screens';
@@ -44,15 +44,7 @@ export function App() {
       const layout = fanLayout(window.innerWidth, readInset('--sat-l'), readInset('--sat-r'), readInset('--sat-b'));
       const side = footSideAt(event.clientX, event.clientY, window.innerWidth, window.innerHeight, layout);
       if (!side) return;
-      const phase = controller.engine.phase;
-      if (phase === 'over' || phase === 'dropped') {
-        controller.noteCornerTap(side, event.pointerId);
-        return;
-      }
-      const target = event.target;
-      if ((phase === 'ready' || phase === 'playing') && !(target instanceof Element && target.closest('.foot-btn'))) {
-        controller.press(side, event.pointerId);
-      }
+      if (footTapAction(controller.engine.phase) === 'kick') controller.press(side, event.pointerId);
     };
     const onUp = (event: PointerEvent) => {
       controller.releasePointer(event.pointerId);

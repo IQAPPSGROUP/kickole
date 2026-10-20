@@ -1,6 +1,7 @@
 import type { BeatGrade } from '../game/beat';
 import { groovePoints } from '../game/beat';
 import { DEFAULT_CONFIG, type GameConfig, type Grade, type Side } from './config';
+import { streakMultiplier } from './scoring';
 import { footContactAnchors } from './footContact';
 import {
   createComboTracker,
@@ -230,6 +231,13 @@ export class GameEngine {
     this.heldNeck = false;
     resetComboTracker(this.combos);
     this.comboSeq = 0;
+  }
+
+  /** Count a clean touch and return its points after the streak multiplier. */
+  private touchPoints(base: number): number {
+    this.streak += 1;
+    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
+    return base * streakMultiplier(this.streak);
   }
 
   /** Record a successful scored event for variety combinations. */
@@ -462,7 +470,8 @@ export class GameEngine {
       this.tryGroove(side);
       return;
     }
-    if (intent == null && this.footTiming() === 'early') {
+    // Outside the window, an early tap waits and a late tap is just as free.
+    if (intent == null && this.footTiming() !== 'open') {
       this.kickCharge = { side, held: 0, power: 0 };
       return;
     }
@@ -476,11 +485,7 @@ export class GameEngine {
     const grade = this.gradeFor(deltaMs);
     this.lastKick[side] = this.time;
     if (grade === 'miss') {
-      this.streak = 0;
-      this.cooldown = this.config.missCooldown;
-      this.lastKickGrade = 'miss';
-      resetComboTracker(this.combos);
-      this.emit({ type: 'miss', side, deltaMs });
+      this.emitMiss(side, deltaMs);
       return;
     }
     this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick, kickPower: highFlick ? 0 : kickPower, thigh: false };
@@ -540,11 +545,7 @@ export class GameEngine {
     this.lastKick[side] = this.time;
     this.selectedTrick = null;
     if (grade === 'miss') {
-      this.streak = 0;
-      this.cooldown = this.config.missCooldown;
-      this.lastKickGrade = 'miss';
-      resetComboTracker(this.combos);
-      this.emit({ type: 'miss', side, deltaMs });
+      this.emitMiss(side, deltaMs);
       return;
     }
     this.contact = {
@@ -586,13 +587,12 @@ export class GameEngine {
     const { scoring } = this.config;
     let points = scoring.header;
     if (grade === 'perfect') points += scoring.perfectBonus;
+    points = this.touchPoints(points);
     if (!t.awarded) {
       t.awarded = true;
       this.stats.headers++;
       this.stats.score += points;
     }
-    this.streak++;
-    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     this.lastKickGrade = grade;
     if (grade === 'perfect') this.lastPerfectTime = this.time;
     this.gravityScale = Math.min(this.config.maxGravityScale, this.gravityScale + this.config.gravityRamp);
@@ -641,12 +641,10 @@ export class GameEngine {
     b.z = target.z;
     b.vx = b.vy = b.vz = 0;
     const trick = createTrickState('neckStall', null, this.time, 'contact');
-    const points = this.config.scoring.neckStall;
+    const points = this.touchPoints(this.config.scoring.neckStall);
     trick.awarded = true;
     this.stats.neckStalls++;
     this.stats.score += points;
-    this.streak++;
-    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     this.lastTrick = { kind: 'neckStall', time: this.time };
     this.trick = trick;
     this.selectedTrick = null;
@@ -693,10 +691,7 @@ export class GameEngine {
     const grade = this.gradeFor(deltaMs);
     this.lastKick[side] = this.time;
     if (grade === 'miss') {
-      this.streak = 0;
-      this.cooldown = this.config.missCooldown;
-      this.lastKickGrade = 'miss';
-      this.emit({ type: 'miss', side, deltaMs });
+      this.emitMiss(side, deltaMs);
       return;
     }
     // Soft laces pop, straight up, no spin. Air time matches the orbit.
@@ -738,6 +733,7 @@ export class GameEngine {
     if (grade === 'perfect') points += scoring.perfectBonus;
     const alternate = this.lastSide !== null && this.lastSide !== side;
     if (alternate) points += scoring.alternateBonus;
+    points = this.touchPoints(points);
     existing.awarded = true;
     existing.revolution = 1;
     existing.phase = 'recover';
@@ -745,8 +741,6 @@ export class GameEngine {
     this.stats.aroundTheWorlds++;
     this.stats.kickUps++;
     this.stats.score += points;
-    this.streak++;
-    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     this.lastSide = side;
     this.lastContact[side] = this.time;
     this.lastTrick = { kind: 'aroundTheWorld', time: this.time };
@@ -826,10 +820,9 @@ export class GameEngine {
       this.lastTrick = { kind: 'highFlick', time: this.time };
     }
 
-    this.streak++;
+    points = this.touchPoints(points);
     this.stats.kickUps++;
     this.stats.score += points;
-    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     this.lastSide = c.side;
     this.lastContact[c.side] = this.time;
     this.lastKickGrade = c.grade;
@@ -877,11 +870,9 @@ export class GameEngine {
   /** High kick, on-beat score, and a dance that ends while the ball is still above the player. */
   private finishGrooveKick(c: Contact) {
     const { scoring } = this.config;
-    const points = groovePoints(scoring.groove, this.lastBeatGrade, scoring.grooveBeatPerfect, scoring.grooveBeatGood);
+    const points = this.touchPoints(groovePoints(scoring.groove, this.lastBeatGrade, scoring.grooveBeatPerfect, scoring.grooveBeatGood));
     this.stats.grooves++;
     this.stats.score += points;
-    this.streak++;
-    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     this.lastSide = c.side;
     this.lastContact[c.side] = this.time;
     this.lastKickGrade = c.grade;
@@ -1003,12 +994,7 @@ export class GameEngine {
 
   private releaseCharge(side: Side, power: number) {
     if (this.phase !== 'playing' || this.inputBlocked() || this.selectedTrick) return;
-    const timing = this.footTiming();
-    if (timing === 'late') {
-      this.emitMiss(side, this.timingDeltaMs());
-      return;
-    }
-    if (timing === 'early') return;
+    if (this.footTiming() !== 'open') return;
     this.tryKick(side, false, power);
   }
 
@@ -1024,9 +1010,7 @@ export class GameEngine {
     if (this.inputBlocked() || this.selectedTrick) return;
     const timing = this.footTiming();
     if (timing === 'late') {
-      const side = charge.side;
       this.kickCharge = null;
-      this.emitMiss(side, this.timingDeltaMs());
       return;
     }
     if (timing === 'early') return;

@@ -1,11 +1,6 @@
 import type { Side } from '../engine/config';
+import type { Phase } from '../engine/engine';
 import { fanLayout, fanRects, type FanLayout } from './fanLayout';
-
-export interface CornerTap {
-  side: Side;
-  at: number;
-  pointerId: number;
-}
 
 /** Foot button under a screen point, with a little slop so a near miss still counts. */
 export function footSideAt(
@@ -26,7 +21,23 @@ export function footSideAt(
   return null;
 }
 
-/** A corner tap during game over is still the kick the player meant, if Play again follows quickly. */
-export function replayFresh(tap: CornerTap | null, now: number, maxAge = 450): boolean {
-  return tap != null && now - tap.at >= 0 && now - tap.at <= maxAge;
+/**
+ * A foot-zone tap kicks only while a run is waiting or live.
+ * Game over does not store the tap, so Play again leaves the ball on the foot.
+ * The button and the zone share this decision, so neither path drops the tap.
+ */
+export function footTapAction(phase: Phase): 'kick' | 'ignore' {
+  switch (phase) {
+    case 'ready':
+    case 'playing':
+      return 'kick';
+    case 'menu':
+    case 'over':
+    case 'dropped':
+      return 'ignore';
+    default: {
+      const unexpected: never = phase;
+      return unexpected;
+    }
+  }
 }

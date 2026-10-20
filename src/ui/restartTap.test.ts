@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fanLayout } from './fanLayout';
-import { footSideAt, replayFresh, type CornerTap } from './restartTap';
+import { footSideAt, footTapAction } from './restartTap';
 
 describe('restart taps', () => {
   it('finds the corner foot buttons and not the middle of the screen', () => {
@@ -14,10 +14,11 @@ describe('restart taps', () => {
     expect(footSideAt(width / 2, height / 2, width, height, layout)).toBeNull();
   });
 
-  it('replays a corner tap only when Play again follows quickly', () => {
-    const tap: CornerTap = { side: 'left', at: 1000, pointerId: 3 };
-    expect(replayFresh(tap, 1200)).toBe(true);
-    expect(replayFresh(tap, 1600)).toBe(false);
-    expect(replayFresh(null, 1200)).toBe(false);
+  it('kicks from a ready or live foot tap and does not store a game-over tap', () => {
+    expect(footTapAction('ready')).toBe('kick');
+    expect(footTapAction('playing')).toBe('kick');
+    expect(footTapAction('over')).toBe('ignore');
+    expect(footTapAction('dropped')).toBe('ignore');
+    expect(footTapAction('menu')).toBe('ignore');
   });
 });

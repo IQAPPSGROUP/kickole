@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, 
 import type { GameController, Hud as HudState, ArmedTrick } from '../game/controller';
 import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
+import { streakMultiplier } from '../engine/scoring';
 import { beatClock } from '../game/audio';
 import { prefersReducedMotion } from '../scene/juice';
 import { fanLayout } from './fanLayout';
@@ -17,6 +18,7 @@ export function Hud({
   onSkipCelebration?: () => void;
 }) {
   const f = hud.feedback;
+  const combo = streakMultiplier(hud.streak);
   return (
     <div className="hud">
       <div className="hud-top">
@@ -24,7 +26,7 @@ export function Hud({
         <div className="score" key={hud.score}>{hud.score}</div>
         <div className="hud-sub">
           <span>KICK-UPS <b>{hud.kickUps}</b></span>
-          {hud.streak >= 2 && <span className="combo" key={hud.streak}>COMBO x{hud.streak}</span>}
+          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
         </div>
       </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}

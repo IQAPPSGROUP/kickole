@@ -4,6 +4,8 @@ import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import {
   STREET_BLOOM,
   STREET_EXPOSURE,
+  STREET_FILL,
+  STREET_HEMI,
   displayLuminance,
   meanStreetLuminance,
   streetDaylightSamples,
@@ -12,22 +14,26 @@ import {
 import { profileFor } from './qualityTier';
 
 describe('street daylight', () => {
-  it('lifts the street into bright daylight without clipping the face', () => {
+  it('holds carnival daylight with contrast and a lit shadow side', () => {
     const samples = streetDaylightSamples();
     const sunlit = displayLuminance(samples.sunlit);
     const shadow = displayLuminance(samples.shadow);
     const court = displayLuminance(samples.court);
     const sky = displayLuminance(samples.sky);
     const mean = meanStreetLuminance(samples);
-    expect(STREET_EXPOSURE).toBeGreaterThan(1.3);
+    expect(STREET_EXPOSURE).toBeCloseTo(1.3, 2);
+    expect(STREET_FILL.intensity).toBeGreaterThan(STREET_HEMI.intensity);
     expect(mean).toBeGreaterThan(0.55);
-    expect(mean).toBeLessThan(0.88);
-    expect(sunlit).toBeGreaterThan(0.55);
-    expect(sunlit).toBeLessThan(0.9);
-    expect(shadow).toBeGreaterThan(0.42);
-    expect(court).toBeGreaterThan(0.45);
-    expect(sky).toBeGreaterThan(0.72);
-    expect(sunlit).toBeGreaterThan(shadow);
+    expect(mean).toBeLessThan(0.76);
+    expect(sunlit).toBeGreaterThan(0.6);
+    expect(sunlit).toBeLessThan(0.8);
+    expect(shadow).toBeGreaterThan(0.4);
+    expect(shadow).toBeLessThan(0.58);
+    expect(court).toBeGreaterThan(0.62);
+    expect(court).toBeLessThan(0.84);
+    expect(sky).toBeGreaterThan(0.75);
+    expect(sky).toBeLessThan(0.92);
+    expect(sunlit - shadow).toBeGreaterThan(0.18);
   });
 
   it('keeps bloom in linear light, ahead of AgX, on every tier that blooms', () => {

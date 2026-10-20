@@ -45,27 +45,44 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+/** Gentle contrast S-curve. Black and white stay put; the quarters pull apart. */
+export function contrastCurve(value: number): number {
+  const t = clamp01(value);
+  const centered = t - 0.5;
+  return clamp01(t + 0.46 * centered * (1 - 4 * centered * centered));
+}
+
 /**
- * Display grade after AgX. Midtones lift, highlights stay near white,
- * and a small warm tint keeps carnival colour without painting the face orange.
+ * Display grade after AgX. Contrast comes back through the S-curve.
+ * Vibrance lifts dull carnival colours more than an already-strong hue.
+ * Blacks stay deep. There is no midtone lift.
  */
 export function gradeDisplayColor(r: number, g: number, b: number): [number, number, number] {
-  const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
-  const mid = luma * (1 - luma);
-  const lifted = luma + mid * 0.18;
-  const scale = luma > 1e-5 ? lifted / luma : 1;
-  let red = r * scale;
-  let green = g * scale;
-  let blue = b * scale;
-  const highlight = smoothstep(0.62, 0.92, lifted);
-  red += highlight * 0.03;
-  green += highlight * 0.01;
-  blue -= highlight * 0.018;
-  const sat = 1.08;
+  let red = contrastCurve(r);
+  let green = contrastCurve(g);
+  let blue = contrastCurve(b);
+  const luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+  const highlight = smoothstep(0.72, 0.95, luma);
+  red += highlight * 0.018;
+  green += highlight * 0.004;
+  blue -= highlight * 0.012;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const chroma = max <= 1e-5 ? 0 : (max - min) / max;
+  const sat = 1.18 + 0.26 * (1 - chroma);
   const nextLuma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
   red = nextLuma + (red - nextLuma) * sat;
   green = nextLuma + (green - nextLuma) * sat;
   blue = nextLuma + (blue - nextLuma) * sat;
-  const toe = 0.018;
-  return [clamp01(red * (1 - toe) + toe), clamp01(green * (1 - toe) + toe * 0.96), clamp01(blue * (1 - toe) + toe * 0.9)];
+  return [clamp01(red), clamp01(green), clamp01(blue)];
+}
+
+export function colorSaturation(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max <= 1e-5 ? 0 : (max - min) / max;
+}
+
+export function rec709Luma(r: number, g: number, b: number): number {
+  return r * 0.2126 + g * 0.7152 + b * 0.0722;
 }

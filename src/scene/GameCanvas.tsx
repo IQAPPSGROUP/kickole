@@ -223,7 +223,7 @@ function SunnyIbl({ ibl }: { ibl: boolean }) {
         hdr = loaded;
         loaded.mapping = EquirectangularReflectionMapping;
         scene.background = loaded;
-        scene.backgroundBlurriness = 0.18;
+        scene.backgroundBlurriness = 0.04;
         if (ibl) {
           env = pm.fromEquirectangular(loaded).texture;
           scene.environment = env;
@@ -311,8 +311,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   return (
     <>
       {street && <StreetTone />}
-      <color attach="background" args={[street ? '#f6e4c8' : '#8dc5cb']} />
-      <fog attach="fog" args={street ? ['#f3ddc0', 28, 70] : ['#8dc5cb', 24, 52]} />
+      <color attach="background" args={[street ? '#9ec4ea' : '#8dc5cb']} />
+      {!street && <fog attach="fog" args={['#8dc5cb', 24, 52]} />}
       <CameraRig shake={quality !== 'low'} quality={quality} />
       {street && <SunnyIbl ibl={profile.ibl} />}
       {!street && quality === 'high' && <Environment />}

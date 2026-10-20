@@ -1,25 +1,30 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, type Bone, type Object3D } from 'three';
+import { DoubleSide, Group, type Bone, type BufferGeometry, type Object3D } from 'three';
 import type { HairStyle } from '../game/appearance';
 import { hairSpring } from './secondaryMotion';
+import { createHairGeometry, hairParts, type HairBody, type HairPart } from './hairFit';
 
 /**
  * Procedural hair silhouettes parented to the head bone so they follow every animation.
  * The authored Hair material mesh is hidden when a non-short style is active.
+ * Placements come from hairFit so the face volume stays clear on both skulls.
  */
 export function HairVariants({
   head,
   style,
   color,
   hairMesh,
+  body = 'male',
 }: {
   head: Bone | Object3D | undefined;
   style: HairStyle;
   color: string;
   hairMesh?: Object3D[];
+  body?: HairBody;
 }) {
   const group = useRef<Group>(null);
+  const parts = useMemo(() => hairParts(style, body), [style, body]);
 
   useLayoutEffect(() => {
     if (!head || !group.current) return;
@@ -31,9 +36,9 @@ export function HairVariants({
 
   useFrame(() => {
     const hideAuthored = style !== 'short';
-    if (hairMesh) for (const m of hairMesh) m.visible = !hideAuthored;
+    if (hairMesh) for (const mesh of hairMesh) mesh.visible = !hideAuthored;
     if (group.current) {
-      group.current.visible = style !== 'short' && style !== 'bald';
+      group.current.visible = parts.length > 0;
       group.current.rotation.set(hairSpring.pitch, hairSpring.yaw, hairSpring.roll);
     }
   });
@@ -42,64 +47,38 @@ export function HairVariants({
 
   return (
     <group ref={group}>
-      {style === 'afro' && (
-        <mesh position={[0, 0.12, -0.02]} castShadow>
-          <sphereGeometry args={[0.2, 14, 12]} />
-          <meshStandardMaterial color={color} roughness={0.72} />
-        </mesh>
-      )}
-      {style === 'mohawk' && (
-        <mesh position={[0, 0.18, -0.01]} castShadow>
-          <boxGeometry args={[0.06, 0.22, 0.22]} />
-          <meshStandardMaterial color={color} roughness={0.72} />
-        </mesh>
-      )}
-      {style === 'highTop' && (
-        <mesh position={[0, 0.2, -0.02]} castShadow>
-          <cylinderGeometry args={[0.14, 0.16, 0.18, 12]} />
-          <meshStandardMaterial color={color} roughness={0.72} />
-        </mesh>
-      )}
-      {style === 'curls' && (
-        <>
-          {[[-0.08, 0.1, 0.06], [0.08, 0.1, 0.06], [0, 0.14, -0.08], [-0.1, 0.08, -0.04], [0.1, 0.08, -0.04]].map((p, i) => (
-            <mesh key={i} position={p as [number, number, number]} castShadow>
-              <sphereGeometry args={[0.055, 8, 8]} />
-              <meshStandardMaterial color={color} roughness={0.72} />
-            </mesh>
-          ))}
-        </>
-      )}
-      {style === 'braids' && (
-        <>
-          {[-0.1, 0.1].map((x) => (
-            <mesh key={x} position={[x, 0.02, -0.04]} rotation={[0.4, 0, x > 0 ? 0.2 : -0.2]} castShadow>
-              <cylinderGeometry args={[0.025, 0.02, 0.28, 8]} />
-              <meshStandardMaterial color={color} roughness={0.72} />
-            </mesh>
-          ))}
-          <mesh position={[0, 0.12, -0.02]}>
-            <sphereGeometry args={[0.12, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
-            <meshStandardMaterial color={color} roughness={0.72} />
-          </mesh>
-        </>
-      )}
-      {style === 'spikes' && (
-        <>
-          {[-0.08, -0.03, 0.03, 0.08].map((x, i) => (
-            <mesh key={i} position={[x, 0.16, -0.02]} castShadow>
-              <coneGeometry args={[0.035, 0.14, 6]} />
-              <meshStandardMaterial color={color} roughness={0.72} />
-            </mesh>
-          ))}
-        </>
-      )}
-      {style === 'shaved' && (
-        <mesh position={[0, 0.08, -0.02]} scale={[1, 0.35, 1]}>
-          <sphereGeometry args={[0.17, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
-          <meshStandardMaterial color={color} roughness={0.72} transparent opacity={0.55} />
-        </mesh>
-      )}
+      {parts.map((part) => (
+        <HairPartMesh key={part.id} part={part} color={color} />
+      ))}
     </group>
   );
+}
+
+function HairPartMesh({ part, color }: { part: HairPart; color: string }) {
+  const geometry = useMemo(() => createHairGeometry(part), [part]);
+  useEffect(() => () => disposeGeometry(geometry), [geometry]);
+  const rotation: [number, number, number] = part.rotation ?? [0, 0, 0];
+  const scale: [number, number, number] = part.shape === 'sphere' ? (part.scale ?? [1, 1, 1]) : [1, 1, 1];
+  return (
+    <mesh
+      name={`hair-${part.id}`}
+      geometry={geometry}
+      position={part.position}
+      rotation={rotation}
+      scale={scale}
+      castShadow
+    >
+      <meshStandardMaterial
+        color={color}
+        roughness={0.82}
+        metalness={0}
+        envMapIntensity={0.35}
+        side={DoubleSide}
+      />
+    </mesh>
+  );
+}
+
+function disposeGeometry(geometry: BufferGeometry) {
+  geometry.dispose();
 }

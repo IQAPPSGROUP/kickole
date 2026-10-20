@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group } from 'three';
 import type { GameEngine } from '../engine/engine';
@@ -6,6 +6,7 @@ import type { Skin } from '../game/skins';
 import { computePose, createPose } from './pose';
 import { computePlayerMotion, createPlayerMotion } from './motion';
 import { createMotionRig } from './motionRig';
+import { HairVariants } from './HairVariants';
 
 interface Props {
   engine: GameEngine;
@@ -21,6 +22,7 @@ export function Character({ engine, skin, expressive = true }: Props) {
   const root = useRef<Group>(null);
   const torso = useRef<Group>(null);
   const head = useRef<Group>(null);
+  const [headObj, setHeadObj] = useState<Group | null>(null);
   const armL = useRef<Group>(null);
   const armR = useRef<Group>(null);
   const thighL = useRef<Group>(null);
@@ -118,35 +120,23 @@ export function Character({ engine, skin, expressive = true }: Props) {
             <cylinderGeometry args={[0.06, 0.07, 0.1, 10]} />
             <meshStandardMaterial color={body.skin} />
           </mesh>
-          <group ref={head} position={[0, 0.17, 0]}>
+          <group
+            ref={(node) => {
+              head.current = node;
+              setHeadObj((prev) => (prev === node ? prev : node));
+            }}
+            position={[0, 0.17, 0]}
+          >
             <mesh castShadow>
               <sphereGeometry args={[0.17, 24, 20]} />
               <meshStandardMaterial color={body.skin} roughness={0.8} />
             </mesh>
-            {(skin.hairStyle ?? 'short') === 'short' && (
-              <mesh position={[0, 0.05, -0.02]} scale={[1, 0.85, 1]}>
-                <sphereGeometry args={[0.18, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
-                <meshStandardMaterial color={body.hair} roughness={0.9} />
-              </mesh>
-            )}
-            {(skin.hairStyle ?? 'short') === 'afro' && (
-              <mesh position={[0, 0.12, -0.02]} castShadow>
-                <sphereGeometry args={[0.2, 14, 12]} />
-                <meshStandardMaterial color={body.hair} roughness={0.92} />
-              </mesh>
-            )}
-            {(skin.hairStyle ?? 'short') === 'mohawk' && (
-              <mesh position={[0, 0.18, -0.01]} castShadow>
-                <boxGeometry args={[0.06, 0.22, 0.22]} />
-                <meshStandardMaterial color={body.hair} roughness={0.9} />
-              </mesh>
-            )}
-            {(skin.hairStyle ?? 'short') === 'highTop' && (
-              <mesh position={[0, 0.2, -0.02]} castShadow>
-                <cylinderGeometry args={[0.14, 0.16, 0.18, 12]} />
-                <meshStandardMaterial color={body.hair} roughness={0.9} />
-              </mesh>
-            )}
+            <HairVariants
+              head={headObj ?? undefined}
+              style={skin.hairStyle ?? 'short'}
+              color={body.hair}
+              body="primitive"
+            />
             <mesh position={[-0.06, 0.02, 0.155]}>
               <sphereGeometry args={[0.022, 8, 8]} />
               <meshStandardMaterial color="#142D35" />

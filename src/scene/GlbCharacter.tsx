@@ -1037,6 +1037,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         style={skin.hairStyle ?? 'short'}
         color={skin.body.hair}
         hairMesh={hairMeshes}
+        body={skin.playerBody}
       />
       {pbr && chest && <ShirtNumber bone={chest} id={skin.id} />}
     </>

@@ -112,8 +112,8 @@ function Posters() {
   const textures = useMemo(() => [posterTexture(true), posterTexture(false)], []);
   useEffect(() => () => { textures.forEach((texture) => texture.dispose()); }, [textures]);
   const spots = [
-    { position: [-2.55, 1.12, -7.02] as const, rotation: [0, 0.02, -0.03] as const },
-    { position: [2.15, 1.02, -7.02] as const, rotation: [0, -0.03, 0.02] as const },
+    { position: [-3.35, 1.7, -7.02] as const, rotation: [0, 0.02, -0.03] as const },
+    { position: [2.9, 1.55, -7.02] as const, rotation: [0, -0.03, 0.02] as const },
   ];
   return (
     <group>
@@ -149,10 +149,10 @@ function paintMural(image: CanvasImageSource): CanvasTexture {
         continue;
       }
       const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-      const grit = 0.9 + 0.1 * (n - Math.floor(n));
+      const grit = 0.94 + 0.06 * (n - Math.floor(n));
       const chip = Math.sin(x * 0.37 + y * 1.91) * 43758.5453;
-      const pit = chip - Math.floor(chip) < 0.06 ? 0.42 : 1;
-      data[i + 3] = Math.round(ink * 0.84 * grit * pit * 255);
+      const pit = chip - Math.floor(chip) < 0.045 ? 0.55 : 1;
+      data[i + 3] = Math.round(ink * 0.92 * grit * pit * 255);
     }
   }
   ctx.putImageData(pixels, 0, 0);
@@ -211,7 +211,7 @@ function Bunting({ sway }: { sway: boolean }) {
         const u = row.count === 1 ? 0.5 : i / (row.count - 1);
         const flutter = sway ? Math.sin(time * 1.8 + u * 8 + row.z) * 0.05 : 0;
         const x = row.x0 + u * (row.x1 - row.x0);
-        const y = row.y - Math.sin(u * Math.PI) * 0.42 + flutter;
+        const y = row.y - Math.sin(u * Math.PI) * row.sag + flutter;
         dummy.position.set(x, y, row.z);
         dummy.rotation.set(flutter * 0.5, 0, flutter);
         dummy.scale.set(1.05, 1.05, 1);
@@ -223,7 +223,7 @@ function Bunting({ sway }: { sway: boolean }) {
           const flutter0 = sway ? Math.sin(time * 1.8 + u0 * 8 + row.z) * 0.05 : 0;
           placeRope(
             dummy,
-            row.x0 + u0 * (row.x1 - row.x0), row.y - Math.sin(u0 * Math.PI) * 0.42 + flutter0, row.z,
+            row.x0 + u0 * (row.x1 - row.x0), row.y - Math.sin(u0 * Math.PI) * row.sag + flutter0, row.z,
             x, y, row.z,
           );
           rope.setMatrixAt(span, dummy.matrix);

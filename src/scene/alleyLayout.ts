@@ -54,12 +54,15 @@ export function alleyViewFromSearch(search: string): AlleyView | null {
 export const ALLEY_WORDMARK = 'brand/kickole-wordmark.webp';
 
 export const ALLEY_MURAL = {
-  position: [-0.15, 2.5, -7.03] as const,
-  size: [4.5, 1.62] as const,
+  position: [0.18, 2.28, -7.03] as const,
+  size: [3.7, 1.33] as const,
 };
 
-/** Two strings across the alley mouth, above head height. */
-export const ALLEY_BUNTING: readonly { z: number; y: number; x0: number; x1: number; count: number }[] = [
-  { z: -2.15, y: 3.42, x0: -3.5, x1: 3.15, count: 16 },
-  { z: -4.05, y: 3.15, x0: -2.4, x1: 2.9, count: 12 },
+/**
+ * Two strings across the open sky, above the brick the wordmark is painted on.
+ * `sag` is how far the middle of the rope drops.
+ */
+export const ALLEY_BUNTING: readonly { z: number; y: number; x0: number; x1: number; count: number; sag: number }[] = [
+  { z: -2.0, y: 4.0, x0: -3.5, x1: 3.2, count: 14, sag: 0.22 },
+  { z: -3.4, y: 4.0, x0: -2.6, x1: 2.9, count: 12, sag: 0.18 },
 ];

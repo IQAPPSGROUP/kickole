@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { AgXToneMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
+import { AgXToneMapping, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
@@ -16,8 +16,8 @@ import { KeyLight } from './KeyLight';
 import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
-import { STREET_FILES, streetUrl } from './streetLayout';
 import { PostFX } from './PostFX';
+import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
 import { installPcss, restorePcss } from './pcss';
 import {
   createFpsGuard,
@@ -184,41 +184,51 @@ function StreetTone() {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = 1.05;
+    gl.toneMappingExposure = STREET_EXPOSURE;
   }, [gl]);
   return null;
 }
 
-/** CC0 sunny daytime IBL. High draws it as the sky; medium uses it for reflections only. */
-function StreetSky({ sky }: { sky: 'hdri' | 'reflect' }) {
+/** Shared sunny HDR. Crisp sky on every theme. Image lighting follows the profile. */
+function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
   useEffect(() => {
     let alive = true;
+    let pmDisposed = false;
     let env: ReturnType<PMREMGenerator['fromEquirectangular']>['texture'] | null = null;
+    let hdr: { dispose: () => void } | null = null;
     const pm = new PMREMGenerator(gl);
+    const disposePm = () => {
+      if (pmDisposed) return;
+      pmDisposed = true;
+      pm.dispose();
+    };
     const timer = window.setTimeout(() => {
-      new HDRLoader().load(streetUrl(STREET_FILES.hdri), (hdr) => {
-        if (!alive) { hdr.dispose(); pm.dispose(); return; }
-        env = pm.fromEquirectangular(hdr).texture;
-        scene.environment = env;
-        scene.environmentIntensity = sky === 'hdri' ? 0.78 : 0.58;
-        if (sky === 'hdri') {
-          scene.background = env;
-          scene.backgroundBlurriness = 0.02;
-          scene.backgroundIntensity = 1.05;
+      new HDRLoader().load(`${import.meta.env.BASE_URL}${STREET_HDR_URL}`, (loaded) => {
+        if (!alive) { loaded.dispose(); disposePm(); return; }
+        hdr = loaded;
+        loaded.mapping = EquirectangularReflectionMapping;
+        scene.background = loaded;
+        scene.backgroundBlurriness = 0;
+        scene.backgroundIntensity = 1;
+        if (ibl) {
+          env = pm.fromEquirectangular(loaded).texture;
+          scene.environment = env;
+          scene.environmentIntensity = STREET_ENV_INTENSITY;
         }
-        hdr.dispose();
-        pm.dispose();
+        disposePm();
       });
-    }, sky === 'hdri' ? 180 : 400);
+    }, 180);
     return () => {
       alive = false;
       window.clearTimeout(timer);
       scene.environment = null;
       scene.background = null;
       env?.dispose();
+      hdr?.dispose();
+      disposePm();
     };
-  }, [gl, scene, sky]);
+  }, [gl, scene, ibl]);
   return null;
 }
 
@@ -280,64 +290,37 @@ function forcedTier(): Quality | null {
 }
 
 function World({ controller, skin, quality, onReady }: SceneProps) {
-  const street = ENVIRONMENT_THEME !== 'beach';
   const profile = profileFor(quality);
-  const shadows = street ? profile.shadows !== 'none' : quality !== 'low';
+  const shadows = profile.shadows !== 'none';
   useEffect(() => { onReady(); }, [onReady]);
-  const post = street && (profile.ssao || profile.bloom || profile.dof || profile.aa !== 'none');
   return (
     <>
       <StreetTone />
-      <color attach="background" args={[street ? '#b7e4f8' : '#c5ebf6']} />
-      <fog attach="fog" args={street ? ['#f8edd4', 28, 70] : ['#f6f1e4', 32, 76]} />
+      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#1f78e0' : '#3d8fe8']} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {profile.sky !== 'flat' && <StreetSky sky={profile.sky} />}
+      <SunnyIbl ibl={profile.ibl} />
       <Simulation controller={controller} />
       <PerfProbe />
-      {street ? (
-        <>
-          <hemisphereLight args={['#fff6df', '#f4e6cc', 0.62]} />
-          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.34} color="#ffe7b0" />
-          <KeyLight quality={quality} engine={controller.engine} />
-        </>
-      ) : (
-        <>
-          <hemisphereLight args={['#fff8e8', '#d7f3ea', 0.72]} />
-          <ambientLight intensity={0.22} />
-          <directionalLight
-            position={[5.4, 10.2, 2.6]}
-            intensity={3.15}
-            color="#fff4d4"
-            castShadow={shadows}
-            shadow-mapSize={[quality === 'high' ? 1024 : 512, quality === 'high' ? 1024 : 512]}
-            shadow-camera-left={-3}
-            shadow-camera-right={3}
-            shadow-camera-top={4}
-            shadow-camera-bottom={-3}
-            shadow-camera-near={1}
-            shadow-camera-far={14}
-            shadow-bias={-0.0004}
-            shadow-radius={quality === 'high' ? 3 : 1}
-          />
-        </>
-      )}
+      <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
+      <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
+      <KeyLight quality={quality} engine={controller.engine} />
       <Court shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
-      {((street && profile.contactShadows && profile.shadowFilter !== 'pcss') || (!street && quality === 'high')) && (
+      {profile.contactShadows && (
         <ContactShadows
-          position={[0, 0.006, 0.2]}
-          opacity={street ? 0.4 : 0.26}
-          scale={4}
-          blur={2.2}
-          far={1.2}
-          resolution={256}
-          color={street ? '#6b5344' : '#c4a56a'}
+          position={[0, 0.006, 0.15]}
+          opacity={0.45}
+          scale={3.1}
+          blur={2.1}
+          far={1.5}
+          resolution={quality === 'low' ? 128 : 256}
+          color="#3d2a22"
         />
       )}
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
-      {post && <PostFX profile={profile} engine={controller.engine} />}
+      <PostFX profile={profile} engine={controller.engine} />
     </>
   );
 }
@@ -372,7 +355,6 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
-  const street = ENVIRONMENT_THEME !== 'beach';
   const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
   const detected = useMemo(() => detectTier(device), [device]);
   const forced = useMemo(() => forcedTier(), []);
@@ -390,15 +372,11 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
 
   const profile = profileFor(tier);
-  if (street && profile.shadowFilter === 'pcss') installPcss();
+  if (profile.shadowFilter === 'pcss') installPcss();
   else restorePcss();
-  const dpr = street ? profile.dpr : (tier === 'low' ? [1, 1] : tier === 'medium' ? [1, 1.25] : [1, 1.5]) as [number, number];
-  const shadowsOn = street ? profile.shadows !== 'none' : tier !== 'low';
-  const shadowType = !shadowsOn
-    ? false
-    : street
-      ? (profile.shadowFilter === 'pcss' ? 'basic' : 'variance')
-      : 'percentage';
+  const dpr = profile.dpr;
+  const shadowsOn = profile.shadows !== 'none';
+  const shadowType = !shadowsOn ? false : profile.shadowFilter === 'pcss' ? 'basic' : 'variance';
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}
@@ -408,9 +386,10 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
         shadows={shadowType}
         dpr={dpr}
         gl={{
-          antialias: street ? profile.aa === 'none' : tier !== 'low',
+          antialias: profile.aa === 'none',
           powerPreference: 'high-performance',
-          ...(street ? { toneMapping: AgXToneMapping, toneMappingExposure: 1.05 } : {}),
+          toneMapping: AgXToneMapping,
+          toneMappingExposure: STREET_EXPOSURE,
         }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >

@@ -14,27 +14,27 @@ Clips are sampled from the procedural pose at 30 fps, eased between keys, with t
 
 ## Ball and court
 
-The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), with an original mural on the wall, a chain-link fence, bins and an instanced crowd outside the touchlines. `sunflowers_puresky_1k.hdr` is the warm daytime image-based light and sky. It loads after the first paint.
+The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), with an original mural on the wall, a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is an original sunny equirect: bright sky, warm ground bounce, and the key-light sun. It is the sky on every tier, street and beach, and the image light where IBL is on. It loads after the first paint. The beach keeps its GLB kit and adds golden sand, a saturated blue sea, and triangular bunting.
 
 ## Rendering tiers
 
-Graphics defaults to Auto. `detectTier` reads the GPU name when the browser exposes it, and otherwise the core and memory hints. A15 and newer iPhones, Apple M, Adreno 7xx, Mali-G7xx and Immortalis start on High. Safari only reports "Apple GPU", so that unnamed string is treated as a recent iPhone. An explicit A14 or older name is not. Low, Medium and High in Settings are a saved choice and are not clamped by the device. `stepFpsGuard` drops one runtime tier after the frame rate stays under 30 for five seconds, without writing settings. `?tier=low|medium|high` forces a tier for captures and skips the guard.
+Graphics defaults to Auto. `detectTier` reads the GPU name when the browser exposes it, and otherwise the core and memory hints. A15 and newer, Apple M, Adreno 640 and up, Mali-G7xx and Immortalis stay on High even when memory is reported as 4 GB. A bare `Apple GPU` string does not, because Safari uses it for old and new phones; that device follows cores and memory. An explicit A14 or older name is not High. Low, Medium and High in Settings are a saved choice and are not clamped by the device. `stepFpsGuard` drops one runtime tier after the frame rate stays under 30 for five seconds, without writing settings. `?tier=low|medium|high` forces a tier for captures and skips the guard.
 
 | | Low | Medium | High |
 | --- | --- | --- | --- |
 | Player | LOD1 | LOD0 | LOD0 |
 | Shadows | off | variance, 512 map, tight box | PCSS, 1024 map, tighter box on the player |
-| Contact shadows | off | on | off while PCSS is the shadow |
-| IBL | off | sunset HDR | sunset HDR |
-| Post | hardware AA, AgX | FXAA, LUT, AgX | SSAO, bloom, title and celebration DOF, SMAA, LUT, AgX |
+| Contact shadows | on | on | on, with PCSS |
+| IBL | sunny HDR | sunny HDR | sunny HDR |
+| Post | AgX, warm grade | FXAA, warm grade, AgX | SSAO, linear bloom, DOF, AgX, warm grade, SMAA |
 | Crowd | 8 | 16 | 28 |
 
-AgX tone mapping is applied on the street theme. The colour LUT runs after AgX. Depth of field is on for the title (`menu`), a milestone celebration, and the game-over hold. SSAO is a hemisphere sample of the depth buffer; a failed depth target copies the colour through. Bloom blurs near-white highlights, including the floodlight heads, and adds that glow back onto the picture. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player.
+AgX tone mapping stays on the street theme at an exposure of about 1.3. Faces stay lit by the fill light, not by lifting the whole frame. The street has no fog. The colour LUT runs after AgX: a gentle S-curve restores contrast, blacks stay slightly deep, and vibrance pushes the pinks, teals and yellows. Bloom samples the linear beauty pass before AgX and stays tight so highlights glow without a milk haze. Anti-aliasing follows the grade. Depth of field is on for the title (`menu`), a milestone celebration, and the game-over hold. SSAO is a hemisphere sample of the depth buffer; a failed depth target copies the colour through. The shadow itself is wide and lighter than black. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player. The home label and tagline sit on a dark scrim so the light type stays readable on the sky.
 
 ## Download
 
-The active player GLB is about 7 MB. Court colour maps and the Basis transcoder come with the first load. Normals, roughness and the HDR are requested after the first paint so the initial art stays under about 15 MB. Low does not request the HDR or the detail maps.
+The active player GLB is about 7 MB. Court colour maps and the Basis transcoder come with the first load. Normals, roughness and the sunny HDR are requested after the first paint so the initial art stays under about 15 MB. Low still loads the sunny HDR so the sky and the face fill match the other tiers. Low skips the detail maps.
 
 ## Licence
 
-The footballers are Fab Standard licence assets, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group. They ship inside the app and the web build. The raw download does not. Poly Haven `asphalt_02`, `concrete_wall_001` and `sunflowers_puresky` are CC0. The mural, ball shading and clips are original. Full text is in `public/models/LICENSE`.
+The footballers are Fab Standard licence assets, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group. They ship inside the app and the web build. The raw download does not. Poly Haven `asphalt_02` and `concrete_wall_001` are CC0. The sunny sky, mural, ball shading and clips are original. Full text is in `public/models/LICENSE`.

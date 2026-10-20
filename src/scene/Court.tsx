@@ -8,6 +8,7 @@ import { ENVIRONMENT_THEME } from './environment';
 import { Crowd } from './Crowd';
 import { profileFor } from './qualityTier';
 import { prefersReducedMotion, sceneLifeBudget } from './juice';
+import { createPennantGeometry, placeRope } from './pennant';
 import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, LAMP_SPOTS, STREET_FILES, streetUrl, wallMapSet, type FenceSlot, type LampSpot } from './streetLayout';
 import { useStreetMaps, useStreetNodes, type StreetMaps } from './streetMaterials';
 
@@ -145,10 +146,19 @@ const FLAG_X = [-4.15, -3.25, -2.35, -1.45, -0.55, 0.35];
 /** Bunting, flags and streamers. Four instanced draws, all outside the play box. */
 function CarnivalDressing({ sway }: { sway: boolean }) {
   const buntingRef = useRef<InstancedMesh>(null);
+  const ropeRef = useRef<InstancedMesh>(null);
   const wallRef = useRef<InstancedMesh>(null);
   const flagRef = useRef<InstancedMesh>(null);
   const poleRef = useRef<InstancedMesh>(null);
   const streamerRef = useRef<InstancedMesh>(null);
+  const buntingGeo = useMemo(() => createPennantGeometry(), []);
+  const wallGeo = useMemo(() => createPennantGeometry(), []);
+  const flagGeo = useMemo(() => createPennantGeometry(), []);
+  useEffect(() => () => {
+    buntingGeo.dispose();
+    wallGeo.dispose();
+    flagGeo.dispose();
+  }, [buntingGeo, wallGeo, flagGeo]);
   const dummy = useMemo(() => new Object3D(), []);
   const tint = useMemo(() => new Color(), []);
   const buntingN = 18;
@@ -160,8 +170,8 @@ function CarnivalDressing({ sway }: { sway: boolean }) {
     if (bunting) {
       for (let i = 0; i < buntingN; i++) {
         const u = i / (buntingN - 1);
-        dummy.position.set(-3.9 + u * 7.6, 3.5 - Math.sin(u * Math.PI) * 0.26 + flutter(u, 2.1), -3.42);
-        dummy.rotation.set(0, 0, Math.PI + (u - 0.5) * 0.18 + flutter(u, 2.1));
+        dummy.position.set(-3.9 + u * 7.6, 3.55 - Math.sin(u * Math.PI) * 0.38 + flutter(u, 2.1), -3.42);
+        dummy.rotation.set(flutter(u, 2.1) * 0.4, 0, flutter(u, 2.1));
         dummy.scale.set(1.15, 1.15, 1);
         dummy.updateMatrix();
         bunting.setMatrixAt(i, dummy.matrix);
@@ -169,13 +179,27 @@ function CarnivalDressing({ sway }: { sway: boolean }) {
       }
       bunting.instanceMatrix.needsUpdate = true;
       if (colors && bunting.instanceColor) bunting.instanceColor.needsUpdate = true;
+      const rope = ropeRef.current;
+      if (rope) {
+        for (let i = 0; i < buntingN - 1; i++) {
+          const u0 = i / (buntingN - 1);
+          const u1 = (i + 1) / (buntingN - 1);
+          placeRope(
+            dummy,
+            -3.9 + u0 * 7.6, 3.55 - Math.sin(u0 * Math.PI) * 0.38 + flutter(u0, 2.1), -3.42,
+            -3.9 + u1 * 7.6, 3.55 - Math.sin(u1 * Math.PI) * 0.38 + flutter(u1, 2.1), -3.42,
+          );
+          rope.setMatrixAt(i, dummy.matrix);
+        }
+        rope.instanceMatrix.needsUpdate = true;
+      }
     }
     const wall = wallRef.current;
     if (wall) {
       for (let i = 0; i < wallN; i++) {
         const u = i / (wallN - 1);
-        dummy.position.set(-3.6 + u * 6.4, 2.15 - Math.sin(u * Math.PI) * 0.16 + flutter(u, 1.7), -3.46);
-        dummy.rotation.set(0, 0, Math.PI + flutter(u, 1.7));
+        dummy.position.set(-3.6 + u * 6.4, 2.28 - Math.sin(u * Math.PI) * 0.28 + flutter(u, 1.7), -3.46);
+        dummy.rotation.set(0, 0, flutter(u, 1.7));
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
         wall.setMatrixAt(i, dummy.matrix);
@@ -196,8 +220,8 @@ function CarnivalDressing({ sway }: { sway: boolean }) {
         poles.setMatrixAt(i, dummy.matrix);
       }
       if (flags) {
-        dummy.position.set(x + 0.22, 3.62 + flutter(u, 2.4), -3.46);
-        dummy.rotation.set(0, 0.35, flutter(u, 2.4) * 1.4);
+        dummy.position.set(x + 0.02, 3.72 + flutter(u, 2.4), -3.46);
+        dummy.rotation.set(0, 0.4, flutter(u, 2.4) * 1.4);
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
         flags.setMatrixAt(i, dummy.matrix);
@@ -228,21 +252,25 @@ function CarnivalDressing({ sway }: { sway: boolean }) {
   useFrame((state) => { if (sway) paint(state.clock.elapsedTime, false); });
   return (
     <group>
+      <instancedMesh ref={ropeRef} args={[undefined, undefined, buntingN - 1]}>
+        <cylinderGeometry args={[0.012, 0.012, 1, 5]} />
+        <meshStandardMaterial color="#fff6ea" roughness={0.55} />
+      </instancedMesh>
       <instancedMesh ref={buntingRef} args={[undefined, undefined, buntingN]}>
-        <circleGeometry args={[0.16, 3]} />
-        <meshStandardMaterial side={DoubleSide} roughness={0.42} metalness={0} />
+        <primitive object={buntingGeo} attach="geometry" />
+        <meshStandardMaterial side={DoubleSide} roughness={0.48} metalness={0} />
       </instancedMesh>
       <instancedMesh ref={wallRef} args={[undefined, undefined, wallN]}>
-        <circleGeometry args={[0.13, 3]} />
-        <meshStandardMaterial side={DoubleSide} roughness={0.42} metalness={0} />
+        <primitive object={wallGeo} attach="geometry" />
+        <meshStandardMaterial side={DoubleSide} roughness={0.48} metalness={0} />
       </instancedMesh>
       <instancedMesh ref={poleRef} args={[undefined, undefined, FLAG_X.length]}>
         <cylinderGeometry args={[0.02, 0.028, 1.15, 6]} />
         <meshStandardMaterial color="#fff6ea" roughness={0.4} metalness={0.05} />
       </instancedMesh>
       <instancedMesh ref={flagRef} args={[undefined, undefined, FLAG_X.length]}>
-        <planeGeometry args={[0.52, 0.32]} />
-        <meshStandardMaterial side={DoubleSide} roughness={0.38} metalness={0} />
+        <primitive object={flagGeo} attach="geometry" />
+        <meshStandardMaterial side={DoubleSide} roughness={0.45} metalness={0} />
       </instancedMesh>
       <instancedMesh ref={streamerRef} args={[undefined, undefined, streamerN]}>
         <planeGeometry args={[0.07, 0.78]} />
@@ -347,11 +375,11 @@ const LINE_W = 0.14;
 
 function useLineMaterial() {
   const material = useMemo(() => new MeshStandardMaterial({
-    color: '#f7f4ec',
-    roughness: 0.4,
+    color: '#fffdf8',
+    roughness: 0.62,
     metalness: 0,
-    emissive: '#e4dccb',
-    emissiveIntensity: 0.65,
+    emissive: '#000000',
+    emissiveIntensity: 0,
     polygonOffset: true,
     polygonOffsetFactor: -4,
     polygonOffsetUnits: -12,
@@ -485,10 +513,10 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         <planeGeometry args={[40.5, 40.5]} />
         <meshStandardMaterial
           map={apron.color ?? undefined}
-          color={apron.color ? '#fff8ee' : '#d9d0c4'}
-          roughness={0.72}
-          metalness={0.04}
-          envMapIntensity={0.85}
+          color={apron.color ? '#e4d2b4' : '#c4b49a'}
+          roughness={0.84}
+          metalness={0.02}
+          envMapIntensity={0.35}
         />
       </mesh>
       <mesh position={[0, -0.08, 0]} receiveShadow={shadows}>
@@ -501,10 +529,10 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
           map={court.color ?? undefined}
           normalMap={court.normal ?? undefined}
           roughnessMap={court.rough ?? undefined}
-          color={court.color ? '#ffffff' : '#6d6a66'}
-          roughness={court.rough ? 0.82 : 0.62}
-          metalness={0.04}
-          envMapIntensity={1.15}
+          color={court.color ? '#d7c4a4' : '#6d6a66'}
+          roughness={court.rough ? 0.9 : 0.72}
+          metalness={0.02}
+          envMapIntensity={0.4}
         />
       </mesh>
       <CourtLines />

@@ -42,11 +42,15 @@ describe('quality tiers', () => {
     expect(gpuTier('')).toBeNull();
     expect(detectTier({ cores: 16, memoryGb: 16, gpu: 'llvmpipe' })).toBe('low');
     expect(detectTier({ cores: 8, memoryGb: 8, gpu: 'NVIDIA GeForce RTX 3060' })).toBe('high');
-    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple GPU' })).toBe('high');
+    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple GPU' })).toBe('medium');
+    expect(isFlagshipGpu('Apple GPU')).toBe(false);
     expect(detectTier({ cores: 4, memoryGb: 4, gpu: 'Apple A16 GPU' })).toBe('high');
     expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple A14 GPU' })).toBe('medium');
     expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Adreno (TM) 740' })).toBe('high');
-    expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Adreno (TM) 660' })).toBe('medium');
+    expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Adreno (TM) 660' })).toBe('high');
+    expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Adreno (TM) 619' })).toBe('medium');
+    expect(isFlagshipGpu('Adreno (TM) 660')).toBe(true);
+    expect(isFlagshipGpu('Adreno (TM) 619')).toBe(false);
     expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Mali-G710' })).toBe('high');
     expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Immortalis-G715' })).toBe('high');
     expect(isFlagshipGpu('Apple A15 GPU')).toBe(true);
@@ -98,7 +102,8 @@ describe('quality tiers', () => {
     expect(profileFor('low').aa).toBe('none');
     expect(profileFor('high').shadows).toBe('tight');
     expect(profileFor('high').shadowFilter).toBe('pcss');
-    expect(profileFor('high').contactShadows).toBe(false);
+    expect(profileFor('high').contactShadows).toBe(true);
+    expect(profileFor('low').contactShadows).toBe(true);
     expect(profileFor('medium').contactShadows).toBe(true);
     expect(profileFor('medium').shadowFilter).toBe('vsm');
     expect(profileFor('medium').ibl).toBe(true);

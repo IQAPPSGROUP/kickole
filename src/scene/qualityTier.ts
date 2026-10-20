@@ -66,18 +66,20 @@ function rank(tier: Quality): number {
 }
 
 /**
- * Phones that should start on High: A15 and newer, Apple M, Adreno 7xx, Mali-G7xx, Immortalis.
- * Safari reports current iPhones as "Apple GPU" with no A-number, so that string counts too.
- * An explicit older A-series name, such as A14, does not.
+ * Phones that stay on High even with a 4 GB memory bucket: A15 and newer, Apple M,
+ * Adreno 640 and up (including 7xx), Mali-G7xx, Immortalis.
+ * A bare "Apple GPU" string is not enough. Safari uses it for old and new phones,
+ * so that device follows the core and memory tier unless the A-number is present.
  */
 export function isFlagshipGpu(renderer: string): boolean {
   const g = renderer.toLowerCase().trim();
   if (!g || /swiftshader|llvmpipe|softpipe|microsoft basic render/.test(g)) return false;
-  if (/adreno(?:\s*\(tm\))?\s*7\d\d\b/.test(g)) return true;
+  const adreno = g.match(/adreno(?:\s*\(tm\))?\s*(\d{3})/);
+  if (adreno && Number(adreno[1]) >= 640) return true;
   if (/mali-g7\d\d/.test(g) || /immortalis/.test(g)) return true;
   const appleGen = g.match(/\bapple a(\d+)\b/);
   if (appleGen) return Number(appleGen[1]) >= 15;
-  if (/apple m\d/.test(g) || /\bapple gpu\b/.test(g)) return true;
+  if (/apple m\d/.test(g)) return true;
   return false;
 }
 
@@ -176,7 +178,8 @@ function cpuTier(device: DeviceHints): Quality {
 
 /**
  * GPU name first. A software renderer or 2 GB forces Low.
- * A15+, Adreno 7xx, Mali-G7xx and Immortalis stay on High instead of stepping down for a 4–6 core phone.
+ * A15+, Adreno 640 and newer, Mali-G7xx and Immortalis stay on High instead of stepping down for a 4–6 core phone.
+ * A bare Apple GPU string is not in that list.
  * Any other strong GPU on a small CPU still steps down. The FPS guard can still drop a tier later.
  */
 export function detectTier(device: DeviceHints): Quality {
@@ -247,14 +250,14 @@ export function profileFor(tier: Quality): TierProfile {
     case 'low':
       return {
         lod: 1, shadows: 'none', shadowMap: 0, shadowFilter: 'off', shadowExtent: 0, shadowRadius: 0,
-        contactShadows: false, ssao: false, bloom: false, dof: false, aa: 'none', ibl: false,
+        contactShadows: true, ssao: false, bloom: false, dof: false, aa: 'none', ibl: true,
         dpr: [1, 1], crowd: 8,
         courtMaps: 'color', fence: 'plane', decals: false, crowdLod: 2, crowdIdle: false,
         sky: 'flat', lamp: 'simple',
       };
     case 'medium':
       return {
-        lod: 0, shadows: 'tight', shadowMap: 512, shadowFilter: 'vsm', shadowExtent: 4.8, shadowRadius: 4,
+        lod: 0, shadows: 'tight', shadowMap: 512, shadowFilter: 'vsm', shadowExtent: 4.8, shadowRadius: 8,
         contactShadows: true, ssao: false, bloom: false, dof: false, aa: 'fxaa', ibl: true,
         dpr: [1, 1.25], crowd: 16,
         courtMaps: 'rough', fence: 'sparse', decals: true, crowdLod: 1, crowdIdle: true,
@@ -262,8 +265,8 @@ export function profileFor(tier: Quality): TierProfile {
       };
     case 'high':
       return {
-        lod: 0, shadows: 'tight', shadowMap: 1024, shadowFilter: 'pcss', shadowExtent: 3.2, shadowRadius: 28,
-        contactShadows: false, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
+        lod: 0, shadows: 'tight', shadowMap: 1024, shadowFilter: 'pcss', shadowExtent: 3.2, shadowRadius: 42,
+        contactShadows: true, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
         dpr: [1, 1.5], crowd: 28,
         courtMaps: 'full', fence: 'link', decals: true, crowdLod: 0, crowdIdle: true,
         sky: 'hdri', lamp: 'lit',

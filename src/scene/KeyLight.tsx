@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { DirectionalLight, OrthographicCamera } from 'three';
 import type { GameEngine } from '../engine/engine';
 import type { Quality } from '../game/storage';
+import { STREET_KEY } from './daylight';
 import { profileFor } from './qualityTier';
 import { shadowFocus } from './shadowFit';
 
@@ -17,7 +18,7 @@ export function KeyLight({ quality, engine }: { quality: Quality; engine: GameEn
   const scene = useThree((state) => state.scene);
   const light = useMemo(() => {
     const profile = profileFor(quality);
-    const sun = new DirectionalLight('#ffe2b0', 3.4);
+    const sun = new DirectionalLight(STREET_KEY.color, STREET_KEY.intensity);
     sun.castShadow = profile.shadows !== 'none';
     sun.shadow.mapSize.set(profile.shadowMap || 512, profile.shadowMap || 512);
     sun.shadow.bias = profile.shadowFilter === 'pcss' ? -0.0016 : -0.00045;

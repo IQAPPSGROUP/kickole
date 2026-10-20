@@ -22,6 +22,7 @@ import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import type { GameEngine } from '../engine/engine';
+import { STREET_BLOOM, streetPostPassNames, type StreetPassName } from './daylight';
 import { depthOfFieldActive, depthOfFieldFocus, depthOfFieldScale, gradeDisplayColor } from './presentation';
 import type { TierProfile } from './qualityTier';
 import { SsaoPass } from './ssaoPass';
@@ -268,35 +269,58 @@ class CountingRenderPass extends RenderPass {
 const FORWARD = new Vector3();
 
 /**
- * Post stack for mid and high. A priority-1 frame replaces the default render.
- * AgX runs in OutputPass. The street LUT grades that display image.
+ * Post stack for every street tier. The composer target is linear, so bloom
+ * runs before OutputPass applies AgX. The grade and anti-aliasing follow AgX.
  * Depth of field opens on the title, celebration, and game-over holds.
  */
 export function PostFX({ profile, engine }: { profile: TierProfile; engine: GameEngine }) {
   const { gl, scene, camera, size } = useThree();
   const lut = useMemo(() => streetLut(), []);
-  const stack = useMemo(() => {
+  const stack = useMemo((): { effect: EffectComposer; bokeh: BokehPass | null } => {
     const effect = new EffectComposer(gl as WebGLRenderer);
-    effect.addPass(new CountingRenderPass(scene, camera));
-    if (profile.ssao) effect.addPass(new SsaoPass(scene, camera, size.width, size.height));
-    if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.9, 0.72));
     let bokeh: BokehPass | null = null;
-    if (profile.dof) {
-      bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.004, maxblur: 0.014 });
-      bokeh.enabled = false;
-      effect.addPass(bokeh);
-    }
-    if (profile.aa === 'smaa') effect.addPass(new SMAAPass());
-    effect.addPass(new OutputPass());
-    effect.addPass(new ShaderPass({
-      uniforms: {
-        tDiffuse: { value: null },
-        uLut: { value: lut },
-      },
-      vertexShader: FULLSCREEN_VERTEX,
-      fragmentShader: LUT_FRAGMENT,
-    }));
-    if (profile.aa === 'fxaa') effect.addPass(new ShaderPass(FXAAShader));
+    const add = (name: StreetPassName) => {
+      switch (name) {
+        case 'beauty':
+          effect.addPass(new CountingRenderPass(scene, camera));
+          break;
+        case 'ssao':
+          effect.addPass(new SsaoPass(scene, camera, size.width, size.height));
+          break;
+        case 'bloom':
+          effect.addPass(new SafeBloomPass(size.width, size.height, STREET_BLOOM.strength, STREET_BLOOM.threshold));
+          break;
+        case 'dof':
+          bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.004, maxblur: 0.014 });
+          bokeh.enabled = false;
+          effect.addPass(bokeh);
+          break;
+        case 'agx':
+          effect.addPass(new OutputPass());
+          break;
+        case 'grade':
+          effect.addPass(new ShaderPass({
+            uniforms: {
+              tDiffuse: { value: null },
+              uLut: { value: lut },
+            },
+            vertexShader: FULLSCREEN_VERTEX,
+            fragmentShader: LUT_FRAGMENT,
+          }));
+          break;
+        case 'smaa':
+          effect.addPass(new SMAAPass());
+          break;
+        case 'fxaa':
+          effect.addPass(new ShaderPass(FXAAShader));
+          break;
+        default: {
+          const neverName: never = name;
+          throw new Error(`unexpected post pass ${String(neverName)}`);
+        }
+      }
+    };
+    for (const name of streetPostPassNames(profile)) add(name);
     return { effect, bokeh };
   }, [gl, scene, camera, profile.ssao, profile.bloom, profile.dof, profile.aa, lut, size.width, size.height]);
 

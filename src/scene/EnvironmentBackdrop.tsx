@@ -24,7 +24,6 @@ class BackdropBoundary extends Component<{ children: ReactNode; fallback: ReactN
 }
 
 const SUNSET = new Color('#6C5CE7');
-const BEACH_SUN = new Color('#fff6e4');
 
 function prepareBackdrop(root: Object3D, theme: EnvironmentTheme) {
   root.traverse((o) => {
@@ -38,10 +37,9 @@ function prepareBackdrop(root: Object3D, theme: EnvironmentTheme) {
       const mat = material as Material & { fog?: boolean; envMapIntensity?: number };
       // Court fog is tuned for the play area; without this the backdrop washes into the sky.
       mat.fog = false;
-      if (typeof mat.envMapIntensity === 'number') mat.envMapIntensity = theme === 'street' ? 0.25 : 0.9;
+      if (typeof mat.envMapIntensity === 'number') mat.envMapIntensity = theme === 'street' ? 0.25 : 0.4;
       const tinted = material as Material & { color?: Color };
       if (theme === 'street' && tinted.color?.isColor) tinted.color.lerp(SUNSET, 0.22);
-      if (theme === 'beach' && tinted.color?.isColor) tinted.color.lerp(BEACH_SUN, 0.22);
       mat.needsUpdate = true;
     });
   });

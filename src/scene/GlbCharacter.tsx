@@ -225,8 +225,7 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
         if (dx * dx + dy * dy > reach * reach) continue;
         if (p[2] > z) z = p[2];
       }
-      socket.y -= 0.004;
-      socket.z = z + 0.006;
+      socket.z = z + 0.008;
     }
   } else {
     for (const socket of sockets) socket.z += 0.006;
@@ -253,7 +252,6 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
   for (const socket of sockets) {
     const eye = new Mesh(geometry, material);
     eye.name = 'FaceEye';
-    eye.userData.billboardEye = true;
     eye.position.set(socket.x, socket.y, socket.z);
     eye.scale.set(1, 0.64, 1);
     eye.castShadow = false;
@@ -655,7 +653,6 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; express
  */
 export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quality = 'high' }: Props) {
   const gl = useThree((state) => state.gl);
-  const camera = useThree((state) => state.camera);
   ktxRenderer.gl = gl;
   // drei types GLTFLoader from three-stdlib, which does not match three's KTX2Loader.
   const gltf = useGLTF(characterModelUrl(characterLod(quality), skin.playerBody), DRACO_DECODER_PATH, true, extendCharacterLoader as never);
@@ -875,14 +872,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     return map;
   }, [clips, mixer]);
 
-  const faceEyes = useMemo(() => {
-    const list: Mesh[] = [];
-    scene.traverse((node) => {
-      const mesh = node as Mesh;
-      if (mesh.isMesh && mesh.userData.billboardEye) list.push(mesh);
-    });
-    return list;
-  }, [scene]);
   const pose = useMemo(() => createPose(), []);
   const motion = useMemo(() => createPlayerMotion(), []);
   const motionRig = useMemo(() => createMotionRig({ root: scene, spine: bones.spine, head: bones.head,
@@ -910,15 +899,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     current.state = null;
     current.token = -1;
   }, [mixer, current, motionRig]);
-
-  const aimEyes = () => {
-    if (faceEyes.length === 0) return;
-    scene.updateMatrixWorld(true);
-    for (const eye of faceEyes) {
-      eye.lookAt(camera.position);
-      eye.rotateY(Math.PI);
-    }
-  };
 
   useFrame((_, dt) => {
     motionRig.restore();
@@ -1005,7 +985,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         }
         inspector.trace.push({ state: current.state ?? '', clip: next.clipTime ?? null, t: engine.time, joints });
       }
-      aimEyes();
       return;
     }
     if (kind === 'ue') {
@@ -1035,7 +1014,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         const selected = selectAnimationState(engine);
         inspector.trace.push({ state: selected.state, clip: selected.clipTime ?? null, t: engine.time, joints });
       }
-      aimEyes();
       return;
     }
     // Fallback for rigs without clips: apply the procedural pose on top of the rest pose.
@@ -1058,7 +1036,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     set('footLeft', pose.legs.left.foot, pose.legs.left.ankleYaw, pose.legs.left.ankleRoll);
     set('footRight', pose.legs.right.foot, pose.legs.right.ankleYaw, pose.legs.right.ankleRoll);
     if (expressive && !pose.lockMotion) motionRig.apply(computePlayerMotion(engine, motion), false);
-    aimEyes();
   });
 
   return (

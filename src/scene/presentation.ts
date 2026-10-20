@@ -46,19 +46,26 @@ function clamp01(value: number): number {
 }
 
 /**
- * Display-referred street grade. It runs after AgX, so it tints the picture
- * instead of crushing the face photograph in linear light.
+ * Display grade after AgX. Midtones lift, highlights stay near white,
+ * and a small warm tint keeps carnival colour without painting the face orange.
  */
 export function gradeDisplayColor(r: number, g: number, b: number): [number, number, number] {
   const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
-  const shadow = 1 - smoothstep(0.12, 0.5, luma);
-  const highlight = smoothstep(0.55, 0.92, luma);
-  let red = r + highlight * 0.04 + shadow * 0.008;
-  let green = g + highlight * 0.01 + shadow * 0.006;
-  let blue = b - highlight * 0.028 + shadow * 0.02;
-  const sat = 1.05;
-  red = luma + (red - luma) * sat;
-  green = luma + (green - luma) * sat;
-  blue = luma + (blue - luma) * sat;
-  return [clamp01(red * 0.98 + 0.016), clamp01(green * 0.98 + 0.014), clamp01(blue * 0.98 + 0.014)];
+  const mid = luma * (1 - luma);
+  const lifted = luma + mid * 0.18;
+  const scale = luma > 1e-5 ? lifted / luma : 1;
+  let red = r * scale;
+  let green = g * scale;
+  let blue = b * scale;
+  const highlight = smoothstep(0.62, 0.92, lifted);
+  red += highlight * 0.03;
+  green += highlight * 0.01;
+  blue -= highlight * 0.018;
+  const sat = 1.08;
+  const nextLuma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+  red = nextLuma + (red - nextLuma) * sat;
+  green = nextLuma + (green - nextLuma) * sat;
+  blue = nextLuma + (blue - nextLuma) * sat;
+  const toe = 0.018;
+  return [clamp01(red * (1 - toe) + toe), clamp01(green * (1 - toe) + toe * 0.96), clamp01(blue * (1 - toe) + toe * 0.9)];
 }

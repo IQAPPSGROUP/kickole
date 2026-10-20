@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { AgXToneMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
+import { AgXToneMapping, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
@@ -18,6 +18,7 @@ import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
+import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
 import { installPcss, restorePcss } from './pcss';
 import {
   createFpsGuard,
@@ -197,28 +198,38 @@ function StreetTone() {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = 1.05;
+    gl.toneMappingExposure = STREET_EXPOSURE;
   }, [gl]);
   return null;
 }
 
-/** CC0 sunset IBL. Loaded after the first paint so the character and court colour maps win the initial budget. */
-function SunsetIbl() {
+/** Original sunny HDR. The sky is the background on every street tier. Image lighting follows the profile. */
+function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
   useEffect(() => {
     let alive = true;
+    let pmDisposed = false;
     let env: ReturnType<PMREMGenerator['fromEquirectangular']>['texture'] | null = null;
+    let hdr: { dispose: () => void } | null = null;
     const pm = new PMREMGenerator(gl);
+    const disposePm = () => {
+      if (pmDisposed) return;
+      pmDisposed = true;
+      pm.dispose();
+    };
     const timer = window.setTimeout(() => {
-      new HDRLoader().load(`${import.meta.env.BASE_URL}textures/venice_sunset_1k.hdr`, (hdr) => {
-        if (!alive) { hdr.dispose(); pm.dispose(); return; }
-        env = pm.fromEquirectangular(hdr).texture;
-        scene.environment = env;
-        scene.background = env;
-        scene.backgroundBlurriness = 0.55;
-        scene.environmentIntensity = 0.42;
-        hdr.dispose();
-        pm.dispose();
+      new HDRLoader().load(`${import.meta.env.BASE_URL}${STREET_HDR_URL}`, (loaded) => {
+        if (!alive) { loaded.dispose(); disposePm(); return; }
+        hdr = loaded;
+        loaded.mapping = EquirectangularReflectionMapping;
+        scene.background = loaded;
+        scene.backgroundBlurriness = 0.18;
+        if (ibl) {
+          env = pm.fromEquirectangular(loaded).texture;
+          scene.environment = env;
+          scene.environmentIntensity = STREET_ENV_INTENSITY;
+        }
+        disposePm();
       });
     }, 400);
     return () => {
@@ -227,8 +238,10 @@ function SunsetIbl() {
       scene.environment = null;
       scene.background = null;
       env?.dispose();
+      hdr?.dispose();
+      disposePm();
     };
-  }, [gl, scene]);
+  }, [gl, scene, ibl]);
   return null;
 }
 
@@ -294,21 +307,21 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const profile = profileFor(quality);
   const shadows = street ? profile.shadows !== 'none' : quality !== 'low';
   useEffect(() => { onReady(); }, [onReady]);
-  const post = street && (profile.ssao || profile.bloom || profile.dof || profile.aa !== 'none');
+  const post = street;
   return (
     <>
       {street && <StreetTone />}
-      <color attach="background" args={[street ? '#3a2a28' : '#8dc5cb']} />
-      <fog attach="fog" args={street ? ['#5c3a32', 22, 48] : ['#8dc5cb', 24, 52]} />
+      <color attach="background" args={[street ? '#f6e4c8' : '#8dc5cb']} />
+      <fog attach="fog" args={street ? ['#f3ddc0', 28, 70] : ['#8dc5cb', 24, 52]} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {street && profile.ibl && <SunsetIbl />}
+      {street && <SunnyIbl ibl={profile.ibl} />}
       {!street && quality === 'high' && <Environment />}
       <Simulation controller={controller} />
       <PerfProbe />
       {street ? (
         <>
-          <hemisphereLight args={['#ffd2a8', '#1c1614', 0.28]} />
-          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.22} color="#8aa4c8" />
+          <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
+          <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
           <KeyLight quality={quality} engine={controller.engine} />
         </>
       ) : (
@@ -337,12 +350,12 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       {((street && profile.contactShadows && profile.shadowFilter !== 'pcss') || (!street && quality === 'high')) && (
         <ContactShadows
           position={[0, 0.006, 0.2]}
-          opacity={street ? 0.4 : 0.38}
+          opacity={street ? 0.16 : 0.28}
           scale={4}
-          blur={2.2}
+          blur={3.4}
           far={1.2}
           resolution={256}
-          color={street ? '#1a120e' : '#1E2A5A'}
+          color={street ? '#6a5344' : '#1E2A5A'}
         />
       )}
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
@@ -421,7 +434,7 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
         gl={{
           antialias: street ? profile.aa === 'none' : tier !== 'low',
           powerPreference: 'high-performance',
-          ...(street ? { toneMapping: AgXToneMapping, toneMappingExposure: 1.05 } : {}),
+          ...(street ? { toneMapping: AgXToneMapping, toneMappingExposure: STREET_EXPOSURE } : {}),
         }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >

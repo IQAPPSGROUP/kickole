@@ -813,6 +813,25 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   letter-spacing: 1px;
 }
 .launch-card p { margin: 0; font-size: 12px; line-height: 1.45; color: #f7e9c5; }
+/* The pulled-back portrait camera puts the wordmark in the same upper band
+   as a centered score card. Park the card on the left so every letter stays clear. */
+@media (orientation: portrait) {
+  .hud-top {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    top: 0;
+    margin: 6px 0 0;
+  }
+  .hud-coaching {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    top: 128px;
+    width: min(42vw, 168px);
+    margin: 0;
+    align-items: flex-start;
+  }
+  .hint-tip { max-width: min(42vw, 168px); }
+}
 @media (max-width: 390px) {
   .player-preview { height: 180px; }
   .shop-action { min-width: 78px; font-size: 9px; }

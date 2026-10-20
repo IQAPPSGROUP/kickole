@@ -102,6 +102,8 @@ describe('alley environment', () => {
   it('shows the full wordmark between the phone HUD and the player', () => {
     const [x, y, z] = ALLEY_MURAL.position;
     const [width, height] = ALLEY_MURAL.size;
+    const letterTop = y + height / 2 - (96 / 368) * height;
+    const letterBottom = y + height / 2 - (296 / 368) * height;
     const point = new Vector3();
     for (const aspect of [390 / 844, 430 / 932]) {
       const cam = new PerspectiveCamera(GAMEPLAY_FOV, aspect, 0.1, 200);
@@ -109,37 +111,50 @@ describe('alley environment', () => {
       cam.lookAt(GAMEPLAY_TARGET);
       cam.updateMatrixWorld();
       cam.updateProjectionMatrix();
-      expect(cam.position.y).toBeGreaterThan(1.5);
-      expect(cam.position.y).toBeLessThan(1.7);
+      const horiz = Math.hypot(GAMEPLAY_TARGET.x - cam.position.x, GAMEPLAY_TARGET.z - cam.position.z);
+      const pitch = Math.atan2(cam.position.y - GAMEPLAY_TARGET.y, horiz) * 180 / Math.PI;
+      expect(cam.position.y).toBeGreaterThan(1.75);
+      expect(cam.position.y).toBeLessThan(2.05);
+      expect(pitch).toBeGreaterThan(6);
+      expect(pitch).toBeLessThan(14);
       const screen = (px: number, py: number, pz: number) => {
         point.set(px, py, pz).project(cam);
         return { x: point.x * 0.5 + 0.5, y: 1 - (point.y * 0.5 + 0.5) };
       };
-      const corners = [
-        screen(x - width / 2, y + height / 2, z),
-        screen(x + width / 2, y + height / 2, z),
-        screen(x - width / 2, y - height / 2, z),
-        screen(x + width / 2, y - height / 2, z),
+      const letters = [
+        screen(x - width / 2, letterTop, z),
+        screen(x + width / 2, letterTop, z),
+        screen(x - width / 2, letterBottom, z),
+        screen(x + width / 2, letterBottom, z),
       ];
-      for (const corner of corners) {
-        expect(corner.x).toBeGreaterThan(0.03);
-        expect(corner.x).toBeLessThan(0.97);
-        // Below the score card and the challenge prompt, above the player's crown.
-        expect(corner.y).toBeGreaterThan(0.22);
-        expect(corner.y).toBeLessThan(0.42);
+      for (const corner of letters) {
+        // Right of the top-left score card, on screen, above the chain-link.
+        expect(corner.x).toBeGreaterThan(0.38);
+        expect(corner.x).toBeLessThan(0.99);
+        expect(corner.y).toBeGreaterThan(0.04);
+        expect(corner.y).toBeLessThan(0.16);
       }
-      const crown = screen(0, 1.75, 0.04);
-      const feet = screen(0, 0, 0.04);
-      const wallBase = screen(0, 0.02, -7.04);
-      expect(crown.y).toBeGreaterThan(corners[2].y + 0.04);
-      expect(feet.y).toBeGreaterThan(0.9);
-      expect(feet.y).toBeLessThan(1);
-      expect(1 - wallBase.y).toBeGreaterThan(0.26);
-      expect(1 - wallBase.y).toBeLessThan(0.36);
+      const crown = screen(0, 1.75, 0.02);
+      const feet = screen(0, 0, 0.02);
+      const body = feet.y - crown.y;
+      expect(body).toBeGreaterThan(0.35);
+      expect(body).toBeLessThan(0.45);
+      expect(feet.y).toBeGreaterThan(0.5);
+      expect(feet.y).toBeLessThan(0.59);
+      expect(crown.y).toBeGreaterThan(letters[2].y + 0.04);
+      const ballBottom = screen(0, 0.19, 0.42);
+      const apex = screen(0, 2.15, 0.3);
+      expect(ballBottom.y).toBeLessThan(0.6);
+      expect(ballBottom.y).toBeLessThan(feet.y + 0.02);
+      expect(apex.y).toBeGreaterThan(0.02);
+      expect(apex.y).toBeLessThan(ballBottom.y);
+      const fence = screen(0.4, 2.115, -4.14);
+      expect(letters[2].y).toBeLessThan(fence.y - 0.01);
+      expect(letters[3].y).toBeLessThan(fence.y - 0.01);
       for (const row of ALLEY_BUNTING) {
         const rope = screen(0, row.y, row.z);
         const tip = screen(0, row.y - row.sag - 0.36, row.z);
-        expect(rope.y).toBeGreaterThan(corners[2].y);
+        expect(rope.y).toBeGreaterThan(letters[2].y);
         expect(tip.y).toBeGreaterThan(rope.y);
       }
     }

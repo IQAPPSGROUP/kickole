@@ -50,12 +50,15 @@ export function alleyViewFromSearch(search: string): AlleyView | null {
   }
 }
 
-/** Wordmark painted high on the camera-facing brick, inside the wall face. */
+/**
+ * Wordmark on the camera-facing brick, above the chain-link and to the right
+ * of the portrait score card. The letters keep the source aspect.
+ */
 export const ALLEY_WORDMARK = 'brand/kickole-wordmark.webp';
 
 export const ALLEY_MURAL = {
-  position: [0, 2.94, -7.03] as const,
-  size: [3.36, 1.208] as const,
+  position: [0.76, 2.68, -7.03] as const,
+  size: [2.386, 0.858] as const,
 };
 
 /**
@@ -64,6 +67,6 @@ export const ALLEY_MURAL = {
  * `sag` is how far the middle of the rope drops.
  */
 export const ALLEY_BUNTING: readonly { z: number; y: number; x0: number; x1: number; count: number; sag: number }[] = [
-  { z: -5.9, y: 2.12, x0: -2.5, x1: 2.4, count: 12, sag: 0.07 },
-  { z: -6.55, y: 2.2, x0: -2.2, x1: 2.15, count: 10, sag: 0.05 },
+  { z: -5.9, y: 1.96, x0: -2.5, x1: 2.4, count: 12, sag: 0.07 },
+  { z: -6.55, y: 2.05, x0: -2.2, x1: 2.15, count: 10, sag: 0.05 },
 ];

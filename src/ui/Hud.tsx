@@ -156,7 +156,7 @@ function armedLabel(kind: ArmedTrick) {
   }
 }
 
-/** Visual beat, including while the steel band is muted. */
+/** Visual beat, including while the music is muted. */
 function BeatRing({ active }: { active: boolean }) {
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {

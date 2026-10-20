@@ -14,9 +14,9 @@ import {
 describe('beat scoring', () => {
   const period = beatPeriod(GAMEPLAY_BPM);
 
-  it('treats gameplay as 112 bpm quarter notes', () => {
-    expect(GAMEPLAY_BPM).toBe(112);
-    expect(period).toBeCloseTo(60 / 112, 8);
+  it('treats gameplay as 92 bpm quarter notes', () => {
+    expect(GAMEPLAY_BPM).toBe(92);
+    expect(period).toBeCloseTo(60 / 92, 8);
     expect(beatsToSeconds(2)).toBeCloseTo(period * 2, 8);
   });
 

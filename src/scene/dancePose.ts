@@ -2,7 +2,7 @@ import type { DanceId } from '../game/dances';
 import type { Pose } from './pose';
 
 /**
- * In-place dance poses sampled from the steel-band phase (0 on the beat, 1 on the next).
+ * In-place dance poses sampled from the beat (0 on the beat, 1 on the next).
  * Cosmetic only: the ball simulation never reads this.
  * Moves are original: low sway, a smooth pendulum, a two-footed shuffle, a heel rock.
  */

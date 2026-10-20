@@ -17,7 +17,7 @@ import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
-import { detectTier, fallbackTier, profileFor, readDevice, startingTier } from './qualityTier';
+import { detectTier, fallbackTier, profileFor, readDevice, rendererShadows, startingTier } from './qualityTier';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
 import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
@@ -295,8 +295,9 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         shadow-camera-bottom={wide ? -4 : -3}
         shadow-camera-near={1}
         shadow-camera-far={street ? 22 : 14}
-        shadow-bias={-0.0004}
-        shadow-radius={wide ? 4 : quality === 'high' ? 3 : 1}
+        shadow-bias={profile.shadowFilter === 'variance' ? -0.0008 : -0.0004}
+        shadow-normalBias={profile.shadowFilter === 'variance' ? 0.03 : 0}
+        shadow-radius={profile.shadowFilter === 'variance' ? 8 : wide ? 3 : 1}
       />
       <Court shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
@@ -371,7 +372,7 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
       {tier !== 'low' && <div className="vignette" />}
       <Canvas
         key={tier}
-        shadows={shadowsOn ? 'percentage' : false}
+        shadows={rendererShadows(profile.shadowFilter, shadowsOn)}
         dpr={dpr}
         gl={{
           antialias: street ? !profile.fxaa : props.quality !== 'low',

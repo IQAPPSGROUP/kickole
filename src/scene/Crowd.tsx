@@ -18,21 +18,27 @@ function mulberry32(seed: number) {
  * Instanced spectators outside the touchlines. One body draw and one head draw.
  * Count comes from the quality tier so low devices stay light.
  */
+const HAIR = ['#1a120e', '#2a1e1a', '#3b2a22', '#111111', '#5a3a28', '#c4b49a'];
+
 export function Crowd({ count }: { count: number }) {
   const body = useRef<InstancedMesh>(null);
   const head = useRef<InstancedMesh>(null);
+  const hair = useRef<InstancedMesh>(null);
+  const detailed = count >= 28;
   const layout = useMemo(() => {
     const random = mulberry32(1962);
     const dummy = new Object3D();
     const bodies: { matrix: number[]; color: string }[] = [];
     const heads: { matrix: number[]; color: string }[] = [];
+    const hairMats: { matrix: number[]; color: string }[] = [];
     for (let i = 0; i < count; i++) {
       const side = i % 2 === 0 ? -1 : 1;
       const row = Math.floor(i / 2);
       const rows = Math.ceil(count / 2);
       const along = (row / Math.max(1, rows - 1) - 0.5) * 7.4;
       const scale = 0.86 + random() * 0.22;
-      const x = side * (5.05 + random() * 0.25);
+      const back = detailed && row % 2 === 1;
+      const x = side * ((back ? 5.72 : 5.05) + random() * 0.18);
       const z = along + (random() - 0.5) * 0.2;
       dummy.position.set(x, 0.72 * scale, z);
       dummy.rotation.set(0, side > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
@@ -43,9 +49,15 @@ export function Crowd({ count }: { count: number }) {
       dummy.scale.setScalar(scale);
       dummy.updateMatrix();
       heads.push({ matrix: dummy.matrix.toArray(), color: SKIN[Math.floor(random() * SKIN.length)] });
+      if (detailed) {
+        dummy.position.set(x, 1.4 * scale, z);
+        dummy.scale.set(scale * 0.72, scale * 0.38, scale * 0.72);
+        dummy.updateMatrix();
+        hairMats.push({ matrix: dummy.matrix.toArray(), color: HAIR[i % HAIR.length] });
+      }
     }
-    return { bodies, heads };
-  }, [count]);
+    return { bodies, heads, hair: hairMats };
+  }, [count, detailed]);
 
   useLayoutEffect(() => {
     const color = new Color();
@@ -61,6 +73,7 @@ export function Crowd({ count }: { count: number }) {
     };
     apply(body.current, layout.bodies);
     apply(head.current, layout.heads);
+    apply(hair.current, layout.hair);
   }, [layout]);
 
   if (count <= 0) return null;
@@ -74,6 +87,12 @@ export function Crowd({ count }: { count: number }) {
         <sphereGeometry args={[0.13, 8, 6]} />
         <meshStandardMaterial roughness={0.7} metalness={0} />
       </instancedMesh>
+      {detailed && (
+        <instancedMesh ref={hair} args={[undefined, undefined, count]} frustumCulled={false}>
+          <sphereGeometry args={[0.12, 8, 5]} />
+          <meshStandardMaterial roughness={0.78} metalness={0} />
+        </instancedMesh>
+      )}
     </group>
   );
 }

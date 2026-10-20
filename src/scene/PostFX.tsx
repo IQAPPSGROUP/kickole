@@ -26,6 +26,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import type { GameEngine } from '../engine/engine';
+import { GAMEPLAY_TARGET } from './gameplayCamera';
 import type { TierProfile } from './qualityTier';
 
 interface SceneStats {
@@ -366,7 +367,8 @@ class CountingRenderPass extends RenderPass {
 
 /**
  * Post stack for mid and high. A priority-1 frame replaces the default render.
- * Depth of field only opens on the game-over hold, which is the replay view.
+ * Depth of field opens on the title, celebrations and the results screen.
+ * Ready and play stay sharp so the ball and the trick buttons stay readable.
  */
 export function PostFX({ profile, engine }: { profile: TierProfile; engine: GameEngine }) {
   const { gl, scene, camera, size } = useThree();
@@ -378,7 +380,7 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
     if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.28, 0.62));
     let bokeh: BokehPass | null = null;
     if (profile.dof) {
-      bokeh = new BokehPass(scene, camera, { focus: 7.2, aperture: 0.00012, maxblur: 0.006 });
+      bokeh = new BokehPass(scene, camera, { focus: 9.2, aperture: 0.0022, maxblur: 0.025 });
       bokeh.enabled = false;
       effect.addPass(bokeh);
     }
@@ -407,8 +409,15 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
     stack.effect.dispose();
   }, [stack, lut]);
 
-  useFrame(() => {
-    if (stack.bokeh) stack.bokeh.enabled = engine.phase === 'over';
+  useFrame(({ camera: cam }) => {
+    if (stack.bokeh) {
+      const cinematic = engine.phase === 'menu' || engine.phase === 'over' || engine.celebration != null;
+      stack.bokeh.enabled = cinematic;
+      if (cinematic) {
+        const focus = (stack.bokeh.uniforms as { focus?: { value: number } }).focus;
+        if (focus) focus.value = cam.position.distanceTo(GAMEPLAY_TARGET);
+      }
+    }
     stack.effect.render();
     if (sceneStats) {
       (globalThis as { __KICKOLE_PERF?: SceneStats }).__KICKOLE_PERF = sceneStats;

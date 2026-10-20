@@ -128,6 +128,7 @@ export function SettingsScreen({
               </button>
             ))}
           </div>
+          <p className="note">High is full detail and is the default on recent iPhones and flagship Androids. Weaker phones start on Medium or Low. High aims for 60 fps and steps down if the frame rate drops. Choosing a lower setting caps the phone.</p>
         </div>
         <div className="group help">
           <label>How to play</label>

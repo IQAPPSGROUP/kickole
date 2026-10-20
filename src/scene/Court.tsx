@@ -263,7 +263,7 @@ function HillsideNeighbourhood() {
 
 const STREET = `${import.meta.env.BASE_URL}textures/street/`;
 
-function useFileTexture(url: string | null, color: boolean, repeatX: number, repeatY = repeatX) {
+function useFileTexture(url: string | null, color: boolean, repeatX: number, repeatY = repeatX, anisotropy = 4) {
   const [tex, setTex] = useState<Texture | null>(null);
   useEffect(() => {
     if (!url) return;
@@ -274,36 +274,99 @@ function useFileTexture(url: string | null, color: boolean, repeatX: number, rep
       loaded.wrapS = loaded.wrapT = RepeatWrapping;
       loaded.repeat.set(repeatX, repeatY);
       loaded.colorSpace = color ? SRGBColorSpace : NoColorSpace;
-      loaded.anisotropy = 4;
+      loaded.anisotropy = anisotropy;
       setTex(loaded);
     });
     return () => {
       alive = false;
       setTex((current) => { current?.dispose(); return null; });
     };
-  }, [url, color, repeatX, repeatY]);
+  }, [url, color, repeatX, repeatY, anisotropy]);
   return tex;
 }
 
+/** Seeded pitch scuffs. The 2K court plates are upscales, so the wear is painted here. */
+function useWearTexture() {
+  return useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1024;
+    const g = canvas.getContext('2d');
+    const rand = seededRandom(20261020);
+    if (g) {
+      g.clearRect(0, 0, 1024, 1024);
+      for (let i = 0; i < 36; i++) {
+        g.save();
+        g.translate(512 + (rand() - 0.5) * 780, 512 + (rand() - 0.5) * 780);
+        g.rotate(rand() * Math.PI);
+        g.fillStyle = `rgba(16,10,8,${0.42 + rand() * 0.4})`;
+        g.beginPath();
+        g.ellipse(0, 0, 40 + rand() * 170, 10 + rand() * 34, 0, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      }
+      for (let i = 0; i < 8; i++) {
+        g.save();
+        g.translate(280 + rand() * 460, 300 + rand() * 420);
+        g.rotate(-0.4 + rand() * 0.8);
+        g.fillStyle = 'rgba(10,8,6,0.72)';
+        g.fillRect(-90, -7, 180, 14);
+        g.restore();
+      }
+      for (let i = 0; i < 10; i++) {
+        g.fillStyle = `rgba(234,244,74,${0.28 + rand() * 0.35})`;
+        g.fillRect(300 + rand() * 420, 320 + rand() * 380, 8 + rand() * 28, 3 + rand() * 6);
+      }
+    }
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    return texture;
+  }, []);
+}
+
+/** Seats on the camera side of the back fence. A stand behind the hillside mesh never enters this portrait frame. */
+function BackStand() {
+  const seats = [-2.8, -1.4, 0, 1.4, 2.8];
+  return (
+    <group position={[0, 3.42, -3.15]}>
+      <mesh castShadow receiveShadow>
+        <boxGeometry args={[7.2, 0.22, 0.38]} />
+        <meshStandardMaterial color="#3e3834" roughness={0.9} metalness={0.02} />
+      </mesh>
+      {seats.map((x) => (
+        <mesh key={x} position={[x, 0.28, 0]} castShadow>
+          <boxGeometry args={[0.34, 0.32, 0.28]} />
+          <meshStandardMaterial color={Math.abs(x) < 0.1 || Math.abs(x) > 2.5 ? '#6e4b3a' : '#2f3d4a'} roughness={0.78} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality }) {
+  const profile = profileFor(quality);
+  const high = quality === 'high';
   const [detail, setDetail] = useState(false);
   useEffect(() => {
     if (quality === 'low') return;
     const id = window.setTimeout(() => setDetail(true), 500);
     return () => window.clearTimeout(id);
   }, [quality]);
-  const asphalt = useFileTexture(`${STREET}asphalt_diff.jpg`, true, 4, 4);
-  const asphaltN = useFileTexture(detail ? `${STREET}asphalt_nor.jpg` : null, false, 4, 4);
-  const asphaltR = useFileTexture(detail ? `${STREET}asphalt_rough.jpg` : null, false, 4, 4);
-  const wall = useFileTexture(`${STREET}wall_graffiti.jpg`, true, 1, 1);
-  const wallN = useFileTexture(detail ? `${STREET}concrete_nor.jpg` : null, false, 1, 1);
-  const wallR = useFileTexture(detail ? `${STREET}concrete_rough.jpg` : null, false, 1, 1);
+  // High loads lanczos 2K plates derived from the 1K set. There is no separate 2K photoshoot.
+  const plate = profile.texture === 2048 ? '2k/' : '';
+  const aniso = profile.anisotropy;
+  const asphalt = useFileTexture(`${STREET}${plate}asphalt_diff.jpg`, true, 4, 4, aniso);
+  const asphaltN = useFileTexture(detail ? `${STREET}${plate}asphalt_nor.jpg` : null, false, 4, 4, aniso);
+  const asphaltR = useFileTexture(detail ? `${STREET}${plate}asphalt_rough.jpg` : null, false, 4, 4, aniso);
+  const wall = useFileTexture(`${STREET}${plate}wall_graffiti.jpg`, true, 1, 1, aniso);
+  const wallN = useFileTexture(detail ? `${STREET}${plate}concrete_nor.jpg` : null, false, 1, 1, aniso);
+  const wallR = useFileTexture(detail ? `${STREET}${plate}concrete_rough.jpg` : null, false, 1, 1, aniso);
   const sign = useSignTexture();
   const fence = useFenceTexture();
   const blob = useBlobTexture();
+  const wear = useWearTexture();
   useEffect(() => () => {
-    sign.dispose(); fence.dispose(); blob.dispose();
-  }, [sign, fence, blob]);
+    sign.dispose(); fence.dispose(); blob.dispose(); wear.dispose();
+  }, [sign, fence, blob, wear]);
   return (
     <group>
       <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
@@ -359,7 +422,14 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
           <meshStandardMaterial color="#3e4650" roughness={0.88} metalness={0.05} />
         </mesh>
       ))}
-      <Crowd count={profileFor(quality).crowd} />
+      {high && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0.15]}>
+          <planeGeometry args={[8.2, 8.2]} />
+          <meshBasicMaterial map={wear} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+        </mesh>
+      )}
+      <Crowd count={profile.crowd} />
+      {high && <BackStand />}
       {/* Painted court corners; simple geometry adds no texture downloads. */}
       {[-2.6, 2.6].map((x) => (
         <mesh key={`paint-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.004, 1.2]}>

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, CanvasTexture, CircleGeometry, DoubleSide, LinearFilter, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type SkinnedMesh, type Texture, type WebGLRenderer } from 'three';
+import { AnimationMixer, BoxGeometry, CanvasTexture, CircleGeometry, DoubleSide, LinearFilter, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, NoColorSpace, Quaternion, RepeatWrapping, SRGBColorSpace, Vector2, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type SkinnedMesh, type Texture, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -287,6 +287,91 @@ function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
   material.needsUpdate = true;
 }
 
+const KIT_DETAIL = new Set<string>([
+  MATERIAL_NAMES.shirt,
+  MATERIAL_NAMES.shirtTrim,
+  MATERIAL_NAMES.shorts,
+  MATERIAL_NAMES.socks,
+  MATERIAL_NAMES.boots,
+  MATERIAL_NAMES.bootsSole,
+  'Boot_Laces',
+  'Boot_Trim',
+]);
+
+let kitDetailMaps: { normal: CanvasTexture; rough: CanvasTexture } | null = null;
+
+/** Weave normal and roughness for High. Shared, and never applied to the head photograph. */
+function kitDetail(): { normal: CanvasTexture; rough: CanvasTexture } {
+  if (kitDetailMaps) return kitDetailMaps;
+  const size = 1024;
+  const normalCanvas = document.createElement('canvas');
+  const roughCanvas = document.createElement('canvas');
+  normalCanvas.width = normalCanvas.height = size;
+  roughCanvas.width = roughCanvas.height = size;
+  const normalG = normalCanvas.getContext('2d');
+  const roughG = roughCanvas.getContext('2d');
+  if (normalG && roughG) {
+    normalG.fillStyle = 'rgb(128,128,255)';
+    normalG.fillRect(0, 0, size, size);
+    roughG.fillStyle = 'rgb(168,168,168)';
+    roughG.fillRect(0, 0, size, size);
+    const step = 8;
+    normalG.strokeStyle = 'rgb(118,124,250)';
+    roughG.strokeStyle = 'rgb(196,196,196)';
+    normalG.lineWidth = 1;
+    roughG.lineWidth = 1;
+    for (let i = 0; i < size; i += step) {
+      normalG.beginPath();
+      normalG.moveTo(i, 0);
+      normalG.lineTo(i, size);
+      normalG.moveTo(0, i);
+      normalG.lineTo(size, i);
+      normalG.stroke();
+      roughG.beginPath();
+      roughG.moveTo(i, 0);
+      roughG.lineTo(i, size);
+      roughG.moveTo(0, i);
+      roughG.lineTo(size, i);
+      roughG.stroke();
+    }
+  }
+  const pack = (canvas: HTMLCanvasElement) => {
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = NoColorSpace;
+    texture.wrapS = texture.wrapT = RepeatWrapping;
+    texture.anisotropy = 8;
+    texture.repeat.set(6, 6);
+    return texture;
+  };
+  kitDetailMaps = { normal: pack(normalCanvas), rough: pack(roughCanvas) };
+  return kitDetailMaps;
+}
+
+function applyKitDetail(material: MeshStandardMaterial, name: string, quality: Quality) {
+  if (!KIT_DETAIL.has(name) || material.userData.facePhoto) return;
+  if (quality !== 'high') {
+    if (material.userData.kitDetail) {
+      material.normalMap = (material.userData.authoredNormal as Texture | null) ?? null;
+      material.roughnessMap = (material.userData.authoredRough as Texture | null) ?? null;
+      material.userData.kitDetail = false;
+      material.needsUpdate = true;
+    }
+    return;
+  }
+  if (!material.userData.kitDetail) {
+    material.userData.authoredNormal = material.normalMap ?? null;
+    material.userData.authoredRough = material.roughnessMap ?? null;
+  }
+  const maps = kitDetail();
+  if (!material.userData.authoredNormal) {
+    material.normalMap = maps.normal;
+    material.normalScale = new Vector2(0.35, 0.35);
+  }
+  if (!material.userData.authoredRough) material.roughnessMap = maps.rough;
+  material.userData.kitDetail = true;
+  material.needsUpdate = true;
+}
+
 function applyContractBones(bones: Partial<Record<BoneKey, Bone>>, pose: Pose, hipsRestY: number) {
   const set = (key: BoneKey, x: number, y: number, z: number) => {
     const bone = bones[key];
@@ -503,8 +588,9 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       }
       const standard = m as MeshStandardMaterial;
       if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern);
+      applyKitDetail(standard, name, quality);
     }
-  }, [skin, materials]);
+  }, [skin, materials, quality]);
 
   useEffect(() => {
     if (pbr || quality === 'low') return;

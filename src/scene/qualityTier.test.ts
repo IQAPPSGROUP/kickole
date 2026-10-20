@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { characterModelUrl } from './rig';
-import { characterLod, detectTier, fallbackTier, profileFor, startingTier } from './qualityTier';
+import { characterLod, detectTier, fallbackTier, profileFor, rendererShadows, startingTier } from './qualityTier';
 
 describe('quality tiers', () => {
   it('detects low, mid and high devices', () => {
@@ -8,6 +8,22 @@ describe('quality tiers', () => {
     expect(detectTier({ cores: 6, memoryGb: 4 })).toBe('medium');
     expect(detectTier({ cores: 8, memoryGb: 8 })).toBe('high');
     expect(detectTier({ cores: 8 })).toBe('high');
+    expect(detectTier({
+      cores: 4,
+      memoryGb: 4,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
+      screenWidth: 393,
+      dpr: 3,
+    })).toBe('high');
+    expect(detectTier({
+      cores: 4,
+      memoryGb: 2,
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
+      screenWidth: 375,
+      dpr: 2,
+    })).toBe('medium');
+    expect(detectTier({ cores: 8, memoryGb: 6, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)' })).toBe('high');
+    expect(detectTier({ cores: 4, memoryGb: 3, userAgent: 'Mozilla/5.0 (Linux; Android 12)' })).toBe('low');
   });
 
   it('treats the saved quality as a ceiling', () => {
@@ -35,6 +51,17 @@ describe('quality tiers', () => {
     expect(profileFor('high').ssao).toBe(true);
     expect(profileFor('high').bloom).toBe(true);
     expect(profileFor('high').dof).toBe(true);
+    expect(profileFor('high').shadowFilter).toBe('variance');
+    expect(profileFor('medium').shadowFilter).toBe('soft');
+    expect(profileFor('low').shadowFilter).toBe('none');
+    expect(profileFor('high').texture).toBe(2048);
+    expect(profileFor('medium').texture).toBe(1024);
+    expect(profileFor('high').lod).toBe(0);
+    expect(profileFor('high').crowd).toBeGreaterThan(profileFor('medium').crowd);
+    expect(rendererShadows('variance', true)).toBe('variance');
+    expect(rendererShadows('soft', true)).toBe('soft');
+    expect(rendererShadows('none', true)).toBe(false);
+    expect(rendererShadows('variance', false)).toBe(false);
     expect(characterModelUrl(0)).toMatch(/kickole_player_v4\.glb$/);
     expect(characterModelUrl(1)).toMatch(/kickole_player_v4_lod1\.glb$/);
     expect(characterModelUrl(0, 'female')).toMatch(/kickole_player_v4_female\.glb$/);

@@ -65,38 +65,126 @@ function photographTexture(source: Texture): CanvasTexture | null {
   return map;
 }
 
-/** The male eye split sits inside the head and one socket samples a dark texel. Paint a sclera and iris on those UVs and bring the shell forward. */
+/** Two eye UV islands. A bind-X split put both irises on one socket. Cluster the UVs instead. */
+function eyeUvCentroids(uv: { count: number; getX(index: number): number; getY(index: number): number } | null): Array<{ u: number; v: number }> {
+  const count = uv?.count ?? 0;
+  if (!uv || count < 2) return [];
+  let seedA = 0;
+  let seedB = 1;
+  let furthest = -1;
+  const stride = Math.max(1, Math.floor(count / 64));
+  for (let i = 0; i < count; i += stride) {
+    for (let j = i + stride; j < count; j += stride) {
+      const du = uv.getX(i) - uv.getX(j);
+      const dv = uv.getY(i) - uv.getY(j);
+      const dist = du * du + dv * dv;
+      if (dist > furthest) {
+        furthest = dist;
+        seedA = i;
+        seedB = j;
+      }
+    }
+  }
+  const seeds = [
+    { u: uv.getX(seedA), v: uv.getY(seedA) },
+    { u: uv.getX(seedB), v: uv.getY(seedB) },
+  ];
+  for (let pass = 0; pass < 4; pass += 1) {
+    const acc = [
+      { u: 0, v: 0, n: 0 },
+      { u: 0, v: 0, n: 0 },
+    ];
+    for (let i = 0; i < count; i += 1) {
+      const u = uv.getX(i);
+      const v = uv.getY(i);
+      const d0 = (u - seeds[0].u) ** 2 + (v - seeds[0].v) ** 2;
+      const d1 = (u - seeds[1].u) ** 2 + (v - seeds[1].v) ** 2;
+      const side = d0 <= d1 ? acc[0] : acc[1];
+      side.u += u;
+      side.v += v;
+      side.n += 1;
+    }
+    for (let s = 0; s < 2; s += 1) {
+      if (!acc[s].n) continue;
+      seeds[s].u = acc[s].u / acc[s].n;
+      seeds[s].v = acc[s].v / acc[s].n;
+    }
+  }
+  return seeds;
+}
+
+/** Paint a sclera and iris on each eye island and bring the shell forward of the skin. */
 function paintEyeIslands(canvas: HTMLCanvasElement, geometry: Mesh['geometry']) {
   const uv = geometry.getAttribute('uv');
-  const position = geometry.getAttribute('position');
   const context = canvas.getContext('2d');
-  if (!uv || !position || !context) return;
-  const sides = [
-    { u: 0, v: 0, n: 0 },
-    { u: 0, v: 0, n: 0 },
-  ];
-  for (let i = 0; i < uv.count; i += 1) {
-    const side = position.getX(i) >= 0 ? sides[1] : sides[0];
-    const x = uv.getX(i) * canvas.width;
-    const y = uv.getY(i) * canvas.height;
-    side.u += x;
-    side.v += y;
-    side.n += 1;
-    context.fillStyle = '#f4e7da';
-    context.fillRect(x - 2, y - 2, 4, 4);
-  }
-  for (const side of sides) {
-    if (!side.n) continue;
-    const x = side.u / side.n;
-    const y = side.v / side.n;
-    const radius = Math.max(5, canvas.width * 0.014);
+  if (!uv || !context) return;
+  const radius = Math.max(10, canvas.width * 0.022);
+  for (const side of eyeUvCentroids(uv)) {
+    const x = side.u * canvas.width;
+    const y = side.v * canvas.height;
     context.beginPath();
-    context.fillStyle = '#1c100c';
-    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fillStyle = '#f4e7da';
+    context.ellipse(x, y, radius * 1.45, radius * 0.92, 0, 0, Math.PI * 2);
     context.fill();
     context.beginPath();
-    context.fillStyle = '#d7c4a4';
-    context.arc(x - radius * 0.28, y - radius * 0.28, radius * 0.22, 0, Math.PI * 2);
+    context.fillStyle = '#1c100c';
+    context.arc(x, y, radius * 0.62, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.fillStyle = '#efe6dc';
+    context.arc(x - radius * 0.16, y - radius * 0.16, radius * 0.12, 0, Math.PI * 2);
+    context.fill();
+  }
+}
+
+/**
+ * The eye shell can sit behind the face photograph. Stamp a sclera and iris onto the
+ * head image at the socket UVs so the eyes read on the surface that the camera sees.
+ */
+function paintFaceEyes(canvas: HTMLCanvasElement, geometry: Mesh['geometry']) {
+  const position = geometry.getAttribute('position');
+  const uv = geometry.getAttribute('uv');
+  const normal = geometry.getAttribute('normal');
+  const context = canvas.getContext('2d');
+  if (!position || !uv || !normal || !context) return;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < position.count; i += 1) maxY = Math.max(maxY, position.getY(i));
+  if (maxY < 0.7) return;
+  const bins: Array<Map<string, { u: number; v: number; n: number }>> = [new Map(), new Map()];
+  for (let i = 0; i < position.count; i += 1) {
+    const y = position.getY(i);
+    if (y < maxY - 0.16 || y > maxY - 0.08) continue;
+    if (normal.getZ(i) < 0.35 || position.getZ(i) < 0.06) continue;
+    const side = position.getX(i) < 0 ? 0 : 1;
+    const u = uv.getX(i);
+    const v = uv.getY(i);
+    const key = `${Math.round(u * 50)}:${Math.round(v * 50)}`;
+    const bin = bins[side].get(key) ?? { u: 0, v: 0, n: 0 };
+    bin.u += u;
+    bin.v += v;
+    bin.n += 1;
+    bins[side].set(key, bin);
+  }
+  const radius = Math.max(8, canvas.width * 0.011);
+  for (const side of bins) {
+    let best: { u: number; v: number; n: number } | null = null;
+    for (const bin of side.values()) {
+      if (!best || bin.n > best.n) best = bin;
+    }
+    if (!best || best.n < 4) continue;
+    const x = (best.u / best.n) * canvas.width;
+    const y = (best.v / best.n) * canvas.height;
+    context.beginPath();
+    context.fillStyle = '#f3e6da';
+    context.ellipse(x, y, radius * 1.2, radius * 0.75, 0, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.fillStyle = '#140e0c';
+    context.arc(x, y, radius * 0.58, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.fillStyle = '#efe6dc';
+    context.arc(x - radius * 0.18, y - radius * 0.18, radius * 0.14, 0, Math.PI * 2);
     context.fill();
   }
 }
@@ -108,9 +196,9 @@ function seatEyes(geometry: Mesh['geometry']) {
   for (let i = 0; i < position.count; i += 1) {
     position.setXYZ(
       i,
-      position.getX(i) + normal.getX(i) * 0.018,
-      position.getY(i) + normal.getY(i) * 0.018,
-      position.getZ(i) + normal.getZ(i) * 0.018,
+      position.getX(i) + normal.getX(i) * 0.028,
+      position.getY(i) + normal.getY(i) * 0.028,
+      position.getZ(i) + normal.getZ(i) * 0.028,
     );
   }
   position.needsUpdate = true;
@@ -316,12 +404,13 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           if ((source.userData.headPhoto || source.name === 'Eyes') && source.map) {
             const photo = photographTexture(source.map);
             if (photo) {
-              if (m.name === 'Eyes') {
-                const canvas = photo.userData.canvas as HTMLCanvasElement | undefined;
-                if (canvas) paintEyeIslands(canvas, mesh.geometry);
-                photo.needsUpdate = true;
+              const canvas = photo.userData.canvas as HTMLCanvasElement | undefined;
+              if (m.name === 'Eyes' && canvas) {
+                paintEyeIslands(canvas, mesh.geometry);
                 seatEyes(mesh.geometry);
               }
+              if (source.userData.headPhoto && canvas) paintFaceEyes(canvas, mesh.geometry);
+              photo.needsUpdate = true;
               // The listing's head image is a finished photograph, and this rig has no
               // face normal. Lighting it as albedo turns the whole head into one dark
               // mass, so the face shows the photograph directly.

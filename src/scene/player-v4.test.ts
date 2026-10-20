@@ -222,14 +222,15 @@ describe.each([
     const center = anchor!.center;
     const strike = anchor!.strike;
     const touch = Math.hypot(center.x - strike.x, center.y - strike.y, center.z - strike.z);
-    // The centre stays on the instep. A simplified sole can push it out by about a centimetre.
-    expect(touch).toBeGreaterThan(DEFAULT_CONFIG.ballRadius - 0.003);
+    // The centre stays on the instep, seated into the leather so the camera sees contact.
+    expect(touch).toBeGreaterThan(DEFAULT_CONFIG.ballRadius - 0.034);
     expect(touch).toBeLessThan(DEFAULT_CONFIG.ballRadius + 0.02);
     expect(center.y).toBeGreaterThan(strike.y - 0.01);
     expect(center.x * (side === 'left' ? -1 : 1)).toBeGreaterThan(0.02);
     const gap = bootSurfaceGap(gltf.scene, new Vector3(center.x, center.y, center.z));
-    expect(gap).toBeGreaterThan(-0.004);
-    expect(gap).toBeLessThan(0.012);
+    // The centre is seated into the leather so the boot reads as touching.
+    expect(gap).toBeGreaterThan(-0.034);
+    expect(gap).toBeLessThan(0.004);
   });
 
   it('skins the authored hair to the head', async () => {

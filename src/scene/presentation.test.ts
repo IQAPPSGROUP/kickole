@@ -14,8 +14,8 @@ describe('presentation', () => {
   it('focuses along the view toward the player and widens on the title', () => {
     expect(depthOfFieldFocus({ x: 0, y: 1.15, z: 8 }, { x: 0, y: 0, z: -1 })).toBeCloseTo(7.8);
     expect(depthOfFieldFocus({ x: 0, y: 1.15, z: 0.1 }, { x: 0, y: 0, z: 1 })).toBe(0.6);
-    expect(depthOfFieldScale('menu', false).aperture).toBeGreaterThan(0.001);
-    expect(depthOfFieldScale('menu', false).maxblur).toBeGreaterThan(0.01);
+    expect(depthOfFieldScale('menu', false).aperture).toBeGreaterThan(0.005);
+    expect(depthOfFieldScale('menu', false).maxblur).toBeGreaterThan(0.02);
     expect(depthOfFieldScale('menu', false).aperture).toBeGreaterThan(depthOfFieldScale('over', false).aperture);
     expect(depthOfFieldScale('playing', true).maxblur).toBeGreaterThan(depthOfFieldScale('over', false).maxblur);
   });

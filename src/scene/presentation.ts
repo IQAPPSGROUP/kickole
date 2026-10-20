@@ -28,11 +28,12 @@ export function depthOfFieldFocus(
 
 /**
  * three r186 bokeh blur is `clamp((focus + viewZ) * aperture, ±maxblur)` in screen space.
- * A 4 m miss at 0.0026 aperture is about a 1% blur; the player stays inside a sharp metre.
+ * The back wall sits about 3 m behind the chest, so 0.0072 aperture is a small soft disk
+ * there while the player's feet stay inside a pixel.
  */
 export function depthOfFieldScale(phase: Phase, celebrating: boolean): { aperture: number; maxblur: number } {
-  if (phase === 'menu' || celebrating) return { aperture: 0.0026, maxblur: 0.018 };
-  return { aperture: 0.0014, maxblur: 0.009 };
+  if (phase === 'menu' || celebrating) return { aperture: 0.0072, maxblur: 0.024 };
+  return { aperture: 0.004, maxblur: 0.014 };
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

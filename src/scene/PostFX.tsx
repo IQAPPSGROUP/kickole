@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   DataTexture,
+  HalfFloatType,
   NearestFilter,
   NoColorSpace,
   RGBAFormat,
@@ -102,13 +103,15 @@ const EXTRACT_FRAGMENT = /* glsl */ `
 const BLUR_FRAGMENT = /* glsl */ `
   uniform sampler2D tDiffuse;
   uniform vec2 uDirection;
+  uniform float uSpread;
   varying vec2 vUv;
   void main() {
+    vec2 step = uDirection * uSpread;
     vec3 sum = texture2D(tDiffuse, vUv).rgb * 0.227027;
-    sum += texture2D(tDiffuse, vUv + uDirection * 1.384615).rgb * 0.316216;
-    sum += texture2D(tDiffuse, vUv - uDirection * 1.384615).rgb * 0.316216;
-    sum += texture2D(tDiffuse, vUv + uDirection * 3.230769).rgb * 0.070270;
-    sum += texture2D(tDiffuse, vUv - uDirection * 3.230769).rgb * 0.070270;
+    sum += texture2D(tDiffuse, vUv + step * 1.384615).rgb * 0.316216;
+    sum += texture2D(tDiffuse, vUv - step * 1.384615).rgb * 0.316216;
+    sum += texture2D(tDiffuse, vUv + step * 3.230769).rgb * 0.070270;
+    sum += texture2D(tDiffuse, vUv - step * 3.230769).rgb * 0.070270;
     gl_FragColor = vec4(sum, 1.0);
   }
 `;
@@ -125,13 +128,13 @@ const BLOOM_FRAGMENT = /* glsl */ `
   }
 `;
 
-function byteTarget(width: number, height: number): WebGLRenderTarget {
+function bloomTarget(width: number, height: number): WebGLRenderTarget {
   const target = new WebGLRenderTarget(Math.max(1, width), Math.max(1, height), {
-    type: UnsignedByteType,
+    type: HalfFloatType,
     depthBuffer: false,
   });
   target.texture.generateMipmaps = false;
-  target.texture.name = 'kickole-post';
+  target.texture.name = 'kickole-bloom';
   return target;
 }
 
@@ -155,8 +158,8 @@ class SafeBloomPass extends Pass {
     this.strength = strength;
     const halfW = Math.max(1, Math.round(width / 2));
     const halfH = Math.max(1, Math.round(height / 2));
-    this.bright = byteTarget(halfW, halfH);
-    this.ping = byteTarget(halfW, halfH);
+    this.bright = bloomTarget(halfW, halfH);
+    this.ping = bloomTarget(halfW, halfH);
     this.extract = new ShaderMaterial({
       uniforms: { tDiffuse: { value: null }, uThreshold: { value: threshold } },
       vertexShader: FULLSCREEN_VERTEX,
@@ -165,7 +168,11 @@ class SafeBloomPass extends Pass {
       depthWrite: false,
     });
     this.blur = new ShaderMaterial({
-      uniforms: { tDiffuse: { value: null }, uDirection: { value: new Vector2(1 / halfW, 0) } },
+      uniforms: {
+        tDiffuse: { value: null },
+        uDirection: { value: new Vector2(1 / halfW, 0) },
+        uSpread: { value: 4.5 },
+      },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: BLUR_FRAGMENT,
       depthTest: false,
@@ -207,17 +214,22 @@ class SafeBloomPass extends Pass {
       draw(this.extract, this.bright);
 
       const blurDir = this.blur.uniforms.uDirection.value as Vector2;
-      blurDir.set(1 / this.bright.width, 0);
-      this.blur.uniforms.tDiffuse.value = this.bright.texture;
-      renderer.setRenderTarget(this.ping);
-      renderer.clear();
-      draw(this.blur, this.ping);
-
-      blurDir.set(0, 1 / this.bright.height);
-      this.blur.uniforms.tDiffuse.value = this.ping.texture;
-      renderer.setRenderTarget(this.bright);
-      renderer.clear();
-      draw(this.blur, this.bright);
+      let source = this.bright;
+      let dest = this.ping;
+      for (let pass = 0; pass < 2; pass++) {
+        blurDir.set(1 / this.bright.width, 0);
+        this.blur.uniforms.tDiffuse.value = source.texture;
+        renderer.setRenderTarget(dest);
+        renderer.clear();
+        draw(this.blur, dest);
+        blurDir.set(0, 1 / this.bright.height);
+        this.blur.uniforms.tDiffuse.value = dest.texture;
+        renderer.setRenderTarget(source);
+        renderer.clear();
+        draw(this.blur, source);
+        source = this.bright;
+        dest = this.ping;
+      }
     }
     this.combine.uniforms.tDiffuse.value = readBuffer.texture;
     this.combine.uniforms.tBloom.value = this.bright.texture;
@@ -267,7 +279,7 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
     const effect = new EffectComposer(gl as WebGLRenderer);
     effect.addPass(new CountingRenderPass(scene, camera));
     if (profile.ssao) effect.addPass(new SsaoPass(scene, camera, size.width, size.height));
-    if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.2, 0.74));
+    if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.9, 0.72));
     let bokeh: BokehPass | null = null;
     if (profile.dof) {
       bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.004, maxblur: 0.014 });

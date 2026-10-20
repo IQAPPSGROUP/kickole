@@ -132,7 +132,7 @@ function Floodlight({ x, z }: { x: number; z: number }) {
       </mesh>
       <mesh position={[0, 3.65, 0]}>
         <boxGeometry args={[0.5, 0.12, 0.2]} />
-        <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={1.1} roughness={0.4} />
+        <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={5} roughness={0.28} />
       </mesh>
     </group>
   );

@@ -50,19 +50,38 @@ function rank(tier: Quality): number {
   }
 }
 
+/**
+ * Phones that should start on High: A15 and newer, Apple M, Adreno 7xx, Mali-G7xx, Immortalis.
+ * Safari reports current iPhones as "Apple GPU" with no A-number, so that string counts too.
+ * An explicit older A-series name, such as A14, does not.
+ */
+export function isFlagshipGpu(renderer: string): boolean {
+  const g = renderer.toLowerCase().trim();
+  if (!g || /swiftshader|llvmpipe|softpipe|microsoft basic render/.test(g)) return false;
+  if (/adreno(?:\s*\(tm\))?\s*7\d\d\b/.test(g)) return true;
+  if (/mali-g7\d\d/.test(g) || /immortalis/.test(g)) return true;
+  const appleGen = g.match(/\bapple a(\d+)\b/);
+  if (appleGen) return Number(appleGen[1]) >= 15;
+  if (/apple m\d/.test(g) || /\bapple gpu\b/.test(g)) return true;
+  return false;
+}
+
 /** Name a GPU from its unmasked renderer string. Unknown names return null so the CPU hint is used. */
 export function gpuTier(renderer: string): Quality | null {
   const g = renderer.toLowerCase().trim();
   if (!g) return null;
   if (/swiftshader|llvmpipe|softpipe|microsoft basic render/.test(g)) return 'low';
 
-  const adreno = g.match(/adreno \(tm\) (\d{3})/);
+  const adreno = g.match(/adreno(?:\s*\(tm\))?\s*(\d{3})/);
   if (adreno) {
     const model = Number(adreno[1]);
+    if (model >= 700) return 'high';
     if (model < 610) return 'low';
     if (model < 620) return 'medium';
     return 'high';
   }
+
+  if (/immortalis/.test(g)) return 'high';
 
   const mali = g.match(/mali-([tg])(\d+)/);
   if (mali) {
@@ -74,7 +93,14 @@ export function gpuTier(renderer: string): Quality | null {
   }
 
   if (/powervr|videocore|video core/.test(g)) return 'low';
-  if (/apple m\d|apple gpu/.test(g)) return 'high';
+  const appleGen = g.match(/\bapple a(\d+)\b/);
+  if (appleGen) {
+    const gen = Number(appleGen[1]);
+    if (gen >= 15) return 'high';
+    if (gen >= 12) return 'medium';
+    return 'low';
+  }
+  if (/apple m\d|\bapple gpu\b/.test(g)) return 'high';
 
   if (g.includes('intel')) {
     if (/arc|iris xe|iris\(r\) xe|iris plus/.test(g)) return 'high';
@@ -133,12 +159,17 @@ function cpuTier(device: DeviceHints): Quality {
   return 'high';
 }
 
-/** GPU name first. A software renderer forces Low. A strong GPU on a small phone still steps down. */
+/**
+ * GPU name first. A software renderer or 2 GB forces Low.
+ * A15+, Adreno 7xx, Mali-G7xx and Immortalis stay on High instead of stepping down for a 4–6 core phone.
+ * Any other strong GPU on a small CPU still steps down. The FPS guard can still drop a tier later.
+ */
 export function detectTier(device: DeviceHints): Quality {
   const cpu = cpuTier(device);
   const gpu = device.gpu ? gpuTier(device.gpu) : null;
   if (!gpu) return cpu;
   if (gpu === 'low' || (device.memoryGb ?? 8) <= 2) return 'low';
+  if (device.gpu && isFlagshipGpu(device.gpu)) return 'high';
   if (gpu === 'high' && cpu === 'low' && device.cores >= 4 && (device.memoryGb ?? 8) >= 4) return 'medium';
   return ORDER[Math.min(rank(gpu), rank(cpu))];
 }
@@ -213,7 +244,7 @@ export function profileFor(tier: Quality): TierProfile {
     case 'high':
       return {
         lod: 0, shadows: 'tight', shadowMap: 1024, shadowFilter: 'pcss', shadowExtent: 3.2, shadowRadius: 28,
-        contactShadows: true, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
+        contactShadows: false, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
         dpr: [1, 1.5], crowd: 28,
       };
     default: {

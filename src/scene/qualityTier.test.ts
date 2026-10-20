@@ -5,6 +5,7 @@ import {
   createFpsGuard,
   detectTier,
   gpuTier,
+  isFlagshipGpu,
   profileFor,
   resolveTier,
   stepFpsGuard,
@@ -22,9 +23,15 @@ describe('quality tiers', () => {
     expect(gpuTier('ANGLE (NVIDIA, NVIDIA GeForce RTX 4070)')).toBe('high');
     expect(gpuTier('ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)')).toBe('high');
     expect(gpuTier('Apple GPU')).toBe('high');
+    expect(gpuTier('Apple A16 GPU')).toBe('high');
+    expect(gpuTier('Apple A15 GPU')).toBe('high');
+    expect(gpuTier('Apple A14 GPU')).toBe('medium');
+    expect(gpuTier('Apple A11 GPU')).toBe('low');
     expect(gpuTier('Adreno (TM) 740')).toBe('high');
     expect(gpuTier('Adreno (TM) 610')).toBe('medium');
     expect(gpuTier('Adreno (TM) 505')).toBe('low');
+    expect(gpuTier('Mali-G710')).toBe('high');
+    expect(gpuTier('Immortalis-G715')).toBe('high');
     expect(gpuTier('Mali-G78')).toBe('high');
     expect(gpuTier('Mali-G52')).toBe('medium');
     expect(gpuTier('Mali-T880')).toBe('low');
@@ -35,7 +42,15 @@ describe('quality tiers', () => {
     expect(gpuTier('')).toBeNull();
     expect(detectTier({ cores: 16, memoryGb: 16, gpu: 'llvmpipe' })).toBe('low');
     expect(detectTier({ cores: 8, memoryGb: 8, gpu: 'NVIDIA GeForce RTX 3060' })).toBe('high');
-    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple GPU' })).toBe('medium');
+    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple GPU' })).toBe('high');
+    expect(detectTier({ cores: 4, memoryGb: 4, gpu: 'Apple A16 GPU' })).toBe('high');
+    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple A14 GPU' })).toBe('medium');
+    expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Adreno (TM) 740' })).toBe('high');
+    expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Adreno (TM) 660' })).toBe('medium');
+    expect(detectTier({ cores: 8, memoryGb: 4, gpu: 'Mali-G710' })).toBe('high');
+    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Immortalis-G715' })).toBe('high');
+    expect(isFlagshipGpu('Apple A15 GPU')).toBe(true);
+    expect(isFlagshipGpu('Apple A14 GPU')).toBe(false);
     expect(detectTier({ cores: 8, memoryGb: 8, gpu: 'Adreno (TM) 505' })).toBe('low');
   });
 
@@ -83,6 +98,8 @@ describe('quality tiers', () => {
     expect(profileFor('low').aa).toBe('none');
     expect(profileFor('high').shadows).toBe('tight');
     expect(profileFor('high').shadowFilter).toBe('pcss');
+    expect(profileFor('high').contactShadows).toBe(false);
+    expect(profileFor('medium').contactShadows).toBe(true);
     expect(profileFor('medium').shadowFilter).toBe('vsm');
     expect(profileFor('medium').ibl).toBe(true);
     expect(profileFor('medium').bloom).toBe(false);

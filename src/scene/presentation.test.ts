@@ -10,13 +10,13 @@ import {
 } from './presentation';
 
 describe('presentation', () => {
-  it('opens depth of field on the title, celebration and game over', () => {
-    expect(depthOfFieldActive('menu', false)).toBe(true);
+  it('keeps the court sharp and only softens the game-over hold', () => {
+    expect(depthOfFieldActive('menu', false)).toBe(false);
     expect(depthOfFieldActive('over', false)).toBe(true);
-    expect(depthOfFieldActive('playing', true)).toBe(true);
+    expect(depthOfFieldActive('playing', true)).toBe(false);
     expect(depthOfFieldActive('playing', false)).toBe(false);
     expect(depthOfFieldActive('ready', false)).toBe(false);
-    expect(depthOfFieldActive('dropped', true)).toBe(true);
+    expect(depthOfFieldActive('dropped', true)).toBe(false);
   });
 
   it('focuses along the view toward the player and widens on the title', () => {

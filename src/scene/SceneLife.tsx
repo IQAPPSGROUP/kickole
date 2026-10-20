@@ -1,10 +1,11 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Color, DoubleSide, Group, InstancedMesh, Object3D } from 'three';
 import type { GameEngine } from '../engine/engine';
 import type { Quality } from '../game/storage';
 import { ENVIRONMENT_THEME } from './environment';
 import { crowdBob, prefersReducedMotion, sceneLifeBudget } from './juice';
+import { createPennantGeometry } from './pennant';
 
 const CROWD = ['#FF4F9A', '#FFD93D', '#00B8A9', '#6C5CE7', '#FF8A5B', '#F8F9FB'];
 
@@ -138,6 +139,8 @@ function Flags({ count, sway }: { count: number; sway: boolean }) {
     });
   });
   const colors = ['#FF4F9A', '#FFD93D', '#6C5CE7', '#00B8A9'];
+  const pennants = useMemo(() => Array.from({ length: count }, () => createPennantGeometry()), [count]);
+  useEffect(() => () => { pennants.forEach((geometry) => geometry.dispose()); }, [pennants]);
   return (
     <group ref={ref}>
       {spots.map((x, i) => (
@@ -146,8 +149,8 @@ function Flags({ count, sway }: { count: number; sway: boolean }) {
             <cylinderGeometry args={[0.03, 0.03, 3.4, 5]} />
             <meshBasicMaterial color="#fff6ea" />
           </mesh>
-          <mesh position={[0.22, 3.15, 0]}>
-            <planeGeometry args={[0.46, 0.28]} />
+          <mesh position={[0.02, 3.4, 0]}>
+            <primitive object={pennants[i]} attach="geometry" />
             <meshBasicMaterial color={colors[i % colors.length]} side={DoubleSide} />
           </mesh>
         </group>

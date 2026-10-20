@@ -17,14 +17,14 @@ export function beachBuntingSpot(index: number, flutter = 0): { x: number; y: nu
   const u = index / (BEACH_BUNTING_COUNT - 1);
   return {
     x: -4.7 + u * 6.4,
-    y: 2.48 - Math.sin(u * Math.PI) * 0.22 + flutter,
+    y: 2.5 - Math.sin(u * Math.PI) * 0.42 + flutter,
     z: -4.72,
   };
 }
 
 export function beachFlagSpot(index: number, flutter = 0): { x: number; y: number; z: number } {
   const x = BEACH_FLAG_X[index] ?? BEACH_FLAG_X[0];
-  return { x: x + 0.22, y: 2.32 + flutter, z: -4.78 };
+  return { x: x + 0.16, y: 2.5 + flutter, z: -4.78 };
 }
 
 export function beachPoleSpot(index: number): { x: number; y: number; z: number } {

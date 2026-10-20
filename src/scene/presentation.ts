@@ -1,15 +1,16 @@
 import type { Phase } from '../engine/engine';
 
-/** Title and celebration hold the player sharp and let the street fall soft. Replay keeps a lighter blur. */
+/** The court stays sharp on the title and in play. Game over keeps a light hold. */
 export function depthOfFieldActive(phase: Phase, celebrating: boolean): boolean {
+  if (celebrating && phase === 'playing') return false;
   switch (phase) {
     case 'menu':
-    case 'over':
-      return true;
     case 'ready':
     case 'playing':
     case 'dropped':
-      return celebrating;
+      return false;
+    case 'over':
+      return true;
     default: {
       const neverPhase: never = phase;
       return neverPhase;

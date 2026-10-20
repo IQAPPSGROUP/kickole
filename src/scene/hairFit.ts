@@ -149,51 +149,62 @@ function shell(
 }
 
 function afro(skull: Skull): HairPart[] {
+  // Closed at the crown (theta 0). The old cap started below the pole and left a bald spot.
   return [shell(skull, {
     id: 'afro',
-    puff: 0.04,
-    open: 1.38,
-    thetaStart: 0.18,
-    thetaLength: 2.35,
-    lift: skull.radius * 0.1,
-    back: skull.radius * 0.18,
+    puff: 0.038,
+    open: 1.28,
+    thetaStart: 0,
+    thetaLength: 2.45,
+    lift: 0,
+    back: 0,
   })];
 }
 
 function mohawk(skull: Skull): HairPart[] {
-  const depth = skull.radius * 0.52;
-  const height = skull.radius * 0.95;
+  const depth = skull.radius * 0.85;
+  const height = skull.radius * 1.15;
   return [{
     id: 'mohawk',
     shape: 'box',
     position: [
       skull.center.x,
-      skull.crownY + height * 0.32,
-      skull.center.z - skull.radius * 0.38,
+      skull.crownY + height * 0.28,
+      skull.center.z - skull.radius * 0.12,
     ],
-    size: [skull.radius * 0.26, height, depth],
+    size: [skull.radius * 0.34, height, depth],
   }];
 }
 
 function highTop(skull: Skull): HairPart[] {
-  const height = skull.radius * 0.5;
-  const radius = skull.radius * 0.56;
+  const height = skull.radius * 1.2;
+  const radius = skull.radius * 0.96;
+  const bottom = skull.crownY - skull.radius * 0.22;
   return [{
     id: 'high-top',
     shape: 'cylinder',
     position: [
       skull.center.x,
-      skull.crownY + height * 0.28,
-      skull.center.z - skull.radius * 0.34,
+      bottom + height / 2,
+      skull.center.z - skull.radius * 0.04,
     ],
-    radiusTop: radius * 0.9,
+    radiusTop: radius * 0.92,
     radiusBottom: radius,
     height,
   }];
 }
 
 function curls(skull: Skull): HairPart[] {
-  const curlRadius = Math.min(0.026, skull.radius * 0.24);
+  const cap = shell(skull, {
+    id: 'curl-cap',
+    puff: 0.02,
+    open: 1.28,
+    thetaStart: 0,
+    thetaLength: 2.05,
+    lift: skull.radius * 0.02,
+    back: skull.radius * 0.04,
+  });
+  const curlRadius = Math.min(0.028, skull.radius * 0.28);
   const spots: Array<[number, number, number]> = [
     [0, 1.02, -0.22],
     [-1.28, 0.72, -0.55],
@@ -202,7 +213,7 @@ function curls(skull: Skull): HairPart[] {
     [1.35, 0.28, -0.72],
     [0, 0.48, -1.05],
   ];
-  return spots.map(([x, y, z], i) => ({
+  const tufts: HairPart[] = spots.map(([x, y, z], i) => ({
     id: `curl-${i}`,
     shape: 'sphere' as const,
     position: [
@@ -212,17 +223,18 @@ function curls(skull: Skull): HairPart[] {
     ],
     radius: curlRadius,
   }));
+  return [cap, ...tufts];
 }
 
 function braids(skull: Skull): HairPart[] {
   const cap = shell(skull, {
     id: 'braid-cap',
-    puff: 0.016,
-    open: 1.42,
-    thetaStart: 0.18,
-    thetaLength: Math.PI * 0.55,
-    lift: skull.radius * 0.16,
-    back: skull.radius * 0.12,
+    puff: 0.022,
+    open: 1.38,
+    thetaStart: 0,
+    thetaLength: 2.2,
+    lift: skull.radius * 0.02,
+    back: skull.radius * 0.04,
   });
   const ropes: HairPart[] = [-1, 1].map((side) => {
     const height = 0.22;
@@ -244,6 +256,15 @@ function braids(skull: Skull): HairPart[] {
 }
 
 function spikes(skull: Skull): HairPart[] {
+  const cap = shell(skull, {
+    id: 'spike-cap',
+    puff: 0.016,
+    open: 1.42,
+    thetaStart: 0,
+    thetaLength: 1.9,
+    lift: skull.radius * 0.04,
+    back: skull.radius * 0.04,
+  });
   const spots: Array<[number, number, number]> = [
     [0, 0.01, -0.22],
     [-0.55, 0, -0.42],
@@ -251,7 +272,7 @@ function spikes(skull: Skull): HairPart[] {
     [-0.28, 0.02, -0.12],
     [0.28, 0.02, -0.12],
   ];
-  return spots.map(([x, y, z], i) => {
+  const cones: HairPart[] = spots.map(([x, y, z], i) => {
     const height = skull.radius * 0.62;
     return {
       id: `spike-${i}`,
@@ -266,20 +287,21 @@ function spikes(skull: Skull): HairPart[] {
       rotation: [z * 0.2, 0, -x * 0.2],
     };
   });
+  return [cap, ...cones];
 }
 
 function shaved(skull: Skull): HairPart[] {
   const cap = shell(skull, {
     id: 'shaved',
-    puff: 0.018,
-    open: 1.48,
-    thetaStart: 0.08,
-    thetaLength: 1.25,
-    lift: skull.radius * 0.42,
-    back: skull.radius * 0.1,
+    puff: 0.014,
+    open: 1.62,
+    thetaStart: 0,
+    thetaLength: 1.85,
+    lift: skull.radius * 0.12,
+    back: skull.radius * 0.04,
   });
   if (cap.shape !== 'sphere') return [cap];
-  return [{ ...cap, scale: [1.02, 0.58, 0.92] }];
+  return [{ ...cap, scale: [1, 0.72, 0.96] }];
 }
 
 function shortCap(skull: Skull): HairPart[] {
@@ -474,6 +496,33 @@ export function hairEyePlaneHits(style: HairStyle, body: HairBody, spring?: Hair
     }
   }
   return hits;
+}
+
+/**
+ * Upper-scalp points, outside the face box, that a full head of hair should contain.
+ * phi 0 is -X, pi/2 is the face, and 3pi/2 is the back of the head.
+ */
+export function uncoveredScalp(style: HairStyle, body: HairBody, thetas = [0.12, 0.45]): string[] {
+  const skull = HAIR_SKULLS[body];
+  const parts = hairParts(style, body);
+  const samples: Array<[string, number, number]> = thetas.flatMap((theta) => [
+    [`crown-${theta.toFixed(2)}`, theta, Math.PI] as [string, number, number],
+    [`back-${theta.toFixed(2)}`, theta, Math.PI * 1.5],
+    [`left-${theta.toFixed(2)}`, theta, Math.PI],
+    [`right-${theta.toFixed(2)}`, theta, 0],
+  ]);
+  const missed: string[] = [];
+  for (const [name, theta, phi] of samples) {
+    const radius = skull.radius * 0.97;
+    const probe = skull.center.clone().add(new Vector3(
+      -Math.sin(theta) * Math.cos(phi) * radius,
+      Math.cos(theta) * radius,
+      Math.sin(theta) * Math.sin(phi) * radius,
+    ));
+    if (pointInFaceBox(probe, skull.face)) continue;
+    if (!parts.some((part) => hairCoversPoint(part, probe))) missed.push(name);
+  }
+  return missed;
 }
 
 /** Smallest gap between a hair vertex and the scalp sphere. Negative means the shell is inside the scalp. */

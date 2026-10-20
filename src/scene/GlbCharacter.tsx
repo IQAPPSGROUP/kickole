@@ -1,13 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, CanvasTexture, CircleGeometry, DoubleSide, LinearFilter, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, NoColorSpace, Quaternion, RepeatWrapping, SRGBColorSpace, Vector2, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type SkinnedMesh, type Texture, type WebGLRenderer } from 'three';
+import { AnimationMixer, BoxGeometry, CanvasTexture, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import { clearFootContactAnchors, setFootContactAnchors } from '../engine/footContact';
-import type { SurfacePattern } from '../game/catalogue';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
 import { applyContractBones } from './contractPose';
@@ -27,244 +26,6 @@ import { HairVariants } from './HairVariants';
 import { measureKickContactAnchors } from './measureFootContact';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
-
-/** The street key is already hot. Keep the photograph under white so cheeks do not clip. */
-const FACE_ALBEDO = '#efe6df';
-const FACE_ROUGHNESS = 0.88;
-const FACE_ENV = 0.16;
-
-/** glTF images on this skinned head sample as one averaged colour. A canvas copy of the same pixels does not. */
-function photographTexture(source: Texture): CanvasTexture | null {
-  const image = source.image as (CanvasImageSource & { width?: number; height?: number }) | undefined;
-  if (!image?.width || !image.height) return null;
-  const canvas = document.createElement('canvas');
-  canvas.width = image.width;
-  canvas.height = image.height;
-  const context = canvas.getContext('2d');
-  if (!context) return null;
-  try {
-    context.drawImage(image, 0, 0);
-  } catch {
-    return null;
-  }
-  // A short lift opens crushed midtones. The old power curve pushed cheeks to white.
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-  const px = pixels.data;
-  for (let i = 0; i < px.length; i += 4) {
-    if (px[i + 3] < 16) continue;
-    for (let channel = 0; channel < 3; channel += 1) {
-      const u = px[i + channel] / 255;
-      const lifted = Math.min(0.9, Math.pow(u, 0.7) * 0.8 + 0.1);
-      px[i + channel] = Math.round(lifted * 255);
-    }
-  }
-  context.putImageData(pixels, 0, 0);
-  const map = new CanvasTexture(canvas);
-  map.userData.canvas = canvas;
-  map.colorSpace = SRGBColorSpace;
-  map.flipY = false;
-  map.minFilter = LinearFilter;
-  map.magFilter = LinearFilter;
-  map.generateMipmaps = false;
-  map.needsUpdate = true;
-  return map;
-}
-
-/** Visible eye radius in head-bone space. Large enough that the iris is a few pixels in the gameplay camera. */
-const FACE_EYE_RADIUS = 0.015;
-
-function paintEye(canvas: HTMLCanvasElement, sclera: string, irisColour: string) {
-  const size = canvas.width;
-  const context = canvas.getContext('2d');
-  if (!context) return;
-  context.fillStyle = sclera;
-  context.fillRect(0, 0, size, size);
-  const cx = size / 2;
-  const cy = size / 2;
-  // Most of the disc is iris. A thin sclera rim is what still reads when the face is bright.
-  const iris = size * 0.36;
-  context.fillStyle = irisColour === '#000000' ? '#000000' : '#140c09';
-  context.beginPath();
-  context.arc(cx, cy, iris + size * 0.035, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = irisColour;
-  context.beginPath();
-  context.arc(cx, cy, iris, 0, Math.PI * 2);
-  context.fill();
-}
-
-/** Albedo chart: warm sclera, brown iris, black pupil, catchlight. */
-function eyeChart(): CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const context = canvas.getContext('2d');
-  paintEye(canvas, '#efe6d8', '#3a2014');
-  if (context) {
-    const cx = size / 2;
-    const cy = size / 2;
-    const iris = size * 0.24;
-    const gradient = context.createRadialGradient(cx, cy, iris * 0.08, cx, cy, iris);
-    gradient.addColorStop(0, '#6a3b24');
-    gradient.addColorStop(0.55, '#3a2014');
-    gradient.addColorStop(1, '#1a0e09');
-    context.fillStyle = gradient;
-    context.beginPath();
-    context.arc(cx, cy, iris, 0, Math.PI * 2);
-    context.fill();
-    context.fillStyle = '#070504';
-    context.beginPath();
-    context.arc(cx, cy, iris * 0.42, 0, Math.PI * 2);
-    context.fill();
-    context.fillStyle = '#fffaf4';
-    context.beginPath();
-    context.arc(cx - iris * 0.28, cy - iris * 0.32, iris * 0.14, 0, Math.PI * 2);
-    context.fill();
-  }
-  const map = new CanvasTexture(canvas);
-  map.colorSpace = SRGBColorSpace;
-  map.anisotropy = 4;
-  map.needsUpdate = true;
-  return map;
-}
-
-/** Emissive is sclera only, so the pupil stays black while the white survives AgX. */
-function eyeGlow(): CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  paintEye(canvas, '#ffffff', '#000000');
-  const map = new CanvasTexture(canvas);
-  map.colorSpace = SRGBColorSpace;
-  map.needsUpdate = true;
-  return map;
-}
-
-function faceEyeGeometry(): CircleGeometry {
-  return new CircleGeometry(FACE_EYE_RADIUS, 24);
-}
-
-/** Bind-pose points in the space of the bone that weighs each vertex most. */
-function skinnedBoneLocal(mesh: SkinnedMesh, only?: Bone): Array<[number, number, number]> {
-  const position = mesh.geometry.attributes.position;
-  const skinIndex = mesh.geometry.attributes.skinIndex;
-  const skinWeight = mesh.geometry.attributes.skinWeight;
-  const out: Array<[number, number, number]> = [];
-  if (!position || !skinIndex || !skinWeight || !mesh.skeleton) return out;
-  const vertex = new Vector3();
-  for (let i = 0; i < position.count; i += 1) {
-    vertex.fromBufferAttribute(position, i);
-    let bone = 0;
-    let weight = -1;
-    for (let k = 0; k < 4; k += 1) {
-      const w = skinWeight.getComponent(i, k);
-      if (w > weight) {
-        weight = w;
-        bone = skinIndex.getComponent(i, k);
-      }
-    }
-    if (only && mesh.skeleton.bones[bone] !== only) continue;
-    const inverse = mesh.skeleton.boneInverses[bone];
-    if (!inverse) continue;
-    vertex.applyMatrix4(mesh.bindMatrix);
-    vertex.applyMatrix4(inverse);
-    out.push([vertex.x, vertex.y, vertex.z]);
-  }
-  return out;
-}
-
-/**
- * The authored eye shell is skinned to the head but its UVs span the whole
- * face photograph, so it cannot show an iris. Hide it and parent a lit disc
- * to the head bone, seated just proud of the skin.
- */
-function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
-  if (!head) return;
-  const sockets: Array<{ x: number; y: number; z: number }> = [];
-  const hide: Mesh[] = [];
-  root.traverse((o) => {
-    const mesh = o as SkinnedMesh;
-    if (!mesh.isMesh || !mesh.material) return;
-    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    if (!list.some((m) => m.name === 'Eyes')) return;
-    hide.push(mesh);
-    if (!mesh.isSkinnedMesh || sockets.length > 0) return;
-    const local = skinnedBoneLocal(mesh);
-    for (const sign of [-1, 1] as const) {
-      const side = local.filter((p) => (sign < 0 ? p[0] < 0 : p[0] >= 0));
-      if (side.length === 0) continue;
-      const zMax = Math.max(...side.map((p) => p[2]));
-      const front = side.filter((p) => p[2] > zMax - 0.006);
-      const sample = front.length > 0 ? front : side;
-      let x = 0;
-      let y = 0;
-      for (const p of sample) {
-        x += p[0];
-        y += p[1];
-      }
-      sockets.push({
-        x: x / sample.length,
-        y: y / sample.length,
-        z: zMax,
-      });
-    }
-  });
-  let headSkin: SkinnedMesh | undefined;
-  root.traverse((o) => {
-    const mesh = o as SkinnedMesh;
-    if (!mesh.isSkinnedMesh || !mesh.material || headSkin) return;
-    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    if (list.some((m) => m.userData.headPhoto)) headSkin = mesh;
-  });
-  if (headSkin) {
-    const skinPoints = skinnedBoneLocal(headSkin, head);
-    const reach = 0.018;
-    for (const socket of sockets) {
-      let z = socket.z;
-      for (const p of skinPoints) {
-        const dx = p[0] - socket.x;
-        const dy = p[1] - socket.y;
-        if (dx * dx + dy * dy > reach * reach) continue;
-        if (p[2] > z) z = p[2];
-      }
-      socket.z = z + 0.008;
-    }
-  } else {
-    for (const socket of sockets) socket.z += 0.006;
-  }
-  for (const mesh of hide) mesh.visible = false;
-  if (sockets.length === 0) return;
-  const map = eyeChart();
-  const geometry = faceEyeGeometry();
-  const material = new MeshStandardMaterial({
-    map,
-    color: '#ffffff',
-    roughness: 0.4,
-    metalness: 0,
-    side: DoubleSide,
-    // A small lift keeps the sclera out of the socket shadow. Stronger than this
-    // trips the street bloom and turns the eye into a white plate.
-    emissive: '#fff6ea',
-    emissiveMap: eyeGlow(),
-    emissiveIntensity: 0.1,
-    polygonOffset: true,
-    polygonOffsetFactor: -4,
-    polygonOffsetUnits: -4,
-  });
-  for (const socket of sockets) {
-    const eye = new Mesh(geometry, material);
-    eye.name = 'FaceEye';
-    eye.position.set(socket.x, socket.y, socket.z);
-    eye.scale.set(1, 0.64, 1);
-    eye.castShadow = false;
-    eye.receiveShadow = false;
-    eye.frustumCulled = false;
-    eye.renderOrder = 2;
-    head.add(eye);
-  }
-}
 
 function liftKickToe(
   bones: Partial<Record<BoneKey, Bone>>,
@@ -315,267 +76,6 @@ function shirtNumber(id: string): number {
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 33 + id.charCodeAt(i)) >>> 0;
   return NUMBERS[hash % NUMBERS.length];
-}
-
-function patternIndex(pattern: SurfacePattern): number {
-  switch (pattern) {
-    case 'plain': return 0;
-    case 'panels': return 1;
-    case 'wave': return 2;
-    case 'mosaic': return 3;
-    case 'stripe': return 4;
-    case 'gold': return 5;
-    case 'midnight': return 6;
-    case 'carnival': return 7;
-    default: {
-      const neverPattern: never = pattern;
-      return neverPattern;
-    }
-  }
-}
-
-const DETAIL_NORMAL_SNIPPET = `
-        vec3 detailN = texture2D(uDetailN, vViewPosition.xy * uDetailScale).xyz * 2.0 - 1.0;
-        normal = normalize(normal + vec3(detailN.xy * uDetailStrength, 0.0));`;
-
-/** Subtle weave so kit patterns survive a flat colour tint. High adds the weave normal. */
-function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern, quality: Quality) {
-  const id = patternIndex(pattern);
-  const detail = quality === 'high';
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uPattern = { value: id };
-    let common = '#include <common>\nuniform float uPattern;';
-    if (detail) {
-      shader.uniforms.uDetailN = { value: kitDetail().normal };
-      shader.uniforms.uDetailScale = { value: 6 };
-      shader.uniforms.uDetailStrength = { value: 0.55 };
-      common += '\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;';
-    }
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', common)
-      .replace('#include <map_fragment>', `#include <map_fragment>
-        float weave = 1.0;
-        if (uPattern > 0.5 && uPattern < 1.5) weave = mix(0.78, 1.0, step(0.5, fract(vMapUv.x * 5.0)));
-        else if (uPattern > 1.5 && uPattern < 2.5) weave = 0.82 + 0.18 * sin(vMapUv.y * 36.0 + vMapUv.x * 4.0);
-        else if (uPattern > 2.5 && uPattern < 3.5) weave = mix(0.75, 1.0, step(0.65, fract(sin(dot(floor(vMapUv * 8.0), vec2(12.9898, 78.233))) * 43758.5453)));
-        else if (uPattern > 3.5 && uPattern < 4.5) weave = mix(0.8, 1.0, step(0.55, fract(vMapUv.y * 10.0)));
-        else if (uPattern > 4.5 && uPattern < 5.5) weave = 0.9 + 0.1 * sin(vMapUv.x * 80.0);
-        else if (uPattern > 5.5 && uPattern < 6.5) weave = mix(0.7, 1.0, step(0.5, fract(vMapUv.x * 2.0 + vMapUv.y)));
-        else if (uPattern > 6.5) weave = 0.84 + 0.16 * sin((vMapUv.x + vMapUv.y) * 28.0);
-        float thread = mix(0.86, 1.0, step(0.5, fract(vViewPosition.y * 220.0)));
-        float cross = mix(0.9, 1.0, step(0.5, fract(vViewPosition.x * 220.0)));
-        diffuseColor.rgb *= weave * thread * cross;`)
-      .replace(
-        '#include <normal_fragment_maps>',
-        detail ? `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}` : '#include <normal_fragment_maps>',
-      );
-  };
-  material.customProgramCacheKey = () => `kit-${id}${detail ? '-weave' : ''}`;
-  material.needsUpdate = true;
-}
-
-const KIT_DETAIL = new Set<string>([
-  MATERIAL_NAMES.shirt,
-  MATERIAL_NAMES.shirtTrim,
-  MATERIAL_NAMES.shorts,
-  MATERIAL_NAMES.socks,
-  MATERIAL_NAMES.boots,
-  MATERIAL_NAMES.bootsSole,
-  'Boot_Laces',
-  'Boot_Trim',
-]);
-
-let kitDetailMaps: { normal: CanvasTexture; rough: CanvasTexture } | null = null;
-
-/** Weave normal and roughness for High. Shared, and never applied to the head photograph. */
-function kitDetail(): { normal: CanvasTexture; rough: CanvasTexture } {
-  if (kitDetailMaps) return kitDetailMaps;
-  const size = 1024;
-  const normalCanvas = document.createElement('canvas');
-  const roughCanvas = document.createElement('canvas');
-  normalCanvas.width = normalCanvas.height = size;
-  roughCanvas.width = roughCanvas.height = size;
-  const normalG = normalCanvas.getContext('2d');
-  const roughG = roughCanvas.getContext('2d');
-  if (normalG && roughG) {
-    normalG.fillStyle = 'rgb(128,128,255)';
-    normalG.fillRect(0, 0, size, size);
-    roughG.fillStyle = 'rgb(168,168,168)';
-    roughG.fillRect(0, 0, size, size);
-    const step = 8;
-    normalG.strokeStyle = 'rgb(118,124,250)';
-    roughG.strokeStyle = 'rgb(196,196,196)';
-    normalG.lineWidth = 1;
-    roughG.lineWidth = 1;
-    for (let i = 0; i < size; i += step) {
-      normalG.beginPath();
-      normalG.moveTo(i, 0);
-      normalG.lineTo(i, size);
-      normalG.moveTo(0, i);
-      normalG.lineTo(size, i);
-      normalG.stroke();
-      roughG.beginPath();
-      roughG.moveTo(i, 0);
-      roughG.lineTo(i, size);
-      roughG.moveTo(0, i);
-      roughG.lineTo(size, i);
-      roughG.stroke();
-    }
-  }
-  const pack = (canvas: HTMLCanvasElement) => {
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = NoColorSpace;
-    texture.wrapS = texture.wrapT = RepeatWrapping;
-    texture.anisotropy = 8;
-    texture.repeat.set(6, 6);
-    return texture;
-  };
-  kitDetailMaps = { normal: pack(normalCanvas), rough: pack(roughCanvas) };
-  return kitDetailMaps;
-}
-
-function applyKitDetail(material: MeshStandardMaterial, name: string, quality: Quality) {
-  if (!KIT_DETAIL.has(name) || material.userData.facePhoto) return;
-  if (quality !== 'high') {
-    if (material.userData.kitDetail) {
-      material.normalMap = (material.userData.authoredNormal as Texture | null) ?? null;
-      material.roughnessMap = (material.userData.authoredRough as Texture | null) ?? null;
-      const scale = (material.userData.authoredNormalScale as number) ?? 1;
-      material.normalScale = new Vector2(scale, scale);
-      if (name !== MATERIAL_NAMES.shirt) {
-        material.onBeforeCompile = () => {};
-        material.customProgramCacheKey = () => 'kit';
-      }
-      material.userData.kitDetail = false;
-      material.needsUpdate = true;
-    }
-    return;
-  }
-  if (!material.userData.kitDetail) {
-    material.userData.authoredNormal = material.normalMap ?? null;
-    material.userData.authoredRough = material.roughnessMap ?? null;
-    material.userData.authoredNormalScale = material.normalScale?.x ?? 1;
-  }
-  const maps = kitDetail();
-  if (!material.userData.authoredNormal) {
-    material.normalMap = maps.normal;
-    material.normalScale = new Vector2(0.35, 0.35);
-  } else {
-    material.normalScale = new Vector2(1.55, 1.55);
-  }
-  if (!material.userData.authoredRough) material.roughnessMap = maps.rough;
-  material.userData.kitDetail = true;
-  if (name !== MATERIAL_NAMES.shirt) {
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.uDetailN = { value: maps.normal };
-      shader.uniforms.uDetailScale = { value: 6 };
-      shader.uniforms.uDetailStrength = { value: 0.5 };
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;',
-        )
-        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}`);
-    };
-    material.customProgramCacheKey = () => 'kit-weave';
-  }
-  material.needsUpdate = true;
-}
-
-let skinDetailMaps: { normal: CanvasTexture; rough: CanvasTexture } | null = null;
-
-/** Pore normal and roughness for body skin. The head photograph keeps its own flat normal. */
-function skinDetail(): { normal: CanvasTexture; rough: CanvasTexture } {
-  if (skinDetailMaps) return skinDetailMaps;
-  const size = 512;
-  const normalCanvas = document.createElement('canvas');
-  const roughCanvas = document.createElement('canvas');
-  normalCanvas.width = normalCanvas.height = size;
-  roughCanvas.width = roughCanvas.height = size;
-  const normalG = normalCanvas.getContext('2d');
-  const roughG = roughCanvas.getContext('2d');
-  if (normalG && roughG) {
-    normalG.fillStyle = 'rgb(128,128,255)';
-    normalG.fillRect(0, 0, size, size);
-    roughG.fillStyle = 'rgb(158,158,158)';
-    roughG.fillRect(0, 0, size, size);
-    for (let i = 0; i < 700; i += 1) {
-      const x = (i * 47) % size;
-      const y = (i * 29) % size;
-      const shade = 96 + (i % 5) * 10;
-      normalG.fillStyle = `rgb(${shade},${120 + (i % 3) * 8},255)`;
-      normalG.fillRect(x, y, 3, 3);
-      roughG.fillStyle = `rgb(${120 + (i % 7) * 12},${120 + (i % 7) * 12},${120 + (i % 7) * 12})`;
-      roughG.fillRect(x, y, 3, 3);
-    }
-  }
-  const pack = (canvas: HTMLCanvasElement) => {
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = NoColorSpace;
-    texture.wrapS = texture.wrapT = RepeatWrapping;
-    texture.anisotropy = 8;
-    texture.repeat.set(4, 4);
-    return texture;
-  };
-  skinDetailMaps = { normal: pack(normalCanvas), rough: pack(roughCanvas) };
-  return skinDetailMaps;
-}
-
-function applySkinDetail(material: MeshStandardMaterial, name: string, quality: Quality) {
-  if (name !== MATERIAL_NAMES.skin || material.userData.facePhoto) return;
-  if (quality !== 'high') {
-    if (material.userData.skinDetail) {
-      material.normalMap = (material.userData.authoredNormal as Texture | null) ?? null;
-      material.roughnessMap = (material.userData.authoredRough as Texture | null) ?? null;
-      const scale = (material.userData.authoredNormalScale as number) ?? 1;
-      material.normalScale = new Vector2(scale, scale);
-      material.userData.skinDetail = false;
-      material.needsUpdate = true;
-    }
-    if (material.userData.skinPores) {
-      material.onBeforeCompile = () => {};
-      material.customProgramCacheKey = () => 'skin';
-      material.userData.skinPores = false;
-      material.needsUpdate = true;
-    }
-    return;
-  }
-  if (!material.userData.skinDetail) {
-    material.userData.authoredNormal = material.normalMap ?? null;
-    material.userData.authoredRough = material.roughnessMap ?? null;
-    material.userData.authoredNormalScale = material.normalScale?.x ?? 1;
-  }
-  const maps = skinDetail();
-  if (!material.userData.authoredNormal) {
-    material.normalMap = maps.normal;
-    material.normalScale = new Vector2(0.4, 0.4);
-  } else {
-    material.normalScale = new Vector2(1.85, 1.85);
-  }
-  if (!material.userData.authoredRough) material.roughnessMap = maps.rough;
-  material.userData.skinDetail = true;
-  if (!material.userData.skinPores) {
-    material.onBeforeCompile = (shader) => {
-      shader.uniforms.uDetailN = { value: maps.normal };
-      shader.uniforms.uDetailScale = { value: 9 };
-      shader.uniforms.uDetailStrength = { value: 0.7 };
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <common>',
-          '#include <common>\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;',
-        )
-        .replace(
-          '#include <map_fragment>',
-          `#include <map_fragment>
-          float pore = fract(sin(dot(floor(vViewPosition.xy * vec2(420.0, 360.0)), vec2(12.9898, 78.233))) * 43758.5453);
-          diffuseColor.rgb *= mix(0.84, 1.0, smoothstep(0.35, 0.7, pore));`,
-        )
-        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}`);
-    };
-    material.customProgramCacheKey = () => 'skin-pores-v2';
-    material.userData.skinPores = true;
-  }
-  material.needsUpdate = true;
 }
 
 const ktxRenderer: { gl: WebGLRenderer | null } = { gl: null };
@@ -644,7 +144,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const boneNames: string[] = [];
     const matNames: string[] = [];
     let textured = false;
-    let litHeadPhoto = false;
     root.traverse((o) => {
       if ((o as Bone).isBone) {
         boneNames.push(o.name);
@@ -658,35 +157,17 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         const cloned = list.map((m) => {
           const source = m as MeshStandardMaterial;
-          const keepPbr = Boolean(source.normalMap);
-          if (keepPbr) textured = true;
-          // The compressed and glTF copies of the face both sample as one flat colour on
-          // this skinned mesh. A canvas of the same photograph samples the real texels.
-          if (source.userData.headPhoto && source.map) {
-            const photo = photographTexture(source.map);
-            if (photo) {
-              photo.needsUpdate = true;
-              litHeadPhoto = true;
-              // Same standard material as the kit: key, fill, shadow and IBL. The
-              // photograph is the albedo. A flat colour here would ignore the street lights.
-              const lit = new MeshStandardMaterial({
-                map: photo,
-                normalMap: source.normalMap ?? null,
-                color: FACE_ALBEDO,
-                roughness: FACE_ROUGHNESS,
-                metalness: 0,
-                envMapIntensity: FACE_ENV,
-              });
-              lit.name = m.name;
-              lit.userData.facePhoto = true;
-              lit.userData.headPhoto = true;
-              return lit;
-            }
-          }
+          // Keep the purchased PBR material: its own albedo, normal and roughness.
+          // A missing normal is the only case that still falls back to the toon shader.
+          const keepPbr = Boolean(source.normalMap) || source.isMeshStandardMaterial;
+          if (source.normalMap || source.map) textured = true;
           const next = keepPbr ? source.clone() : toToonMaterial(m, m.name === MATERIAL_NAMES.skin);
           next.name = m.name;
-          // The head photograph is its own Skin material. The wardrobe tint stays off it.
-          if (source.userData.headPhoto) next.userData.headPhoto = true;
+          // The head photograph stays at the file's own colour. The wardrobe swatch must not multiply it.
+          if (source.userData.headPhoto) {
+            next.userData.headPhoto = true;
+            next.userData.facePhoto = true;
+          }
           return next;
         });
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
@@ -703,9 +184,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       const bone = byName.get(boneName);
       if (bone) boneMap[k] = bone;
     });
-    // Female eyes keep their authored atlas. The male photograph has no sclera,
-    // so the head gets a pair of lit eyeballs parented to the head bone.
-    if (litHeadPhoto) attachFaceEyes(root, boneMap.head);
     const hairMeshes: Object3D[] = [];
     root.traverse((o) => {
       const mesh = o as Mesh;
@@ -758,16 +236,9 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const colors = skinMaterialColors(skin);
     for (const m of materials) {
       const name = m.name;
-      // Every Skin instance gets the wardrobe colour. The head photograph is already
-      // the finished face, so multiplying it by the skin swatch flattens the cheeks.
-      if (m.userData.facePhoto) {
-        m.color.set(FACE_ALBEDO);
-        if (m instanceof MeshStandardMaterial) {
-          m.roughness = FACE_ROUGHNESS;
-          m.envMapIntensity = FACE_ENV;
-        }
-        continue;
-      }
+      // The purchased face and body skin keep their own albedo. A swatch multiply
+      // repaints the photograph. Kit colours still come from the wardrobe.
+      if (m.userData.facePhoto || m.userData.headPhoto || name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair) continue;
       if (colors[name]) m.color.set(colors[name]);
       if ((m as MeshToonMaterial).isMeshToonMaterial) {
         const toon = m as MeshToonMaterial;
@@ -777,12 +248,8 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         setToonTrim(toon, skin.clothing.shirtTrim);
         continue;
       }
-      const standard = m as MeshStandardMaterial;
-      if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern, quality);
-      applyKitDetail(standard, name, quality);
-      applySkinDetail(standard, name, quality);
     }
-  }, [skin, materials, quality]);
+  }, [skin, materials]);
 
   useEffect(() => {
     if (pbr || quality === 'low') return;

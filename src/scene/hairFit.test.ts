@@ -12,6 +12,7 @@ import {
   hairFaceHits,
   hairParts,
   hairScalpGap,
+  uncoveredScalp,
   pointInFaceBox,
   type HairBody,
   type HairSpring,
@@ -120,6 +121,13 @@ describe('hair fit', () => {
         expect(gap, `${style} ${body}`).toBeLessThan(0.045);
         expect(gap, `${style} ${body} buried`).toBeGreaterThan(-0.04);
       }
+    }
+  });
+
+  it('covers the crown for a full afro and a seated high-top', () => {
+    for (const body of ['male', 'female', 'primitive'] as const) {
+      expect(uncoveredScalp('afro', body, [0.12, 0.7]), `afro ${body}`).toEqual([]);
+      expect(uncoveredScalp('highTop', body, [0.12, 0.38]), `high-top ${body}`).toEqual([]);
     }
   });
 

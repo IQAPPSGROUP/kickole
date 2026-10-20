@@ -23,6 +23,19 @@ function started() {
 }
 
 describe('GameEngine', () => {
+  it('a new finger still kicks when the previous press never released', () => {
+    const e = new GameEngine();
+    e.prepare('ready');
+    e.press('left', 1);
+    expect(e.phase).toBe('playing');
+    runUntilContactDelta(e, 5);
+    e.press('left', 2);
+    e.release('left');
+    stepN(e, 6);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.phase).toBe('playing');
+  });
+
   it('launches the ball on first tap', () => {
     const e = started();
     expect(e.phase).toBe('playing');

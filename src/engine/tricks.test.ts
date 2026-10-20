@@ -113,11 +113,38 @@ describe('header', () => {
     expect(e.stats.kickUps).toBe(beforeKick);
     expect(e.lastKick.left).toBeLessThan(e.time - 0.01); // not recorded as a foot kick on this tap
     expect(e.lastTrick?.kind).toBe('header');
+    expect(e.ball.vy).toBeGreaterThan(1);
+    expect(Math.hypot(e.ball.wx, e.ball.wy, e.ball.wz)).toBeLessThan(0.2);
     const scored = e.stats.score;
     // Farming: second press while recovering / no window does not re-award.
     e.press('right');
     expect(e.stats.headers).toBe(1);
     expect(e.stats.score).toBe(scored);
+  });
+
+  it('heads a normal juggle in front of the player and pops the ball up', () => {
+    const e = started();
+    runUntilContactDelta(e, 5);
+    e.press('right');
+    e.release('right');
+    stepN(e, 8);
+    let headed = false;
+    for (let i = 0; i < 4000 && e.phase === 'playing' && !headed; i++) {
+      e.step(e.config.fixedStep);
+      if (e.ball.vy < 0 && e.ball.y < e.config.contacts.forehead.y + 0.35 && e.ball.y > e.config.contacts.forehead.y - 0.05) {
+        e.attemptHeader();
+        headed = e.stats.headers === 1;
+      }
+    }
+    expect(headed).toBe(true);
+    expect(e.ball.vy).toBeGreaterThan(0);
+    let apex = e.ball.y;
+    for (let i = 0; i < 800 && e.ball.vy > 0; i++) {
+      e.step(e.config.fixedStep);
+      apex = Math.max(apex, e.ball.y);
+    }
+    expect(apex - e.config.contacts.forehead.y).toBeGreaterThan(0.25);
+    expect(apex - e.config.contacts.forehead.y).toBeLessThan(0.7);
   });
 
   it('rejects headers while the ball is still rising', () => {
@@ -169,28 +196,33 @@ describe('around the world', () => {
     runUntilContactDelta(e, 5);
     e.press('left'); e.release('left');
     expect(e.ball.vy).toBeGreaterThan(1);
+    expect(Math.hypot(e.ball.wx, e.ball.wy, e.ball.wz)).toBeLessThan(0.05);
+    const y = e.ball.y;
     stepN(e, 5);
+    expect(e.ball.y).toBeGreaterThan(y);
     expect(e.stats.aroundTheWorlds).toBe(0);
     expect(e.stats.score).toBe(0);
     expect(e.trick?.kind).toBe('aroundTheWorld');
     expect(e.trick?.phase).toBe('execute');
   });
 
-  it('awards +20 only after revolution and a timed return touch', () => {
+  it('awards +20 when the orbit brings the foot back under the ball', () => {
     const e = started();
     e.setTrick('aroundTheWorld');
     runUntilContactDelta(e, 5);
     e.press('left'); e.release('left');
-    // Wait for a full revolution.
-    const need = Math.ceil(e.config.tricks.atwRevolutionTime / e.config.fixedStep) + 2;
-    stepN(e, need);
-    expect(e.trick?.phase).toBe('recover');
-    expect(e.trick?.revolution).toBeGreaterThanOrEqual(1);
-    runUntilContactDelta(e, 5);
-    e.press('right'); e.release('right');
+    const foot = e.config.contactHeight;
+    let apex = e.ball.y;
+    for (let i = 0; i < 4000 && e.stats.aroundTheWorlds === 0 && e.phase === 'playing'; i++) {
+      e.step(e.config.fixedStep);
+      apex = Math.max(apex, e.ball.y);
+    }
     expect(e.stats.aroundTheWorlds).toBe(1);
     expect(e.stats.score).toBeGreaterThanOrEqual(1 + 20);
-    expect(e.trick).toBeNull();
+    expect(apex - foot).toBeGreaterThan(0.28);
+    expect(apex - foot).toBeLessThan(0.7);
+    expect(e.ball.vy).toBeGreaterThan(0);
+    expect(e.phase).toBe('playing');
   });
 
   it('duplicate taps during the revolution do not finish or farm points', () => {
@@ -297,26 +329,27 @@ describe('groove trick', () => {
     expect(e.selectedTrick).toBeNull();
     expect(e.trick?.kind).toBe('groove');
     const flight = (2 * e.ball.vy) / e.gravity;
-    expect(flight).toBeGreaterThan(1.5);
+    expect(flight).toBeGreaterThan(1.7);
     expect(flight).toBeLessThan(2);
     let apex = e.ball.y;
-    let clearedY = 0;
-    for (let i = 0; i < 4000 && !(e.ball.vy < 0 && e.ball.y < e.config.contactHeight + 0.15); i++) {
+    let sawDance = false;
+    for (let i = 0; i < 4000 && e.trick?.phase === 'execute'; i++) {
       e.step(e.config.fixedStep);
       apex = Math.max(apex, e.ball.y);
-      if (clearedY === 0 && e.trick == null) clearedY = e.ball.y;
+      const age = e.time - (e.trick?.startedAt ?? e.time);
+      if (age > 0.4 && age < e.config.tricks.grooveDanceSec) sawDance = true;
     }
-    expect(apex).toBeGreaterThan(e.config.contacts.forehead.y + 0.8);
-    expect(clearedY).toBeGreaterThan(e.config.contacts.forehead.y + 0.4);
+    expect(sawDance).toBe(true);
+    expect(apex - e.config.contactHeight).toBeGreaterThan(3);
+    expect(apex - e.config.contactHeight).toBeLessThan(5.2);
+    expect(e.trick?.phase === 'recover' || e.trick == null).toBe(true);
+    expect(e.ball.y).toBeLessThan(e.config.contactHeight);
+    expect(e.ball.y).toBeGreaterThan(e.config.contactHeight - 0.32);
+    expect(e.ball.vy).toBeGreaterThan(0);
+    for (let i = 0; i < 800 && e.trick; i++) e.step(e.config.fixedStep);
     expect(e.trick).toBeNull();
     expect(e.phase).toBe('playing');
-    runUntilContactDelta(e, 8);
-    e.press('left');
-    e.release('left');
-    stepN(e, 6);
-    expect(e.stats.kickUps).toBe(1);
     expect(e.stats.grooves).toBe(1);
-    expect(e.phase).toBe('playing');
   });
 
   it('still scores the touch when the tap misses the beat', () => {

@@ -9,6 +9,7 @@ import {
 import type { Side } from '../engine/config';
 import type { GameEngine } from '../engine/engine';
 import type { TrickKind } from '../engine/tricks';
+import { atwFootOffset } from './atwOrbit';
 import { aimPoint, pinAnkle, solveTwoBone, forwardPole } from './footIk';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import {
@@ -172,6 +173,8 @@ const thighLocal: Record<Side, Vector3> = {
 };
 const backLocal = new Vector3(0, 0.08, -0.1);
 const foreheadLocal = new Vector3(0, 0.1, 0.09);
+const plantLiftL = new Vector3();
+const plantLiftR = new Vector3();
 
 function other(side: Side): Side {
   return side === 'left' ? 'right' : 'left';
@@ -630,8 +633,12 @@ export function createFreestyleRig() {
   function applyHead(engine: GameEngine) {
     const head = bones?.head;
     const spine = bones?.spine;
-    if (!head) return;
+    if (!head || !bones) return;
     resetHipPlanar();
+    // Heels are up before the contact solve so the body can rise into the ball.
+    bones.hips.position.y += 0.03;
+    bones.hips.updateMatrix();
+    bones.hips.updateWorldMatrix(true, true);
     clipFoot.copy(head.quaternion);
     if (spine) clipThigh.copy(spine.quaternion);
     ballNow(engine, ball);
@@ -653,11 +660,35 @@ export function createFreestyleRig() {
       head.localToWorld(landmark.copy(foreheadLocal));
       lean += 0.16;
     });
+    // Tip the forehead back (~35°) after the leather is found, then slide the
+    // body with it so the hairline stays on the ball. A tilt inside the aim
+    // loop points the face away and the planted feet cannot close a 25 cm gap.
+    head.updateWorldMatrix(true, true);
+    head.localToWorld(surface.copy(foreheadLocal));
+    head.quaternion.multiply(swing.setFromEuler(euler.set(-0.62, 0, 0)));
+    head.updateMatrix();
+    head.updateWorldMatrix(true, true);
+    head.localToWorld(landmark.copy(foreheadLocal));
+    approach.copy(surface).sub(landmark);
+    crouch(planted, 0.04);
+    shiftClamped(approach, planted);
+    if (bones.armLeft && bones.armRight) {
+      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.12, 0, -0.65)));
+      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0.12, 0, 0.7)));
+    }
+    if (bones.elbowLeft && bones.elbowRight) {
+      bones.elbowLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.4, 0, 0)));
+      bones.elbowRight.quaternion.multiply(swing.setFromEuler(euler.set(0.4, 0, 0)));
+    }
     hold(head);
     hold(spine);
-    hold(bones?.chest);
-    pin('left', anchors.left.plant);
-    pin('right', anchors.right.plant);
+    hold(bones.chest);
+    plantLiftL.copy(anchors.left.plant);
+    plantLiftR.copy(anchors.right.plant);
+    plantLiftL.y += 0.035;
+    plantLiftR.y += 0.035;
+    pin('left', plantLiftL);
+    pin('right', plantLiftR);
   }
 
   function applyNeck(engine: GameEngine) {
@@ -706,55 +737,91 @@ export function createFreestyleRig() {
   }
 
   /**
-   * Foot circles the ball on the outside, instep on the leather.
-   * The arc never crosses the standing leg: x stays on the free-leg side and z stays in front.
+   * Outside around-the-world. The foot meets the ball on the pop and the catch,
+   * and passes over the top in between. It does not stick to the leather for the whole orbit.
    */
   function applyAtw(engine: GameEngine, side: Side) {
     const support = other(side);
     const planted: Side[] = [support];
     resetHipPlanar();
-    const rev = engine.trick?.revolution ?? 0;
+    const rev = engine.trick?.phase === 'recover' ? 1 : (engine.trick?.revolution ?? 0);
     ballNow(engine, ball);
     const radius = engine.config.ballRadius;
     const len = Math.max(0.05, instepLocal[side].length());
     const outward = side === 'left' ? -1 : 1;
-    const ang = Math.min(1, Math.max(0, rev)) * Math.PI;
-    const lift = Math.sin(ang);
-    // Stay on the face of the ball the hip can actually reach. A far-side target
-    // locks the leg and the boot spears through the leather.
-    leg(side).thigh.getWorldPosition(hipWorld);
-    approach.copy(hipWorld).sub(ball);
-    if (approach.lengthSq() < 1e-6) approach.set(-outward, 0.2, 0.4);
-    approach.normalize();
-    strikeDir.set(outward * (0.85 + 0.15 * Math.cos(ang)), 0.15 + 0.85 * lift, 0.55 + 0.35 * lift);
-    strikeDir.normalize();
-    approach.lerp(strikeDir, 0.35).normalize();
-    surface.copy(ball).addScaledVector(approach, radius);
-    ankleTarget.copy(surface).addScaledVector(approach, len);
-    ensureAnkleReach(side, ankleTarget, planted);
-    pin(support, anchors[support].plant);
-    strikeDir.copy(approach).negate();
-    solveStrike(side, ankleTarget, strikeDir, true);
-    separateFromSupport(side, support);
-    if (skinned) {
-      const limb = leg(side);
-      limb.foot.getWorldPosition(ankleTarget);
-      for (let pass = 0; pass < 5; pass++) {
-        const hit = closestSkinnedVertex(skinned, ball, BOOT_MATERIALS, ankleTarget, 0.45);
-        if (!hit) break;
-        const gap = hit.distanceTo(ball) - radius;
-        if (Math.abs(gap) < 0.01) break;
-        strikeDir.copy(hit).sub(ball);
-        if (strikeDir.lengthSq() < 1e-8) break;
-        strikeDir.normalize();
-        const step = Math.max(-0.035, Math.min(0.035, gap));
-        ankleTarget.addScaledVector(strikeDir, -step);
-        approach.copy(ball).sub(ankleTarget);
-        if (approach.lengthSq() > 1e-8) orientInstep(side, approach);
-        solveStrike(side, ankleTarget, approach.lengthSq() > 1e-8 ? approach : strikeDir, true);
-        limb.foot.getWorldPosition(ankleTarget);
-      }
+    const offset = atwFootOffset(rev, outward, radius);
+    const orbit = Math.min(1, Math.max(0, (rev - 0.12) / 0.78));
+    const hop = engine.trick?.phase === 'execute' ? Math.sin(orbit * Math.PI) * 0.06 : 0;
+    if (offset.contact) {
+      approach.set(offset.x, offset.y, offset.z);
+      if (approach.lengthSq() < 1e-6) approach.set(0, -1, 0);
+      seatFoot(side, ball, radius, approach);
+    } else {
+      approach.set(offset.x, offset.y, offset.z);
+      if (approach.lengthSq() < 1e-8) approach.set(0, 1, 0);
+      approach.normalize();
+      surface.copy(ball).addScaledVector(approach, Math.hypot(offset.x, offset.y, offset.z));
+      ankleTarget.copy(surface).addScaledVector(approach, len);
+      ensureAnkleReach(side, ankleTarget, planted);
+      strikeDir.copy(approach).negate();
+      solveStrike(side, ankleTarget, strikeDir, true);
     }
+    separateFromSupport(side, support);
+    plantLiftL.copy(anchors[support].plant);
+    plantLiftL.y += hop;
+    pin(support, plantLiftL);
+    const counter = Math.sin(Math.min(1, Math.max(0, rev)) * Math.PI);
+    if (bones?.spine) {
+      bones.spine.quaternion.multiply(swing.setFromEuler(euler.set(0.1, outward * 0.12 * counter, -outward * 0.1)));
+    }
+    if (bones?.armLeft && bones.armRight) {
+      const same = side === 'left' ? -1 : 1;
+      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(-0.15 * counter, 0, -0.55 + same * 0.35 * counter)));
+      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(-0.15 * counter, 0, 0.55 + same * 0.35 * counter)));
+    }
+    if (bones?.head) {
+      bones.head.quaternion.multiply(swing.setFromEuler(euler.set(0.58, 0, 0)));
+      hold(bones.head);
+    }
+  }
+
+  /** High kick, samba on the spot, then a cushioned catch as the ball comes down. */
+  function applyGroove(engine: GameEngine) {
+    if (!bones) return;
+    resetHipPlanar();
+    const trick = engine.trick;
+    const age = Math.max(0, engine.time - (trick?.startedAt ?? engine.time));
+    const flight = engine.config.tricks.grooveFlightSec;
+    const danceStart = 0.2;
+    const danceEnd = danceStart + engine.config.tricks.grooveDanceSec;
+    const reacquire = age >= flight - 0.4;
+    const dancing = trick?.phase === 'execute' && age >= danceStart && age < danceEnd && !reacquire;
+    if (dancing) {
+      const beat = Math.sin((age - danceStart) * Math.PI * 6);
+      bones.hips.position.x = hipRest.x + beat * 0.025;
+      bones.hips.position.y += 0.01 * Math.abs(beat);
+      bones.hips.updateMatrix();
+      bones.hips.updateWorldMatrix(true, true);
+      if (bones.spine) bones.spine.quaternion.multiply(swing.setFromEuler(euler.set(0, beat * 0.08, beat * 0.12)));
+      if (bones.armLeft && bones.armRight) {
+        bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.05, 0, -0.48 - 0.22 * beat)));
+        bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0.05, 0, 0.48 + 0.22 * beat)));
+      }
+    } else if (trick?.phase === 'execute' && bones.head) {
+      bones.head.quaternion.multiply(swing.setFromEuler(euler.set(age < danceStart ? -0.5 : -0.6, 0, 0)));
+      hold(bones.head);
+    }
+    const catching = trick?.phase === 'recover';
+    if (catching) {
+      const side = trick.side ?? 'right';
+      ballNow(engine, ball);
+      approach.set(0, -1, -0.08);
+      seatFoot(side, ball, engine.config.ballRadius, approach);
+      pin(other(side), anchors[other(side)].plant);
+      return;
+    }
+    pin('left', anchors.left.plant);
+    pin('right', anchors.right.plant);
   }
 
   /**
@@ -831,9 +898,7 @@ export function createFreestyleRig() {
         applyFlick(engine, side, Math.max(0, engine.time - engine.lastKick[side]));
         return;
       case 'groove':
-        resetHipPlanar();
-        pin('left', anchors.left.plant);
-        pin('right', anchors.right.plant);
+        applyGroove(engine);
         return;
       default: {
         const exhaustive: never = kind;
@@ -993,7 +1058,7 @@ export function createFreestyleRig() {
         bones.chest.updateMatrix();
       }
       if (bones.head) {
-        const tracking = trick === 'header' || trick === 'neckStall';
+        const tracking = trick === 'header' || trick === 'neckStall' || trick === 'aroundTheWorld' || trick === 'groove';
         if (tracking || !headLagReady) {
           // Contact poses keep the aimed head. Lag is for hair and ordinary looking.
           headLag.copy(bones.head.quaternion);

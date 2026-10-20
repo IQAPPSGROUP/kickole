@@ -329,18 +329,27 @@ describe('fab foot contact', () => {
 
     engine.trick = {
       kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 1.4,
-      awarded: false, revolution: 0.35, held: 0,
+      awarded: false, revolution: 0.5, held: 0,
     };
-    engine.ball.x = -engine.config.atwHoverX;
-    engine.ball.y = engine.config.atwHoverY;
-    engine.ball.z = engine.config.atwHoverZ;
+    engine.ball.x = -engine.config.footX * 0.55;
+    engine.ball.y = engine.config.contactHeight + 0.32;
+    engine.ball.z = engine.config.ballZ;
     const atwPose = show(engine);
     const atwFoot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
-    const atwGap = absGap(engine, BOOT_MATERIALS, atwFoot, 0.45);
+    const atwBall = centreOf(engine);
     const clearance = supportClearance(gltf.scene, 'left');
-    expect(Math.abs(atwGap), `atw boot ${atwGap.toFixed(3)}`).toBeLessThan(0.02);
+    expect(atwFoot.y, 'the foot passes over the ball').toBeGreaterThan(atwBall.y + engine.config.ballRadius * 0.4);
     expect(clearance, 'circling foot stays off the standing leg').toBeGreaterThan(0.04);
     expect(Math.abs(atwPose.bodyYaw)).toBeGreaterThan(0.4);
+    engine.trick = {
+      kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 1.4,
+      awarded: false, revolution: 0.97, held: 0,
+    };
+    engine.ball.y = engine.config.contactHeight + 0.04;
+    show(engine);
+    const catchFoot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
+    const catchGap = absGap(engine, BOOT_MATERIALS, catchFoot, 0.45);
+    expect(Math.abs(catchGap), `atw catch ${catchGap.toFixed(3)}`).toBeLessThan(0.03);
 
     engine.trick = {
       kind: 'highFlick', phase: 'execute', side: 'right', startedAt: 2,

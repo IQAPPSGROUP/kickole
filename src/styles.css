@@ -280,7 +280,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   position: relative;
   font: inherit;
   font-weight: 900;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: .3px;
   width: var(--trick-size);
   height: var(--trick-size);
@@ -289,7 +289,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   border: 3px solid #F7F5ED;
   color: #F7F5ED;
   background: #102830;
-  box-shadow: 0 3px 0 #07141a, 0 6px 12px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 0 3px #07141a, 0 4px 0 #07141a, 0 8px 16px rgba(0, 0, 0, .55);
   cursor: pointer;
   touch-action: none;
   display: grid;
@@ -297,8 +297,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   align-content: center;
   gap: 1px;
 }
-.trick-icon { width: 22px; height: 22px; display: block; }
-.trick-label { font-size: 13px; font-weight: 900; line-height: 1; letter-spacing: .4px; }
+.trick-icon { width: 18px; height: 18px; display: block; }
+.trick-label { font-size: 15px; font-weight: 900; line-height: 1; letter-spacing: .4px; }
 .trick-sub { font-size: 10px; font-weight: 900; letter-spacing: .6px; opacity: 1; }
 .ps-head { background: #FFD93D; color: #102830; }
 .ps-atw { background: #4A33B5; color: #F8F9FB; }
@@ -398,7 +398,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   border-radius: 50%;
   border: 3px solid #F7F5ED;
   background: #102830;
-  box-shadow: 0 3px 0 #07141a, 0 6px 12px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 0 3px #07141a, 0 4px 0 #07141a, 0 8px 16px rgba(0, 0, 0, .55);
   color: #F7F5ED;
   cursor: pointer;
   display: flex;
@@ -422,7 +422,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   text-shadow: 0 2px 0 #07141a;
 }
 .foot-btn-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 1px;
   color: #F7F5ED;

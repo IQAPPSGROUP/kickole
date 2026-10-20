@@ -32,6 +32,7 @@ import {
   withDanceRank,
 } from './dances';
 import { fx } from '../scene/fx';
+import { replayFresh, type CornerTap } from '../ui/restartTap';
 import { prefersReducedMotion, swoopStrength } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
 import {
@@ -119,6 +120,8 @@ export class GameController {
   private prompts: PromptClock = freshClock([], true);
   /** The thigh and rainbow finish events are followed by a kick in the same turn. */
   private suppressKickPrompt = false;
+  /** Foot tap that landed while the game-over card was covering the corners. */
+  private cornerTap: CornerTap | null = null;
   private readonly billing: PurchaseService = createDefaultPurchaseService();
   private billingMessage: string | null = null;
   private billingBusy = false;
@@ -485,7 +488,7 @@ export class GameController {
     }
   }
 
-  press(side: Side) {
+  press(side: Side, pointerId?: number) {
     const e = this.engine;
     if (e.celebration) {
       e.skipCelebration();
@@ -497,8 +500,20 @@ export class GameController {
     e.setBeatGrade(gradeBeat(beatErrorMs(clock.now, clock.origin, clock.bpm, clock.latency)));
     const before = e.phase;
     const beforeTrick = e.selectedTrick;
-    e.press(side);
+    e.press(side, pointerId ?? null);
     if (before !== e.phase || beforeTrick !== e.selectedTrick || e.contact || e.trick) this.publish();
+  }
+
+  /** Remember a foot tap that the game-over card swallowed, so Play again can use it. */
+  noteCornerTap(side: Side, pointerId: number) {
+    if (this.engine.phase !== 'over' && this.engine.phase !== 'dropped') return;
+    this.cornerTap = { side, at: performance.now(), pointerId };
+  }
+
+  releasePointer(pointerId: number) {
+    const was = this.engine.contact;
+    this.engine.releaseMatching(pointerId);
+    if (was && !this.engine.contact) this.publish();
   }
 
   release(side: Side) {
@@ -589,11 +604,15 @@ export class GameController {
     this.queuedCelebration = null;
     this.suppressKickPrompt = false;
     this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
+    const replay = this.cornerTap;
+    this.cornerTap = null;
     this.engine.prepare('ready');
+    if (replay && replayFresh(replay, performance.now())) this.engine.press(replay.side, replay.pointerId);
     this.publish();
   }
 
   home() {
+    this.cornerTap = null;
     this.feedback = null;
     this.result = null;
     this.suppressKickPrompt = false;

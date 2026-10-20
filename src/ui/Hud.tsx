@@ -242,15 +242,13 @@ function bindFoot(controller: GameController, side: Side) {
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      controller.press(side);
+      controller.press(side, e.pointerId);
     },
     onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       controller.release(side);
     },
     onPointerCancel: () => controller.release(side),
-    onLostPointerCapture: () => controller.release(side),
   };
 }
 
@@ -425,7 +423,7 @@ export function TouchZones({ controller }: { controller: GameController }) {
         {trick.kind === 'groove' && <BeatRing active={playing || Boolean(clue?.beat)} />}
         {clueOn(trick.control) && clue && <ClueMark gesture={clue.gesture} />}
         <TrickIcon kind={trick.kind} />
-        <span className="trick-label">{playing ? trickName(trick.kind) : 'LOCKED'}</span>
+        <span className="trick-label">{trickName(trick.kind)}</span>
         {trick.kind === 'neck' && playing && <small className="trick-sub">HOLD</small>}
       </button>
     );

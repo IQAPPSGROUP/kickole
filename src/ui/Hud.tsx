@@ -29,8 +29,10 @@ export function Hud({
           {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
         </div>
       </div>
-      {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
-      {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
+      <div className="hud-coaching">
+        {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
+        {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
+      </div>
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}
@@ -84,16 +86,22 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
     return () => cancelAnimationFrame(frame);
   }, [controller, prompt]);
   const chain = prompt.chainNeed > 1 ? ` ${prompt.chainCount}/${prompt.chainNeed}` : '';
+  const call = `${prompt.call}${chain}`;
   return (
     <div className="prompt-banner" key={`${prompt.id}:${prompt.startedAt}`}>
-      <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
-        <circle cx="18" cy="18" r="15.5" />
-        <circle ref={ring} cx="18" cy="18" r="15.5" pathLength={100} />
-      </svg>
-      <span>
-        <b>{prompt.call}{chain}</b>
-        <small>{prompt.tip}</small>
-      </span>
+      <div className="prompt-pop">
+        <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
+          <circle cx="18" cy="18" r="14" />
+          <circle ref={ring} cx="18" cy="18" r="14" pathLength={100} />
+        </svg>
+        <b className="prompt-call">
+          <span className="prompt-extrude prompt-violet" aria-hidden="true">{call}</span>
+          <span className="prompt-extrude prompt-navy" aria-hidden="true">{call}</span>
+          <span className="prompt-stroke" aria-hidden="true">{call}</span>
+          <span className="prompt-face">{call}</span>
+        </b>
+        <small className="prompt-tip">{prompt.tip}</small>
+      </div>
     </div>
   );
 }

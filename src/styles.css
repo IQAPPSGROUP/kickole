@@ -159,35 +159,108 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   45% { transform: rotate(5deg) scale(1.02); }
   100% { transform: rotate(0) scale(1); }
 }
-.prompt-banner {
-  position: absolute;
-  left: 50%;
-  top: 118px;
-  transform: translateX(-50%);
-  z-index: 7;
+.hud-coaching {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  width: min(92vw, 360px);
-  padding: 8px 12px 8px 8px;
-  border-radius: 16px;
-  background: #1E2A5A;
-  color: #F8F9FB;
-  box-shadow: 0 5px 0 #222831;
-  animation: prompt-in .32s ease-out;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 0 8px;
+  pointer-events: none;
 }
-.prompt-banner b { display: block; letter-spacing: .4px; font-size: 16px; color: #FFD93D; }
-.prompt-banner small { display: block; font-size: 11px; letter-spacing: .2px; opacity: .9; }
-@keyframes prompt-in { from { transform: translateX(-50%) translateY(-22px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
-.prompt-ring { width: 36px; height: 36px; flex: 0 0 auto; }
-.prompt-ring circle { fill: none; stroke: rgba(248, 249, 251, .25); stroke-width: 3; }
-.prompt-ring circle:last-child { stroke: #FFD93D; stroke-dasharray: 100; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 18px 18px; }
-.hint-tip {
+.prompt-banner {
+  position: relative;
+  z-index: 7;
+  width: min(94vw, 420px);
+  text-align: center;
+  background: none;
+  color: var(--white);
+}
+.prompt-pop {
+  transform-origin: 50% 0;
+  animation: prompt-pop .38s cubic-bezier(.16, 1.35, .32, 1);
+}
+@keyframes prompt-pop {
+  0% { transform: scale(.62); opacity: 0; }
+  64% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.prompt-call {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding-bottom: .24em;
+  font-family: 'Trebuchet MS', 'Segoe UI', Inter, var(--font);
+  font-weight: 900;
+  font-style: italic;
+  font-size: clamp(26px, 7.4vw, 40px);
+  line-height: .92;
+  letter-spacing: .3px;
+}
+.prompt-call > span { display: block; }
+.prompt-extrude,
+.prompt-stroke {
   position: absolute;
-  left: 50%;
-  top: 176px;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  top: 0;
+}
+.prompt-violet {
+  color: var(--violet);
+  -webkit-text-stroke: .14em var(--violet);
+  transform: translate(.16em, .2em);
+}
+.prompt-navy {
+  color: var(--navy);
+  -webkit-text-stroke: .14em var(--navy);
+  transform: translate(.08em, .1em);
+}
+.prompt-stroke {
+  color: #fff;
+  -webkit-text-stroke: .13em #fff;
+}
+.prompt-face {
+  position: relative;
+  background: linear-gradient(180deg, #FF8CC0 0%, #FF4F9A 55%, #E23A86 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.prompt-tip {
+  display: block;
+  margin-top: 7px;
+  font-family: 'Trebuchet MS', 'Segoe UI', Inter, var(--font);
+  font-style: italic;
+  font-weight: 900;
+  font-size: clamp(13px, 3.5vw, 16px);
+  line-height: 1.05;
+  letter-spacing: .2px;
+  color: #FFE97A;
+  -webkit-text-stroke: 3px var(--navy);
+  paint-order: stroke fill;
+  text-shadow: 2px 3px 0 var(--violet);
+}
+.prompt-ring {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto -2px;
+  display: block;
+  filter: drop-shadow(1px 2px 0 var(--navy)) drop-shadow(2px 3px 0 var(--violet));
+}
+.prompt-ring circle { fill: none; stroke: #fff; stroke-width: 4; }
+.prompt-ring circle:last-child {
+  stroke: #FFD93D;
+  stroke-width: 4;
+  stroke-dasharray: 100;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 18px 18px;
+}
+.hint-tip {
+  position: relative;
   max-width: min(90vw, 340px);
+  margin-top: 4px;
   padding: 6px 12px;
   border-radius: 999px;
   background: #FF4F9A;
@@ -196,8 +269,9 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   font-weight: 800;
   letter-spacing: .3px;
   text-align: center;
-  animation: prompt-in .28s ease-out;
+  animation: hint-in .28s ease-out;
 }
+@keyframes hint-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 .ghost-hand {
   position: absolute;
   top: -34px;
@@ -553,6 +627,10 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .home .best-pill b { font-size: 16px; }
   .home-help { font-size: 9px; text-align: center; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
+  .hud-coaching { position: absolute; left: 50%; top: 4px; width: min(46vw, 360px); margin: 0; transform: translateX(-50%); }
+  .prompt-call { font-size: 22px; }
+  .prompt-tip { font-size: 12px; -webkit-text-stroke-width: 2px; }
+  .prompt-ring { width: 18px; height: 18px; }
   .score { font-size: 44px; }
   .feedback { left: auto; right: max(12px, env(safe-area-inset-right)); top: 24px; width: 26%; font-size: 28px; }
   .tap-start { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 16px); font-size: 24px; }

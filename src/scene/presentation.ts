@@ -28,12 +28,12 @@ export function depthOfFieldFocus(
 
 /**
  * three r186 bokeh blur is `clamp((focus + viewZ) * aperture, ±maxblur)` in screen space.
- * The back wall sits about 3 m behind the chest, so 0.0072 aperture is a small soft disk
- * there while the player's feet stay inside a pixel.
+ * The back wall is only a few metres behind the player, so this stays a hint.
+ * A wider disk read as fog on the wall and the bunting.
  */
 export function depthOfFieldScale(phase: Phase, celebrating: boolean): { aperture: number; maxblur: number } {
-  if (phase === 'menu' || celebrating) return { aperture: 0.0072, maxblur: 0.024 };
-  return { aperture: 0.004, maxblur: 0.014 };
+  if (phase === 'menu' || celebrating) return { aperture: 0.0014, maxblur: 0.005 };
+  return { aperture: 0.0008, maxblur: 0.003 };
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {
@@ -45,35 +45,53 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-/** Gentle contrast S-curve. Black and white stay put; the quarters pull apart. */
+/**
+ * Contrast S-curve. Black, white, and mid grey stay put.
+ * The quarters pull apart. The ends ease off so a bright pastel is not crushed to white.
+ */
 export function contrastCurve(value: number): number {
   const t = clamp01(value);
   const centered = t - 0.5;
-  return clamp01(t + 0.46 * centered * (1 - 4 * centered * centered));
+  const falloff = Math.pow(Math.max(0, 1 - Math.abs(centered) * 2), 1.15);
+  return clamp01(t + centered * 0.9 * falloff);
+}
+
+function vibrate(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max <= 1e-5 ? 0 : (max - min) / max;
+  const wanted = 1.42 + 0.7 * (1 - chroma);
+  const luma = r * 0.2126 + g * 0.7152 + b * 0.0722;
+  const span = max - luma;
+  const room = span > 1e-5 ? (1 - luma) / span : wanted;
+  const sat = Math.min(wanted, Math.max(1, room));
+  return [
+    luma + (r - luma) * sat,
+    luma + (g - luma) * sat,
+    luma + (b - luma) * sat,
+  ];
 }
 
 /**
- * Display grade after AgX. Contrast comes back through the S-curve.
- * Vibrance lifts dull carnival colours more than an already-strong hue.
- * Blacks stay deep. There is no midtone lift.
+ * Display grade after AgX. Vibrance runs first so pastel walls and bunting
+ * gain chroma. The S-curve then moves luma only, so it does not lift mid grey
+ * or crush those colours back to white.
  */
 export function gradeDisplayColor(r: number, g: number, b: number): [number, number, number] {
-  let red = contrastCurve(r);
-  let green = contrastCurve(g);
-  let blue = contrastCurve(b);
+  let [red, green, blue] = vibrate(r, g, b);
   const luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-  const highlight = smoothstep(0.72, 0.95, luma);
-  red += highlight * 0.018;
-  green += highlight * 0.004;
-  blue -= highlight * 0.012;
-  const max = Math.max(red, green, blue);
-  const min = Math.min(red, green, blue);
-  const chroma = max <= 1e-5 ? 0 : (max - min) / max;
-  const sat = 1.18 + 0.26 * (1 - chroma);
+  const curved = contrastCurve(luma);
+  const peak = Math.max(red, green, blue, 1e-5);
+  let scale = luma > 1e-5 ? curved / luma : 1;
+  if (scale > 1) scale = Math.min(scale, 1 / peak);
+  red *= scale;
+  green *= scale;
+  blue *= scale;
   const nextLuma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-  red = nextLuma + (red - nextLuma) * sat;
-  green = nextLuma + (green - nextLuma) * sat;
-  blue = nextLuma + (blue - nextLuma) * sat;
+  const highlight = smoothstep(0.82, 0.98, nextLuma);
+  red += highlight * 0.012;
+  green += highlight * 0.002;
+  blue -= highlight * 0.008;
   return [clamp01(red), clamp01(green), clamp01(blue)];
 }
 

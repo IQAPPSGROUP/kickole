@@ -164,7 +164,7 @@ function Environment() {
     const pm = new PMREMGenerator(gl);
     const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     scene.environment = env;
-    scene.environmentIntensity = 0.35;
+    scene.environmentIntensity = 0.16;
     return () => { scene.environment = null; env.dispose(); pm.dispose(); };
   }, [gl, scene]);
   return null;
@@ -194,12 +194,12 @@ interface SceneProps {
   onReady: () => void;
 }
 
-function StreetTone() {
+function StreetTone({ exposure }: { exposure: number }) {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = STREET_EXPOSURE;
-  }, [gl]);
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
   return null;
 }
 
@@ -223,7 +223,7 @@ function SunnyIbl({ ibl }: { ibl: boolean }) {
         hdr = loaded;
         loaded.mapping = EquirectangularReflectionMapping;
         scene.background = loaded;
-        scene.backgroundBlurriness = 0.04;
+        scene.backgroundBlurriness = 0;
         if (ibl) {
           env = pm.fromEquirectangular(loaded).texture;
           scene.environment = env;
@@ -307,12 +307,11 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const profile = profileFor(quality);
   const shadows = street ? profile.shadows !== 'none' : quality !== 'low';
   useEffect(() => { onReady(); }, [onReady]);
-  const post = street;
+  const postProfile = street ? profile : { ...profile, ssao: false, bloom: false, dof: false };
   return (
     <>
-      {street && <StreetTone />}
-      <color attach="background" args={[street ? '#9ec4ea' : '#8dc5cb']} />
-      {!street && <fog attach="fog" args={['#8dc5cb', 24, 52]} />}
+      <StreetTone exposure={street ? STREET_EXPOSURE : 1} />
+      <color attach="background" args={[street ? '#7eb4e8' : '#7ec8d4']} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
       {street && <SunnyIbl ibl={profile.ibl} />}
       {!street && quality === 'high' && <Environment />}
@@ -361,7 +360,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
-      {post && <PostFX profile={profile} engine={controller.engine} />}
+      <PostFX profile={postProfile} engine={controller.engine} />
     </>
   );
 }
@@ -434,7 +433,8 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
         gl={{
           antialias: street ? profile.aa === 'none' : tier !== 'low',
           powerPreference: 'high-performance',
-          ...(street ? { toneMapping: AgXToneMapping, toneMappingExposure: STREET_EXPOSURE } : {}),
+          toneMapping: AgXToneMapping,
+          toneMappingExposure: street ? STREET_EXPOSURE : 1,
         }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >

@@ -7,7 +7,7 @@ export const STREET_KEY = { color: '#fff4e2', intensity: 3.15 };
 export const STREET_HEMI = { sky: '#fff1d4', ground: '#c8966a', intensity: 0.85 };
 export const STREET_FILL = { color: '#ffe3bf', intensity: 1.25 };
 export const STREET_ENV_INTENSITY = 0.62;
-export const STREET_BLOOM = { strength: 0.2, threshold: 1.5 };
+export const STREET_BLOOM = { strength: 0.05, threshold: 4.5, spread: 1.4 };
 export const STREET_HDR_URL = 'textures/street_day_1k.hdr';
 
 type RGB = [number, number, number];

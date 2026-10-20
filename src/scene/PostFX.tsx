@@ -153,7 +153,7 @@ class SafeBloomPass extends Pass {
   private readonly ping: WebGLRenderTarget;
   private readonly quad: FullScreenQuad;
 
-  constructor(width: number, height: number, strength: number, threshold: number) {
+  constructor(width: number, height: number, strength: number, threshold: number, spread: number) {
     super();
     this.needsSwap = true;
     this.strength = strength;
@@ -172,7 +172,7 @@ class SafeBloomPass extends Pass {
       uniforms: {
         tDiffuse: { value: null },
         uDirection: { value: new Vector2(1 / halfW, 0) },
-        uSpread: { value: 4.5 },
+        uSpread: { value: spread },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: BLUR_FRAGMENT,
@@ -288,7 +288,7 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
           effect.addPass(new SsaoPass(scene, camera, size.width, size.height));
           break;
         case 'bloom':
-          effect.addPass(new SafeBloomPass(size.width, size.height, STREET_BLOOM.strength, STREET_BLOOM.threshold));
+          effect.addPass(new SafeBloomPass(size.width, size.height, STREET_BLOOM.strength, STREET_BLOOM.threshold, STREET_BLOOM.spread));
           break;
         case 'dof':
           bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.004, maxblur: 0.014 });

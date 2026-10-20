@@ -28,19 +28,19 @@ export function sunnyRadiance(x, y, width = WIDTH, height = HEIGHT) {
   const dirX = horiz * Math.cos(phi);
   const dirZ = horiz * Math.sin(phi);
   if (dirY < 0) {
-    const bounce = 0.55 + 0.2 * (dirY + 1);
-    return [0.95 * bounce, 0.72 * bounce, 0.48 * bounce];
+    const bounce = 0.4 + 0.16 * (dirY + 1);
+    return [0.72 * bounce, 0.48 * bounce, 0.28 * bounce];
   }
-  const up = Math.pow(dirY, 0.4);
-  const horizon = [1.85, 1.55, 1.15];
-  const zenith = [0.72, 1.05, 1.55];
-  const r = mix(horizon[0], zenith[0], up) * 1.25;
-  const g = mix(horizon[1], zenith[1], up) * 1.35;
-  const b = mix(horizon[2], zenith[2], up) * 1.45;
+  const up = Math.pow(dirY, 0.65);
+  const horizon = [0.85, 1.2, 1.75];
+  const zenith = [0.28, 0.62, 1.55];
+  const r = mix(horizon[0], zenith[0], up) * 1.2;
+  const g = mix(horizon[1], zenith[1], up) * 1.22;
+  const b = mix(horizon[2], zenith[2], up) * 1.28;
   const sunDot = dirX * SUN[0] + dirY * SUN[1] + dirZ * SUN[2];
-  const disk = Math.pow(Math.max(0, sunDot), 700) * 22;
-  const glow = Math.pow(Math.max(0, sunDot), 6) * 1.8;
-  return [r + disk + glow * 1.15, g + disk * 0.96 + glow, b + disk * 0.72 + glow * 0.65];
+  const disk = Math.pow(Math.max(0, sunDot), 900) * 26;
+  const glow = Math.pow(Math.max(0, sunDot), 80) * 2.4;
+  return [r + disk + glow, g + disk * 0.94 + glow * 0.72, b + disk * 0.55 + glow * 0.35];
 }
 
 function floatToRgbe(r, g, b) {

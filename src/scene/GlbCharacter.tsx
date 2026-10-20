@@ -10,7 +10,9 @@ import { clearFootContactAnchors, setFootContactAnchors } from '../engine/footCo
 import type { SurfacePattern } from '../game/catalogue';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
-import { computePose, createPose, type Pose } from './pose';
+import { applyContractBones } from './contractPose';
+import { createFreestyleRig } from './freestyleLayer';
+import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
 import { computePlayerMotion, createPlayerMotion } from './motion';
 import { createMotionRig } from './motionRig';
@@ -68,8 +70,8 @@ function photographTexture(source: Texture): CanvasTexture | null {
   return map;
 }
 
-/** Visible eye radius in head-bone space. Covers the painted socket without flooding the cheek. */
-const FACE_EYE_RADIUS = 0.012;
+/** Visible eye radius in head-bone space. Large enough that the iris is a few pixels in the gameplay camera. */
+const FACE_EYE_RADIUS = 0.015;
 
 function paintEye(canvas: HTMLCanvasElement, sclera: string, irisColour: string) {
   const size = canvas.width;
@@ -79,8 +81,12 @@ function paintEye(canvas: HTMLCanvasElement, sclera: string, irisColour: string)
   context.fillRect(0, 0, size, size);
   const cx = size / 2;
   const cy = size / 2;
-  // Dark centre stays small enough that the two pupils do not merge at the play camera.
-  const iris = size * 0.24;
+  // Most of the disc is iris. A thin sclera rim is what still reads when the face is bright.
+  const iris = size * 0.36;
+  context.fillStyle = irisColour === '#000000' ? '#000000' : '#140c09';
+  context.beginPath();
+  context.arc(cx, cy, iris + size * 0.035, 0, Math.PI * 2);
+  context.fill();
   context.fillStyle = irisColour;
   context.beginPath();
   context.arc(cx, cy, iris, 0, Math.PI * 2);
@@ -223,10 +229,10 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
         if (dx * dx + dy * dy > reach * reach) continue;
         if (p[2] > z) z = p[2];
       }
-      socket.z = z + 0.009;
+      socket.z = z + 0.008;
     }
   } else {
-    for (const socket of sockets) socket.z += 0.008;
+    for (const socket of sockets) socket.z += 0.006;
   }
   for (const mesh of hide) mesh.visible = false;
   if (sockets.length === 0) return;
@@ -243,7 +249,7 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
     // trips the street bloom and turns the eye into a white plate.
     emissive: '#fff6ea',
     emissiveMap: eyeGlow(),
-    emissiveIntensity: 0.06,
+    emissiveIntensity: 0.1,
     polygonOffset: true,
     polygonOffsetFactor: -4,
     polygonOffsetUnits: -4,
@@ -252,7 +258,7 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
     const eye = new Mesh(geometry, material);
     eye.name = 'FaceEye';
     eye.position.set(socket.x, socket.y, socket.z);
-    eye.scale.set(1, 0.66, 1);
+    eye.scale.set(1, 0.64, 1);
     eye.castShadow = false;
     eye.receiveShadow = false;
     eye.frustumCulled = false;
@@ -329,13 +335,25 @@ function patternIndex(pattern: SurfacePattern): number {
   }
 }
 
-/** Subtle weave so kit patterns survive a flat colour tint. */
-function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
+const DETAIL_NORMAL_SNIPPET = `
+        vec3 detailN = texture2D(uDetailN, vViewPosition.xy * uDetailScale).xyz * 2.0 - 1.0;
+        normal = normalize(normal + vec3(detailN.xy * uDetailStrength, 0.0));`;
+
+/** Subtle weave so kit patterns survive a flat colour tint. High adds the weave normal. */
+function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern, quality: Quality) {
   const id = patternIndex(pattern);
+  const detail = quality === 'high';
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPattern = { value: id };
+    let common = '#include <common>\nuniform float uPattern;';
+    if (detail) {
+      shader.uniforms.uDetailN = { value: kitDetail().normal };
+      shader.uniforms.uDetailScale = { value: 6 };
+      shader.uniforms.uDetailStrength = { value: 0.55 };
+      common += '\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;';
+    }
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uPattern;')
+      .replace('#include <common>', common)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float weave = 1.0;
         if (uPattern > 0.5 && uPattern < 1.5) weave = mix(0.78, 1.0, step(0.5, fract(vMapUv.x * 5.0)));
@@ -345,10 +363,15 @@ function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
         else if (uPattern > 4.5 && uPattern < 5.5) weave = 0.9 + 0.1 * sin(vMapUv.x * 80.0);
         else if (uPattern > 5.5 && uPattern < 6.5) weave = mix(0.7, 1.0, step(0.5, fract(vMapUv.x * 2.0 + vMapUv.y)));
         else if (uPattern > 6.5) weave = 0.84 + 0.16 * sin((vMapUv.x + vMapUv.y) * 28.0);
-        float thread = mix(0.82, 1.0, step(0.5, fract(vViewPosition.y * 90.0)));
-        diffuseColor.rgb *= weave * thread;`);
+        float thread = mix(0.86, 1.0, step(0.5, fract(vViewPosition.y * 220.0)));
+        float cross = mix(0.9, 1.0, step(0.5, fract(vViewPosition.x * 220.0)));
+        diffuseColor.rgb *= weave * thread * cross;`)
+      .replace(
+        '#include <normal_fragment_maps>',
+        detail ? `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}` : '#include <normal_fragment_maps>',
+      );
   };
-  material.customProgramCacheKey = () => `kit-${id}`;
+  material.customProgramCacheKey = () => `kit-${id}${detail ? '-weave' : ''}`;
   material.needsUpdate = true;
 }
 
@@ -420,6 +443,10 @@ function applyKitDetail(material: MeshStandardMaterial, name: string, quality: Q
       material.roughnessMap = (material.userData.authoredRough as Texture | null) ?? null;
       const scale = (material.userData.authoredNormalScale as number) ?? 1;
       material.normalScale = new Vector2(scale, scale);
+      if (name !== MATERIAL_NAMES.shirt) {
+        material.onBeforeCompile = () => {};
+        material.customProgramCacheKey = () => 'kit';
+      }
       material.userData.kitDetail = false;
       material.needsUpdate = true;
     }
@@ -439,6 +466,20 @@ function applyKitDetail(material: MeshStandardMaterial, name: string, quality: Q
   }
   if (!material.userData.authoredRough) material.roughnessMap = maps.rough;
   material.userData.kitDetail = true;
+  if (name !== MATERIAL_NAMES.shirt) {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uDetailN = { value: maps.normal };
+      shader.uniforms.uDetailScale = { value: 6 };
+      shader.uniforms.uDetailStrength = { value: 0.5 };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;',
+        )
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}`);
+    };
+    material.customProgramCacheKey = () => 'kit-weave';
+  }
   material.needsUpdate = true;
 }
 
@@ -516,41 +557,26 @@ function applySkinDetail(material: MeshStandardMaterial, name: string, quality: 
   material.userData.skinDetail = true;
   if (!material.userData.skinPores) {
     material.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-          float pore = fract(sin(dot(floor(vViewPosition.xy * vec2(70.0, 55.0)), vec2(12.9898, 78.233))) * 43758.5453);
-          diffuseColor.rgb *= mix(0.76, 1.0, step(0.42, pore));`,
-      );
+      shader.uniforms.uDetailN = { value: maps.normal };
+      shader.uniforms.uDetailScale = { value: 9 };
+      shader.uniforms.uDetailStrength = { value: 0.7 };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;',
+        )
+        .replace(
+          '#include <map_fragment>',
+          `#include <map_fragment>
+          float pore = fract(sin(dot(floor(vViewPosition.xy * vec2(420.0, 360.0)), vec2(12.9898, 78.233))) * 43758.5453);
+          diffuseColor.rgb *= mix(0.84, 1.0, smoothstep(0.35, 0.7, pore));`,
+        )
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}`);
     };
-    material.customProgramCacheKey = () => 'skin-pores';
+    material.customProgramCacheKey = () => 'skin-pores-v2';
     material.userData.skinPores = true;
   }
   material.needsUpdate = true;
-}
-
-function applyContractBones(bones: Partial<Record<BoneKey, Bone>>, pose: Pose, hipsRestY: number) {
-  const set = (key: BoneKey, x: number, y: number, z: number) => {
-    const bone = bones[key];
-    if (bone) bone.rotation.set(x, y, z);
-  };
-  if (bones.root) bones.root.position.y = hipsRestY + pose.bodyY;
-  set('root', 0, pose.bodyYaw, 0);
-  set('spine', pose.torsoPitch, pose.torsoYaw, pose.torsoRoll);
-  set('neck', pose.neckPitch, pose.neckYaw, 0);
-  set('head', pose.headPitch, pose.headYaw, 0);
-  set('armLeft', pose.armLeftPitch, 0, -pose.armLeft);
-  set('armRight', pose.armRightPitch, 0, pose.armRight);
-  set('elbowLeft', pose.elbowLeft, 0, 0);
-  set('elbowRight', pose.elbowRight, 0, 0);
-  const leg = (side: 'left' | 'right', thigh: BoneKey, shin: BoneKey, foot: BoneKey) => {
-    const limb = pose.legs[side];
-    set(thigh, limb.thigh, limb.twist, limb.abduct);
-    set(shin, limb.knee, 0, 0);
-    set(foot, limb.foot, limb.ankleYaw, limb.ankleRoll);
-  };
-  leg('left', 'thighLeft', 'shinLeft', 'footLeft');
-  leg('right', 'thighRight', 'shinRight', 'footRight');
 }
 
 const ktxRenderer: { gl: WebGLRenderer | null } = { gl: null };
@@ -704,6 +730,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
 
   const useClips = report.missingClips.length === 0;
   const usable = useClips || report.missingBones.length === 0;
+  const freestyle = useMemo(() => createFreestyleRig(), []);
 
   useLayoutEffect(() => {
     if (!useClips) {
@@ -712,11 +739,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     }
     const anchors = measureKickContactAnchors(scene, clips);
     setFootContactAnchors(anchors.left, anchors.right);
+    freestyle.measure(scene, clips);
+    if (anchors.left) freestyle.anchors.left.ball.set(anchors.left.x, anchors.left.y, anchors.left.z);
+    if (anchors.right) freestyle.anchors.right.ball.set(anchors.right.x, anchors.right.y, anchors.right.z);
     if (import.meta.env.DEV) {
       (window as unknown as { __footContact?: typeof anchors }).__footContact = anchors;
     }
     return () => clearFootContactAnchors();
-  }, [scene, clips, useClips]);
+  }, [scene, clips, useClips, freestyle]);
 
   useEffect(() => {
     if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); return; }
@@ -749,7 +779,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         continue;
       }
       const standard = m as MeshStandardMaterial;
-      if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern);
+      if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern, quality);
       applyKitDetail(standard, name, quality);
       applySkinDetail(standard, name, quality);
     }
@@ -870,10 +900,11 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         if (to) {
           to.reset().play();
           if (from && from !== to) {
-            // Snappy into kicks (physics-timed); softer out of kick/miss/celebrate into Idle.
+            // The torso eases across the fade. Contact itself is the foot IK path, not this blend.
             const fromKick = current.state?.startsWith('Kick');
             const toKick = next.state.startsWith('Kick');
-            const fade = toKick ? 0.04 : fromKick || current.state === 'Miss' || current.state === 'Celebrate' ? 0.22 : 0.15;
+            // Long enough that the torso eases. The striking foot is IK'd on its own path, so this fade does not delay contact.
+            const fade = toKick ? 0.12 : fromKick || current.state === 'Miss' || current.state === 'Celebrate' ? 0.22 : 0.16;
             from.crossFadeTo(to, fade, false);
           }
         }
@@ -933,6 +964,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
         }
       }
+      freestyle.apply(engine, next.state, pose, dt);
       if (inspector.active) {
         const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
         if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }

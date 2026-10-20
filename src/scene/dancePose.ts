@@ -80,7 +80,8 @@ function applyShuffle(out: Pose, angle: number, k: number) {
 /** Small heel rock with crossed bent arms. The body does not spin a full turn. */
 function applyHeelRock(out: Pose, angle: number, k: number) {
   const rock = Math.sin(angle);
-  out.bodyYaw = 0.4 * rock * k;
+  out.bodyYaw = 0.55 * rock * k;
+  out.torsoYaw = -0.2 * rock * k;
   out.armLeft = 0.65 * k;
   out.armRight = 0.65 * k;
   out.elbowLeft = 1.1 * k;

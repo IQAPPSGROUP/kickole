@@ -1,6 +1,10 @@
 import type { GameEngine } from '../engine/engine';
 import type { Side } from '../engine/config';
-import { V2_LIMBS, visualContactPoint } from './limbCalibration';
+import { isDanceId, STARTER_DANCE_ID } from '../game/dances';
+import { atwLeg } from './atwOrbit';
+import { GAMEPLAY_BPM } from '../game/beat';
+import { applyDancePose } from './dancePose';
+import { V2_LIMBS } from './limbCalibration';
 
 export interface LegPose {
   /** Thigh rotation about X (negative = forward). */
@@ -158,10 +162,9 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
   }
 
   if (trick.kind === 'neckStall') {
-    const hold = trick.phase === 'contact' || trick.phase === 'execute';
     const release = trick.phase === 'recover' || (trick.phase === 'execute' && b.vy > 0.4);
-    // Snap into the hinged catch immediately, then settle with hold time.
-    const k = hold ? clamp(0.65 + trick.held / 0.2, 0, 1) : 1;
+    // Hinge on the first catch frame so the ball is on the back, not inside the chest.
+    const k = 1;
     const rel = release ? clamp((t - trick.startedAt - trick.held) / 0.25, 0, 1) : 0;
     softKnees(out, lerp(0.75, 0.2, rel));
     // Hinge forward, face down — ball sits on upper back behind the neck, not the face.
@@ -184,30 +187,10 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
     const side = trick.side ?? 'left';
     const other: Side = side === 'left' ? 'right' : 'left';
     const rev = clamp(trick.revolution, 0, 1);
-    const angle = rev * Math.PI * 2 * (side === 'left' ? 1 : -1);
-    const radius = 0.28;
-    // Support foot planted.
+    // Support foot planted. The active foot travels outside-in around the ball.
     out.legs[other] = { ...REST, knee: 0.08, thigh: 0.05 };
-    const ballPoint = visualContactPoint(
-      { x: b.x, y: b.y, z: b.z },
-      { x: 0, y: HIP_Y, z: 0 },
-      c.ballRadius,
-    );
-    const target = {
-      x: ballPoint.x + Math.sin(angle) * radius * (side === 'left' ? -1 : 1),
-      y: clamp(ballPoint.y - 0.02 + Math.sin(angle * 0.5) * 0.04, 0.35, 1.15),
-      z: ballPoint.z + Math.cos(angle) * radius * 0.55 - 0.05,
-    };
-    const circling = solveLeg(side, target);
-    circling.twist = angle * 0.55;
-    circling.ankleYaw = angle * 0.35;
-    circling.ankleRoll = Math.sin(angle) * 0.25;
-    circling.foot += Math.cos(angle) * 0.15;
-    // Clamp impossible splits.
-    circling.thigh = clamp(circling.thigh, -1.35, 0.35);
-    circling.knee = clamp(circling.knee, 0.05, 2.1);
-    circling.abduct = clamp(circling.abduct, -0.55, 0.55);
-    out.legs[side] = circling;
+    out.legs[side] = atwLeg(side, rev);
+    const angle = rev * Math.PI * 2;
     out.torsoPitch += 0.08;
     out.torsoYaw = (side === 'left' ? 1 : -1) * 0.12 * Math.sin(angle);
     out.torsoRoll = (side === 'left' ? 1 : -1) * 0.06;
@@ -348,12 +331,19 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
 
     const bx = held ? b.x : (side === 'left' ? -1 : 1) * c.footX * 0.6;
     const stallLift = held && engine.contact!.kind === 'stall' ? 0.02 * Math.sin(t * 18) : 0;
-    const highScoop = held && engine.contact!.highFlick ? 0.12 : 0;
-    const target = { x: bx, y: c.contactHeight - 0.17 + stallLift + highScoop, z: c.ballZ - 0.2 + (highScoop ? 0.08 : 0) };
+    const highScoop = held && engine.contact!.highFlick ? 0.08 : 0;
+    // Ankle sits on the instep, just under and behind the ball centre, so the boot meets it.
+    const target = {
+      x: bx,
+      y: c.contactHeight - c.ballRadius * 0.15 + stallLift + highScoop,
+      z: c.ballZ - 0.08 + (highScoop ? 0.04 : 0),
+    };
     const follow = held ? 0 : (1 - env) * 0.18;
     target.y += follow + (engine.contact?.highFlick || (!held && engine.ball.vy > c.kickSpeed * 1.05) ? follow * 0.8 : 0);
     target.z += follow * 0.5;
     const leg = solveLeg(side, target);
+    // A small instep pitch presents the laces to the ball instead of leaving a gap.
+    leg.foot += 0.06 * Math.min(1, env);
     if (held && engine.contact!.highFlick) {
       leg.foot = -0.4;
       leg.ankleYaw = (side === 'left' ? 1 : -1) * 0.25;
@@ -389,6 +379,17 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     out.armRight = lerp(out.armRight, 0.05, k);
     out.armLeftPitch = out.armRightPitch = 0.2 * k;
     out.bodyY -= 0.04 * k;
+  }
+
+  const groove = engine.trick?.kind === 'groove' && engine.trick.phase === 'execute';
+  const dancing = engine.celebration != null || groove;
+  if (dancing) {
+    const danceId = engine.celebration?.danceId ?? engine.equippedDance;
+    const dance = isDanceId(danceId) ? danceId : STARTER_DANCE_ID;
+    const phaseBeat = groove
+      ? (t - (engine.trick?.startedAt ?? t)) / c.tricks.grooveDanceSec
+      : engine.beatPhase != null ? engine.beatPhase : ((t * GAMEPLAY_BPM) / 60) % 1;
+    applyDancePose(out, dance, phaseBeat, engine.reducedMotion ? 0.35 : 1);
   }
 
   return out;

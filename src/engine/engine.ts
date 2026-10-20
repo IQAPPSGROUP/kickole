@@ -1,3 +1,5 @@
+import type { BeatGrade } from '../game/beat';
+import { groovePoints } from '../game/beat';
 import { DEFAULT_CONFIG, type GameConfig, type Grade, type Side } from './config';
 import { footContactAnchors } from './footContact';
 import {
@@ -8,9 +10,11 @@ import {
   type ComboId,
 } from './combos';
 import {
+  apexForKickPower,
   createTrickState,
   impulseForApex,
   nearDepth,
+  normalKickApex,
   timeToHeight,
   type TrickKind,
   type TrickPhase,
@@ -50,8 +54,18 @@ export interface RunStats {
   neckStalls: number;
   aroundTheWorlds: number;
   highFlicks: number;
+  grooves: number;
   combos: number;
 }
+
+export interface CelebrationState {
+  danceId: string;
+  reason: string;
+  startedAt: number;
+  until: number;
+}
+
+export type GroovePart = 'knee' | 'chest';
 
 export interface Contact {
   kind: 'pending' | 'stall';
@@ -61,8 +75,21 @@ export interface Contact {
   held: number;
   /** When true, release uses the high-flick apex impulse instead of kickSpeed. */
   highFlick: boolean;
+  /** 0 for a tap. A held charge eases the apex toward highFlickApex. */
+  kickPower: number;
   /** When true, release is a thigh return (trick bonus already handled on trap). */
   thigh: boolean;
+  /** High kick that starts the equipped dance, then leaves a normal catch. */
+  groove?: boolean;
+}
+
+export type FootTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick' | 'groove'>;
+
+export interface KickCharge {
+  side: Side;
+  held: number;
+  /** 0–1 loft, filled over kickChargeTime. */
+  power: number;
 }
 
 /**
@@ -98,6 +125,25 @@ export class GameEngine {
   trick: TrickState | null = null;
   /** Next trick intent. `null` keeps classic foot-only controls. */
   selectedTrick: TrickKind | null = null;
+  /** Short milestone dance. Physics holds the ball while this is set during play. */
+  celebration: CelebrationState | null = null;
+  /** Equipped cosmetic dance. Scoring never reads it. */
+  equippedDance = 'sway';
+  /** 0 on the music beat. Null until the audio clock is known. */
+  beatPhase: number | null = null;
+  /** Last groove tap versus the heard beat. */
+  lastBeatGrade: BeatGrade = 'off';
+  groovePart: GroovePart = 'knee';
+  /** Shrinks dance amplitude when the player prefers reduced motion. */
+  reducedMotion = false;
+  /** Hold-to-kick-higher. Null unless a classic foot press started early. */
+  kickCharge: KickCharge | null = null;
+  /** Foot trick waiting for its timing window after a single tap. */
+  queuedFoot: { kind: FootTrick; side: Side } | null = null;
+  /** Header tap waiting out cooldown or for the ball to arrive. */
+  queuedHeader = false;
+  /** Neck tap waiting out cooldown. `tap` releases as soon as the catch lands. */
+  queuedNeck: 'hold' | 'tap' | null = null;
   private acc = 0;
   private cooldown = 0;
   private trickCooldown = 0;
@@ -106,6 +152,10 @@ export class GameEngine {
   private listeners = new Set<(e: EngineEvent) => void>();
   private held: Record<Side, boolean> = { left: false, right: false };
   private heldNeck = false;
+  /** Blocks a second header award until the ball has risen clear of the forehead. */
+  private headerGuard = false;
+  /** Blocks a second neck award until the ball has risen clear of the nape. */
+  private neckGuard = false;
   private combos = createComboTracker();
   private comboSeq = 0;
 
@@ -121,6 +171,7 @@ export class GameEngine {
         thigh: { ...DEFAULT_CONFIG.contacts.thigh, ...config.contacts?.thigh },
         forehead: { ...DEFAULT_CONFIG.contacts.forehead, ...config.contacts?.forehead },
         nape: { ...DEFAULT_CONFIG.contacts.nape, ...config.contacts?.nape },
+        chest: { ...DEFAULT_CONFIG.contacts.chest, ...config.contacts?.chest },
       },
     };
     // Keep legacy foot fields aligned with the contact table.
@@ -157,6 +208,14 @@ export class GameEngine {
     this.hitPause = 0;
     this.trick = null;
     this.selectedTrick = null;
+    this.celebration = null;
+    this.lastBeatGrade = 'off';
+    this.kickCharge = null;
+    this.queuedFoot = null;
+    this.queuedHeader = false;
+    this.queuedNeck = null;
+    this.headerGuard = false;
+    this.neckGuard = false;
     this.cooldown = 0;
     this.trickCooldown = 0;
     this.lastKick = { left: -10, right: -10 };
@@ -237,6 +296,11 @@ export class GameEngine {
 
   release(side: Side) {
     this.held[side] = false;
+    const charge = this.kickCharge;
+    if (charge && charge.side === side) {
+      this.kickCharge = null;
+      this.releaseCharge(side, charge.power);
+    }
     const c = this.contact;
     if (c && c.side === side && this.phase === 'playing' && c.held >= this.config.contactDelay) {
       this.completeContact(c.kind === 'stall');
@@ -246,33 +310,101 @@ export class GameEngine {
   /** Direct header attempt from the HEAD control (not a foot tap). */
   attemptHeader() {
     if (this.phase !== 'playing') return;
-    if (this.cooldown > 0 || this.contact || this.trickCooldown > 0) return;
+    if (this.headerGuard) return;
+    if (this.inputBlocked() || this.trickBusy() || !this.headerWindowOpen()) {
+      if (!this.headerWindowPassed()) this.queuedHeader = true;
+      return;
+    }
     this.selectedTrick = 'header';
     this.tryHeader();
   }
 
-  /** NECK control: press-and-hold catch. */
+  /** NECK control. A tap catches and flicks; a hold stalls until release. */
   pressNeck() {
     if (this.phase !== 'playing') return;
     if (this.heldNeck) return;
     this.heldNeck = true;
-    if (this.cooldown > 0 || this.contact || this.trickCooldown > 0) return;
+    if (this.neckGuard) return;
+    if (this.inputBlocked() || this.trickBusy() || !this.neckWindowOpen()) {
+      if (!this.neckWindowPassed()) this.queuedNeck = 'hold';
+      return;
+    }
     this.selectedTrick = 'neckStall';
     this.tryNeckCatch();
   }
 
   releaseNeck() {
+    if (this.queuedNeck) {
+      this.heldNeck = false;
+      this.queuedNeck = 'tap';
+      return;
+    }
     if (!this.heldNeck) return;
     this.heldNeck = false;
-    const neck = this.trick;
-    if (neck && neck.kind === 'neckStall' && (neck.phase === 'contact' || neck.phase === 'execute')) {
-      this.releaseNeckStall();
+    this.finishNeckHold();
+  }
+
+  /**
+   * One tap plays a foot trick on the other foot as soon as the window is open.
+   * Returns `queued` when the ball has not arrived yet.
+   */
+  requestFootTrick(kind: FootTrick): 'fired' | 'queued' | 'locked' {
+    if (this.phase !== 'playing') return 'locked';
+    if (this.trick?.kind === 'aroundTheWorld' && this.trick.phase !== 'fail') return 'fired';
+    const side: Side = this.lastSide === 'left' ? 'right' : this.lastSide === 'right' ? 'left' : 'right';
+    this.selectedTrick = kind;
+    this.queuedFoot = { kind, side };
+    this.flushQueues();
+    return this.queuedFoot ? 'queued' : 'fired';
+  }
+
+  /** Grade of the latest tap against the heard beat. Groove scoring reads this. */
+  setBeatGrade(grade: BeatGrade) {
+    this.lastBeatGrade = grade;
+  }
+
+  /**
+   * Hold the ball and play a short dance. A second call while one is running is ignored.
+   * Passing a non-positive duration does nothing.
+   */
+  startCelebration(danceId: string, reason: string, duration: number) {
+    if (this.celebration || duration <= 0) return;
+    this.celebration = {
+      danceId,
+      reason,
+      startedAt: this.time,
+      until: this.time + duration,
+    };
+    if (this.phase === 'playing') {
+      this.ball.vx = 0;
+      this.ball.vy = 0;
+      this.ball.vz = 0;
     }
   }
 
-  /** Arm or cancel a foot-armed trick (ATW / thigh / high flick). */
-  armTrick(kind: Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick'> | null) {
+  /** End the dance early and leave a descending ball when the run is still live. */
+  skipCelebration(): boolean {
+    if (!this.celebration) return false;
+    this.finishCelebration(this.phase === 'playing');
+    return true;
+  }
+
+  private finishCelebration(resumeBall: boolean) {
+    this.celebration = null;
+    if (!resumeBall || this.phase !== 'playing') return;
+    const c = this.config;
+    this.ball.x *= 0.25;
+    this.ball.y = Math.max(this.ball.y, c.contactHeight + 0.48);
+    this.ball.z = c.ballZ;
+    this.ball.vx = 0;
+    this.ball.vy = -1.35;
+    this.ball.vz = 0;
+  }
+
+  /** Arm or cancel a foot-armed trick (ATW / thigh / high flick / groove). */
+  armTrick(kind: Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick' | 'groove'> | null) {
     if (kind === null) {
+      this.queuedFoot = null;
       this.setTrick(null);
       return true;
     }
@@ -311,11 +443,19 @@ export class GameEngine {
       this.tryThigh(side);
       return;
     }
+    if (intent === 'groove') {
+      this.tryGroove(side);
+      return;
+    }
+    if (intent == null && this.footTiming() === 'early') {
+      this.kickCharge = { side, held: 0, power: 0 };
+      return;
+    }
     // highFlick or null → classic foot trap; highFlick flags the pending contact.
     this.tryKick(side, intent === 'highFlick');
   }
 
-  private tryKick(side: Side, highFlick = false) {
+  private tryKick(side: Side, highFlick = false, kickPower = 0) {
     if (this.trick && this.trick.kind === 'aroundTheWorld' && this.trick.phase !== 'fail') return;
     const deltaMs = this.timingDeltaMs();
     const grade = this.gradeFor(deltaMs);
@@ -328,7 +468,7 @@ export class GameEngine {
       this.emit({ type: 'miss', side, deltaMs });
       return;
     }
-    this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick, thigh: false };
+    this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick, kickPower: highFlick ? 0 : kickPower, thigh: false };
     const b = this.ball;
     b.vx = b.vy = b.vz = 0;
     const anchor = footContactAnchors[side];
@@ -364,7 +504,7 @@ export class GameEngine {
     }
     // Foot statistic: thigh is a lower-limb touch, recorded on the used side.
     this.lastKick[side] = this.time;
-    this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick: false, thigh: true };
+    this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick: false, kickPower: 0, thigh: true };
     const b = this.ball;
     b.y = target.y;
     b.z = target.z;
@@ -372,6 +512,35 @@ export class GameEngine {
     b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.45;
     this.trick = createTrickState('thigh', side, this.time, 'contact');
     this.emit({ type: 'trick', kind: 'thigh', phase: 'contact', points: 0, side });
+  }
+
+  private tryGroove(side: Side) {
+    if (this.trick && this.trick.phase !== 'recover' && this.trick.phase !== 'fail') {
+      this.rejectTrick('groove', 'busy');
+      return;
+    }
+    // Same foot window as a flick. A tap sends the ball high; the dance plays in the air.
+    const deltaMs = this.timingDeltaMs();
+    const grade = this.gradeFor(deltaMs);
+    this.lastKick[side] = this.time;
+    this.selectedTrick = null;
+    if (grade === 'miss') {
+      this.streak = 0;
+      this.cooldown = this.config.missCooldown;
+      this.lastKickGrade = 'miss';
+      resetComboTracker(this.combos);
+      this.emit({ type: 'miss', side, deltaMs });
+      return;
+    }
+    this.contact = {
+      kind: 'pending', side, grade, deltaMs, held: 0,
+      highFlick: false, kickPower: 0, thigh: false, groove: true,
+    };
+    const b = this.ball;
+    b.y = this.config.contactHeight;
+    b.z = this.config.ballZ;
+    b.vx = b.vy = b.vz = 0;
+    b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.6;
   }
 
   private tryHeader() {
@@ -429,6 +598,8 @@ export class GameEngine {
     this.emit({ type: 'trick', kind: 'header', phase: 'execute', points, side: null });
     this.noteCombo('header');
     this.selectedTrick = null;
+    this.headerGuard = true;
+    this.queuedHeader = false;
     this.trick = { ...t, phase: 'recover' };
   }
 
@@ -440,7 +611,7 @@ export class GameEngine {
     }
     if (this.trick) this.trick = null;
     const target = this.config.contacts.nape;
-    if (this.ball.vy >= 0 || !this.inContactBand(target)) {
+    if (this.ball.vy >= 0 || !this.neckApproach()) {
       this.rejectTrick('neckStall', 'window');
       return;
     }
@@ -467,8 +638,17 @@ export class GameEngine {
     this.lastTrick = { kind: 'neckStall', time: this.time };
     this.trick = trick;
     this.selectedTrick = null;
+    this.neckGuard = true;
+    this.queuedNeck = null;
     this.emit({ type: 'trick', kind: 'neckStall', phase: 'contact', points, side: null });
     this.noteCombo('neckCatch');
+  }
+
+  private finishNeckHold() {
+    const neck = this.trick;
+    if (neck && neck.kind === 'neckStall' && (neck.phase === 'contact' || neck.phase === 'execute')) {
+      this.releaseNeckStall();
+    }
   }
 
   private releaseNeckStall() {
@@ -480,8 +660,9 @@ export class GameEngine {
     const b = this.ball;
     const g = this.gravity;
     // Believable flick off the nape toward freestyle height.
-    b.vy = impulseForApex(this.config.contacts.forehead.y + 0.35, b.y, g) * 0.92;
-    b.vz = 0.55;
+    b.vy = impulseForApex(2.35, b.y, g);
+    // Leave backward off the upper back, then the recover step carries it forward once it is above the head.
+    b.vz = -0.7;
     b.vx = 0;
     b.wx = -5; b.wy = 1; b.wz = 3;
     this.emit({ type: 'trick', kind: 'neckStall', phase: 'execute', points: 0, side: null });
@@ -513,13 +694,12 @@ export class GameEngine {
       this.emit({ type: 'miss', side, deltaMs });
       return;
     }
-    // Controlled pop — not a completed ATW and not a normal scored kick.
+    // Light pop off the foot. The ball drifts out to the hover while the foot
+    // circles; it is not pinned in place on the first frame.
     const b = this.ball;
-    b.y = this.config.contactHeight;
-    b.z = this.config.ballZ;
-    b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.55;
-    b.vx = 0;
+    b.y = Math.max(b.y, this.config.contactHeight);
     b.vy = this.config.atwPopSpeed;
+    b.vx = 0;
     b.vz = 0;
     this.applySpin(side, 0.85);
     this.lastContact[side] = this.time;
@@ -607,6 +787,10 @@ export class GameEngine {
     const c = this.contact;
     if (!c) return;
     this.contact = null;
+    if (c.groove) {
+      this.finishGrooveKick(c);
+      return;
+    }
     const { scoring } = this.config;
     const alternate = this.lastSide !== null && this.lastSide !== c.side;
     let points = scoring.kickUp;
@@ -624,7 +808,8 @@ export class GameEngine {
       this.trick = null;
       this.selectedTrick = null;
     }
-    if (c.highFlick) {
+    const lofty = !stall && !c.thigh && (c.highFlick || c.kickPower >= this.config.highKickComboPower);
+    if (lofty) {
       this.stats.highFlicks++;
       this.lastTrick = { kind: 'highFlick', time: this.time };
     }
@@ -641,8 +826,12 @@ export class GameEngine {
     const quality = c.grade === 'perfect' || stall ? 1 : c.grade === 'good' ? 0.95 : 0.86;
     const b = this.ball;
     if (c.highFlick) {
-      // Full apex impulse so upper-body windows stay reachable across the gravity ramp.
+      // Armed flick keeps the exact authored apex. A charge eases toward it instead.
       b.vy = impulseForApex(this.config.highFlickApex, b.y, this.gravity);
+    } else if (c.kickPower > 0 && !c.thigh) {
+      const normal = normalKickApex(b.y, this.config.kickSpeed * quality, this.gravity);
+      const apex = apexForKickPower(c.kickPower, normal, this.config.highFlickApex);
+      b.vy = impulseForApex(apex, b.y, this.gravity);
     } else if (c.thigh) {
       b.vy = this.config.kickSpeed * 0.92 * quality;
       b.z = this.config.contacts.foot.z;
@@ -660,7 +849,7 @@ export class GameEngine {
     this.applySpin(c.side, quality);
     if (!c.thigh) this.hitPause = this.config.hitPause;
     this.emit({ type: 'kick', side: c.side, grade: c.grade, points, alternate, stall, streak: this.streak, deltaMs: c.deltaMs });
-    if (c.highFlick) this.noteCombo('highFlick');
+    if (lofty) this.noteCombo('highFlick');
     else if (c.thigh) this.noteCombo('thighTouch');
     else if (stall) this.noteCombo('footStall');
     else this.noteCombo('footTouch');
@@ -671,6 +860,217 @@ export class GameEngine {
     b.rx += b.wx * dt;
     b.ry += b.wy * dt;
     b.rz += b.wz * dt;
+  }
+
+  /** High kick, on-beat score, and a dance that ends while the ball is still above the player. */
+  private finishGrooveKick(c: Contact) {
+    const { scoring } = this.config;
+    const points = groovePoints(scoring.groove, this.lastBeatGrade, scoring.grooveBeatPerfect, scoring.grooveBeatGood);
+    this.stats.grooves++;
+    this.stats.score += points;
+    this.streak++;
+    this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
+    this.lastSide = c.side;
+    this.lastContact[c.side] = this.time;
+    this.lastKickGrade = c.grade;
+    if (c.grade === 'perfect') this.lastPerfectTime = this.time;
+    this.selectedTrick = null;
+    const nextScale = Math.min(this.config.maxGravityScale, this.gravityScale + this.config.gravityRamp);
+    this.gravityScale = nextScale;
+    const g = this.config.gravity * nextScale;
+    const flight = this.config.tricks.grooveFlightSec;
+    const b = this.ball;
+    b.x = 0;
+    b.y = this.config.contactHeight;
+    b.z = this.config.ballZ;
+    b.vx = 0;
+    b.vz = 0;
+    b.vy = (flight * g) / 2;
+    this.applySpin(c.side, c.grade === 'poor' ? 0.86 : 1);
+    const trick = createTrickState('groove', c.side, this.time, 'execute');
+    trick.awarded = true;
+    this.trick = trick;
+    this.lastTrick = { kind: 'groove', time: this.time };
+    this.emit({ type: 'trick', kind: 'groove', phase: 'execute', points, side: c.side });
+  }
+
+  private inputBlocked(): boolean {
+    return this.cooldown > 0 || this.contact != null || this.trickCooldown > 0;
+  }
+
+  private trickBusy(): boolean {
+    return this.trick != null && this.trick.phase !== 'recover' && this.trick.phase !== 'fail';
+  }
+
+  private headerWindowOpen(): boolean {
+    const target = this.config.contacts.forehead;
+    return this.ball.vy < 0
+      && this.inContactBand(target)
+      && this.gradeFor(this.timingDeltaMs(target.y)) !== 'miss';
+  }
+
+  private headerWindowPassed(): boolean {
+    const y = this.config.contacts.forehead.y;
+    return this.ball.vy < 0 && this.ball.y < y - 0.2;
+  }
+
+  /**
+   * A neck catch is timed on the way down through nape height. The ball is
+   * still in the juggle lane (around ballZ); the catch then settles it on
+   * the back of the neck. Placing the ball on the nape already also qualifies,
+   * so scripted stalls and the live juggle share one window.
+   */
+  private neckApproach(): boolean {
+    const b = this.ball;
+    const lane = this.config.tricks.depthTol * 1.6;
+    const inLane = nearDepth(b.z, this.config.ballZ, lane)
+      || nearDepth(b.z, this.config.contacts.nape.z, this.config.tricks.depthTol);
+    if (!inLane) return false;
+    if (Math.abs(b.x) > this.config.tricks.lateralTol + 0.15) return false;
+    return this.gradeFor(this.timingDeltaMs(this.config.contacts.nape.y), this.config.tricks.neckPrepMs) !== 'miss';
+  }
+
+  private neckWindowOpen(): boolean {
+    return this.ball.vy < 0 && this.neckApproach();
+  }
+
+  private neckWindowPassed(): boolean {
+    const y = this.config.contacts.nape.y;
+    return this.ball.vy < 0 && this.ball.y < y - 0.2;
+  }
+
+  private emitMiss(side: Side, deltaMs: number) {
+    this.streak = 0;
+    this.cooldown = this.config.missCooldown;
+    this.lastKickGrade = 'miss';
+    resetComboTracker(this.combos);
+    this.emit({ type: 'miss', side, deltaMs });
+  }
+
+  /** Early means the ball has not reached the foot yet. A ball already below the foot is late. */
+  private footTiming(): 'early' | 'late' | 'open' {
+    const deltaMs = this.timingDeltaMs();
+    if (this.gradeFor(deltaMs) !== 'miss') return 'open';
+    if (!Number.isFinite(deltaMs)) return this.ball.y > this.config.contactHeight ? 'early' : 'late';
+    return deltaMs < 0 ? 'late' : 'early';
+  }
+
+  private releaseCharge(side: Side, power: number) {
+    if (this.phase !== 'playing' || this.inputBlocked() || this.selectedTrick) return;
+    const timing = this.footTiming();
+    if (timing === 'late') {
+      this.emitMiss(side, this.timingDeltaMs());
+      return;
+    }
+    if (timing === 'early') return;
+    this.tryKick(side, false, power);
+  }
+
+  private advanceKickCharge(h: number) {
+    const charge = this.kickCharge;
+    if (!charge || this.phase !== 'playing') return;
+    if (!this.held[charge.side]) {
+      this.kickCharge = null;
+      return;
+    }
+    charge.held += h;
+    charge.power = Math.min(1, charge.held / Math.max(0.05, this.config.kickChargeTime));
+    if (this.inputBlocked() || this.selectedTrick) return;
+    const timing = this.footTiming();
+    if (timing === 'late') {
+      const side = charge.side;
+      this.kickCharge = null;
+      this.emitMiss(side, this.timingDeltaMs());
+      return;
+    }
+    if (timing === 'early') return;
+    const { side, power } = charge;
+    this.kickCharge = null;
+    this.tryKick(side, false, power);
+  }
+
+  private releaseGuards() {
+    const b = this.ball;
+    if (this.headerGuard && b.vy > 0 && b.y > this.config.contacts.forehead.y + 0.2) this.headerGuard = false;
+    if (this.neckGuard && b.vy > 0 && b.y > this.config.contacts.nape.y + 0.25) this.neckGuard = false;
+  }
+
+  private footWindowReady(kind: FootTrick): boolean {
+    if (kind === 'thigh') {
+      const target = this.config.contacts.thigh;
+      if (this.ball.vy >= 0 || !this.inContactBand(target)) return false;
+      return this.gradeFor(this.timingDeltaMs(target.y)) !== 'miss';
+    }
+    if (this.ball.vy >= 0) return false;
+    return this.gradeFor(this.timingDeltaMs()) !== 'miss';
+  }
+
+  private footWindowPassed(kind: FootTrick): boolean {
+    const height = kind === 'thigh' ? this.config.contacts.thigh.y : this.config.contactHeight;
+    if (this.ball.vy < 0 && this.ball.y < height - 0.28) return true;
+    return this.timingDeltaMs(height) < -this.config.timing.poorMs;
+  }
+
+  private flushQueues() {
+    if (this.phase !== 'playing') return;
+    this.releaseGuards();
+    this.flushHeader();
+    this.flushNeck();
+    this.flushFootQueue();
+  }
+
+  private flushHeader() {
+    if (!this.queuedHeader || this.headerGuard || this.inputBlocked() || this.trickBusy()) return;
+    const open = this.headerWindowOpen();
+    const passed = this.headerWindowPassed();
+    if (!open) {
+      if (passed) this.queuedHeader = false;
+      return;
+    }
+    this.queuedHeader = false;
+    this.selectedTrick = 'header';
+    this.tryHeader();
+  }
+
+  private flushNeck() {
+    if (!this.queuedNeck || this.neckGuard || this.inputBlocked() || this.trickBusy()) return;
+    const open = this.neckWindowOpen();
+    const passed = this.neckWindowPassed();
+    if (!open) {
+      if (passed) this.queuedNeck = null;
+      return;
+    }
+    const mode = this.queuedNeck;
+    this.queuedNeck = null;
+    this.heldNeck = mode === 'hold';
+    this.selectedTrick = 'neckStall';
+    this.tryNeckCatch();
+    if (mode === 'tap' && this.trick?.kind === 'neckStall') {
+      this.heldNeck = false;
+      this.releaseNeckStall();
+    }
+  }
+
+  private flushFootQueue() {
+    const q = this.queuedFoot;
+    if (!q || this.inputBlocked()) return;
+    if (this.trick?.kind === 'aroundTheWorld') return;
+    if (this.trickBusy()) return;
+    if (!this.footWindowReady(q.kind)) {
+      if (this.footWindowPassed(q.kind)) {
+        this.queuedFoot = null;
+        if (q.kind !== 'aroundTheWorld') this.selectedTrick = null;
+      }
+      return;
+    }
+    const score = this.stats.score;
+    const trick = this.trick;
+    this.selectedTrick = q.kind;
+    this.tryAction(q.side);
+    const started = this.contact != null || this.trick !== trick || this.stats.score !== score;
+    if (!started) return;
+    this.queuedFoot = null;
+    if (q.kind !== 'aroundTheWorld') this.selectedTrick = null;
   }
 
   private applySpin(side: Side, power: number) {
@@ -703,9 +1103,29 @@ export class GameEngine {
     this.time += h;
     if (this.cooldown > 0) this.cooldown = Math.max(0, this.cooldown - h);
     if (this.trickCooldown > 0) this.trickCooldown = Math.max(0, this.trickCooldown - h);
+    if (this.celebration && this.time >= this.celebration.until) {
+      this.finishCelebration(this.phase === 'playing');
+    }
     const b = this.ball;
 
     if (this.phase === 'menu' || this.phase === 'ready') return;
+
+    if (this.phase === 'playing' && !this.celebration) {
+      if (this.trick?.kind === 'groove' && this.time - this.trick.startedAt >= this.config.tricks.grooveDanceSec) {
+        this.trick = null;
+      }
+      this.advanceKickCharge(h);
+      this.flushQueues();
+    }
+
+    // Milestone dance: keep the ball where it is so the juggle can resume.
+    if (this.celebration && this.phase === 'playing' && !this.contact) {
+      b.vx = 0;
+      b.vy = 0;
+      b.vz = 0;
+      b.rx += h * 1.2;
+      return;
+    }
 
     // Neck stall hold (logical upper-back contact).
     if (this.trick?.kind === 'neckStall' && (this.trick.phase === 'contact' || this.trick.phase === 'execute')) {
@@ -725,26 +1145,60 @@ export class GameEngine {
     // Clear short recover markers once the ball is airborne again.
     if (this.trick && (this.trick.phase === 'recover' || this.trick.phase === 'fail')
       && this.trick.kind !== 'aroundTheWorld') {
-      if (this.time - this.trick.startedAt > 0.35 || b.vy > 0.2) this.trick = null;
+      if (this.trick.kind === 'neckStall' && this.trick.phase === 'recover') {
+        if (b.y > 2.05 && b.z < this.config.ballZ - 0.08) {
+          b.vz = Math.max(b.vz, 1.35);
+        }
+        if (this.time - this.trick.startedAt > 0.7) this.trick = null;
+      } else if (this.time - this.trick.startedAt > 0.35 || b.vy > 0.2) {
+        this.trick = null;
+      }
     }
 
-    // Around-the-world revolution progresses on simulation time only.
+    // Around-the-world: a short pop, then the ball holds at foot height
+    // while the foot circles outside-in, then it drops for the keep-up.
     if (this.trick?.kind === 'aroundTheWorld' && this.trick.phase === 'execute') {
       this.trick.revolution = Math.min(
         1,
         this.trick.revolution + h / this.config.tricks.atwRevolutionTime,
       );
+      const hoverX = (this.trick.side === 'left' ? -1 : 1) * this.config.atwHoverX;
+      const hoverY = this.config.atwHoverY;
+      const hoverZ = this.config.atwHoverZ;
+      const popping = this.trick.revolution < 0.3;
+      if (!popping && this.trick.revolution < 1 - 1e-9) {
+        const blend = Math.min(1, h * 12);
+        b.x += (hoverX - b.x) * blend;
+        b.y += (hoverY - b.y) * blend;
+        b.z += (hoverZ - b.z) * blend;
+        b.vx = 0;
+        b.vy = 0;
+        b.vz = 0;
+        b.rx += b.wx * h; b.ry += b.wy * h; b.rz += b.wz * h;
+        return;
+      }
       if (this.trick.revolution >= 1 - 1e-9) {
         this.trick.revolution = 1;
         this.trick.phase = 'recover';
+        b.x = hoverX;
+        b.y = hoverY;
+        b.z = hoverZ;
+        b.vx = 0;
+        b.vz = 0;
+        b.vy = -this.config.atwDropSpeed;
         this.emit({ type: 'trick', kind: 'aroundTheWorld', phase: 'recover', points: 0, side: this.trick.side });
+      } else {
+        b.vx = (hoverX - b.x) * 8;
+        b.vz = (hoverZ - b.z) * 8;
       }
     }
 
     const c = this.contact;
     if (c && this.phase === 'playing') {
       c.held += h;
-      if (!this.held[c.side] && c.held >= this.config.contactDelay - 1e-9) {
+      if (c.groove && c.held >= this.config.contactDelay - 1e-9) {
+        this.completeContact(false);
+      } else if (!this.held[c.side] && c.held >= this.config.contactDelay - 1e-9) {
         this.completeContact(c.kind === 'stall');
       } else if (c.thigh && c.held >= this.config.stallHoldTime) {
         // Thigh touches do not become foot stalls.
@@ -813,6 +1267,7 @@ function emptyStats(): RunStats {
     neckStalls: 0,
     aroundTheWorlds: 0,
     highFlicks: 0,
+    grooves: 0,
     combos: 0,
   };
 }

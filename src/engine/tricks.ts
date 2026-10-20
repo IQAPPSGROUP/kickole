@@ -1,7 +1,7 @@
 import type { Side } from './config';
 
 /** Playable freestyle tricks. `null` selection keeps classic foot juggling. */
-export type TrickKind = 'header' | 'thigh' | 'neckStall' | 'aroundTheWorld' | 'highFlick';
+export type TrickKind = 'header' | 'thigh' | 'neckStall' | 'aroundTheWorld' | 'highFlick' | 'groove';
 
 export type TrickPhase = 'prep' | 'contact' | 'execute' | 'recover' | 'fail';
 
@@ -30,6 +30,19 @@ export interface TrickState {
 
 export function createTrickState(kind: TrickKind, side: Side | null, time: number, phase: TrickPhase = 'prep'): TrickState {
   return { kind, phase, side, startedAt: time, awarded: false, revolution: 0, held: 0 };
+}
+
+/** Apex of an uncharged kick launched at `kickSpeed` from `fromY`. */
+export function normalKickApex(fromY: number, kickSpeed: number, gravity: number): number {
+  const g = Math.max(1e-6, gravity);
+  return fromY + (kickSpeed * kickSpeed) / (2 * g);
+}
+
+/** Ease a charge from a normal kick apex up to the high-flick apex. */
+export function apexForKickPower(power: number, normalApex: number, highApex: number): number {
+  const t = Math.min(1, Math.max(0, power));
+  const ease = Math.pow(t, 0.72);
+  return normalApex + (highApex - normalApex) * ease;
 }
 
 /** Upward speed that reaches `apexY` from `fromY` under the given gravity. */

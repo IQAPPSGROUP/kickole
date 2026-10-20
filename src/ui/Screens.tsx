@@ -1,10 +1,27 @@
 import type { Result } from '../game/controller';
 import type { Quality, RunRecord, Settings } from '../game/storage';
 
+const brand = (file: string) => `${import.meta.env.BASE_URL}${file}`;
+
 export function Logo() {
   return (
     <h1 className="logo">
-      KICK<span>OLÉ</span>
+      <img
+        className="logo-mark"
+        src={brand('icons/icon-192.png')}
+        alt=""
+        width={192}
+        height={192}
+        draggable={false}
+      />
+      <img
+        className="logo-word"
+        src={brand('brand/kickole-wordmark.webp')}
+        alt="KICKOLÉ"
+        width={1024}
+        height={368}
+        draggable={false}
+      />
     </h1>
   );
 }
@@ -37,7 +54,7 @@ export function Home({
           <button className="btn ghost" onClick={onShop}>SHOP</button>
         </div>
         <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
-        <p className="home-help">Tap to juggle · Hold to stall</p>
+        <p className="home-help">Tap to juggle · Hold L or R to kick higher · Hold through the ball to stall</p>
         <p className="credit">IQ Apps Group · v0.1</p>
       </div>
     </div>
@@ -101,6 +118,7 @@ export function SettingsScreen({
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
         <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />
         <Toggle label="Vibration" value={settings.vibration} onChange={(vibration) => onChange({ vibration })} />
+        <Toggle label="Trick hints" value={settings.hints} onChange={(hints) => onChange({ hints })} />
         <div className="group">
           <label>Graphics quality</label>
           <div className="seg">
@@ -114,10 +132,12 @@ export function SettingsScreen({
         <div className="group help">
           <label>How to play</label>
           <p>Tap <b>left</b> or <b>right</b> of the screen to kick with that foot just as the ball drops to the foot. Perfect timing earns bonus points; alternate feet for +3.</p>
-          <p><b>Foot stall:</b> press and hold on a good kick, then release to flick for +10.</p>
+          <p><b>High kick:</b> press L or R early and hold. A ring fills with power — release as the ball arrives to kick higher and buy time for tricks. A quick tap stays a normal kick.</p>
+          <p><b>Foot stall:</b> hold through contact on a good kick, then release to flick for +10.</p>
           <p><b>Coins</b> are earned from run score and spent in the Shop. Customise looks are free. Boots and kits never change timing.</p>
           <p>Keyboard: <b>A</b>/<b>D</b> feet · <b>H</b> header · <b>N</b> neck (hold) · <b>W</b> ATW · <b>T</b> thigh · <b>F</b> flick · <b>Esc</b> cancel · <b>Space</b> start.</p>
-          <p>Arm <b>ATW</b> / <b>THIGH</b> / <b>FLICK</b>, then tap left or right. <b>HEAD</b> taps immediately; <b>NECK</b> is press-and-hold, release to flick out.</p>
+          <p>Tap <b>ATW</b>, <b>THIGH</b>, <b>FLICK</b> or <b>GROOVE</b> once — the trick plays on the next touch. <b>HEAD</b> taps immediately. <b>NECK</b> works on a tap; hold it to stall, then release to flick out. <b>GROOVE</b> is a high kick: your dance plays while the ball is up, then you catch it on the way down. Extra points when that tap is on the beat.</p>
+          <p><b>Trick hints</b> call a move, glow the button, and show a tap or a hold. Finish it before the ring empties for bonus points. Turn hints off here once you know the tricks. Each lesson is remembered on this device.</p>
           <p><b>Combos +5:</b> flick→header · header→neck→release · stall→ATW · alternating foot↔thigh. Chains expire if you wait too long or miss.</p>
         </div>
         <div className="group help">

@@ -83,12 +83,24 @@ describe('GameEngine', () => {
     expect(e.phase).toBe('over');
   });
 
-  it('early taps are a miss and do not end the run', () => {
+  it('early taps charge instead of missing and do not end the run', () => {
     const e = started();
     e.step(e.config.fixedStep);
     e.press('right');
     expect(e.phase).toBe('playing');
     expect(e.stats.kickUps).toBe(0);
+    expect(e.kickCharge?.side).toBe('right');
+    expect(e.contact).toBeNull();
+    e.release('right');
+    e.ball.y = 0.4;
+    e.ball.vy = -2.2;
+    e.ball.z = e.config.ballZ;
+    let misses = 0;
+    e.on((ev) => { if (ev.type === 'miss') misses++; });
+    e.press('left');
+    expect(misses).toBe(1);
+    expect(e.stats.kickUps).toBe(0);
+    expect(e.phase).toBe('playing');
   });
 });
 

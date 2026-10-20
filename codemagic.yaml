@@ -1,7 +1,7 @@
 # Kickolé iOS builds run on Codemagic Macs. No certificates, profiles, API keys,
 # or the App Store Apple ID belong in this file. Signing uses the existing
-# Codemagic integration "Amigos App Store Connect" and the env group
-# kickole_app_store (APP_STORE_APPLE_ID only).
+# Codemagic integration "IQ APSS" and the env group app_store
+# (APP_STORE_APPLE_ID and CERTIFICATE_PRIVATE_KEY), same as the other IQ apps.
 
 workflows:
   ios-testflight:
@@ -12,22 +12,21 @@ workflows:
     triggering:
       events: []
     integrations:
-      app_store_connect: Amigos App Store Connect
+      app_store_connect: "IQ APSS"
     environment:
       node: "22"
       xcode: latest
       groups:
-        - kickole_app_store
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.iqappsgroup.kickole
+        - app_store
+      vars:
+        BUNDLE_ID: com.iqappsgroup.kickole
     scripts:
       - name: Require the Kickolé App Store Apple ID
         script: |
           set -euo pipefail
           if [ -z "${APP_STORE_APPLE_ID:-}" ]; then
             echo "APP_STORE_APPLE_ID is missing."
-            echo "In Codemagic, create environment group kickole_app_store and add APP_STORE_APPLE_ID."
+            echo "In Codemagic, add APP_STORE_APPLE_ID to the app_store environment group."
             echo "Use the numeric Apple ID from App Store Connect > Kickolé > General > App Information."
             echo "Do not commit that value, and do not print it in the build log."
             exit 1
@@ -59,17 +58,18 @@ workflows:
       - name: Set up code signing on the Xcode project
         script: |
           set -euo pipefail
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
           xcode-project use-profiles --project ios/App/App.xcodeproj
       - name: Set build number to the latest TestFlight build plus one
         script: |
           set -euo pipefail
           cd ios/App
-          LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")"
+          # The first build has no TestFlight builds yet, so treat no answer as 0.
+          LATEST_BUILD_NUMBER="$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)"
           case "${LATEST_BUILD_NUMBER}" in
-            ''|*[!0-9]*)
-              echo "Could not read a numeric TestFlight build number for this app."
-              exit 1
-              ;;
+            ''|*[!0-9]*) LATEST_BUILD_NUMBER=0 ;;
           esac
           NEXT_BUILD_NUMBER="$((LATEST_BUILD_NUMBER + 1))"
           echo "Next CFBundleVersion: ${NEXT_BUILD_NUMBER}"

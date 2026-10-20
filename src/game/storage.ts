@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import type { Appearance, PlayerBody } from './appearance';
 import { normalizeAppearance } from './appearance';
+import { normalizeLearned, type LessonId } from './prompts';
 import {
   bumpChallenges,
   coinsForScore,
@@ -26,6 +27,8 @@ export interface Settings {
   /** Kicks, cheers and the crowd bed. */
   sfx: boolean;
   vibration: boolean;
+  /** On-screen trick prompts, glowing controls and tutorial tips. */
+  hints: boolean;
   quality: Quality;
   /** @deprecated Prefer wardrobe kit + appearance; kept for migration. */
   skinId: string;
@@ -34,6 +37,8 @@ export interface Settings {
 export interface SaveData extends WardrobeLocker {
   best: number;
   leaderboard: RunRecord[];
+  /** Trick lessons the player has already been taught. */
+  learnedTricks: LessonId[];
 }
 
 const SAVE_KEY = 'kicky.save.v1';
@@ -44,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   music: true,
   sfx: true,
   vibration: true,
+  hints: true,
   quality: 'high',
   skinId: 'kicky-teal',
 };
@@ -87,7 +93,7 @@ export function loadSave(): SaveData {
   const locker = normalizeLocker({
     ...d,
     hadSave: d != null,
-    legacySkinId: storedVersion < WARDROBE_VERSION && typeof settings?.skinId === 'string'
+    legacySkinId: storedVersion < 2 && typeof settings?.skinId === 'string'
       ? settings.skinId
       : null,
   }, { trustStoreCache: trustNativeStoreCache() });
@@ -95,6 +101,7 @@ export function loadSave(): SaveData {
     best: Math.max(best, ...lb.map((r) => r.score), 0),
     leaderboard: lb,
     ...locker,
+    learnedTricks: normalizeLearned(d?.learnedTricks),
   };
   // Persist migrated shape when an older save existed (keep empty installs unwritten).
   if (d && (d as { wardrobeVersion?: number }).wardrobeVersion !== WARDROBE_VERSION) {
@@ -136,6 +143,7 @@ export function loadSettings(): Settings {
     music: typeof d.music === 'boolean' ? d.music : DEFAULT_SETTINGS.music,
     sfx: typeof d.sfx === 'boolean' ? d.sfx : DEFAULT_SETTINGS.sfx,
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
+    hints: typeof d.hints === 'boolean' ? d.hints : DEFAULT_SETTINGS.hints,
     quality: d.quality === 'low' || d.quality === 'medium' || d.quality === 'high' ? d.quality : DEFAULT_SETTINGS.quality,
     skinId: typeof d.skinId === 'string' ? d.skinId : DEFAULT_SETTINGS.skinId,
   };

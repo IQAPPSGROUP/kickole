@@ -13,6 +13,13 @@ import {
   type ChallengeKind,
   type UnlockRequirement,
 } from './catalogue';
+import {
+  STARTER_DANCE_ID,
+  equipDance,
+  normalizeDances,
+  type DanceId,
+  type DanceLocker,
+} from './dances';
 
 export interface ChallengeProgress {
   alternateFoot: number;
@@ -43,6 +50,10 @@ export interface WardrobeLocker {
   entitlementSource: EntitlementSource;
   entitlementVerifiedAt: number;
   entitlementTransactionRef: string | null;
+  /** Lifetime milestone rank that unlocks cosmetic dances. */
+  danceRank: number;
+  ownedDances: DanceId[];
+  equippedDance: DanceId;
   /** Save schema version for migrations. */
   wardrobeVersion: number;
 }
@@ -186,6 +197,9 @@ export interface RawSaveFields {
   entitlementSource?: unknown;
   entitlementVerifiedAt?: unknown;
   entitlementTransactionRef?: unknown;
+  danceRank?: unknown;
+  ownedDances?: unknown;
+  equippedDance?: unknown;
   wardrobeVersion?: unknown;
   bodyChosen?: unknown;
   /** Set by loadSave when a save object already existed. Not written back. */
@@ -224,7 +238,7 @@ export function normalizeLocker(
     ? [...new Set(raw.ownedKits.filter((id): id is string => typeof id === 'string' && isKitId(id)))]
     : [];
 
-  // Legacy skin seeds run once, while the save is still older than the wardrobe schema.
+  // Legacy skin seeds run once, while the save is still older than schema 2.
   const legacy = storedVersion < LEGACY_SKIN_VERSION && typeof raw?.legacySkinId === 'string'
     ? LEGACY_SKIN_MAP[raw.legacySkinId]
     : undefined;
@@ -257,6 +271,13 @@ export function normalizeLocker(
     perfectTouch: typeof ch?.perfectTouch === 'number' && ch.perfectTouch > 0 ? Math.floor(ch.perfectTouch) : 0,
   };
 
+  let danceRank = typeof raw?.danceRank === 'number' && Number.isFinite(raw.danceRank)
+    ? raw.danceRank
+    : undefined;
+  if (danceRank === undefined && storedVersion < WARDROBE_VERSION) {
+    danceRank = seedDanceRank(challenges);
+  }
+
   let appearance = normalizeAppearance(raw?.appearance as Partial<Appearance> | undefined);
   if (legacy?.appearance) {
     appearance = normalizeAppearance({ ...appearance, ...legacy.appearance, clothing: { ...appearance.clothing, ...legacy.appearance.clothing } });
@@ -272,6 +293,11 @@ export function normalizeLocker(
   const launchGrantedItemIds = Array.isArray(raw?.launchGrantedItemIds)
     ? raw.launchGrantedItemIds.filter((id): id is string => typeof id === 'string')
     : [];
+  const dances = normalizeDances({
+    danceRank,
+    ownedDances: raw?.ownedDances,
+    equippedDance: raw?.equippedDance,
+  });
 
   // A bare boolean is not proof. On web, apple/google strings are not proof either.
   // Native builds may keep that cache and re-check it with the store.
@@ -301,6 +327,9 @@ export function normalizeLocker(
     entitlementSource: 'none',
     entitlementVerifiedAt: 0,
     entitlementTransactionRef: null,
+    danceRank: dances.danceRank,
+    ownedDances: dances.ownedDances,
+    equippedDance: dances.equippedDance,
     wardrobeVersion: WARDROBE_VERSION,
   };
 
@@ -319,6 +348,21 @@ export function normalizeLocker(
   return locker;
 }
 
+/** Equip a dance the player already unlocked. Dances are not coin purchases. */
+export function equipOwnedDance(locker: WardrobeLocker, id: string): ShopResult {
+  const result = equipDance(locker, id);
+  if (!result.ok) return { ok: false, locker, reason: 'locked' };
+  return { ok: true, locker: { ...locker, ...result.locker } };
+}
+
+/** Challenge progress from saves that predate the dance locker. */
+function seedDanceRank(progress: ChallengeProgress): number {
+  if (progress.perfectTouch >= 80) return 50;
+  if (progress.perfectTouch >= 25) return 25;
+  if (progress.stalls >= 25 || progress.alternateFoot >= 40) return 10;
+  return 0;
+}
+
 export function bumpChallenges(
   progress: ChallengeProgress,
   delta: Partial<ChallengeProgress>,
@@ -330,4 +374,5 @@ export function bumpChallenges(
   };
 }
 
-export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID };
+export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID };
+export type { DanceId, DanceLocker };

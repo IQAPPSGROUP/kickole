@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { applyNeckPointer, type NeckPointerState } from '../ui/trickInput';
 import { GameEngine } from './engine';
 import { impulseForApex } from './tricks';
 
@@ -167,6 +168,7 @@ describe('around the world', () => {
     e.setTrick('aroundTheWorld');
     runUntilContactDelta(e, 5);
     e.press('left'); e.release('left');
+    expect(e.ball.vy).toBeGreaterThan(1);
     stepN(e, 5);
     expect(e.stats.aroundTheWorlds).toBe(0);
     expect(e.stats.score).toBe(0);
@@ -273,5 +275,221 @@ describe('trick safety and determinism', () => {
     expect(e.stats.headers).toBe(0);
     expect(e.selectedTrick).toBeNull();
     expect(e.trick).toBeNull();
+    expect(e.celebration).toBeNull();
+  });
+});
+
+describe('groove trick', () => {
+  function launchGroove(e: GameEngine, beat: 'perfect' | 'good' | 'off' = 'perfect') {
+    e.equippedDance = 'sway';
+    e.setBeatGrade(beat);
+    runUntilContactDelta(e, 5);
+    expect(e.requestFootTrick('groove')).toBe('fired');
+    stepN(e, Math.ceil(e.config.contactDelay / e.config.fixedStep) + 2);
+  }
+
+  it('pays the on-beat bonus and sends the ball well above the head', () => {
+    const e = started();
+    launchGroove(e, 'perfect');
+    expect(e.stats.grooves).toBe(1);
+    expect(e.stats.score).toBe(e.config.scoring.groove + e.config.scoring.grooveBeatPerfect);
+    expect(e.stats.kickUps).toBe(0);
+    expect(e.selectedTrick).toBeNull();
+    expect(e.trick?.kind).toBe('groove');
+    const flight = (2 * e.ball.vy) / e.gravity;
+    expect(flight).toBeGreaterThan(1.5);
+    expect(flight).toBeLessThan(2);
+    let apex = e.ball.y;
+    let clearedY = 0;
+    for (let i = 0; i < 4000 && !(e.ball.vy < 0 && e.ball.y < e.config.contactHeight + 0.15); i++) {
+      e.step(e.config.fixedStep);
+      apex = Math.max(apex, e.ball.y);
+      if (clearedY === 0 && e.trick == null) clearedY = e.ball.y;
+    }
+    expect(apex).toBeGreaterThan(e.config.contacts.forehead.y + 0.8);
+    expect(clearedY).toBeGreaterThan(e.config.contacts.forehead.y + 0.4);
+    expect(e.trick).toBeNull();
+    expect(e.phase).toBe('playing');
+    runUntilContactDelta(e, 8);
+    e.press('left');
+    e.release('left');
+    stepN(e, 6);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.stats.grooves).toBe(1);
+    expect(e.phase).toBe('playing');
+  });
+
+  it('still scores the touch when the tap misses the beat', () => {
+    const e = started();
+    launchGroove(e, 'off');
+    expect(e.stats.grooves).toBe(1);
+    expect(e.stats.score).toBe(e.config.scoring.groove);
+    expect(e.lastBeatGrade).toBe('off');
+    expect(e.ball.vy).toBeGreaterThan(e.config.kickSpeed);
+  });
+
+  it('leaves classic kicks alone until groove is armed', () => {
+    const e = started();
+    runUntilContactDelta(e, 8);
+    e.press('right');
+    e.release('right');
+    stepN(e, 6);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.stats.grooves).toBe(0);
+  });
+});
+
+describe('milestone celebration', () => {
+  it('holds the ball, can be skipped, and leaves a catchable descent', () => {
+    const e = started();
+    e.ball.y = 1.4;
+    e.ball.vy = 1.2;
+    e.ball.vx = 0.4;
+    e.startCelebration('samba', 'streak:10', 0.5);
+    const held = e.ball.y;
+    stepN(e, 8);
+    expect(e.celebration?.danceId).toBe('samba');
+    expect(e.ball.y).toBeCloseTo(held, 5);
+    expect(e.ball.vy).toBe(0);
+    expect(e.skipCelebration()).toBe(true);
+    expect(e.celebration).toBeNull();
+    expect(e.ball.vy).toBeLessThan(0);
+    expect(e.ball.y).toBeGreaterThan(e.config.contactHeight);
+    expect(e.phase).toBe('playing');
+  });
+
+  it('ends itself and ignores a second dance until the first finishes', () => {
+    const e = started();
+    e.startCelebration('robot', 'juggle:10', 0.15);
+    e.startCelebration('spin', 'perfect:50', 2);
+    expect(e.celebration?.danceId).toBe('robot');
+    stepN(e, Math.ceil(0.2 / e.config.fixedStep) + 2);
+    expect(e.celebration).toBeNull();
+    expect(e.phase).toBe('playing');
+    expect(e.ball.vy).toBeLessThan(0);
+  });
+});
+
+describe('one-tap tricks and queues', () => {
+  it('plays a thigh touch from a single button press', () => {
+    const e = started();
+    fallThrough(e, e.config.contacts.thigh.y, e.config.contacts.thigh.z, 8);
+    expect(e.requestFootTrick('thigh')).toBe('fired');
+    stepN(e, 6);
+    expect(e.stats.thighs).toBe(1);
+    expect(e.stats.kickUps).toBe(1);
+  });
+
+  it('queues a thigh tap until the ball arrives', () => {
+    const e = started();
+    e.ball.y = 2.4;
+    e.ball.vy = 1;
+    e.ball.z = e.config.contacts.thigh.z;
+    expect(e.requestFootTrick('thigh')).toBe('queued');
+    expect(e.stats.thighs).toBe(0);
+    for (let i = 0; i < 800 && e.stats.thighs === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.thighs).toBe(1);
+  });
+
+  it('queues a header through cooldown and does not farm a second one', () => {
+    const e = started();
+    fallThrough(e, e.config.contacts.forehead.y, e.config.contacts.forehead.z, 8);
+    e.attemptHeader();
+    expect(e.stats.headers).toBe(1);
+    e.attemptHeader();
+    stepN(e, 40);
+    expect(e.stats.headers).toBe(1);
+  });
+
+  it('a pointer tap on the juggle catches the ball on the back of the neck', () => {
+    const e = started();
+    e.ball.x = -0.08;
+    e.ball.y = e.config.contacts.nape.y + 0.85;
+    e.ball.z = e.config.ballZ;
+    e.ball.vy = 0.3;
+    e.ball.vx = 0;
+    e.ball.vz = 0;
+    let pointer: NeckPointerState = { pointerId: null };
+    const events = [
+      { type: 'pointerdown' as const, pointerId: 3 },
+      { type: 'lostpointercapture' as const, pointerId: 3 },
+      { type: 'pointerup' as const, pointerId: 3 },
+    ];
+    for (const event of events) {
+      const next = applyNeckPointer(pointer, event, e.phase);
+      pointer = next.state;
+      if (next.action === 'press') e.pressNeck();
+      if (next.action === 'release') e.releaseNeck();
+    }
+    expect(pointer.pointerId).toBeNull();
+    expect(e.stats.neckStalls).toBe(0);
+    expect(e.queuedNeck).toBe('tap');
+    for (let i = 0; i < 800 && e.stats.neckStalls === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.ball.z).toBeLessThan(0);
+    expect(e.ball.y).toBeGreaterThan(e.config.contacts.nape.y);
+    expect(e.ball.vy).toBeGreaterThan(0);
+  });
+
+  it('a pointer hold stalls on the nape until pointerup', () => {
+    const e = started();
+    e.ball.y = e.config.contacts.nape.y + 0.7;
+    e.ball.z = e.config.ballZ;
+    e.ball.vy = -0.4;
+    e.ball.x = 0;
+    let pointer: NeckPointerState = { pointerId: null };
+    const down = applyNeckPointer(pointer, { type: 'pointerdown', pointerId: 8 }, e.phase);
+    pointer = down.state;
+    expect(down.action).toBe('press');
+    e.pressNeck();
+    for (let i = 0; i < 800 && e.stats.neckStalls === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.trick?.kind).toBe('neckStall');
+    const y = e.ball.y;
+    stepN(e, 30);
+    expect(e.ball.y).toBeCloseTo(y, 5);
+    const up = applyNeckPointer(pointer, { type: 'pointerup', pointerId: 8 }, e.phase);
+    expect(up.action).toBe('release');
+    e.releaseNeck();
+    expect(e.ball.vy).toBeGreaterThan(0);
+  });
+
+  it('a neck tap catches and flicks without a second award', () => {
+    const e = started();
+    e.ball.y = e.config.contacts.nape.y + 0.8;
+    e.ball.vy = 0.4;
+    e.ball.z = e.config.contacts.nape.z;
+    e.pressNeck();
+    e.releaseNeck();
+    expect(e.stats.neckStalls).toBe(0);
+    for (let i = 0; i < 800 && e.stats.neckStalls === 0 && e.phase === 'playing'; i++) e.step(e.config.fixedStep);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.ball.vy).toBeGreaterThan(0);
+    const score = e.stats.score;
+    e.pressNeck();
+    e.releaseNeck();
+    stepN(e, 10);
+    expect(e.stats.neckStalls).toBe(1);
+    expect(e.stats.score).toBe(score);
+  });
+
+  it('a full charge kicks higher than a tap and counts as a high flick', () => {
+    const tap = started();
+    runUntilContactDelta(tap, 5);
+    tap.press('right');
+    tap.release('right');
+    stepN(tap, 4);
+    const tapVy = tap.ball.vy;
+
+    const held = started();
+    held.press('right');
+    for (let i = 0; i < 4000 && !held.contact && held.phase === 'playing'; i++) held.step(held.config.fixedStep);
+    expect(held.contact?.kickPower).toBeGreaterThanOrEqual(held.config.highKickComboPower);
+    held.release('right');
+    stepN(held, 10);
+    expect(held.ball.vy).toBeGreaterThan(tapVy + 0.4);
+    expect(held.stats.highFlicks).toBe(1);
+    expect(held.stats.stalls).toBe(0);
+    expect(held.stats.kickUps).toBe(1);
   });
 });

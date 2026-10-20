@@ -54,7 +54,8 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
                 let storeProducts = try await Product.products(for: [productId])
                 self.products = storeProducts
                 guard let product = storeProducts.first else {
-                    call.resolve(nil)
+                    // Capacitor iOS cannot resolve nil; the JS adapter maps a rejection to null.
+                    call.reject("product_unavailable")
                     return
                 }
                 call.resolve([

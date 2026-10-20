@@ -1,5 +1,6 @@
 import { Component, Suspense, useLayoutEffect, type ReactNode } from 'react';
 import { useGLTF } from '@react-three/drei';
+import { attachLocalDecoders, DRACO_DECODER_PATH } from './decoders';
 import { Color, type Material, type Mesh, type Object3D } from 'three';
 import type { Quality } from '../game/storage';
 import {
@@ -38,14 +39,14 @@ function prepareBackdrop(root: Object3D, theme: EnvironmentTheme) {
       mat.fog = false;
       if (typeof mat.envMapIntensity === 'number') mat.envMapIntensity = theme === 'street' ? 0.25 : 0.55;
       const tinted = material as Material & { color?: Color };
-      if (theme === 'street' && tinted.color?.isColor) tinted.color.lerp(SUNSET, 0.55);
+      if (theme === 'street' && tinted.color?.isColor) tinted.color.lerp(SUNSET, 0.22);
       mat.needsUpdate = true;
     });
   });
 }
 
 function Model({ url, theme }: { url: string; theme: EnvironmentTheme }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useGLTF(url, DRACO_DECODER_PATH, true, attachLocalDecoders);
   useLayoutEffect(() => {
     prepareBackdrop(scene, theme);
     notifyEnvironmentReady();

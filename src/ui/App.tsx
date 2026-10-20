@@ -69,14 +69,18 @@ export function App() {
         controller.pressNeck();
       } else if (e.code === 'KeyT') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('thigh');
+        controller.playTrick('thigh');
       } else if (e.code === 'KeyF') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('highFlick');
+        controller.playTrick('highFlick');
       } else if (e.code === 'KeyW') {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.armTrick('aroundTheWorld');
+        controller.playTrick('aroundTheWorld');
+      } else if (e.code === 'KeyG') {
+        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
+        controller.playTrick('groove');
       } else if (e.code === 'Escape') {
+        if (controller.engine.celebration) controller.skipCelebration();
         controller.armTrick(null);
       }
     };
@@ -128,7 +132,9 @@ export function App() {
           onShop={() => setOverlay('shop')}
         />
       )}
-      {phase !== 'menu' && <Hud hud={snap.hud} />}
+      {phase !== 'menu' && (
+        <Hud hud={snap.hud} controller={controller} onSkipCelebration={() => controller.skipCelebration()} />
+      )}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
       {phase === 'over' && snap.result && overlay === 'none' && (
         <GameOver
@@ -166,6 +172,7 @@ export function App() {
           billingBusy={snap.billingBusy}
           onBuyBoot={(id) => controller.buyBoot(id)}
           onBuyKit={(id) => controller.buyKit(id)}
+          onEquipDance={(id) => controller.equipDance(id)}
           onPurchaseLaunch={() => { void controller.purchaseLaunchCollection(); }}
           onRestorePurchases={() => { void controller.restorePurchases(); }}
           onPreview={(opts) => controller.previewEquipment(opts)}

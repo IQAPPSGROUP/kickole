@@ -56,7 +56,7 @@ describe('trick poses', () => {
     expect(pose.headYaw).toBe(0);
   });
 
-  it('ATW circles the active foot with hip twist while planting the support foot', () => {
+  it('ATW keeps a bent knee and a planted support foot while the foot circles', () => {
     const e = started();
     e.setTrick('aroundTheWorld');
     for (let i = 0; i < 100000; i++) {
@@ -67,9 +67,11 @@ describe('trick poses', () => {
     stepN(e, Math.ceil(e.config.tricks.atwRevolutionTime / e.config.fixedStep * 0.5));
     const pose = computePose(e);
     expect(pose.lockMotion).toBe(true);
-    expect(Math.abs(pose.legs.left.twist)).toBeGreaterThan(0.2);
+    expect(pose.legs.left.knee).toBeGreaterThan(0.4);
+    expect(pose.legs.left.knee).toBeLessThan(1.2);
+    expect(Math.abs(pose.legs.left.twist)).toBeLessThan(0.45);
+    expect(pose.legs.left.thigh).toBeLessThan(-0.8);
     expect(Math.abs(pose.legs.right.thigh)).toBeLessThan(0.2);
-    expect(pose.legs.left.knee).toBeGreaterThan(0.05);
   });
 
   it('thigh raise keeps the support foot near rest', () => {
@@ -96,5 +98,28 @@ describe('trick poses', () => {
     expect(a.torsoPitch).toBeCloseTo(b.torsoPitch, 8);
     expect(a.neckPitch).toBeCloseTo(b.neckPitch, 8);
     expect(a.lockMotion).toBe(true);
+  });
+
+  it('dances through a groove and is back in a ready stance while the ball is still up', () => {
+    const e = started();
+    e.equippedDance = 'shuffle';
+    e.setTrick('groove');
+    fallThrough(e, e.config.contactHeight, e.config.ballZ);
+    e.press('right');
+    e.release('right');
+    stepN(e, Math.ceil(e.config.contactDelay / e.config.fixedStep) + 3);
+    const dancing = computePose(e);
+    expect(e.trick?.kind).toBe('groove');
+    expect(dancing.lockMotion).toBe(true);
+    expect(dancing.legs.left.knee).toBeLessThan(0.5);
+    expect(dancing.legs.right.knee).toBeLessThan(0.5);
+    expect(dancing.legs.left.thigh).toBeGreaterThan(-0.4);
+    for (let i = 0; i < 4000 && e.trick; i++) e.step(e.config.fixedStep);
+    expect(e.trick).toBeNull();
+    expect(e.ball.y).toBeGreaterThan(e.config.contacts.forehead.y);
+    const ready = computePose(e);
+    expect(ready.lockMotion).toBe(false);
+    expect(Math.abs(ready.legs.left.thigh)).toBeLessThan(0.35);
+    expect(Math.abs(ready.legs.right.thigh)).toBeLessThan(0.35);
   });
 });

@@ -13,6 +13,8 @@ import { Court } from './Court';
 import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
+import { cameraSway, prefersReducedMotion } from './juice';
+import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
 import { detectTier, fallbackTier, profileFor, readDevice, startingTier } from './qualityTier';
@@ -48,7 +50,7 @@ function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
 }
 
 /** Three-quarter front camera that fits the play area in portrait and landscape, with kick push-in and shake. */
-function CameraRig({ shake }: { shake: boolean }) {
+function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
   const { camera, size } = useThree();
   useEffect(() => {
     const cam = camera as PerspectiveCamera;
@@ -99,17 +101,44 @@ function CameraRig({ shake }: { shake: boolean }) {
     }
     fx.push = Math.max(0, fx.push - dt * 3);
     fx.shake = Math.max(0, fx.shake - dt * 4);
+    const reduced = prefersReducedMotion();
+    if (reduced) fx.swoop = 0;
+    fx.swoop = Math.max(0, fx.swoop - dt * 0.72);
     if (BASE.lengthSq() === 0) gameplayCameraPosition(aspect, BASE);
-    if (!shake) {
+    const swoop = fx.swoop;
+    const swayStill = cameraSway(state.clock.elapsedTime, quality, reduced);
+    if (!shake && swoop <= 0 && swayStill.x === 0 && swayStill.y === 0) {
+      if (cam.fov !== FOV) {
+        cam.fov = FOV;
+        cam.updateProjectionMatrix();
+      }
       cam.position.copy(BASE);
       cam.lookAt(TARGET);
       return;
     }
     const t = state.clock.elapsedTime;
+    const sway = cameraSway(t, quality, reduced);
     LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
     camera.position.copy(BASE).add(LOOK);
-    camera.position.x += Math.sin(t * 55) * 0.015 * fx.shake;
-    camera.position.y += Math.cos(t * 63) * 0.015 * fx.shake;
+    camera.position.x += sway.x;
+    camera.position.y += sway.y;
+    if (shake) {
+      camera.position.x += Math.sin(t * 55) * 0.015 * fx.shake;
+      camera.position.y += Math.cos(t * 63) * 0.015 * fx.shake;
+    }
+    if (swoop > 0) {
+      camera.position.x += Math.sin(swoop * 1.15) * 0.62;
+      camera.position.y += swoop * 0.32;
+      camera.position.z -= swoop * 0.38;
+      const nextFov = FOV - swoop * 5.5;
+      if (Math.abs(cam.fov - nextFov) > 0.05) {
+        cam.fov = nextFov;
+        cam.updateProjectionMatrix();
+      }
+    } else if (cam.fov !== FOV) {
+      cam.fov = FOV;
+      cam.updateProjectionMatrix();
+    }
     camera.lookAt(TARGET);
   });
   return null;
@@ -238,7 +267,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       {street && <StreetTone />}
       <color attach="background" args={[street ? '#3a2a28' : '#8dc5cb']} />
       <fog attach="fog" args={street ? ['#5c3a32', 22, 48] : ['#8dc5cb', 24, 52]} />
-      <CameraRig shake={quality !== 'low'} />
+      <CameraRig shake={quality !== 'low'} quality={quality} />
       {street && profile.ibl && <SunsetIbl />}
       {!street && quality === 'high' && <Environment />}
       <Simulation controller={controller} />
@@ -270,6 +299,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         shadow-radius={wide ? 4 : quality === 'high' ? 3 : 1}
       />
       <Court shadows={shadows} quality={quality} />
+      <SceneLife engine={controller.engine} quality={quality} />
       {((street && profile.contactShadows) || (!street && quality === 'high')) && (
         <ContactShadows
           position={[0, 0.006, 0.2]}

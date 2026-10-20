@@ -210,7 +210,8 @@ describe.each([
       expect(toe.y).toBeGreaterThan(ball.y - 0.1);
       const meshGap = bootSurfaceGap(gltf.scene, ball);
       expect(meshGap).toBeGreaterThan(-0.015);
-      expect(meshGap).toBeLessThan(0.06);
+      // The readable ball is 0.11 across, so this fixed authored centre sits a little further off the leather than the 0.14 ball did.
+      expect(meshGap).toBeLessThan(0.09);
     },
   );
 

@@ -2,17 +2,36 @@ import { Suspense, useRef, useState, type PointerEvent as ReactPointerEvent } fr
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Group } from 'three';
 import { GameEngine } from '../engine/engine';
+import { GAMEPLAY_BPM } from '../game/beat';
+import type { DanceId } from '../game/dances';
 import type { Skin } from '../game/skins';
 import { CharacterSwitch } from '../scene/CharacterSwitch';
 
-function Turntable({ skin, yaw }: { skin: Skin; yaw: number }) {
+function Turntable({ skin, yaw, dance }: { skin: Skin; yaw: number; dance: DanceId | null }) {
   const engine = useRef(new GameEngine()).current;
   const group = useRef<Group>(null);
   if (engine.phase === 'menu') {
     engine.prepare('ready');
     engine.phase = 'ready';
   }
-  useFrame(() => {
+  useFrame((_, dt) => {
+    if (dance) {
+      engine.phase = 'playing';
+      engine.equippedDance = dance;
+      engine.selectedTrick = null;
+      engine.celebration = null;
+      engine.time += dt;
+      const dur = engine.config.tricks.grooveDanceSec;
+      engine.trick = {
+        kind: 'groove', phase: 'execute', side: 'right',
+        startedAt: engine.time - (engine.time % dur),
+        awarded: true, revolution: 0, held: 0,
+      };
+      engine.beatPhase = ((engine.time * GAMEPLAY_BPM) / 60) % 1;
+    } else if (engine.trick?.kind === 'groove') {
+      engine.trick = null;
+      engine.phase = 'ready';
+    }
     if (group.current) group.current.rotation.y = yaw;
   });
   return (
@@ -29,10 +48,12 @@ export function PlayerPreview({
   skin,
   closeUp = false,
   label,
+  dance = null,
 }: {
   skin: Skin;
   closeUp?: boolean;
   label?: string;
+  dance?: DanceId | null;
 }) {
   const [yaw, setYaw] = useState(0.35);
   const drag = useRef<{ x: number; yaw: number } | null>(null);
@@ -66,7 +87,7 @@ export function PlayerPreview({
         <color attach="background" args={['#6C5CE7']} />
         <hemisphereLight args={['#FF8A5B', '#1E2A5A', 0.85]} />
         <directionalLight position={[2, 4, 3]} intensity={2.2} color="#FFF6E8" />
-        <Turntable skin={skin} yaw={yaw} />
+        <Turntable skin={skin} yaw={yaw} dance={dance ?? null} />
       </Canvas>
       <span className="preview-hint">Drag to rotate</span>
     </div>

@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
 import { AnimationMixer, BoxGeometry, CanvasTexture, LinearFilter, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import { clearFootContactAnchors, setFootContactAnchors } from '../engine/footContact';
@@ -22,6 +23,7 @@ import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
 import { HairVariants } from './HairVariants';
 import { measureKickContactAnchors } from './measureFootContact';
+import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
 /** glTF images on this skinned head sample as one averaged colour. A canvas copy of the same pixels does not. */
@@ -114,6 +116,20 @@ function seatEyes(geometry: Mesh['geometry']) {
   position.needsUpdate = true;
 }
 
+function liftKickToe(
+  bones: Partial<Record<BoneKey, Bone>>,
+  state: AnimationState | null,
+  clipTime: number,
+  out: Quaternion,
+) {
+  if (state !== 'KickLeft' && state !== 'KickRight') return;
+  const pitch = kickToeClearance(clipTime);
+  if (pitch === 0) return;
+  const foot = bones[state === 'KickLeft' ? 'footLeft' : 'footRight'];
+  if (!foot) return;
+  foot.quaternion.multiply(toeClearanceQuaternion(pitch, out));
+}
+
 function toonRole(name: string): ToonRole {
   if (name === MATERIAL_NAMES.skin) return 'skin';
   if (name === MATERIAL_NAMES.shirt) return 'shirt';
@@ -122,11 +138,25 @@ function toonRole(name: string): ToonRole {
 
 /** Straps in foot-bone space. On this rig local +Y runs toward the toe and local −Z is the instep. */
 const LACES: ReadonlyArray<{ position: [number, number, number]; size: [number, number, number] }> = [
-  { position: [0, 0.042, -0.05], size: [0.07, 0.008, 0.012] },
-  { position: [0, 0.068, -0.055], size: [0.066, 0.008, 0.012] },
-  { position: [0, 0.094, -0.056], size: [0.06, 0.008, 0.012] },
-  { position: [0, 0.12, -0.05], size: [0.052, 0.008, 0.011] },
-  { position: [0, 0.082, -0.06], size: [0.013, 0.1, 0.01] },
+  { position: [0, 0.042, -0.055], size: [0.074, 0.012, 0.016] },
+  { position: [0, 0.07, -0.06], size: [0.068, 0.012, 0.016] },
+  { position: [0, 0.098, -0.06], size: [0.06, 0.012, 0.015] },
+  { position: [0, 0.124, -0.052], size: [0.05, 0.012, 0.014] },
+  { position: [0, 0.084, -0.068], size: [0.016, 0.11, 0.014] },
+];
+
+/** Local +Y runs toward the toe and local +Z is the sole (opposite the instep). */
+const SOLE: { position: [number, number, number]; size: [number, number, number] } = {
+  position: [0, 0.07, 0.042],
+  size: [0.074, 0.16, 0.018],
+};
+const STUDS: ReadonlyArray<[number, number, number]> = [
+  [-0.022, 0.018, 0.056],
+  [0.022, 0.018, 0.056],
+  [-0.022, 0.07, 0.056],
+  [0.022, 0.07, 0.056],
+  [-0.022, 0.122, 0.054],
+  [0.022, 0.122, 0.054],
 ];
 
 const NUMBERS = [7, 9, 10, 11, 14, 17, 21, 23] as const;
@@ -204,7 +234,7 @@ const ktxRenderer: { gl: WebGLRenderer | null } = { gl: null };
 
 function extendCharacterLoader(loader: { setKTX2Loader: (ktx2: KTX2Loader) => void }) {
   const ktx2 = new KTX2Loader();
-  ktx2.setTranscoderPath(`${import.meta.env.BASE_URL}basis/`);
+  ktx2.setTranscoderPath(KTX2_TRANSCODER_PATH);
   if (ktxRenderer.gl) ktx2.detectSupport(ktxRenderer.gl);
   loader.setKTX2Loader(ktx2);
 }
@@ -257,7 +287,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   const gl = useThree((state) => state.gl);
   ktxRenderer.gl = gl;
   // drei types GLTFLoader from three-stdlib, which does not match three's KTX2Loader.
-  const gltf = useGLTF(characterModelUrl(characterLod(quality), skin.playerBody), false, true, extendCharacterLoader as never);
+  const gltf = useGLTF(characterModelUrl(characterLod(quality), skin.playerBody), DRACO_DECODER_PATH, true, extendCharacterLoader as never);
   const { scene, clips, report, bones, materials, hairMeshes, kind, quaternius, pbr, chest } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
@@ -400,10 +430,16 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     if (pbr || quality === 'low') return;
     const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
     const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
+    const soleGeo = new BoxGeometry(SOLE.size[0], SOLE.size[1], SOLE.size[2]);
+    const studGeo = new BoxGeometry(0.012, 0.012, 0.014);
     const laceMat = new MeshToonMaterial({ name: 'Boot_Laces', color: skin.boots.lace ?? '#F8F9FB' });
     const trimMat = new MeshToonMaterial({ name: 'Boot_Trim', color: skin.boots.trim ?? skin.boots.main });
+    const soleMat = new MeshToonMaterial({ name: 'Boot_Sole', color: '#1A1A1A' });
+    const studMat = new MeshToonMaterial({ name: 'Boot_Studs', color: '#C4C8D0' });
     bindSunsetToon(laceMat, 'flat', skin.clothing.shirtTrim);
     bindSunsetToon(trimMat, 'flat', skin.clothing.shirtTrim);
+    bindSunsetToon(soleMat, 'flat', skin.clothing.shirtTrim);
+    bindSunsetToon(studMat, 'flat', skin.clothing.shirtTrim);
     const added: Mesh[] = [];
     const attach = (bone: Bone | undefined) => {
       if (!bone) return;
@@ -415,12 +451,23 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         bone.add(mesh);
         added.push(mesh);
       });
-      // Heel trim panel — distinct finishes without extra GLB weight.
       const heel = new Mesh(heelGeo, trimMat);
       heel.position.set(0, 0.02, -0.05);
       heel.frustumCulled = false;
       bone.add(heel);
       added.push(heel);
+      const sole = new Mesh(soleGeo, soleMat);
+      sole.position.set(SOLE.position[0], SOLE.position[1], SOLE.position[2]);
+      sole.frustumCulled = false;
+      bone.add(sole);
+      added.push(sole);
+      for (const stud of STUDS) {
+        const mesh = new Mesh(studGeo, studMat);
+        mesh.position.set(stud[0], stud[1], stud[2]);
+        mesh.frustumCulled = false;
+        bone.add(mesh);
+        added.push(mesh);
+      }
     };
     attach(bones.footLeft);
     attach(bones.footRight);
@@ -433,8 +480,12 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       for (const mesh of added) mesh.parent?.remove(mesh);
       laceMat.dispose();
       trimMat.dispose();
+      soleMat.dispose();
+      studMat.dispose();
       for (const geo of laceGeos) geo.dispose();
       heelGeo.dispose();
+      soleGeo.dispose();
+      studGeo.dispose();
     };
   }, [scene, clips, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality]);
 
@@ -508,7 +559,8 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       // so the head — and the skinned hair — still follow the ball.
       if (quaternius) {
         computePose(engine, pose);
-        const trickPose = pose.lockMotion || engine.trick != null;
+        const dancing = engine.celebration != null || engine.trick?.kind === 'groove';
+        const trickPose = pose.lockMotion || engine.trick != null || dancing;
         if (trickPose) {
           scene.position.set(0, pose.bodyY, 0);
           if (bones.root) bones.root.position.y = hipsRestY;
@@ -520,6 +572,17 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         } else {
           mixer.update(dt);
           scene.position.set(0, 0, 0);
+          if (act && (next.state === 'KickLeft' || next.state === 'KickRight')) {
+            const kickSide = next.state === 'KickLeft' ? 'left' : 'right';
+            const legKeys = kickSide === 'left'
+              ? (['thighLeft', 'shinLeft', 'footLeft'] as const)
+              : (['thighRight', 'shinRight', 'footRight'] as const);
+            for (const key of legKeys) {
+              const bone = bones[key];
+              const restQ = restQuat.get(key);
+              if (bone && restQ) bone.quaternion.copy(restQ).multiply(ueDeltaQuaternion(key, pose, deltaQ));
+            }
+          }
           if (next.state === 'Idle' || next.state.startsWith('Kick')) {
             for (const key of ['head', 'neck'] as const) {
               const b = bones[key];
@@ -530,12 +593,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         }
       } else {
         computePose(engine, pose);
-        const trickPose = pose.lockMotion || engine.trick != null;
+        const dancing = engine.celebration != null || engine.trick?.kind === 'groove';
+        const trickPose = pose.lockMotion || engine.trick != null || dancing;
         if (trickPose) {
           applyContractBones(bones, pose, hipsRestY);
           scene.position.set(0, 0, 0);
         } else {
           mixer.update(dt);
+          if (act) liftKickToe(bones, next.state, act.time, deltaQ);
           if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
         }
       }

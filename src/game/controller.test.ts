@@ -72,11 +72,22 @@ describe('GameController', () => {
     expect(cb).toHaveBeenCalled();
   });
 
-  it('shows MISS feedback for a bad tap without ending the run', async () => {
+  it('charges an early tap and shows MISS for a late one', async () => {
     const { c } = await make(QUIET);
     c.play(); c.press('left'); c.release('left');
     c.tick(0.02);
     c.press('right');
+    expect(c.engine.kickCharge?.side).toBe('right');
+    expect(c.getSnapshot().hud.feedback?.kind).not.toBe('miss');
+    c.release('right');
+    // A normal launch is still inside the foot window when it reaches the ground.
+    // A slow drop already below the foot is the late miss.
+    c.engine.ball.y = 0.4;
+    c.engine.ball.vy = -2.2;
+    c.engine.ball.vz = 0;
+    c.engine.ball.vx = 0;
+    c.engine.ball.z = c.engine.config.ballZ;
+    c.press('left');
     expect(c.getSnapshot().hud.feedback?.kind).toBe('miss');
     expect(c.engine.phase).toBe('playing');
   });

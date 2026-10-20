@@ -1,11 +1,14 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Box3, Matrix4, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
+import { AnimationMixer, Box3, Matrix4, Quaternion, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { DEFAULT_CONFIG } from '../engine/config';
-import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel } from './rig';
+import { GameEngine } from '../engine/engine';
+import { computePose } from './pose';
+import { ueDeltaQuaternion } from './ue-pose';
+import { ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel, type BoneKey } from './rig';
 
 const MODEL = new URL('../../public/models/kickole_player_v3.glb', import.meta.url);
 
@@ -32,14 +35,15 @@ const skinnedWorld = new Vector3();
 const boneWorld = new Matrix4();
 
 /** Closest boot vertex to the ball, as a gap outside the surface. Negative means the mesh is inside. */
-function bootSurfaceGap(scene: Group, ball: Vector3): number {
+function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => boolean): number {
   let gap = Number.POSITIVE_INFINITY;
   let samples = 0;
   scene.updateMatrixWorld(true);
   scene.traverse((obj) => {
     const mesh = obj as SkinnedMesh;
     if (!mesh.isSkinnedMesh || !mesh.geometry?.attributes.position || !mesh.geometry.attributes.skinIndex) return;
-    if (!materialNames(mesh.material).some((name) => name === 'Boots' || name === 'Boots_Sole')) return;
+    const mats = materialNames(mesh.material).join(',');
+    if (!accept(mats)) return;
     mesh.skeleton.update();
     const position = mesh.geometry.attributes.position;
     const skinIndex = mesh.geometry.attributes.skinIndex;
@@ -52,7 +56,7 @@ function bootSurfaceGap(scene: Group, ball: Vector3): number {
         if (weight === 0) continue;
         const boneIndex = skinIndex.getComponent(i, influence);
         const bone = mesh.skeleton.bones[boneIndex];
-        if (!bone) throw new Error(`missing bone ${boneIndex} on ${mesh.name} (${mesh.skeleton.bones.length} bones)`);
+        if (!bone) throw new Error(`missing bone ${boneIndex} on ${mesh.name}`);
         boneWorld.multiplyMatrices(bone.matrixWorld, mesh.skeleton.boneInverses[boneIndex]);
         skinnedWorld.addScaledVector(weighted.copy(bindPosition).applyMatrix4(boneWorld), weight);
       }
@@ -60,8 +64,25 @@ function bootSurfaceGap(scene: Group, ball: Vector3): number {
       gap = Math.min(gap, skinnedWorld.distanceTo(ball) - DEFAULT_CONFIG.ballRadius);
     }
   });
-  if (samples === 0) throw new Error('no boot vertices');
+  if (samples === 0) throw new Error('no vertices');
   return gap;
+}
+
+function bootSurfaceGap(scene: Group, ball: Vector3): number {
+  return surfaceGap(scene, ball, (mats) => mats.includes('Boots'));
+}
+
+const POSE_BONES: Record<BoneKey, string> = { ...BONE_NAMES, ...EXTRA_BONE_NAMES };
+
+function applyContractPose(scene: Group, bones: Record<string, Bone>, pose: ReturnType<typeof computePose>) {
+  const delta = new Quaternion();
+  for (const key of Object.keys(POSE_BONES) as BoneKey[]) {
+    const bone = bones[POSE_BONES[key]];
+    if (!bone) continue;
+    bone.quaternion.multiply(ueDeltaQuaternion(key, pose, delta));
+  }
+  scene.position.y = pose.bodyY;
+  scene.updateMatrixWorld(true);
 }
 
 function bonesOf(scene: Group) {
@@ -159,6 +180,100 @@ describe('kickole_player_v3.glb', () => {
       expect(meshGap).toBeLessThan(0.06);
     },
   );
+
+  it('lifts the kicking leg so the instep meets the ball', async () => {
+    const gltf = await load();
+    const { bones } = bonesOf(gltf.scene);
+    const e = new GameEngine();
+    e.prepare('ready');
+    e.phase = 'playing';
+    e.time = 1;
+    e.lastKick.left = 1 - e.config.contactDelay;
+    e.ball.x = -e.config.footX * 0.6;
+    e.ball.y = e.config.contactHeight;
+    e.ball.z = e.config.ballZ;
+    e.ball.vy = 0;
+    e.contact = {
+      kind: 'pending', side: 'left', grade: 'perfect', deltaMs: 0,
+      held: e.config.contactDelay, highFlick: false, kickPower: 0, thigh: false,
+    };
+    const pose = computePose(e);
+    const delta = new Quaternion();
+    const keys: (keyof typeof BONE_NAMES)[] = ['thighLeft', 'shinLeft', 'footLeft'];
+    for (const key of keys) {
+      const bone = bones[BONE_NAMES[key]];
+      bone.quaternion.multiply(ueDeltaQuaternion(key, pose, delta));
+    }
+    gltf.scene.updateMatrixWorld(true);
+    const foot = bones.Foot_L.getWorldPosition(new Vector3());
+    const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+    expect(foot.y).toBeGreaterThan(0.45);
+    expect(foot.distanceTo(ball)).toBeLessThan(0.28);
+    expect(bootSurfaceGap(gltf.scene, ball)).toBeLessThan(0.08);
+  });
+
+  it('rests a neck catch on the back of the neck', async () => {
+    const gltf = await load();
+    const { bones } = bonesOf(gltf.scene);
+    const rest = new Map(Object.values(bones).map((bone) => [bone, bone.quaternion.clone()]));
+    const e = new GameEngine();
+    e.prepare('ready');
+    e.phase = 'playing';
+    e.time = 1;
+    e.trick = {
+      kind: 'neckStall', phase: 'execute', side: null, startedAt: 0.6,
+      awarded: true, revolution: 0, held: 0.35,
+    };
+    e.ball.x = 0;
+    e.ball.y = e.config.contacts.nape.y;
+    e.ball.z = e.config.contacts.nape.z;
+    for (const [bone, q] of rest) bone.quaternion.copy(q);
+    applyContractPose(gltf.scene, bones, computePose(e));
+    const neck = bones.Neck.getWorldPosition(new Vector3());
+    const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+    const gap = surfaceGap(gltf.scene, ball, (mats) => mats.includes('Shirt') || mats.includes('Skin') || mats.includes('Hair'));
+    expect(ball.z).toBeLessThan(neck.z - 0.12);
+    expect(gap).toBeGreaterThan(-0.03);
+    expect(gap).toBeLessThan(0.08);
+  });
+
+  it('circles the foot outside-in around the ball without the leg passing through it', async () => {
+    const gltf = await load();
+    const { bones } = bonesOf(gltf.scene);
+    const rest = new Map(Object.values(bones).map((bone) => [bone, bone.quaternion.clone()]));
+    const e = new GameEngine();
+    e.prepare('ready');
+    e.phase = 'playing';
+    e.time = 1;
+    const toes: number[] = [];
+    let minBoot = Infinity;
+    let minBody = Infinity;
+    for (const rev of [0.3, 0.5, 0.7, 0.85, 1]) {
+      e.trick = {
+        kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 0,
+        awarded: false, revolution: rev, held: 0,
+      };
+      e.ball.x = -e.config.atwHoverX;
+      e.ball.y = e.config.atwHoverY;
+      e.ball.z = e.config.atwHoverZ;
+      for (const [bone, q] of rest) bone.quaternion.copy(q);
+      const pose = computePose(e);
+      expect(pose.legs.left.knee).toBeGreaterThan(0.4);
+      expect(pose.legs.left.knee).toBeLessThan(1.2);
+      expect(Math.abs(pose.legs.left.twist)).toBeLessThan(0.45);
+      applyContractPose(gltf.scene, bones, pose);
+      const toe = bones.Toe_L.getWorldPosition(new Vector3());
+      toes.push(toe.x);
+      const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+      minBoot = Math.min(minBoot, surfaceGap(gltf.scene, ball, (mats) => mats.includes('Boots')));
+      minBody = Math.min(minBody, surfaceGap(gltf.scene, ball, (mats) => !mats.includes('Boots')));
+      expect(Math.abs(toe.y - ball.y)).toBeLessThan(0.22);
+    }
+    expect(toes[0]).toBeLessThan(toes[toes.length - 1] - 0.2);
+    expect(minBoot).toBeGreaterThan(-0.02);
+    expect(minBoot).toBeLessThan(0.12);
+    expect(minBody).toBeGreaterThan(0.05);
+  });
 
   it('skins the authored hair to the head bone', async () => {
     const gltf = await load();

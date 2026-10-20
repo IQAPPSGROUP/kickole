@@ -26,6 +26,10 @@ export interface ScoringConfig {
   aroundTheWorld: number;
   /** Variety bonus awarded once per completed trick combination. */
   varietyBonus: number;
+  /** Groove high kick before the on-beat bonus. */
+  groove: number;
+  grooveBeatGood: number;
+  grooveBeatPerfect: number;
 }
 
 export interface TrickTimingConfig {
@@ -44,6 +48,10 @@ export interface TrickTimingConfig {
   trickCooldown: number;
   /** Seconds between successful combo steps before progress expires. */
   comboExpirySec: number;
+  /** Air time of a groove kick, from the foot back to the foot (s). */
+  grooveFlightSec: number;
+  /** Equipped dance length during a groove. Shorter than the flight so the catch is ready. */
+  grooveDanceSec: number;
 }
 
 export interface GameConfig {
@@ -56,6 +64,8 @@ export interface GameConfig {
     thigh: ContactTarget;
     forehead: ContactTarget;
     nape: ContactTarget;
+    /** Chest centre used by the groove trick. */
+    chest: ContactTarget;
   };
   /** Fixed physics step in seconds. */
   fixedStep: number;
@@ -76,9 +86,19 @@ export interface GameConfig {
   launchSpeed: number;
   /**
    * World-space ball-centre apex used to derive the high-flick impulse from current gravity.
-   * Not applied to normal kicks.
+   * A plain tap stays on kickSpeed. A charged hold eases toward this apex.
    */
   highFlickApex: number;
+  /** Seconds a foot must be held before a charge reaches full loft. */
+  kickChargeTime: number;
+  /** Charge power (0–1) at which a released kick counts as a high flick for combos. */
+  highKickComboPower: number;
+  /** Ball-centre hover while a foot circles outside-in. X is mirrored by side. */
+  atwHoverX: number;
+  atwHoverY: number;
+  atwHoverZ: number;
+  /** Downward speed when the ATW hover ends and the return window opens. */
+  atwDropSpeed: number;
   /** Modest pop used to start around-the-world (below a normal kick). */
   atwPopSpeed: number;
   /** Gravity grows by this fraction per kick-up, up to maxGravityScale. */
@@ -114,33 +134,47 @@ export const DEFAULT_CONFIG: GameConfig = {
     neckStall: 10,
     aroundTheWorld: 20,
     varietyBonus: 5,
+    groove: 2,
+    grooveBeatGood: 2,
+    grooveBeatPerfect: 4,
   },
   tricks: {
     depthTol: 0.22,
     lateralTol: 0.35,
-    neckPrepMs: 140,
+    neckPrepMs: 220,
     neckMaxHold: 1.15,
     atwRevolutionTime: 0.55,
     atwReturnMs: 160,
     trickCooldown: 0.2,
     comboExpirySec: 3.5,
+    grooveFlightSec: 1.75,
+    grooveDanceSec: 1.05,
   },
   contacts: {
     foot: FOOT,
     thigh: { y: 1.02, z: 0.56 },
     forehead: { y: 1.68, z: 0.4 },
-    nape: { y: 1.5, z: 0.1 },
+    // Rest pose: ball centre on the upper back, behind the hinged neck.
+    // A juggle in front of the player (ballZ) is still a valid approach.
+    nape: { y: 1.4, z: -0.08 },
+    chest: { y: 1.32, z: 0.48 },
   },
   fixedStep: 1 / 120,
   gravity: 11,
-  ballRadius: 0.14,
+  ballRadius: 0.11,
   contactHeight: FOOT.y,
   ballZ: FOOT.z,
   footX: 0.17,
   kickSpeed: 5.6,
   launchSpeed: 6.4,
-  highFlickApex: 2.85,
-  atwPopSpeed: 4.4,
+  highFlickApex: 3.68,
+  kickChargeTime: 0.42,
+  highKickComboPower: 0.65,
+  atwHoverX: 0.76,
+  atwHoverY: 0.81,
+  atwHoverZ: 0.82,
+  atwDropSpeed: 1.15,
+  atwPopSpeed: 2.2,
   gravityRamp: 0.012,
   maxGravityScale: 1.45,
   missCooldown: 0.22,

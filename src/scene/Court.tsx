@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, Color, DoubleSide, InstancedMesh, NoColorSpace, Object3D, RepeatWrapping, SRGBColorSpace, Texture, TextureLoader } from 'three';
 import type { Quality } from '../game/storage';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
@@ -6,6 +7,7 @@ import { BeachCourt } from './BeachCourt';
 import { ENVIRONMENT_THEME } from './environment';
 import { Crowd } from './Crowd';
 import { profileFor } from './qualityTier';
+import { prefersReducedMotion, sceneLifeBudget } from './juice';
 
 const NAVY = '#1E2A5A';
 const TEAL = '#00B8A9';
@@ -139,25 +141,28 @@ function Floodlight({ x, z }: { x: number; z: number }) {
 const BUNTING_COLORS = [CORAL, LIME, TEAL, VIOLET];
 
 /** Festa-style bunting: one instanced draw call, strung across the back of the court. */
-function Bunting() {
+function Bunting({ sway }: { sway: boolean }) {
   const ref = useRef<InstancedMesh>(null);
+  const dummy = useMemo(() => new Object3D(), []);
+  const tint = useMemo(() => new Color(), []);
   const N = 22;
-  useLayoutEffect(() => {
+  const paint = (time: number) => {
     const m = ref.current;
     if (!m) return;
-    const d = new Object3D();
-    const c = new Color();
     for (let i = 0; i < N; i++) {
       const u = i / (N - 1);
-      d.position.set(-3.7 + u * 7.4, 2.62 - Math.sin(u * Math.PI) * 0.22 - 0.09, -3.18);
-      d.rotation.set(0, 0, Math.PI + (u - 0.5) * 0.25);
-      d.updateMatrix();
-      m.setMatrixAt(i, d.matrix);
-      m.setColorAt(i, c.set(BUNTING_COLORS[i % BUNTING_COLORS.length]));
+      const wave = sway ? Math.sin(time * 2.2 + u * 8) * 0.05 : 0;
+      dummy.position.set(-3.7 + u * 7.4, 2.62 - Math.sin(u * Math.PI) * 0.22 - 0.09 + wave, -3.18);
+      dummy.rotation.set(0, 0, Math.PI + (u - 0.5) * 0.25 + wave);
+      dummy.updateMatrix();
+      m.setMatrixAt(i, dummy.matrix);
+      if (time === 0) m.setColorAt(i, tint.set(BUNTING_COLORS[i % BUNTING_COLORS.length]));
     }
     m.instanceMatrix.needsUpdate = true;
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
-  }, []);
+    if (time === 0 && m.instanceColor) m.instanceColor.needsUpdate = true;
+  };
+  useLayoutEffect(() => { paint(0); }, []);
+  useFrame((state) => { if (sway) paint(state.clock.elapsedTime); });
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, N]}>
       <circleGeometry args={[0.1, 3]} />
@@ -377,7 +382,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         <planeGeometry args={[1.8, 0.9]} />
         <meshBasicMaterial map={blob} transparent depthWrite={false} />
       </mesh>
-      <Bunting />
+      <Bunting sway={sceneLifeBudget(quality, prefersReducedMotion()).buntingSway} />
       <Floodlight x={-3.8} z={-3.2} />
       <Floodlight x={3.8} z={-3.2} />
     </group>

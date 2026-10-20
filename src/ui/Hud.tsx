@@ -97,12 +97,12 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
         </filter>
       </svg>
       <div className="prompt-bounce">
+        <GraffitiText text={call} className={call.length > 16 ? 'graffiti prompt-call is-long' : 'graffiti prompt-call'} />
+        <GraffitiText text={prompt.tip} className="graffiti prompt-tip" />
         <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
           <circle cx="18" cy="18" r="14" />
           <circle ref={ring} cx="18" cy="18" r="14" pathLength={100} />
         </svg>
-        <GraffitiText text={call} className={call.length > 16 ? 'graffiti prompt-call is-long' : 'graffiti prompt-call'} />
-        <GraffitiText text={prompt.tip} className="graffiti prompt-tip" />
       </div>
     </div>
   );

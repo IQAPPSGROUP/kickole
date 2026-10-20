@@ -237,25 +237,26 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .prompt-shine {
   z-index: 0;
-  color: #fff;
+  color: transparent;
   transform: translate(-0.045em, -0.06em);
 }
+.prompt-shine .prompt-ch { color: #fff; }
 .prompt-ink {
   z-index: 1;
+  color: transparent;
+}
+.prompt-ink .prompt-ch {
   color: #140814;
   -webkit-text-stroke: 0.09em #140814;
 }
 .prompt-face {
   position: relative;
   z-index: 2;
-  background: linear-gradient(180deg, #FFF3B0 0%, #FFE27A 16%, #FF4F9A 46%, #D21B72 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: #FF4F9A;
-  -webkit-text-fill-color: transparent;
+  background: none;
+  color: transparent;
 }
 .prompt-face .prompt-ch {
-  background: inherit;
+  background: linear-gradient(180deg, #FFF3B0 0%, #FFE27A 16%, #FF4F9A 46%, #D21B72 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -263,12 +264,13 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .prompt-spray {
   z-index: 3;
-  color: #fff;
+  color: transparent;
   opacity: .8;
   filter: url(#prompt-spray);
   mix-blend-mode: screen;
   pointer-events: none;
 }
+.prompt-spray .prompt-ch { color: #fff; }
 .prompt-call {
   margin: 0;
   padding-bottom: .16em;
@@ -281,12 +283,11 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   line-height: 1;
 }
 .prompt-ring {
-  position: absolute;
-  left: 50%;
-  top: -4px;
-  width: 34px;
-  height: 34px;
-  transform: translateX(-50%);
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 8px auto 0;
   z-index: 4;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .65));
 }

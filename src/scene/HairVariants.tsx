@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group, type Bone, type Object3D } from 'three';
 import type { HairStyle } from '../game/appearance';
+import { hairSpring } from './secondaryMotion';
 
 /**
  * Procedural hair silhouettes parented to the head bone so they follow every animation.
@@ -31,7 +32,10 @@ export function HairVariants({
   useFrame(() => {
     const hideAuthored = style !== 'short';
     if (hairMesh) for (const m of hairMesh) m.visible = !hideAuthored;
-    if (group.current) group.current.visible = style !== 'short' && style !== 'bald';
+    if (group.current) {
+      group.current.visible = style !== 'short' && style !== 'bald';
+      group.current.rotation.set(hairSpring.pitch, hairSpring.yaw, hairSpring.roll);
+    }
   });
 
   if (!head) return null;

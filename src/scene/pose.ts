@@ -82,6 +82,10 @@ export function solveLeg(side: Side, target: { x: number; y: number; z: number }
 const REST: LegPose = { thigh: 0, knee: 0.04, abduct: 0, twist: 0, foot: 0, ankleRoll: 0, ankleYaw: 0 };
 
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function smooth01(u: number) {
+  const x = clamp(u, 0, 1);
+  return x * x * (3 - 2 * x);
+}
 function lerpLeg(a: LegPose, b: LegPose, t: number): LegPose {
   return {
     thigh: lerp(a.thigh, b.thigh, t),
@@ -163,14 +167,15 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
 
   if (trick.kind === 'neckStall') {
     const release = trick.phase === 'recover' || (trick.phase === 'execute' && b.vy > 0.4);
-    // Hinge on the first catch frame so the ball is on the back, not inside the chest.
-    const k = 1;
+    // Hinge on the catch, eased in over a few frames so the back does not snap under the ball.
+    const k = smooth01((t - trick.startedAt) / 0.05);
     const rel = release ? clamp((t - trick.startedAt - trick.held) / 0.25, 0, 1) : 0;
     softKnees(out, lerp(0.75, 0.2, rel));
     // Hinge forward, face down — ball sits on upper back behind the neck, not the face.
-    out.torsoPitch = lerp(0.55 * k, 0.12, rel);
-    out.neckPitch = lerp(0.45 * k, 0.05, rel);
-    out.headPitch = lerp(0.55 * k, 0.1, rel);
+    // A deep bow swings the nape out from under the ball. This hinge stays on the contact.
+    out.torsoPitch = lerp(0.34 * k, 0.1, rel);
+    out.neckPitch = lerp(0.32 * k, 0.05, rel);
+    out.headPitch = lerp(0.4 * k, 0.08, rel);
     out.headYaw = 0;
     out.armLeft = lerp(1.15 * k, 0.35, rel);
     out.armRight = lerp(1.15 * k, 0.35, rel);
@@ -191,12 +196,17 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
     out.legs[other] = { ...REST, knee: 0.08, thigh: 0.05 };
     out.legs[side] = atwLeg(side, rev);
     const angle = rev * Math.PI * 2;
+    const hip = Math.sin(rev * Math.PI);
+    const sideSign = side === 'left' ? 1 : -1;
+    // Hips lead the circling foot. The chest turns back against them so the move reads as a hip rotation.
+    out.bodyYaw = sideSign * 0.55 * hip;
+    out.torsoYaw = -sideSign * 0.24 * hip + sideSign * 0.08 * Math.sin(angle);
     out.torsoPitch += 0.08;
-    out.torsoYaw = (side === 'left' ? 1 : -1) * 0.12 * Math.sin(angle);
-    out.torsoRoll = (side === 'left' ? 1 : -1) * 0.06;
-    out.armLeft = 0.45 + (side === 'right' ? 0.25 : 0);
-    out.armRight = 0.45 + (side === 'left' ? 0.25 : 0);
-    out.bodyYaw = (side === 'left' ? 1 : -1) * 0.1 * Math.sin(angle);
+    out.torsoRoll = sideSign * 0.08;
+    out.armLeft = 0.5 + (side === 'right' ? 0.4 : 0.1);
+    out.armRight = 0.5 + (side === 'left' ? 0.4 : 0.1);
+    out.elbowLeft = 0.45;
+    out.elbowRight = 0.45;
     if (trick.phase === 'recover') {
       softKnees(out, 0.2);
       out.headPitch = clamp(out.headPitch, -0.4, 0.3);
@@ -314,6 +324,7 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
 
   // Foot contact: IK leg to the ball position at the instant of contact.
   const sides: Side[] = ['left', 'right'];
+  let striking = false;
   for (const side of sides) {
     const held = engine.contact && engine.contact.side === side && !engine.contact.thigh;
     const sinceTap = t - engine.lastKick[side];
@@ -324,11 +335,13 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
         ? Math.exp(-Math.max(0, sinceContact) / 0.14)
         : kickEnvelope(sinceTap);
     if (env <= 0.001) continue;
+    striking = true;
     // Skip normal kick IK when ATW owns the circling foot.
     if (engine.trick?.kind === 'aroundTheWorld' && engine.trick.side === side) continue;
     if (engine.trick?.kind === 'thigh' && engine.trick.side === side) continue;
     if (engine.contact?.thigh && engine.contact.side === side) continue;
 
+    const flick = engine.trick?.kind === 'highFlick' && engine.trick.side === side;
     const bx = held ? b.x : (side === 'left' ? -1 : 1) * c.footX * 0.6;
     const stallLift = held && engine.contact!.kind === 'stall' ? 0.02 * Math.sin(t * 18) : 0;
     const highScoop = held && engine.contact!.highFlick ? 0.08 : 0;
@@ -338,23 +351,57 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
       y: c.contactHeight - c.ballRadius * 0.15 + stallLift + highScoop,
       z: c.ballZ - 0.08 + (highScoop ? 0.04 : 0),
     };
-    const follow = held ? 0 : (1 - env) * 0.18;
-    target.y += follow + (engine.contact?.highFlick || (!held && engine.ball.vy > c.kickSpeed * 1.05) ? follow * 0.8 : 0);
+    const follow = held || flick ? 0 : (1 - env) * 0.18;
+    target.y += follow + (engine.contact?.highFlick || (!held && !flick && engine.ball.vy > c.kickSpeed * 1.05) ? follow * 0.8 : 0);
     target.z += follow * 0.5;
+    if (flick) {
+      target.y = c.contactHeight - c.ballRadius * 0.45;
+      target.z = c.ballZ + 0.04;
+    }
     const leg = solveLeg(side, target);
     // A small instep pitch presents the laces to the ball instead of leaving a gap.
     leg.foot += 0.06 * Math.min(1, env);
-    if (held && engine.contact!.highFlick) {
-      leg.foot = -0.4;
-      leg.ankleYaw = (side === 'left' ? 1 : -1) * 0.25;
+    if ((held && engine.contact!.highFlick) || flick) {
+      leg.foot = -0.45;
+      leg.ankleYaw = (side === 'left' ? 1 : -1) * 0.2;
+    }
+    if (!held && sinceContact >= 0 && sinceContact < 0.22 && engine.lastContact[side] >= engine.lastKick[side]) {
+      const through = Math.sin(Math.min(1, sinceContact / 0.22) * Math.PI);
+      leg.foot -= 0.35 * through;
     }
     out.legs[side] = lerpLeg(REST, leg, Math.min(1, env));
     const sign = side === 'left' ? 1 : -1;
     out.torsoPitch += 0.12 * env;
     out.torsoRoll += sign * 0.05 * env;
     out.bodyYaw += sign * 0.12 * env;
-    if (side === 'left') out.armRight += 0.35 * env; else out.armLeft += 0.35 * env;
+    // Opposite arm comes forward, the kicking-side arm trails, both elbows soft.
+    out.armLeft += (side === 'right' ? 0.42 : 0.08) * env;
+    out.armRight += (side === 'left' ? 0.42 : 0.08) * env;
+    out.armLeftPitch += (side === 'left' ? 0.22 : -0.12) * env;
+    out.armRightPitch += (side === 'right' ? 0.22 : -0.12) * env;
+    out.elbowLeft = Math.max(out.elbowLeft, 0.32 * env);
+    out.elbowRight = Math.max(out.elbowRight, 0.32 * env);
     out.bodyY -= 0.03 * env;
+    if (!held && sinceContact > 0.12 && sinceContact < 0.4) {
+      const recover = Math.sin(((sinceContact - 0.12) / 0.28) * Math.PI);
+      out.legs.left.knee += 0.06 * recover;
+      out.legs.right.knee += 0.06 * recover;
+    }
+  }
+
+  // Load the legs while the ball is dropping, before the foot is chosen.
+  if (!striking && active && !engine.trick) {
+    const eta = engine.timeToContact();
+    const falling = b.vy < 0 && Number.isFinite(eta) && eta >= 0 && eta < 0.45;
+    const k = falling ? smooth01(1 - eta / 0.45) : 0;
+    if (k > 0) {
+      softKnees(out, 0.4 * k);
+      out.torsoPitch += 0.06 * k;
+      out.armLeft += 0.1 * k;
+      out.armRight += 0.1 * k;
+      out.elbowLeft = Math.max(out.elbowLeft, 0.18 * k);
+      out.elbowRight = Math.max(out.elbowRight, 0.18 * k);
+    }
   }
 
   applyTrickPose(engine, out, t);

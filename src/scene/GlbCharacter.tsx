@@ -10,7 +10,9 @@ import { clearFootContactAnchors, setFootContactAnchors } from '../engine/footCo
 import type { SurfacePattern } from '../game/catalogue';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
-import { computePose, createPose, type Pose } from './pose';
+import { applyContractBones } from './contractPose';
+import { createFreestyleRig } from './freestyleLayer';
+import { computePose, createPose } from './pose';
 import { inspector } from './inspector';
 import { computePlayerMotion, createPlayerMotion } from './motion';
 import { createMotionRig } from './motionRig';
@@ -576,30 +578,6 @@ function applySkinDetail(material: MeshStandardMaterial, name: string, quality: 
   material.needsUpdate = true;
 }
 
-function applyContractBones(bones: Partial<Record<BoneKey, Bone>>, pose: Pose, hipsRestY: number) {
-  const set = (key: BoneKey, x: number, y: number, z: number) => {
-    const bone = bones[key];
-    if (bone) bone.rotation.set(x, y, z);
-  };
-  if (bones.root) bones.root.position.y = hipsRestY + pose.bodyY;
-  set('root', 0, pose.bodyYaw, 0);
-  set('spine', pose.torsoPitch, pose.torsoYaw, pose.torsoRoll);
-  set('neck', pose.neckPitch, pose.neckYaw, 0);
-  set('head', pose.headPitch, pose.headYaw, 0);
-  set('armLeft', pose.armLeftPitch, 0, -pose.armLeft);
-  set('armRight', pose.armRightPitch, 0, pose.armRight);
-  set('elbowLeft', pose.elbowLeft, 0, 0);
-  set('elbowRight', pose.elbowRight, 0, 0);
-  const leg = (side: 'left' | 'right', thigh: BoneKey, shin: BoneKey, foot: BoneKey) => {
-    const limb = pose.legs[side];
-    set(thigh, limb.thigh, limb.twist, limb.abduct);
-    set(shin, limb.knee, 0, 0);
-    set(foot, limb.foot, limb.ankleYaw, limb.ankleRoll);
-  };
-  leg('left', 'thighLeft', 'shinLeft', 'footLeft');
-  leg('right', 'thighRight', 'shinRight', 'footRight');
-}
-
 const ktxRenderer: { gl: WebGLRenderer | null } = { gl: null };
 
 function extendCharacterLoader(loader: { setKTX2Loader: (ktx2: KTX2Loader) => void }) {
@@ -751,6 +729,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
 
   const useClips = report.missingClips.length === 0;
   const usable = useClips || report.missingBones.length === 0;
+  const freestyle = useMemo(() => createFreestyleRig(), []);
 
   useLayoutEffect(() => {
     if (!useClips) {
@@ -759,11 +738,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     }
     const anchors = measureKickContactAnchors(scene, clips);
     setFootContactAnchors(anchors.left, anchors.right);
+    freestyle.measure(scene, clips);
+    if (anchors.left) freestyle.anchors.left.ball.set(anchors.left.x, anchors.left.y, anchors.left.z);
+    if (anchors.right) freestyle.anchors.right.ball.set(anchors.right.x, anchors.right.y, anchors.right.z);
     if (import.meta.env.DEV) {
       (window as unknown as { __footContact?: typeof anchors }).__footContact = anchors;
     }
     return () => clearFootContactAnchors();
-  }, [scene, clips, useClips]);
+  }, [scene, clips, useClips, freestyle]);
 
   useEffect(() => {
     if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); return; }
@@ -917,10 +899,11 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         if (to) {
           to.reset().play();
           if (from && from !== to) {
-            // Snappy into kicks (physics-timed); softer out of kick/miss/celebrate into Idle.
+            // The torso eases across the fade. Contact itself is the foot IK path, not this blend.
             const fromKick = current.state?.startsWith('Kick');
             const toKick = next.state.startsWith('Kick');
-            const fade = toKick ? 0.04 : fromKick || current.state === 'Miss' || current.state === 'Celebrate' ? 0.22 : 0.15;
+            // Long enough that the torso eases. The striking foot is IK'd on its own path, so this fade does not delay contact.
+            const fade = toKick ? 0.12 : fromKick || current.state === 'Miss' || current.state === 'Celebrate' ? 0.22 : 0.16;
             from.crossFadeTo(to, fade, false);
           }
         }
@@ -980,6 +963,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           if (expressive) motionRig.apply(computePlayerMotion(engine, motion));
         }
       }
+      freestyle.apply(engine, next.state, pose, dt);
       if (inspector.active) {
         const foot = bones[current.state === 'KickLeft' ? 'footLeft' : 'footRight'];
         if (foot) { scene.updateMatrixWorld(true); foot.getWorldPosition(footPos); inspector.foot = [footPos.x, footPos.y, footPos.z]; }

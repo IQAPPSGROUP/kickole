@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, CanvasTexture, LinearFilter, LoopOnce, LoopRepeat, Material, Mesh, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type Texture, type WebGLRenderer } from 'three';
+import { AnimationMixer, BoxGeometry, CanvasTexture, LinearFilter, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
@@ -38,7 +38,22 @@ function photographTexture(source: Texture): CanvasTexture | null {
   } catch {
     return null;
   }
+  // The street grade and AgX crush this photograph's shadows to black. Lift them
+  // so the cheeks stay skin and the painted eyes stay dark features, not holes.
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  const px = pixels.data;
+  for (let i = 0; i < px.length; i += 4) {
+    if (px[i + 3] < 16) continue;
+    for (let channel = 0; channel < 3; channel += 1) {
+      const u = px[i + channel] / 255;
+      // A small shadow lift only. A stronger curve pulled the painted eyes into the cheek colour.
+      const lifted = Math.min(1, Math.pow(u, 0.85) * 0.92 + 0.05);
+      px[i + channel] = Math.round(lifted * 255);
+    }
+  }
+  context.putImageData(pixels, 0, 0);
   const map = new CanvasTexture(canvas);
+  map.userData.canvas = canvas;
   map.colorSpace = SRGBColorSpace;
   map.flipY = false;
   map.minFilter = LinearFilter;
@@ -46,6 +61,57 @@ function photographTexture(source: Texture): CanvasTexture | null {
   map.generateMipmaps = false;
   map.needsUpdate = true;
   return map;
+}
+
+/** The male eye split sits inside the head and one socket samples a dark texel. Paint a sclera and iris on those UVs and bring the shell forward. */
+function paintEyeIslands(canvas: HTMLCanvasElement, geometry: Mesh['geometry']) {
+  const uv = geometry.getAttribute('uv');
+  const position = geometry.getAttribute('position');
+  const context = canvas.getContext('2d');
+  if (!uv || !position || !context) return;
+  const sides = [
+    { u: 0, v: 0, n: 0 },
+    { u: 0, v: 0, n: 0 },
+  ];
+  for (let i = 0; i < uv.count; i += 1) {
+    const side = position.getX(i) >= 0 ? sides[1] : sides[0];
+    const x = uv.getX(i) * canvas.width;
+    const y = uv.getY(i) * canvas.height;
+    side.u += x;
+    side.v += y;
+    side.n += 1;
+    context.fillStyle = '#f4e7da';
+    context.fillRect(x - 2, y - 2, 4, 4);
+  }
+  for (const side of sides) {
+    if (!side.n) continue;
+    const x = side.u / side.n;
+    const y = side.v / side.n;
+    const radius = Math.max(5, canvas.width * 0.014);
+    context.beginPath();
+    context.fillStyle = '#1c100c';
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+    context.beginPath();
+    context.fillStyle = '#d7c4a4';
+    context.arc(x - radius * 0.28, y - radius * 0.28, radius * 0.22, 0, Math.PI * 2);
+    context.fill();
+  }
+}
+
+function seatEyes(geometry: Mesh['geometry']) {
+  const position = geometry.getAttribute('position');
+  const normal = geometry.getAttribute('normal');
+  if (!position || !normal) return;
+  for (let i = 0; i < position.count; i += 1) {
+    position.setXYZ(
+      i,
+      position.getX(i) + normal.getX(i) * 0.018,
+      position.getY(i) + normal.getY(i) * 0.018,
+      position.getZ(i) + normal.getZ(i) * 0.018,
+    );
+  }
+  position.needsUpdate = true;
 }
 
 function toonRole(name: string): ToonRole {
@@ -196,7 +262,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
     const byName = new Map<string, Bone>();
-    const mats: Array<MeshToonMaterial | MeshStandardMaterial> = [];
+    const mats: Array<MeshToonMaterial | MeshStandardMaterial | MeshBasicMaterial> = [];
     const boneNames: string[] = [];
     const matNames: string[] = [];
     let textured = false;
@@ -205,7 +271,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         boneNames.push(o.name);
         byName.set(o.name, o as Bone);
       }
-      const mesh = o as { isMesh?: boolean; material?: Material | Material[]; castShadow?: boolean; receiveShadow?: boolean; frustumCulled?: boolean };
+        const mesh = o as Mesh;
       if (mesh.isMesh && mesh.material) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -219,7 +285,27 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           // this skinned mesh. A canvas of the same photograph samples the real texels.
           if ((source.userData.headPhoto || source.name === 'Eyes') && source.map) {
             const photo = photographTexture(source.map);
-            if (photo) source.map = photo;
+            if (photo) {
+              if (m.name === 'Eyes') {
+                const canvas = photo.userData.canvas as HTMLCanvasElement | undefined;
+                if (canvas) paintEyeIslands(canvas, mesh.geometry);
+                photo.needsUpdate = true;
+                seatEyes(mesh.geometry);
+              }
+              // The listing's head image is a finished photograph, and this rig has no
+              // face normal. Lighting it as albedo turns the whole head into one dark
+              // mass, so the face shows the photograph directly.
+              const basic = new MeshBasicMaterial({ map: photo, toneMapped: false });
+              if (m.name === 'Eyes') {
+                basic.polygonOffset = true;
+                basic.polygonOffsetFactor = -2;
+                basic.polygonOffsetUnits = -2;
+              }
+              basic.name = m.name;
+              basic.userData.facePhoto = true;
+              if (source.userData.headPhoto) basic.userData.headPhoto = true;
+              return basic;
+            }
           }
           const next = keepPbr ? source.clone() : toToonMaterial(m, m.name === MATERIAL_NAMES.skin);
           next.name = m.name;
@@ -228,6 +314,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           return next;
         });
         mesh.material = Array.isArray(mesh.material) ? cloned : cloned[0];
+        if (cloned.some((m) => m.userData.facePhoto)) mesh.receiveShadow = false;
         cloned.forEach((m) => { matNames.push(m.name); mats.push(m); });
       }
     });
@@ -291,8 +378,11 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       const name = m.name;
       // Every Skin instance gets the wardrobe colour. The head photograph is already
       // the finished face, so multiplying it by the skin swatch flattens the cheeks.
-      const headPhoto = Boolean(m.userData.headPhoto);
-      if (colors[name]) m.color.set(headPhoto ? '#ffffff' : colors[name]);
+      if (m.userData.facePhoto) {
+        m.color.set('#ffffff');
+        continue;
+      }
+      if (colors[name]) m.color.set(colors[name]);
       if ((m as MeshToonMaterial).isMeshToonMaterial) {
         const toon = m as MeshToonMaterial;
         // Flat kit swaps. Skin keeps its atlas so the eye texels survive a tone change.

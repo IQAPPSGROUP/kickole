@@ -36,26 +36,27 @@ interface SceneStats {
 
 let sceneStats: SceneStats | null = null;
 
-/** 16³ display grade packed as 16 slices. Shadows stay neutral, highlights pick up street gold. */
+/** Display grade packed as slices. 32 steps keeps a face photograph from posterising into flat decals. */
 function streetLut(): DataTexture {
-  const size = 16;
+  const size = 32;
   const data = new Uint8Array(size * size * size * 4);
-  const grade = (c: number) => {
-    const contrasted = (c - 0.5) * 1.22 + 0.5;
-    return Math.min(1, Math.max(0, contrasted));
-  };
+  // AgX already shapes contrast. Pushing contrast here, before it, crushed the
+  // face photograph into flat black and a few dark reds.
+  const grade = (c: number) => c;
   for (let b = 0; b < size; b++) {
     for (let g = 0; g < size; g++) {
       for (let r = 0; r < size; r++) {
         let red = grade(r / (size - 1));
         let green = grade(g / (size - 1));
         let blue = grade(b / (size - 1));
-        red = Math.min(1, red * 1.05);
-        blue = Math.min(1, blue * 0.94);
         const luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-        red = luma + (red - luma) * 1.08;
-        green = luma + (green - luma) * 1.04;
-        blue = luma + (blue - luma) * 0.96;
+        if (luma > 0.45) {
+          red = Math.min(1, red * 1.04);
+          blue = Math.min(1, blue * 0.97);
+        }
+        red = luma + (red - luma) * 1.04;
+        green = luma + (green - luma) * 1.02;
+        blue = luma + (blue - luma) * 0.98;
         const x = b * size + r;
         const i = (g * size * size + x) * 4;
         data[i] = Math.round(Math.min(1, Math.max(0, red)) * 255);
@@ -89,7 +90,7 @@ const LUT_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
   void main() {
     vec3 color = clamp(texture2D(tDiffuse, vUv).rgb, 0.0, 1.0);
-    float size = 16.0;
+    float size = 32.0;
     float slice = color.b * (size - 1.0);
     float s0 = floor(slice);
     float s1 = min(s0 + 1.0, size - 1.0);

@@ -23,6 +23,19 @@ function started() {
 }
 
 describe('GameEngine', () => {
+  it('a new finger still kicks when the previous press never released', () => {
+    const e = new GameEngine();
+    e.prepare('ready');
+    e.press('left', 1);
+    expect(e.phase).toBe('playing');
+    runUntilContactDelta(e, 5);
+    e.press('left', 2);
+    e.release('left');
+    stepN(e, 6);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.phase).toBe('playing');
+  });
+
   it('launches the ball on first tap', () => {
     const e = started();
     expect(e.phase).toBe('playing');
@@ -52,16 +65,18 @@ describe('GameEngine', () => {
     e.release('right');
     stepN(e, 5);
     expect(e.stats.kickUps).toBe(1);
-    expect(e.stats.score).toBe(1 + 2);
+    expect(e.stats.score).toBe(e.config.scoring.kickUp + e.config.scoring.perfectBonus);
     expect(e.ball.vy).toBeGreaterThan(0);
   });
 
   it('awards the alternating-foot bonus', () => {
     const e = started();
+    const { kickUp, perfectBonus, alternateBonus } = e.config.scoring;
     runUntilContactDelta(e, 5); e.press('left'); e.release('left'); stepN(e, 5);
     const first = e.stats.score;
     runUntilContactDelta(e, 5); e.press('right'); e.release('right'); stepN(e, 5);
-    expect(e.stats.score - first).toBe(1 + 2 + 3);
+    expect(e.stats.score - first).toBe(kickUp + perfectBonus + alternateBonus);
+    expect(perfectBonus).toBeGreaterThan(alternateBonus);
   });
 
   it('foot stall awards 10 extra points and flicks the ball back up', () => {
@@ -71,7 +86,8 @@ describe('GameEngine', () => {
     stepN(e, 60);
     expect(e.contact?.kind).toBe('stall');
     e.release('left');
-    expect(e.stats.score).toBe(1 + 2 + 10);
+    const { kickUp, perfectBonus, footStall } = e.config.scoring;
+    expect(e.stats.score).toBe(kickUp + perfectBonus + footStall);
     expect(e.ball.vy).toBeGreaterThan(0);
   });
 
@@ -83,7 +99,7 @@ describe('GameEngine', () => {
     expect(e.phase).toBe('over');
   });
 
-  it('early taps charge instead of missing and do not end the run', () => {
+  it('early and late taps outside the window charge instead of missing', () => {
     const e = started();
     e.step(e.config.fixedStep);
     e.press('right');
@@ -98,9 +114,41 @@ describe('GameEngine', () => {
     let misses = 0;
     e.on((ev) => { if (ev.type === 'miss') misses++; });
     e.press('left');
-    expect(misses).toBe(1);
+    expect(misses).toBe(0);
+    expect(e.kickCharge?.side).toBe('left');
     expect(e.stats.kickUps).toBe(0);
     expect(e.phase).toBe('playing');
+    e.release('left');
+    expect(misses).toBe(0);
+  });
+
+  it('doubles at 10 clean touches, triples at 25, quadruples at 50, and resets on a miss', () => {
+    const e = started();
+    const { kickUp, perfectBonus } = e.config.scoring;
+    const base = kickUp + perfectBonus;
+    const scorePerfect = (side: 'left' | 'right') => {
+      runUntilContactDelta(e, 5);
+      const before = e.stats.score;
+      e.press(side);
+      e.release(side);
+      stepN(e, 5);
+      return e.stats.score - before;
+    };
+    e.streak = 9;
+    expect(scorePerfect('right')).toBe(base * 2);
+    expect(e.streak).toBe(10);
+    e.streak = 24;
+    expect(scorePerfect('right')).toBe(base * 3);
+    expect(e.streak).toBe(25);
+    e.streak = 49;
+    expect(scorePerfect('right')).toBe(base * 4);
+    expect(e.streak).toBe(50);
+    e.setTrick('highFlick');
+    e.ball.y = 2.4;
+    e.ball.vy = 2;
+    e.ball.z = e.config.ballZ;
+    e.press('left');
+    expect(e.streak).toBe(0);
   });
 });
 
@@ -127,7 +175,32 @@ describe('input abuse', () => {
     }
   });
 
-  it('spamming early taps scores nothing and respects the miss cooldown', () => {
+  it('a mistimed flick blocks the next tap for about 0.12s', () => {
+    const e = started();
+    e.setTrick('highFlick');
+    let misses = 0;
+    e.on((ev) => { if (ev.type === 'miss') misses++; });
+    e.step(e.config.fixedStep);
+    e.press('left');
+    e.release('left');
+    expect(misses).toBe(1);
+    expect(e.config.missCooldown).toBeCloseTo(0.12, 5);
+    e.ball.y = 2.2;
+    e.ball.vy = 1.5;
+    e.ball.z = e.config.ballZ;
+    e.press('right');
+    e.release('right');
+    expect(misses).toBe(1);
+    stepN(e, Math.ceil(e.config.missCooldown / e.config.fixedStep) + 1);
+    e.ball.y = 2.2;
+    e.ball.vy = 1.5;
+    e.ball.z = e.config.ballZ;
+    e.press('left');
+    e.release('left');
+    expect(misses).toBe(2);
+  });
+
+  it('spamming taps outside the window scores nothing', () => {
     const e = started();
     let misses = 0;
     e.on((ev) => { if (ev.type === 'miss') misses++; });
@@ -137,7 +210,7 @@ describe('input abuse', () => {
       e.step(e.config.fixedStep);
     }
     expect(e.stats.score).toBe(0);
-    expect(misses).toBeLessThanOrEqual(2);
+    expect(misses).toBe(0);
   });
 
   it('inputs after the run ends do nothing', () => {
@@ -158,7 +231,8 @@ describe('input abuse', () => {
       stepN(e, holdSteps);
       e.release('left');
       stepN(e, 30);
-      expect(e.stats.score, `hold ${holdSteps}`).toBe(1 + 2);
+      const { kickUp, perfectBonus } = e.config.scoring;
+      expect(e.stats.score, `hold ${holdSteps}`).toBe(kickUp + perfectBonus);
       expect(e.ball.vy).toBeGreaterThan(0);
     }
   });

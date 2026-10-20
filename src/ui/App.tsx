@@ -9,6 +9,8 @@ import {
   skipOpeningIntro,
   subscribeOpeningIntro,
 } from '../scene/openingIntro';
+import { fanLayout } from './fanLayout';
+import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { Home, GameOver, SettingsScreen } from './Screens';
@@ -29,6 +31,33 @@ export function App() {
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
   useEffect(() => { initOpeningIntro(); }, []);
+
+  useEffect(() => {
+    const readInset = (name: string) => {
+      const app = document.querySelector('.app');
+      if (!app) return 0;
+      const value = parseFloat(getComputedStyle(app).getPropertyValue(name));
+      return Number.isFinite(value) ? value : 0;
+    };
+    const onDown = (event: PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      const layout = fanLayout(window.innerWidth, readInset('--sat-l'), readInset('--sat-r'), readInset('--sat-b'));
+      const side = footSideAt(event.clientX, event.clientY, window.innerWidth, window.innerHeight, layout);
+      if (!side) return;
+      if (footTapAction(controller.engine.phase) === 'kick') controller.press(side, event.pointerId);
+    };
+    const onUp = (event: PointerEvent) => {
+      controller.releasePointer(event.pointerId);
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+    };
+  }, [controller]);
 
   useEffect(() => {
     installAudioLifecycle();

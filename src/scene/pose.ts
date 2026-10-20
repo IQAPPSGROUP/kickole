@@ -3,7 +3,7 @@ import type { Side } from '../engine/config';
 import { isDanceId, STARTER_DANCE_ID } from '../game/dances';
 import { atwLeg } from './atwOrbit';
 import { GAMEPLAY_BPM } from '../game/beat';
-import { applyDancePose } from './dancePose';
+import { applyDancePose, applySambaStep } from './dancePose';
 import { V2_LIMBS } from './limbCalibration';
 
 export interface LegPose {
@@ -149,19 +149,22 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
 
   if (trick.kind === 'header') {
     const age = t - trick.startedAt;
-    const hit = clamp(age / 0.08, 0, 1);
-    const recover = age > 0.12 ? clamp((age - 0.12) / 0.35, 0, 1) : 0;
-    softKnees(out, 0.65 * (1 - recover));
-    out.torsoPitch += lerp(0.22, 0.04, recover);
-    out.neckPitch = lerp(-0.05, 0.02, recover);
-    // Meet with the forehead — modest pitch, no neck snap.
-    out.headPitch = lerp(-0.22, out.headPitch * 0.3, recover);
-    out.headYaw *= 1 - hit * 0.7;
-    out.armLeft = lerp(0.55, out.armLeft, recover);
-    out.armRight = lerp(0.55, out.armRight, recover);
-    out.elbowLeft = lerp(0.35, 0, recover);
-    out.elbowRight = lerp(0.35, 0, recover);
-    out.bodyY += 0.03 * hit * (1 - recover);
+    const recover = age > 0.1 ? clamp((age - 0.1) / 0.25, 0, 1) : 0;
+    // Knees load, then extend as the heels rise. The forehead stays tilted back, eyes up.
+    const bend = lerp(0.38, 0.12, recover);
+    out.legs.left.knee = bend;
+    out.legs.right.knee = bend;
+    out.legs.left.thigh = 0.06 * (1 - recover);
+    out.legs.right.thigh = 0.06 * (1 - recover);
+    out.bodyY += lerp(0.035, 0.008, recover);
+    out.torsoPitch += lerp(0.08, 0.02, recover);
+    out.neckPitch = lerp(-0.08, 0, recover);
+    out.headPitch = lerp(-0.7, -0.25, recover);
+    out.headYaw *= 0.2;
+    out.armLeft = lerp(0.38, 0.22, recover);
+    out.armRight = lerp(0.4, 0.22, recover);
+    out.elbowLeft = lerp(0.7, 0.35, recover);
+    out.elbowRight = lerp(0.68, 0.35, recover);
     return;
   }
 
@@ -203,10 +206,10 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
     out.torsoYaw = -sideSign * 0.24 * hip + sideSign * 0.08 * Math.sin(angle);
     out.torsoPitch += 0.08;
     out.torsoRoll = sideSign * 0.08;
-    out.armLeft = 0.5 + (side === 'right' ? 0.4 : 0.1);
-    out.armRight = 0.5 + (side === 'left' ? 0.4 : 0.1);
-    out.elbowLeft = 0.45;
-    out.elbowRight = 0.45;
+    out.armLeft = 0.36 + (side === 'right' ? 0.16 : 0.04);
+    out.armRight = 0.36 + (side === 'left' ? 0.16 : 0.04);
+    out.elbowLeft = 0.62;
+    out.elbowRight = 0.62;
     if (trick.phase === 'recover') {
       softKnees(out, 0.2);
       out.headPitch = clamp(out.headPitch, -0.4, 0.3);
@@ -428,14 +431,55 @@ export function computePose(engine: GameEngine, out: Pose = createPose()): Pose 
     out.bodyY -= 0.04 * k;
   }
 
-  const groove = engine.trick?.kind === 'groove' && engine.trick.phase === 'execute';
-  const dancing = engine.celebration != null || groove;
-  if (dancing) {
-    const danceId = engine.celebration?.danceId ?? engine.equippedDance;
+  const grooveTrick = engine.trick?.kind === 'groove' ? engine.trick : null;
+  if (grooveTrick) {
+    const age = Math.max(0, t - grooveTrick.startedAt);
+    const watch = 0.2;
+    const danceEnd = watch + c.tricks.grooveDanceSec;
+    const reacquireAt = c.tricks.grooveFlightSec - 0.4;
+    out.lockMotion = true;
+    if (grooveTrick.phase === 'recover') {
+      const side = grooveTrick.side ?? 'right';
+      const other: Side = side === 'left' ? 'right' : 'left';
+      out.legs[other] = { ...REST, knee: 0.22, thigh: 0.04 };
+      const cushion = solveLeg(side, {
+        x: b.x,
+        y: Math.max(0.12, b.y - c.ballRadius),
+        z: b.z - 0.04,
+      });
+      cushion.foot = 0.15;
+      out.legs[side] = cushion;
+      out.headPitch = -0.35;
+      out.armLeft = 0.55;
+      out.armRight = 0.55;
+      out.elbowLeft = 0.35;
+      out.elbowRight = 0.35;
+    } else if (age < watch) {
+      // Eyes follow the ball. The kicking leg has already left the boot, so the
+      // stance is planted again instead of holding the strike.
+      out.legs.left = { ...REST, knee: 0.1, thigh: 0.02 };
+      out.legs.right = { ...REST, knee: 0.1, thigh: 0.02 };
+      out.armLeft = 0.7;
+      out.armRight = 0.74;
+      out.elbowLeft = 0.35;
+      out.elbowRight = 0.32;
+      out.headPitch = Math.min(out.headPitch, -0.45);
+    } else if (age < danceEnd && age < reacquireAt) {
+      applySambaStep(out, (age - watch) * 3, engine.reducedMotion ? 0.35 : 1);
+      out.headPitch = lerp(out.headPitch, 0.05, 0.8);
+    } else {
+      out.legs.left.knee = 0.16;
+      out.legs.right.knee = 0.16;
+      out.headPitch = -0.62;
+      out.armLeft = 0.4;
+      out.armRight = 0.42;
+      out.elbowLeft = 0.3;
+      out.elbowRight = 0.3;
+    }
+  } else if (engine.celebration != null) {
+    const danceId = engine.celebration.danceId ?? engine.equippedDance;
     const dance = isDanceId(danceId) ? danceId : STARTER_DANCE_ID;
-    const phaseBeat = groove
-      ? (t - (engine.trick?.startedAt ?? t)) / c.tricks.grooveDanceSec
-      : engine.beatPhase != null ? engine.beatPhase : ((t * GAMEPLAY_BPM) / 60) % 1;
+    const phaseBeat = engine.beatPhase != null ? engine.beatPhase : ((t * GAMEPLAY_BPM) / 60) % 1;
     applyDancePose(out, dance, phaseBeat, engine.reducedMotion ? 0.35 : 1);
   }
 

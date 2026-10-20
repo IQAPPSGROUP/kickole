@@ -150,7 +150,39 @@ function showPose(engine: GameEngine) {
 interface Row {
   title: string;
   times: number[];
+  labels?: string[];
+  camera?: { pos: [number, number, number]; look: [number, number, number] };
   step: (t: number) => void;
+}
+
+function freeze(source: GameEngine): GameEngine {
+  const engine = new GameEngine();
+  engine.phase = source.phase;
+  engine.time = source.time;
+  engine.ball = { ...source.ball };
+  engine.trick = source.trick ? { ...source.trick } : null;
+  engine.selectedTrick = source.selectedTrick;
+  engine.contact = source.contact ? { ...source.contact } : null;
+  engine.lastKick = { ...source.lastKick };
+  engine.lastContact = { ...source.lastContact };
+  engine.celebration = null;
+  engine.equippedDance = source.equippedDance;
+  engine.reducedMotion = false;
+  engine.lastPerfectTime = source.lastPerfectTime;
+  return engine;
+}
+
+function stepUntil(engine: GameEngine, done: () => boolean, limit = 8000) {
+  const h = engine.config.fixedStep;
+  for (let i = 0; i < limit && !done(); i++) engine.step(h);
+}
+
+function playingEngine(): GameEngine {
+  const engine = new GameEngine();
+  engine.prepare('ready');
+  engine.press('left');
+  engine.release('left');
+  return engine;
 }
 
 function idleRow(): Row {
@@ -263,44 +295,59 @@ function neckRow(): Row {
   };
 }
 
-function atwRow(): Row {
-  return {
-    title: 'ATW',
-    times: [0.02, 0.2, 0.35, 0.55, 0.75, 0.95],
-    step(t) {
-      const engine = fresh('playing');
-      engine.time = 2 + t;
-      engine.trick = {
-        kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 1.4,
-        awarded: false, revolution: t, held: 0,
-      };
-      engine.ball.x = -engine.config.atwHoverX;
-      engine.ball.y = engine.config.atwHoverY;
-      engine.ball.z = engine.config.atwHoverZ;
-      showPose(engine);
-      placeBall(engine, true);
-    },
-  };
+function headerRow(): Row {
+  const engine = playingEngine();
+  stepUntil(engine, () => engine.ball.vy < 0 && engine.timingDeltaMs() <= 6);
+  engine.press('right');
+  engine.release('right');
+  const shots: GameEngine[] = [];
+  const labels = ['drop', 'meet', 'pop', 'rise', 'follow', 'clear'];
+  let contactAt = -1;
+  const want = [0.08, 0.16, 0.28, 0.42];
+  stepUntil(engine, () => {
+    const headY = engine.config.contacts.forehead.y;
+    if (contactAt < 0 && shots.length === 0 && engine.ball.vy < 0 && engine.ball.y < headY + 0.16 && engine.ball.y > headY + 0.05) {
+      shots.push(freeze(engine));
+    }
+    if (contactAt < 0 && engine.ball.vy < 0 && engine.ball.y < headY + 0.06) {
+      const before = engine.stats.headers;
+      engine.attemptHeader();
+      if (engine.stats.headers > before) {
+        contactAt = engine.time;
+        shots.push(freeze(engine));
+      }
+    }
+    if (contactAt >= 0) {
+      const age = engine.time - contactAt;
+      const next = want[shots.length - 2];
+      if (next != null && age >= next) shots.push(freeze(engine));
+    }
+    return shots.length >= labels.length;
+  });
+  return shotRow('Header', labels, shots, {
+    pos: [1.7, 1.45, 1.55],
+    look: [0, 1.55, 0.45],
+  });
 }
 
-function headerRow(): Row {
-  return {
-    title: 'Header',
-    times: [0.02, 0.06, 0.1, 0.16, 0.24, 0.36],
-    step(t) {
-      const engine = fresh('playing');
-      engine.time = 2 + t;
-      engine.trick = {
-        kind: 'header', phase: t < 0.12 ? 'contact' : 'recover', side: null, startedAt: 2,
-        awarded: false, revolution: 0, held: 0,
-      };
-      engine.ball.x = 0;
-      engine.ball.y = engine.config.contacts.forehead.y + Math.max(0, t - 0.1) * 1.2;
-      engine.ball.z = engine.config.contacts.forehead.z;
-      showPose(engine);
-      placeBall(engine, true);
-    },
-  };
+function atwRow(): Row {
+  const engine = playingEngine();
+  stepUntil(engine, () => engine.ball.vy < 0 && engine.timingDeltaMs() <= 8);
+  engine.setTrick('aroundTheWorld');
+  engine.press('left');
+  engine.release('left');
+  const shots: GameEngine[] = [];
+  const marks = [0.02, 0.28, 0.5, 0.72, 0.9, 1];
+  stepUntil(engine, () => {
+    const rev = engine.trick?.kind === 'aroundTheWorld' ? engine.trick.revolution : 1;
+    const next = marks[shots.length];
+    if (next != null && rev + 1e-6 >= next) shots.push(freeze(engine));
+    return shots.length >= marks.length || engine.trick == null;
+  });
+  return shotRow('ATW', ['pop', 'inside', 'over', 'outside', 'return', 'catch'], shots, {
+    pos: [1.55, 1.05, 2.15],
+    look: [-0.05, 0.95, 0.45],
+  });
 }
 
 function thighRow(): Row {
@@ -369,23 +416,51 @@ function danceRow(title: string, danceId: string): Row {
 }
 
 function grooveRow(): Row {
-  const phases = [0.05, 0.22, 0.4, 0.55, 0.72, 0.9];
+  const engine = playingEngine();
+  engine.equippedDance = 'shuffle';
+  stepUntil(engine, () => engine.ball.vy < 0 && engine.timingDeltaMs() <= 6);
+  engine.setTrick('groove');
+  engine.press('right');
+  engine.release('right');
+  const shots: GameEngine[] = [];
+  const marks = [0.08, 0.283, 0.45, 1.5];
+  let caught = false;
+  stepUntil(engine, () => {
+    const trick = engine.trick?.kind === 'groove' ? engine.trick : null;
+    const age = trick ? engine.time - trick.startedAt : 0;
+    const next = marks[shots.length];
+    if (trick?.phase === 'execute' && next != null && age >= next) shots.push(freeze(engine));
+    if (!caught && trick?.phase === 'recover') {
+      caught = true;
+      shots.push(freeze(engine));
+    }
+    if (caught && trick && engine.time - trick.held >= 0.1 && shots.length < 6) shots.push(freeze(engine));
+    return shots.length >= 6 || (caught && engine.trick == null);
+  });
+  return shotRow('Groove', ['watch', 'samba', 'samba', 'eyes up', 'cushion', 'control'], shots, {
+    // Three-quarter view at the body so the samba step, hip sway and arm swing read.
+    pos: [1.65, 1.2, 2.55],
+    look: [0, 1.02, 0.28],
+  });
+}
+
+function shotRow(
+  title: string,
+  labels: string[],
+  shots: GameEngine[],
+  camera: { pos: [number, number, number]; look: [number, number, number] },
+): Row {
+  const frames = shots.length > 0 ? shots : [fresh('playing')];
   return {
-    title: 'Groove',
-    times: [0, 1, 2, 3, 4, 5].map((i) => i / 60),
+    title,
+    labels,
+    camera,
+    times: frames.map((_, index) => index / 60),
     step(t) {
-      const index = Math.round(t * 60);
-      const phase = phases[index] ?? 0;
-      const engine = fresh('playing');
-      engine.time = 3;
-      engine.equippedDance = 'shuffle';
-      engine.trick = {
-        kind: 'groove', phase: 'execute', side: null,
-        startedAt: engine.time - phase * engine.config.tricks.grooveDanceSec,
-        awarded: true, revolution: 0, held: 0,
-      };
+      const index = Math.min(frames.length - 1, Math.max(0, Math.round(t * 60)));
+      const engine = frames[index] ?? frames[0];
       showPose(engine);
-      placeBall(engine, false);
+      placeBall(engine, true);
     },
   };
 }
@@ -429,8 +504,16 @@ async function loadModel(): Promise<AnimationClip[]> {
   return gltf.animations;
 }
 
+function applyCamera(row: Row) {
+  const cam = row.camera ?? { pos: [1.5, 0.5, 0.18] as [number, number, number], look: [0, 0.82, 0.18] as [number, number, number] };
+  camera.position.set(cam.pos[0], cam.pos[1], cam.pos[2]);
+  camera.lookAt(cam.look[0], cam.look[1], cam.look[2]);
+  camera.updateProjectionMatrix();
+}
+
 function paintRow(index: number, row: Row) {
   rig.reset();
+  applyCamera(row);
   const samples = [...row.times].sort((a, b) => a - b);
   const y = HEADER + index * CELL_H;
   ctx.fillStyle = '#17191d';
@@ -453,11 +536,12 @@ function paintRow(index: number, row: Row) {
     ctx.drawImage(renderer.domElement, x, y + 22, CELL_W, CELL_H - 22);
     ctx.fillStyle = '#f4f0e6';
     ctx.font = '12px sans-serif';
-    ctx.fillText(`${t.toFixed(2)}s`, x + 8, y + 16);
+    ctx.fillText(row.labels?.[col] ?? `${t.toFixed(2)}s`, x + 8, y + 16);
   });
 }
 
 async function main() {
+  const only = new URLSearchParams(location.search).get('only');
   const rows: Row[] = [
     idleRow(),
     approachRow(),
@@ -471,7 +555,7 @@ async function main() {
     flickRow(),
     grooveRow(),
     danceRow('Heel rock', 'heelrock'),
-  ];
+  ].filter((row) => !only || row.title.toLowerCase() === only.toLowerCase());
   sheet.width = LABEL_W + COLS * CELL_W;
   sheet.height = HEADER + rows.length * CELL_H;
   ctx.fillStyle = '#17191d';

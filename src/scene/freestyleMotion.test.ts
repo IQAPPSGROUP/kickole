@@ -180,6 +180,9 @@ describe('fab foot contact', () => {
       planted.push(bone(gltf.scene, supportName).getWorldPosition(new Vector3()));
     }
     const contact = playingKick('right', 0.04);
+    contact.ball.x = rig.anchors.right.ball.x;
+    contact.ball.y = rig.anchors.right.ball.y;
+    contact.ball.z = rig.anchors.right.ball.z;
     action.time = animationSampleTime(contact, 'KickRight', clip.duration);
     mixer.update(1 / 60);
     rig.apply(contact, 'KickRight', computePose(contact), 1 / 60);
@@ -200,6 +203,15 @@ describe('fab foot contact', () => {
     expect(corrected.slide).toBeLessThan(0.01);
     expect(corrected.bob).toBeLessThan(0.012);
     expect(Math.abs(bootGap), `boot gap ${bootGap.toFixed(3)} foot ${strikeFoot.toArray().map((n) => n.toFixed(3)).join(',')}`).toBeLessThan(0.02);
+    const kickHip = bone(gltf.scene, 'UpperLeg_R').getWorldPosition(new Vector3());
+    const kickKnee = bone(gltf.scene, 'LowerLeg_R').getWorldPosition(new Vector3());
+    const kickToe = bone(gltf.scene, 'Toe_R').getWorldPosition(new Vector3());
+    expect(kickKnee.y, 'the knee stays below the hip').toBeLessThan(kickHip.y - 0.06);
+    expect(kickKnee.z, 'the knee lifts forward').toBeGreaterThan(kickHip.z + 0.08);
+    const footDir = kickToe.clone().sub(strikeFoot).normalize();
+    expect(footDir.z, 'the laces point forward').toBeGreaterThan(0.75);
+    expect(footDir.y, 'the toes sit slightly up').toBeGreaterThan(-0.05);
+    expect(footDir.y, 'the toes are not pulled up to the shin').toBeLessThan(0.45);
 
     const idleSamples: Array<{ x: number; y: number; z: number }> = [];
     const idle = gltf.animations.find((entry) => entry.name === 'Idle');
@@ -254,6 +266,9 @@ describe('fab foot contact', () => {
     };
 
     const leftKick = playingKick('left', 0.04);
+    leftKick.ball.x = rig.anchors.left.ball.x;
+    leftKick.ball.y = rig.anchors.left.ball.y;
+    leftKick.ball.z = rig.anchors.left.ball.z;
     const leftClip = gltf.animations.find((entry) => entry.name === 'KickLeft');
     if (!leftClip) throw new Error('missing KickLeft');
     const leftMixer = new AnimationMixer(gltf.scene);
@@ -329,18 +344,27 @@ describe('fab foot contact', () => {
 
     engine.trick = {
       kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 1.4,
-      awarded: false, revolution: 0.35, held: 0,
+      awarded: false, revolution: 0.5, held: 0,
     };
-    engine.ball.x = -engine.config.atwHoverX;
-    engine.ball.y = engine.config.atwHoverY;
-    engine.ball.z = engine.config.atwHoverZ;
+    engine.ball.x = -engine.config.footX * 0.55;
+    engine.ball.y = engine.config.contactHeight + 0.32;
+    engine.ball.z = engine.config.ballZ;
     const atwPose = show(engine);
     const atwFoot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
-    const atwGap = absGap(engine, BOOT_MATERIALS, atwFoot, 0.45);
+    const atwBall = centreOf(engine);
     const clearance = supportClearance(gltf.scene, 'left');
-    expect(Math.abs(atwGap), `atw boot ${atwGap.toFixed(3)}`).toBeLessThan(0.02);
+    expect(atwFoot.y, 'the foot passes over the ball').toBeGreaterThan(atwBall.y + engine.config.ballRadius * 0.4);
     expect(clearance, 'circling foot stays off the standing leg').toBeGreaterThan(0.04);
     expect(Math.abs(atwPose.bodyYaw)).toBeGreaterThan(0.4);
+    engine.trick = {
+      kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 1.4,
+      awarded: false, revolution: 0.97, held: 0,
+    };
+    engine.ball.y = engine.config.contactHeight + 0.04;
+    show(engine);
+    const catchFoot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
+    const catchGap = absGap(engine, BOOT_MATERIALS, catchFoot, 0.45);
+    expect(Math.abs(catchGap), `atw catch ${catchGap.toFixed(3)}`).toBeLessThan(0.03);
 
     engine.trick = {
       kind: 'highFlick', phase: 'execute', side: 'right', startedAt: 2,
@@ -369,14 +393,76 @@ describe('fab foot contact', () => {
     engine.equippedDance = 'shuffle';
     engine.celebration = null;
     show(engine);
-    expect(bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3()).distanceTo(rig.anchors.left.plant)).toBeLessThan(0.012);
-    expect(bone(gltf.scene, 'Foot_R').getWorldPosition(new Vector3()).distanceTo(rig.anchors.right.plant)).toBeLessThan(0.012);
+    // Age 1.0 is inside the samba: the standing foot stays put and the other steps.
+    const grooveLeft = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
+    const grooveRight = bone(gltf.scene, 'Foot_R').getWorldPosition(new Vector3());
+    expect(grooveRight.distanceTo(rig.anchors.right.plant)).toBeLessThan(0.012);
+    expect(grooveLeft.y).toBeGreaterThan(grooveRight.y + 0.02);
+    expect(grooveLeft.distanceTo(rig.anchors.left.plant)).toBeLessThan(0.12);
     engine.trick = null;
     engine.celebration = { danceId: 'heelrock', reason: 'test', startedAt: 1, until: 9 };
     engine.beatPhase = 0.4;
     show(engine);
     expect(bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3()).distanceTo(rig.anchors.left.plant)).toBeLessThan(0.012);
     expect(bone(gltf.scene, 'Foot_R').getWorldPosition(new Vector3()).distanceTo(rig.anchors.right.plant)).toBeLessThan(0.012);
+  });
+
+  it('meets the juggle-lane header and clears the ATW ball at the top', async () => {
+    const gltf = await load(MODEL);
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
+    const bones: Partial<Record<BoneKey, Bone>> = {};
+    const names: Record<string, string> = { ...BONE_NAMES, ...EXTRA_BONE_NAMES };
+    for (const [key, name] of Object.entries(names)) {
+      const found = gltf.scene.getObjectByName(name);
+      if (found) bones[key as BoneKey] = found as Bone;
+    }
+    const hipsRestY = bones.root?.position.y ?? 0;
+    const show = (engine: GameEngine) => {
+      const pose = computePose(engine);
+      applyContractBones(bones, pose, hipsRestY);
+      rig.apply(engine, 'Idle', pose, 1 / 60);
+      gltf.scene.updateMatrixWorld(true);
+    };
+    const stepUntil = (engine: GameEngine, done: () => boolean) => {
+      const h = engine.config.fixedStep;
+      for (let i = 0; i < 20000 && !done(); i++) engine.step(h);
+    };
+    const head = new GameEngine();
+    head.prepare('ready');
+    head.press('left');
+    head.release('left');
+    stepUntil(head, () => head.ball.vy < 0 && head.timingDeltaMs() <= 6);
+    head.press('right');
+    head.release('right');
+    stepUntil(head, () => {
+      const y = head.config.contacts.forehead.y;
+      if (head.ball.vy < 0 && head.ball.y < y + 0.2) head.attemptHeader();
+      return head.stats.headers === 1;
+    });
+    show(head);
+    const headBone = bone(gltf.scene, 'Head').getWorldPosition(new Vector3());
+    const brow = headBone.clone();
+    brow.y += 0.06;
+    brow.z += 0.08;
+    const centre = new Vector3(head.ball.x, head.ball.y, head.ball.z);
+    const gap = surfaceGap(gltf.scene, centre, head.config.ballRadius, UPPER_MATERIALS, brow, 0.22);
+    const wide = surfaceGap(gltf.scene, centre, head.config.ballRadius, UPPER_MATERIALS, headBone, 0.35);
+    const hip = bone(gltf.scene, 'Hips').getWorldPosition(new Vector3());
+    expect(Math.abs(gap), `juggle header ${gap.toFixed(3)} wide ${wide.toFixed(3)} ball ${centre.y.toFixed(2)},${centre.z.toFixed(2)} head ${headBone.y.toFixed(2)},${headBone.z.toFixed(2)} hip ${hip.y.toFixed(2)},${hip.z.toFixed(2)}`).toBeLessThan(0.03);
+
+    const atw = new GameEngine();
+    atw.prepare('ready');
+    atw.press('left');
+    atw.release('left');
+    stepUntil(atw, () => atw.ball.vy < 0 && atw.timingDeltaMs() <= 8);
+    atw.setTrick('aroundTheWorld');
+    atw.press('left');
+    atw.release('left');
+    stepUntil(atw, () => (atw.trick?.revolution ?? 0) >= 0.5);
+    show(atw);
+    const foot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
+    expect(foot.y, `over ball ${atw.ball.y.toFixed(2)} foot ${foot.y.toFixed(2)}`).toBeGreaterThan(atw.ball.y + atw.config.ballRadius * 0.4);
   });
 });
 

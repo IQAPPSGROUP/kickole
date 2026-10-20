@@ -45,7 +45,8 @@ const worldPoint = new Vector3();
  * Two-bone IK. `end` is the ankle (child of `shin`).
  * The knee is placed on the hip/ankle triangle so the leg can shorten — a
  * direction-only solver leaves a straight leg locked and the foot rides the hip.
- * An already bent clip knee stays the bend direction; `poleWorld` is the fallback.
+ * An already bent clip knee stays the bend direction unless `forcePole` is set.
+ * `poleWorld` is the fallback. Tricks that seat a foot force it so a raised clip knee cannot fold into the hip.
  * Returns the remaining distance from the ankle to the target, in metres.
  */
 export function solveTwoBone(
@@ -54,6 +55,7 @@ export function solveTwoBone(
   end: Object3D,
   targetWorld: Vector3,
   poleWorld: Vector3,
+  forcePole = false,
 ): number {
   const parent = thigh.parent;
   if (!parent) return 0;
@@ -85,7 +87,7 @@ export function solveTwoBone(
   // falls back to the pole so the knee breaks forward instead of locking.
   bend.copy(kneePos).sub(hipPos);
   plane.copy(bend).addScaledVector(axis, -bend.dot(axis));
-  if (plane.lengthSq() < 2.5e-3) {
+  if (forcePole || plane.lengthSq() < 2.5e-3) {
     bend.copy(poleWorld).sub(hipPos);
     plane.copy(bend).addScaledVector(axis, -bend.dot(axis));
   }

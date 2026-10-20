@@ -1,4 +1,5 @@
-import type { Side } from './config';
+import { DEFAULT_CONFIG, type GameConfig, type Side } from './config';
+import { normalKickApex } from './tricks';
 
 /** World-space ball centre. Kept free of three.js so the engine can stay headless. */
 export interface BallCenter {
@@ -21,6 +22,24 @@ export function setFootContactAnchors(left: BallCenter | null, right: BallCenter
 export function clearFootContactAnchors(): void {
   footContactAnchors.left = null;
   footContactAnchors.right = null;
+}
+
+/**
+ * The juggle window follows the posed boot. Kick speed is retuned so the apex
+ * stays where a kick from the old waist-height contact used to land, which
+ * keeps headers reachable once the foot drops to knee height.
+ */
+export function alignFootWindow(config: GameConfig, left: BallCenter | null, right: BallCenter | null): void {
+  const samples = [left, right].filter((sample): sample is BallCenter => sample != null);
+  if (samples.length === 0) return;
+  const y = samples.reduce((sum, sample) => sum + sample.y, 0) / samples.length;
+  const z = samples.reduce((sum, sample) => sum + sample.z, 0) / samples.length;
+  const authoredApex = normalKickApex(DEFAULT_CONFIG.contactHeight, DEFAULT_CONFIG.kickSpeed, config.gravity);
+  config.contacts.foot = { ...config.contacts.foot, y, z };
+  config.contactHeight = y;
+  config.ballZ = z;
+  const rise = Math.max(0.45, authoredApex - y);
+  config.kickSpeed = Math.sqrt(2 * Math.max(0.01, config.gravity) * rise);
 }
 
 /**

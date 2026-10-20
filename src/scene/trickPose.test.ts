@@ -38,7 +38,8 @@ describe('trick poses', () => {
     const pose = computePose(e);
     expect(pose.lockMotion).toBe(true);
     expect(pose.legs.left.knee + pose.legs.right.knee).toBeGreaterThan(0.2);
-    expect(Math.abs(pose.headPitch)).toBeLessThan(0.55);
+    expect(pose.headPitch).toBeLessThan(-0.5);
+    expect(pose.bodyY).toBeGreaterThan(0.02);
   });
 
   it('neck stall hinges forward with arms open and locks tracking', () => {
@@ -114,9 +115,15 @@ describe('trick poses', () => {
     expect(dancing.legs.left.knee).toBeLessThan(0.5);
     expect(dancing.legs.right.knee).toBeLessThan(0.5);
     expect(dancing.legs.left.thigh).toBeGreaterThan(-0.4);
-    for (let i = 0; i < 4000 && e.trick; i++) e.step(e.config.fixedStep);
+    let apex = e.ball.y;
+    for (let i = 0; i < 4000 && e.trick; i++) {
+      e.step(e.config.fixedStep);
+      apex = Math.max(apex, e.ball.y);
+    }
     expect(e.trick).toBeNull();
-    expect(e.ball.y).toBeGreaterThan(e.config.contacts.forehead.y);
+    expect(apex - e.config.contactHeight).toBeGreaterThan(3);
+    expect(e.ball.vy).toBeGreaterThan(0);
+    expect(e.phase).toBe('playing');
     const ready = computePose(e);
     expect(ready.lockMotion).toBe(false);
     expect(Math.abs(ready.legs.left.thigh)).toBeLessThan(0.35);

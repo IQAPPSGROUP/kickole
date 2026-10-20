@@ -7,6 +7,16 @@
   --white: #F8F9FB;
   --font: 'Trebuchet MS', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
+/* Rubik Wet Paint by The Rubik Filtered Project Authors. SIL Open Font License 1.1.
+   Latin subset. Full licence: /fonts/RubikWetPaint-OFL.txt */
+@font-face {
+  font-family: 'Rubik Wet Paint';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/RubikWetPaint-Regular.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { margin: 0; height: 100%; background: var(--navy); overflow: hidden; }
 body { font-family: var(--font); color: var(--white); user-select: none; -webkit-user-select: none; overscroll-behavior: none; touch-action: manipulation; }
@@ -14,19 +24,28 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   position: fixed;
   inset: 0;
   overflow: hidden;
-  --trick-size: 72px;
-  --btn: 72px;
-  --trick-gap: 8px;
+  --trick-size: 52px;
+  --btn: 52px;
+  --trick-gap: 6px;
   --sat-l: env(safe-area-inset-left, 0px);
   --sat-r: env(safe-area-inset-right, 0px);
   --sat-b: env(safe-area-inset-bottom, 0px);
-  --fan-d: 80px;
-  --fan-dx: 107.36px;
-  --fan-dy: 75.17px;
+  --fan-d: 140px;
+  --fan-dx: 115px;
+  --fan-dy: 80px;
   --fan-inset-l: 4px;
   --fan-inset-r: 4px;
-  --fan-inset-b: 8px;
+  --fan-inset-b: calc(env(safe-area-inset-bottom, 0px) + 16px);
   --control-lift: calc(var(--fan-d) + var(--btn) + 12px);
+}
+@media (min-width: 360px) and (max-width: 430px) {
+  .app {
+    --fan-inset-l: max(16px, env(safe-area-inset-left, 0px));
+    --fan-inset-r: max(16px, env(safe-area-inset-right, 0px));
+    --fan-d: 113px;
+    --fan-dx: 93px;
+    --fan-dy: 65px;
+  }
 }
 .app canvas { display: block; touch-action: none; }
 
@@ -150,35 +169,141 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   45% { transform: rotate(5deg) scale(1.02); }
   100% { transform: rotate(0) scale(1); }
 }
+.hud-coaching {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 0 8px;
+  pointer-events: none;
+}
 .prompt-banner {
   position: absolute;
   left: 50%;
-  top: 118px;
+  bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 18px);
   transform: translateX(-50%);
   z-index: 7;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: min(92vw, 360px);
-  padding: 8px 12px 8px 8px;
-  border-radius: 16px;
-  background: #1E2A5A;
-  color: #F8F9FB;
-  box-shadow: 0 5px 0 #222831;
-  animation: prompt-in .32s ease-out;
+  width: min(94vw, 520px);
+  text-align: center;
+  background: none;
+  color: var(--white);
+  pointer-events: none;
 }
-.prompt-banner b { display: block; letter-spacing: .4px; font-size: 16px; color: #FFD93D; }
-.prompt-banner small { display: block; font-size: 11px; letter-spacing: .2px; opacity: .9; }
-@keyframes prompt-in { from { transform: translateX(-50%) translateY(-22px); opacity: 0; } to { transform: translateX(-50%); opacity: 1; } }
-.prompt-ring { width: 36px; height: 36px; flex: 0 0 auto; }
-.prompt-ring circle { fill: none; stroke: rgba(248, 249, 251, .25); stroke-width: 3; }
-.prompt-ring circle:last-child { stroke: #FFD93D; stroke-dasharray: 100; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 18px 18px; }
-.hint-tip {
+.prompt-filters { position: absolute; width: 0; height: 0; }
+.prompt-bounce {
+  position: relative;
+  transform-origin: 50% 100%;
+  animation: prompt-bounce 1.05s linear both;
+}
+.prompt-bounce::before {
+  content: '';
   position: absolute;
-  left: 50%;
-  top: 176px;
-  transform: translateX(-50%);
+  left: 2%;
+  right: 2%;
+  top: 8%;
+  bottom: -6%;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, rgba(6, 10, 22, .78) 0%, rgba(6, 10, 22, .42) 48%, transparent 74%);
+  filter: blur(8px);
+}
+@keyframes prompt-bounce {
+  0% { opacity: 0; transform: translateY(-88px) scale(.32, .7) rotate(-10deg); }
+  28% { opacity: 1; transform: translateY(16px) scale(1.28, .62) rotate(6deg); }
+  46% { transform: translateY(-22px) scale(.86, 1.24) rotate(-4deg); }
+  64% { transform: translateY(6px) scale(1.08, .92) rotate(1.5deg); }
+  78% { transform: translateY(0) scale(1) rotate(0); }
+  90% { transform: translateY(-8px) scale(1.18) rotate(-3deg); }
+  100% { opacity: 1; transform: none; }
+}
+.graffiti {
+  position: relative;
+  display: block;
+  font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
+  font-weight: 400;
+  font-style: normal;
+  font-synthesis: none;
+  line-height: .92;
+}
+.graffiti > span { display: block; }
+.prompt-ch { display: inline-block; }
+.prompt-shine,
+.prompt-ink,
+.prompt-spray {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+}
+.prompt-shine {
+  z-index: 0;
+  color: transparent;
+  transform: translate(-0.045em, -0.06em);
+}
+.prompt-shine .prompt-ch { color: #fff; }
+.prompt-ink {
+  z-index: 1;
+  color: transparent;
+}
+.prompt-ink .prompt-ch {
+  color: #140814;
+  -webkit-text-stroke: 0.09em #140814;
+}
+.prompt-face {
+  position: relative;
+  z-index: 2;
+  background: none;
+  color: transparent;
+}
+.prompt-face .prompt-ch {
+  background: linear-gradient(180deg, #FFF3B0 0%, #FFE27A 16%, #FF4F9A 46%, #D21B72 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.prompt-spray {
+  z-index: 3;
+  color: transparent;
+  opacity: .8;
+  filter: url(#prompt-spray);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+.prompt-spray .prompt-ch { color: #fff; }
+.prompt-call {
+  margin: 0;
+  padding-bottom: .16em;
+  font-size: clamp(52px, 15vw, 84px);
+}
+.prompt-call.is-long { font-size: clamp(36px, 9.4vw, 56px); }
+.prompt-tip {
+  margin-top: .08em;
+  font-size: clamp(20px, 5.4vw, 30px);
+  line-height: 1;
+}
+.prompt-ring {
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
+  margin: 8px auto 0;
+  z-index: 4;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .65));
+}
+.prompt-ring circle { fill: none; stroke: #140814; stroke-width: 5; }
+.prompt-ring circle:last-child {
+  stroke: #FFD93D;
+  stroke-width: 4;
+  stroke-dasharray: 100;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 18px 18px;
+}
+.hint-tip {
+  position: relative;
   max-width: min(90vw, 340px);
+  margin-top: 4px;
   padding: 6px 12px;
   border-radius: 999px;
   background: #FF4F9A;
@@ -187,8 +312,9 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   font-weight: 800;
   letter-spacing: .3px;
   text-align: center;
-  animation: prompt-in .28s ease-out;
+  animation: hint-in .28s ease-out;
 }
+@keyframes hint-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 .ghost-hand {
   position: absolute;
   top: -34px;
@@ -280,7 +406,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   position: relative;
   font: inherit;
   font-weight: 900;
-  font-size: 13px;
+  font-size: 15px;
   letter-spacing: .3px;
   width: var(--trick-size);
   height: var(--trick-size);
@@ -289,24 +415,56 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   border: 3px solid #F7F5ED;
   color: #F7F5ED;
   background: #102830;
-  box-shadow: 0 3px 0 #07141a, 0 6px 12px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 0 3px #07141a, 0 4px 0 #07141a, 0 8px 16px rgba(0, 0, 0, .55);
   cursor: pointer;
   touch-action: none;
   display: grid;
   place-items: center;
-  align-content: center;
-  gap: 1px;
+  overflow: hidden;
 }
-.trick-icon { width: 22px; height: 22px; display: block; }
-.trick-label { font-size: 13px; font-weight: 900; line-height: 1; letter-spacing: .4px; }
-.trick-sub { font-size: 10px; font-weight: 900; letter-spacing: .6px; opacity: 1; }
-.ps-head { background: #FFD93D; color: #102830; }
-.ps-atw { background: #4A33B5; color: #F8F9FB; }
-.ps-neck { background: #FF4F9A; color: #102830; }
-.ps-flick { background: #FF8A5B; color: #102830; }
-.ps-groove { background: #FFD93D; color: #102830; }
-.ps-thigh { background: #0A6E66; color: #F8F9FB; }
-.ps-groove .beat-ring { border-color: #102830; box-shadow: 0 0 6px #102830; }
+.trick-icon {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%);
+}
+.trick-label {
+  position: relative;
+  z-index: 1;
+  font-family: system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #FFFFFF;
+}
+.trick-sub {
+  position: absolute;
+  bottom: 8px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  opacity: 1;
+  color: #FFFFFF;
+}
+.trick-lock {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 9px;
+  height: 9px;
+  color: #FFFFFF;
+}
+.ps-head { background: #B91C1C; color: #FFFFFF; }
+.ps-atw { background: #5B21B6; color: #FFFFFF; }
+.ps-neck { background: #9D174D; color: #FFFFFF; }
+.ps-flick { background: #C2410C; color: #FFFFFF; }
+.ps-groove { background: #9A3412; color: #FFFFFF; }
+.ps-thigh { background: #0F766E; color: #FFFFFF; }
+.ps-groove .beat-ring { border-color: #FFFFFF; box-shadow: 0 0 6px #FFFFFF; }
 .beat-ring {
   position: absolute;
   inset: 4px;
@@ -339,7 +497,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .dance-shuffle { background: linear-gradient(135deg, #00B8A9, #FF8A5B); }
 .dance-heelrock { background: linear-gradient(135deg, #FF4F9A, #FFD93D); }
 .dance-price { display: block; color: #FFD93D; font-weight: 800; }
-.trick-btn.locked { filter: grayscale(.9); opacity: .48; }
+.trick-btn.locked { filter: none; opacity: 1; }
 .trick-btn:disabled { opacity: .4; cursor: default; }
 .trick-btn.on {
   box-shadow: 0 0 0 3px #FFD93D, 0 3px 0 #07141a, 0 6px 12px rgba(0, 0, 0, .4);
@@ -398,7 +556,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   border-radius: 50%;
   border: 3px solid #F7F5ED;
   background: #102830;
-  box-shadow: 0 3px 0 #07141a, 0 6px 12px rgba(0, 0, 0, .4);
+  box-shadow: 0 0 0 3px #07141a, 0 4px 0 #07141a, 0 8px 16px rgba(0, 0, 0, .55);
   color: #F7F5ED;
   cursor: pointer;
   display: flex;
@@ -406,6 +564,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   align-items: center;
   justify-content: center;
   gap: 1px;
+  padding: 5px 4px 6px;
+  overflow: hidden;
   font: inherit;
   transition: transform .12s ease;
 }
@@ -413,19 +573,20 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   transform: scale(.94);
 }
 .foot-btn-mark {
-  font-size: clamp(34px, 9vw, 42px);
+  font-size: 22px;
   font-weight: 900;
   font-style: italic;
-  line-height: .85;
+  line-height: 1;
   letter-spacing: 0;
-  color: #FFD93D;
-  text-shadow: 0 2px 0 #07141a;
+  color: #FFFFFF;
 }
 .foot-btn-label {
-  font-size: 12px;
+  font-family: system-ui, sans-serif;
+  font-size: 8px;
   font-weight: 900;
-  letter-spacing: 1px;
-  color: #F7F5ED;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  color: #FFFFFF;
   opacity: 1;
 }
 
@@ -509,10 +670,16 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .home .best-pill b { font-size: 16px; }
   .home-help { font-size: 9px; text-align: center; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
+  .hud-coaching { position: absolute; left: 50%; top: 4px; width: min(46vw, 360px); margin: 0; transform: translateX(-50%); }
+  .prompt-banner { width: min(54vw, 440px); bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 8px); }
+  .prompt-call { font-size: 34px; }
+  .prompt-call.is-long { font-size: 26px; }
+  .prompt-tip { font-size: 16px; }
+  .prompt-ring { width: 22px; height: 22px; }
   .score { font-size: 44px; }
   .feedback { left: auto; right: max(12px, env(safe-area-inset-right)); top: 24px; width: 26%; font-size: 28px; }
   .tap-start { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 16px); font-size: 24px; }
-  .foot-btn-mark { font-size: 26px; }
+  .foot-btn-mark { font-size: 22px; }
   .stall-hint { bottom: calc(max(12px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px); }
 }
 @media (prefers-reduced-motion: reduce) {

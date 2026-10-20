@@ -32,6 +32,7 @@ import {
   withDanceRank,
 } from './dances';
 import { fx } from '../scene/fx';
+import { playHaptic, type HapticCue } from './haptics';
 import { prefersReducedMotion, swoopStrength } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
 import {
@@ -316,10 +317,8 @@ export class GameController {
     unlockAudio();
   }
 
-  private vibrate(ms: number | number[]) {
-    if (this.settings.vibration && 'vibrate' in navigator) {
-      try { navigator.vibrate(ms); } catch { /* unsupported */ }
-    }
+  private buzz(cue: HapticCue) {
+    void playHaptic(cue, this.settings.vibration);
   }
 
   private show(kind: Feedback['kind'], text: string, points: number) {
@@ -334,7 +333,7 @@ export class GameController {
     }
     switch (e.type) {
       case 'launch':
-        this.vibrate(15);
+        this.buzz('launch');
         break;
       case 'kick': {
         if (e.alternate) this.runChallenges.alternateFoot += 1;
@@ -345,7 +344,7 @@ export class GameController {
         const label = e.stall ? 'FOOT STALL!' : high ? 'HIGH FLICK!' : e.grade.toUpperCase();
         this.show(e.stall ? 'stall' : e.grade, label, e.points);
         if (sound) { if (e.stall) sfx.stall(); sfx.kick(e.grade, e.streak); }
-        this.vibrate(e.grade === 'perfect' ? [12, 20, 12] : 10);
+        this.buzz(e.grade);
         fx.swoop = Math.max(fx.swoop, swoopStrength(e.streak, 0, prefersReducedMotion()));
         if (this.suppressKickPrompt) this.suppressKickPrompt = false;
         else if (high) this.onPromptAction('flick');
@@ -356,6 +355,7 @@ export class GameController {
       case 'miss':
         this.show('miss', 'MISS', 0);
         if (sound) sfx.miss();
+        this.buzz('miss');
         this.onPromptAction('miss');
         this.publish();
         break;
@@ -383,18 +383,19 @@ export class GameController {
       case 'combo':
         this.show('perfect', `${e.label} +${e.points}`, e.points);
         if (sound) sfx.kick('perfect', this.engine.streak);
-        this.vibrate([10, 30, 10]);
+        this.buzz('combo');
         fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, e.points, prefersReducedMotion()));
         this.publish();
         break;
       case 'trickFail':
         this.show('miss', 'TRICK MISS', 0);
+        this.buzz('miss');
         this.onPromptAction('miss');
         this.publish();
         break;
       case 'drop':
         if (sound) sfx.drop();
-        this.vibrate(80);
+        this.buzz('drop');
         this.publish();
         break;
       case 'over': {
@@ -485,20 +486,31 @@ export class GameController {
     }
   }
 
-  press(side: Side) {
+  press(side: Side, pointerId?: number) {
     const e = this.engine;
-    if (e.celebration) {
+    const skippedDance = e.celebration != null;
+    if (skippedDance) {
       e.skipCelebration();
-      this.publish();
+      this.queuedCelebration = null;
+    }
+    if (e.phase === 'menu' || e.phase === 'over' || e.phase === 'dropped') {
+      if (skippedDance) this.publish();
       return;
     }
-    if (e.phase === 'menu' || e.phase === 'over' || e.phase === 'dropped') return;
     const clock = beatClock();
     e.setBeatGrade(gradeBeat(beatErrorMs(clock.now, clock.origin, clock.bpm, clock.latency)));
     const before = e.phase;
     const beforeTrick = e.selectedTrick;
-    e.press(side);
-    if (before !== e.phase || beforeTrick !== e.selectedTrick || e.contact || e.trick) this.publish();
+    e.press(side, pointerId ?? null);
+    if (skippedDance || before !== e.phase || beforeTrick !== e.selectedTrick || e.contact || e.trick || e.kickCharge) {
+      this.publish();
+    }
+  }
+
+  releasePointer(pointerId: number) {
+    const was = this.engine.contact;
+    this.engine.releaseMatching(pointerId);
+    if (was && !this.engine.contact) this.publish();
   }
 
   release(side: Side) {

@@ -95,6 +95,30 @@ function applyHeelRock(out: Pose, angle: number, k: number) {
   out.bodyY += 0.02 * Math.abs(rock) * k;
 }
 
+/**
+ * Samba ball-change under a high ball. About three steps a second.
+ * `phase` is in steps (1 = one ball-change). Feet stay under the hips.
+ */
+export function applySambaStep(out: Pose, phase: number, intensity = 1): void {
+  const step = Math.sin(phase * Math.PI * 2);
+  const k = Math.max(0, Math.min(1, intensity));
+  out.bodyYaw = 0.38 * step * k;
+  out.torsoRoll = 0.16 * step * k;
+  out.torsoYaw = -0.28 * step * k;
+  out.legs.left.knee = 0.12 + 0.5 * Math.max(0, step) * k;
+  out.legs.right.knee = 0.12 + 0.5 * Math.max(0, -step) * k;
+  out.legs.left.thigh = -0.2 * Math.max(0, step) * k;
+  out.legs.right.thigh = -0.2 * Math.max(0, -step) * k;
+  out.armLeft = 0.32;
+  out.armRight = 0.32;
+  out.armLeftPitch = 0.65 * step * k;
+  out.armRightPitch = -0.65 * step * k;
+  out.elbowLeft = 0.85 * k;
+  out.elbowRight = 0.85 * k;
+  out.bodyY += 0.02 * Math.abs(step) * k;
+  out.lockMotion = true;
+}
+
 /** Extra knee or chest shape on the beat of a groove touch. */
 export function accentGrooveTouch(
   out: Pose,

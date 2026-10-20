@@ -197,6 +197,21 @@ function instepStrike(scene: Object3D, foot: Vector3, toe: Vector3): { point: Ve
   return { point, outward };
 }
 
+/**
+ * Ball centre on the laces of whatever pose is already on `scene`.
+ * The leather meets the bottom of the ball, a couple of centimetres into the kiss.
+ */
+export function ballCenterOnInstep(scene: Object3D, side: Side, radius: number): Vector3 | null {
+  const foot = boneNamed(scene, footBoneName(side));
+  if (!foot) return null;
+  const toe = boneNamed(scene, toeBoneName(side));
+  const footPosition = foot.getWorldPosition(new Vector3());
+  const toePosition = toe ? toe.getWorldPosition(new Vector3()) : footPosition.clone().add(new Vector3(0, -0.04, 0.16));
+  const seated = instepStrike(scene, footPosition, toePosition);
+  if (!seated) return null;
+  return seated.point.clone().addScaledVector(seated.outward, Math.max(0.02, radius - 0.012));
+}
+
 /** Signed gap: closest surface vertex to the ball centre, minus the radius. Negative means the mesh is inside the ball. */
 export function surfaceGap(
   scene: Object3D,

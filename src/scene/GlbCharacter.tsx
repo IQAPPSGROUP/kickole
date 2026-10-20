@@ -6,7 +6,7 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
-import { clearFootContactAnchors, setFootContactAnchors } from '../engine/footContact';
+import { alignFootWindow, clearFootContactAnchors, setFootContactAnchors, type BallCenter } from '../engine/footContact';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
 import { applyContractBones } from './contractPose';
@@ -22,9 +22,21 @@ import {
 } from './rig';
 import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
-import { measureKickContactAnchors } from './measureFootContact';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
+
+function ballCenter(v: Vector3): BallCenter {
+  return { x: v.x, y: v.y, z: v.z };
+}
+
+/** Snap the live ball onto the posed laces and keep the juggle window there. */
+function publishKickContact(engine: GameEngine, freestyle: ReturnType<typeof createFreestyleRig>) {
+  const left = ballCenter(freestyle.anchors.left.ball);
+  const right = ballCenter(freestyle.anchors.right.ball);
+  setFootContactAnchors(left, right);
+  alignFootWindow(engine.config, left, right);
+  return { left, right };
+}
 
 function liftKickToe(
   bones: Partial<Record<BoneKey, Bone>>,
@@ -226,16 +238,13 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       clearFootContactAnchors();
       return;
     }
-    const anchors = measureKickContactAnchors(scene, clips);
-    setFootContactAnchors(anchors.left, anchors.right);
     freestyle.measure(scene, clips);
-    if (anchors.left) freestyle.anchors.left.ball.set(anchors.left.x, anchors.left.y, anchors.left.z);
-    if (anchors.right) freestyle.anchors.right.ball.set(anchors.right.x, anchors.right.y, anchors.right.z);
+    const anchors = publishKickContact(engine, freestyle);
     if (import.meta.env.DEV) {
       (window as unknown as { __footContact?: typeof anchors }).__footContact = anchors;
     }
     return () => clearFootContactAnchors();
-  }, [scene, clips, useClips, freestyle]);
+  }, [scene, clips, useClips, freestyle, engine]);
 
   useEffect(() => {
     if (!usable) { console.warn('Character GLB does not match the rig contract; using fallback.', report); onInvalid(); return; }
@@ -308,8 +317,8 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     };
     attach(bones.footLeft);
     attach(bones.footRight);
-    const anchors = measureKickContactAnchors(scene, clips);
-    setFootContactAnchors(anchors.left, anchors.right);
+    freestyle.measure(scene, clips);
+    const anchors = publishKickContact(engine, freestyle);
     if (import.meta.env.DEV) {
       (window as unknown as { __footContact?: typeof anchors }).__footContact = anchors;
     }
@@ -324,7 +333,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       soleGeo.dispose();
       studGeo.dispose();
     };
-  }, [scene, clips, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality]);
+  }, [scene, clips, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality, freestyle, engine]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
   const actions = useMemo(() => {

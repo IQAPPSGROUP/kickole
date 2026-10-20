@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPose } from './pose';
-import { accentGrooveTouch, applyDancePose } from './dancePose';
+import { accentGrooveTouch, applyDancePose, applySambaStep } from './dancePose';
 import type { DanceId } from '../game/dances';
 
 const IDS: DanceId[] = ['sway', 'pendulum', 'shuffle', 'heelrock'];
@@ -43,6 +43,18 @@ describe('dance poses', () => {
     expect(Math.abs(rock.bodyYaw)).toBeLessThan(1);
     expect(rock.elbowLeft).toBeGreaterThan(0.8);
     expect(rock.armLeft).toBeLessThan(1.2);
+  });
+
+  it('mirrors the samba step on opposite beats', () => {
+    const left = createPose();
+    const right = createPose();
+    applySambaStep(left, 0.25, 1);
+    applySambaStep(right, 0.75, 1);
+    expect(left.armLeftPitch).toBeGreaterThan(0.4);
+    expect(right.armLeftPitch).toBeLessThan(-0.4);
+    expect(left.legs.left.knee).toBeGreaterThan(left.legs.right.knee + 0.25);
+    expect(right.legs.right.knee).toBeGreaterThan(right.legs.left.knee + 0.25);
+    expect(left.elbowLeft).toBeGreaterThan(0.6);
   });
 
   it('shrinks the motion when intensity is reduced', () => {

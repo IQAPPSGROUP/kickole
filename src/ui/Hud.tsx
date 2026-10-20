@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, 
 import type { GameController, Hud as HudState, ArmedTrick } from '../game/controller';
 import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
+import { streakMultiplier } from '../engine/scoring';
 import { beatClock } from '../game/audio';
 import { prefersReducedMotion } from '../scene/juice';
 import { fanLayout } from './fanLayout';
@@ -17,6 +18,7 @@ export function Hud({
   onSkipCelebration?: () => void;
 }) {
   const f = hud.feedback;
+  const combo = streakMultiplier(hud.streak);
   return (
     <div className="hud">
       <div className="hud-top">
@@ -24,11 +26,13 @@ export function Hud({
         <div className="score" key={hud.score}>{hud.score}</div>
         <div className="hud-sub">
           <span>KICK-UPS <b>{hud.kickUps}</b></span>
-          {hud.streak >= 2 && <span className="combo" key={hud.streak}>COMBO x{hud.streak}</span>}
+          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
         </div>
       </div>
+      <div className="hud-coaching">
+        {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
+      </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
-      {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}
@@ -82,17 +86,50 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
     return () => cancelAnimationFrame(frame);
   }, [controller, prompt]);
   const chain = prompt.chainNeed > 1 ? ` ${prompt.chainCount}/${prompt.chainNeed}` : '';
+  const call = `${prompt.call}${chain}`;
   return (
     <div className="prompt-banner" key={`${prompt.id}:${prompt.startedAt}`}>
-      <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
-        <circle cx="18" cy="18" r="15.5" />
-        <circle ref={ring} cx="18" cy="18" r="15.5" pathLength={100} />
+      <svg className="prompt-filters" aria-hidden width="0" height="0">
+        <filter id="prompt-spray" x="-8%" y="-20%" width="116%" height="150%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="noise" />
+          <feColorMatrix in="noise" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.4 -0.55" result="speck" />
+          <feComposite in="speck" in2="SourceAlpha" operator="in" />
+        </filter>
       </svg>
-      <span>
-        <b>{prompt.call}{chain}</b>
-        <small>{prompt.tip}</small>
-      </span>
+      <div className="prompt-bounce">
+        <GraffitiText text={call} className={call.length > 16 ? 'graffiti prompt-call is-long' : 'graffiti prompt-call'} />
+        <GraffitiText text={prompt.tip} className="graffiti prompt-tip" />
+        <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
+          <circle cx="18" cy="18" r="14" />
+          <circle ref={ring} cx="18" cy="18" r="14" pathLength={100} />
+        </svg>
+      </div>
     </div>
+  );
+}
+
+const GRAFFITI_TILT = [-4, 3, -2, 4, -3, 2, -4, 2, 3, -2, 4, -1] as const;
+
+function graffitiGlyphs(text: string) {
+  return [...text].map((ch, index) => {
+    const tilt = GRAFFITI_TILT[index % GRAFFITI_TILT.length] ?? 0;
+    const lift = (index % 3) - 1;
+    return (
+      <span className="prompt-ch" key={`${index}:${ch}`} style={{ transform: `rotate(${tilt}deg) translateY(${lift}px)` }}>
+        {ch === ' ' ? '\u00A0' : ch}
+      </span>
+    );
+  });
+}
+
+function GraffitiText({ text, className }: { text: string; className: string }) {
+  return (
+    <span className={className}>
+      <span className="prompt-shine" aria-hidden="true">{graffitiGlyphs(text)}</span>
+      <span className="prompt-ink" aria-hidden="true">{graffitiGlyphs(text)}</span>
+      <span className="prompt-face">{graffitiGlyphs(text)}</span>
+      <span className="prompt-spray" aria-hidden="true">{graffitiGlyphs(text)}</span>
+    </span>
   );
 }
 
@@ -242,15 +279,13 @@ function bindFoot(controller: GameController, side: Side) {
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.stopPropagation();
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      controller.press(side);
+      controller.press(side, e.pointerId);
     },
     onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.stopPropagation();
       controller.release(side);
     },
     onPointerCancel: () => controller.release(side),
-    onLostPointerCapture: () => controller.release(side),
   };
 }
 
@@ -424,8 +459,14 @@ export function TouchZones({ controller }: { controller: GameController }) {
       >
         {trick.kind === 'groove' && <BeatRing active={playing || Boolean(clue?.beat)} />}
         {clueOn(trick.control) && clue && <ClueMark gesture={clue.gesture} />}
+        {!playing && (
+          <svg className="trick-lock" viewBox="0 0 12 12" aria-hidden>
+            <rect x="2.2" y="5.2" width="7.6" height="5.4" rx="1" fill="currentColor" />
+            <path d="M3.6 5.2V3.7a2.4 2.4 0 0 1 4.8 0v1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+        )}
         <TrickIcon kind={trick.kind} />
-        <span className="trick-label">{playing ? trickName(trick.kind) : 'LOCKED'}</span>
+        <span className="trick-label">{trickName(trick.kind)}</span>
         {trick.kind === 'neck' && playing && <small className="trick-sub">HOLD</small>}
       </button>
     );

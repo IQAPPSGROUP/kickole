@@ -28,12 +28,17 @@ describe('corner fan', () => {
     expect(byName.atw.x).toBeGreaterThan(byName.left.x);
     const angle = Math.atan2(layout.dy, layout.dx) * (180 / Math.PI);
     expect(angle).toBeCloseTo(35, 4);
+    expect(Math.hypot(layout.dx, layout.dy)).toBeCloseTo(layout.d, 3);
+    expect(byName.neck.y).toBeGreaterThan(byName.head.y + 24);
+    expect(byName.neck.y).toBeLessThan(byName.left.y - 24);
+    expect(byName.thigh.y).toBeGreaterThan(byName.flick.y + 24);
+    expect(byName.thigh.y).toBeLessThan(byName.right.y - 24);
     expect(byName.flick.x).toBeCloseTo(byName.right.x, 4);
     expect(byName.groove.y).toBeCloseTo(byName.right.y, 4);
     expect(byName.thigh.x).toBeLessThan(byName.right.x);
   });
 
-  it('keeps 72px buttons from overlapping on a 375x667 phone and a large phone', () => {
+  it('keeps the fan buttons from overlapping on a 375x667 phone and a large phone', () => {
     for (const [width, height] of [[375, 667], [390, 844], [430, 932]] as const) {
       const { nearest, pair, rects } = nearestGap(width, height);
       expect(nearest, `${width} ${pair}`).toBeGreaterThanOrEqual(6);
@@ -41,8 +46,26 @@ describe('corner fan', () => {
     }
   });
 
+  it('insets 360–430px phones so GROOVE clears ATW and RIGHT stays on screen', () => {
+    for (const width of [360, 375, 390, 414, 430]) {
+      const { layout, rects } = nearestGap(width, 800);
+      const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
+      expect(layout.insetLeft, `${width} left`).toBeGreaterThanOrEqual(16);
+      expect(layout.insetRight, `${width} right`).toBeGreaterThanOrEqual(16);
+      expect(byName.right.x + byName.right.w, `${width} right edge`).toBeLessThanOrEqual(width - 16);
+      expect(circleGap(byName.atw, byName.groove), `${width} atw/groove`).toBeGreaterThanOrEqual(16);
+      expect(layout.insetBottom, `${width} bottom`).toBe(16);
+      expect(byName.left.y + byName.left.h, `${width} bottom edge`).toBeLessThanOrEqual(800 - 16);
+    }
+    const narrow = fanLayout(320);
+    const wide = fanLayout(500);
+    expect(narrow.insetLeft).toBe(4);
+    expect(wide.insetRight).toBe(4);
+  });
+
   it('keeps the fan inside the screen when the safe area grows', () => {
-    const { rects, nearest } = nearestGap(390, 844, 12, 12, 34);
+    const { layout, rects, nearest } = nearestGap(390, 844, 12, 12, 34);
+    expect(layout.insetBottom).toBe(34 + 16);
     expect(nearest).toBeGreaterThanOrEqual(6);
     for (const rect of rects) {
       expect(rect.x).toBeGreaterThanOrEqual(12);

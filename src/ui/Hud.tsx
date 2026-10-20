@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { GameController, Hud as HudState, ArmedTrick } from '../game/controller';
 import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
@@ -111,15 +111,31 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
 const GRAFFITI_TILT = [-4, 3, -2, 4, -3, 2, -4, 2, 3, -2, 4, -1] as const;
 
 function graffitiGlyphs(text: string) {
-  return [...text].map((ch, index) => {
-    const tilt = GRAFFITI_TILT[index % GRAFFITI_TILT.length] ?? 0;
-    const lift = (index % 3) - 1;
-    return (
-      <span className="prompt-ch" key={`${index}:${ch}`} style={{ transform: `rotate(${tilt}deg) translateY(${lift}px)` }}>
-        {ch === ' ' ? '\u00A0' : ch}
-      </span>
+  const glyphs: ReactNode[] = [];
+  let index = 0;
+  const words = text.split(' ');
+  words.forEach((word, wordIndex) => {
+    glyphs.push(
+      <span className="prompt-word" key={`w${wordIndex}`}>
+        {[...word].map((ch) => {
+          const tilt = GRAFFITI_TILT[index % GRAFFITI_TILT.length] ?? 0;
+          const lift = (index % 3) - 1;
+          const node = (
+            <span className="prompt-ch" key={`${index}:${ch}`} style={{ transform: `rotate(${tilt}deg) translateY(${lift}px)` }}>
+              {ch}
+            </span>
+          );
+          index += 1;
+          return node;
+        })}
+      </span>,
     );
+    if (wordIndex < words.length - 1) {
+      glyphs.push(' ');
+      index += 1;
+    }
   });
+  return glyphs;
 }
 
 function GraffitiText({ text, className }: { text: string; className: string }) {

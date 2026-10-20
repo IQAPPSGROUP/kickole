@@ -332,7 +332,7 @@ function imageKey(bytes: Buffer) {
   return createHash('sha1').update(bytes).digest('hex').slice(0, 16);
 }
 
-async function atlas(prims: Prim[], role: Role) {
+async function atlas(prims: Prim[], role: Role, preserveSkin = false) {
   const group = prims.filter((prim) => prim.role === role);
   const keys: string[] = [];
   const buffers = new Map<string, Buffer>();
@@ -354,7 +354,12 @@ async function atlas(prims: Prim[], role: Role) {
     // photograph is a finished face: fill its empty border, but do not recolour it.
     // Recolouring clamps the cheeks to one value and leaves rectangular patches.
     if (role === 'Skin' && !opaquePhotograph(decoded.data)) {
-      if (sourceNames.get(keys[i])?.toUpperCase().includes('HEAD')) fillSkinBorders(decoded.data, decoded.width, decoded.height);
+      // The peach divide exists so a wardrobe swatch can multiply the colour back.
+      // The runtime no longer tints Skin, and the female face lives in this atlas
+      // (the male face is the untouched head photograph). Dividing her albedo
+      // leaves the pale lilac. Keep the purchased texels and only fill empty borders.
+      const keepPurchased = preserveSkin || sourceNames.get(keys[i])?.toUpperCase().includes('HEAD');
+      if (keepPurchased) fillSkinBorders(decoded.data, decoded.width, decoded.height);
       else correctSkin(decoded.data, decoded.width, decoded.height);
     }
     const resized = await sharp(decoded.data, { raw: { width: decoded.width, height: decoded.height, channels: 4 } })
@@ -1024,13 +1029,13 @@ async function encodeHeadPhotograph(prims: Prim[]) {
   return { albedo: albedoBytes, normal: normalBytes };
 }
 
-async function encodeTextures(prims: Prim[]) {
+async function encodeTextures(prims: Prim[], preserveSkin = false) {
   const textures = new Map<string, { albedo: Uint8Array; normal: Uint8Array }>();
   const head = prims.filter(usesHeadPhotograph);
   const body = prims.filter((prim) => !usesHeadPhotograph(prim));
   const present = [...new Set(body.map((prim) => prim.role))];
   for (const role of present) {
-    const packed = await atlas(body, role);
+    const packed = await atlas(body, role, preserveSkin);
     const kind = role === 'Hair' ? 'hair' : role === 'Eyes' || role === 'InnerMouth' || role === 'Skin' ? 'keep' : 'cloth';
     const albedo = neutralize(packed.raw, packed.width, packed.height, kind);
     const normal = detailNormal(albedo, packed.width, packed.height, role === 'Skin' || role === 'Hair' ? 0.45 : 0.35);
@@ -1088,7 +1093,7 @@ async function buildBody(body: 'male' | 'female') {
     { name: 'Miss', ...sampleTimes(1.2, missFn) },
     { name: 'Celebrate', ...sampleTimes(1.2, celebrateFn) },
   ];
-  const textures = await encodeTextures(prims);
+  const textures = await encodeTextures(prims, body === 'female');
   const out0 = join(PUBLIC, body === 'male' ? 'kickole_player_v4.glb' : 'kickole_player_v4_female.glb');
   const out1 = join(PUBLIC, body === 'male' ? 'kickole_player_v4_lod1.glb' : 'kickole_player_v4_female_lod1.glb');
   console.log(body, 'LOD0 tris', triCount(prims));

@@ -644,8 +644,18 @@ export function createFreestyleRig() {
     ballNow(engine, ball);
     const radius = engine.config.ballRadius;
     const planted: Side[] = ['left', 'right'];
+    // The juggle lane sits in front of the face. Step into it; do not pull the ball back.
+    const stepZ = Math.min(0.2, Math.max(0, ball.z - 0.42));
+    plantLiftL.copy(anchors.left.plant);
+    plantLiftR.copy(anchors.right.plant);
+    if (stepZ > 0) {
+      anchors.left.plant.z += stepZ;
+      anchors.right.plant.z += stepZ;
+      approach.set(ball.x * 0.25, 0.04, stepZ);
+      shiftHips(approach);
+    }
     let lean = 0;
-    bringSurface(ball, radius, UPPER_MATERIALS, landmark, 0.16, planted, () => {
+    bringSurface(ball, radius, UPPER_MATERIALS, landmark, 0.22, planted, () => {
       if (spine) {
         spine.quaternion.copy(clipThigh);
         if (lean > 0) spine.quaternion.multiply(swing.setFromEuler(euler.set(lean, 0, 0)));
@@ -660,18 +670,27 @@ export function createFreestyleRig() {
       head.localToWorld(landmark.copy(foreheadLocal));
       lean += 0.16;
     });
-    // Tip the forehead back (~35°) after the leather is found, then slide the
-    // body with it so the hairline stays on the ball. A tilt inside the aim
-    // loop points the face away and the planted feet cannot close a 25 cm gap.
+    // Heels up free a little reach so the forehead can tip back and stay on the ball.
+    anchors.left.plant.y += 0.035;
+    anchors.right.plant.y += 0.035;
+    // Add head-back only while the planted feet can slide the hairline with it.
     head.updateWorldMatrix(true, true);
     head.localToWorld(surface.copy(foreheadLocal));
-    head.quaternion.multiply(swing.setFromEuler(euler.set(-0.62, 0, 0)));
-    head.updateMatrix();
-    head.updateWorldMatrix(true, true);
-    head.localToWorld(landmark.copy(foreheadLocal));
-    approach.copy(surface).sub(landmark);
-    crouch(planted, 0.04);
-    shiftClamped(approach, planted);
+    clipShin.copy(head.quaternion);
+    let tipped = false;
+    for (const pitch of [0.55, 0.45, 0.35]) {
+      head.quaternion.copy(clipShin);
+      head.quaternion.multiply(swing.setFromEuler(euler.set(-pitch, 0, 0)));
+      head.updateMatrix();
+      head.updateWorldMatrix(true, true);
+      head.localToWorld(landmark.copy(foreheadLocal));
+      approach.copy(surface).sub(landmark);
+      if (!withinReach(approach, planted)) continue;
+      shiftClamped(approach, planted);
+      tipped = true;
+      break;
+    }
+    if (!tipped) head.quaternion.copy(clipShin);
     if (bones.armLeft && bones.armRight) {
       bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.12, 0, -0.65)));
       bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0.12, 0, 0.7)));
@@ -683,12 +702,12 @@ export function createFreestyleRig() {
     hold(head);
     hold(spine);
     hold(bones.chest);
-    plantLiftL.copy(anchors.left.plant);
-    plantLiftR.copy(anchors.right.plant);
-    plantLiftL.y += 0.035;
-    plantLiftR.y += 0.035;
-    pin('left', plantLiftL);
-    pin('right', plantLiftR);
+    pin('left', anchors.left.plant);
+    pin('right', anchors.right.plant);
+    anchors.left.plant.y -= 0.035;
+    anchors.right.plant.y -= 0.035;
+    anchors.left.plant.z -= stepZ;
+    anchors.right.plant.z -= stepZ;
   }
 
   function applyNeck(engine: GameEngine) {

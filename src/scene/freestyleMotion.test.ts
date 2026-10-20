@@ -387,6 +387,64 @@ describe('fab foot contact', () => {
     expect(bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3()).distanceTo(rig.anchors.left.plant)).toBeLessThan(0.012);
     expect(bone(gltf.scene, 'Foot_R').getWorldPosition(new Vector3()).distanceTo(rig.anchors.right.plant)).toBeLessThan(0.012);
   });
+
+  it('meets the juggle-lane header and clears the ATW ball at the top', async () => {
+    const gltf = await load(MODEL);
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
+    const bones: Partial<Record<BoneKey, Bone>> = {};
+    const names: Record<string, string> = { ...BONE_NAMES, ...EXTRA_BONE_NAMES };
+    for (const [key, name] of Object.entries(names)) {
+      const found = gltf.scene.getObjectByName(name);
+      if (found) bones[key as BoneKey] = found as Bone;
+    }
+    const hipsRestY = bones.root?.position.y ?? 0;
+    const show = (engine: GameEngine) => {
+      const pose = computePose(engine);
+      applyContractBones(bones, pose, hipsRestY);
+      rig.apply(engine, 'Idle', pose, 1 / 60);
+      gltf.scene.updateMatrixWorld(true);
+    };
+    const stepUntil = (engine: GameEngine, done: () => boolean) => {
+      const h = engine.config.fixedStep;
+      for (let i = 0; i < 20000 && !done(); i++) engine.step(h);
+    };
+    const head = new GameEngine();
+    head.prepare('ready');
+    head.press('left');
+    head.release('left');
+    stepUntil(head, () => head.ball.vy < 0 && head.timingDeltaMs() <= 6);
+    head.press('right');
+    head.release('right');
+    stepUntil(head, () => {
+      const y = head.config.contacts.forehead.y;
+      if (head.ball.vy < 0 && head.ball.y < y + 0.2) head.attemptHeader();
+      return head.stats.headers === 1;
+    });
+    show(head);
+    const headBone = bone(gltf.scene, 'Head').getWorldPosition(new Vector3());
+    const brow = headBone.clone();
+    brow.y += 0.06;
+    brow.z += 0.08;
+    const centre = new Vector3(head.ball.x, head.ball.y, head.ball.z);
+    const gap = surfaceGap(gltf.scene, centre, head.config.ballRadius, UPPER_MATERIALS, brow, 0.22);
+    const wide = surfaceGap(gltf.scene, centre, head.config.ballRadius, UPPER_MATERIALS, headBone, 0.35);
+    const hip = bone(gltf.scene, 'Hips').getWorldPosition(new Vector3());
+    expect(Math.abs(gap), `juggle header ${gap.toFixed(3)} wide ${wide.toFixed(3)} ball ${centre.y.toFixed(2)},${centre.z.toFixed(2)} head ${headBone.y.toFixed(2)},${headBone.z.toFixed(2)} hip ${hip.y.toFixed(2)},${hip.z.toFixed(2)}`).toBeLessThan(0.03);
+
+    const atw = new GameEngine();
+    atw.prepare('ready');
+    atw.press('left');
+    atw.release('left');
+    stepUntil(atw, () => atw.ball.vy < 0 && atw.timingDeltaMs() <= 8);
+    atw.setTrick('aroundTheWorld');
+    atw.press('left');
+    atw.release('left');
+    stepUntil(atw, () => (atw.trick?.revolution ?? 0) >= 0.5);
+    show(atw);
+    const foot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
+    expect(foot.y, `over ball ${atw.ball.y.toFixed(2)} foot ${foot.y.toFixed(2)}`).toBeGreaterThan(atw.ball.y + atw.config.ballRadius * 0.4);
+  });
 });
 
 function supportClearance(scene: Group, circling: 'left' | 'right'): number {

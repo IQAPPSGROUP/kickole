@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { ALLEY_FILES, ALLEY_OFFSET } from './alleyLayout';
+import { ALLEY_FILES, ALLEY_MURAL, ALLEY_OFFSET } from './alleyLayout';
 import { resolveEnvironmentTheme } from './environment';
 import { inPlayVolume } from './streetLayout';
 
@@ -78,6 +78,19 @@ describe('alley environment', () => {
     expect(beach.includes('alley_game')).toBe(false);
     expect(hillside.includes('alley_game')).toBe(false);
     expect(ALLEY_FILES.model.startsWith('models/env/')).toBe(true);
+  });
+
+  it('keeps the wordmark on the back brick, clear of the play box', () => {
+    const [x, y, z] = ALLEY_MURAL.position;
+    const [width, height] = ALLEY_MURAL.size;
+    expect(z).toBeLessThan(-6.8);
+    expect(z).toBeGreaterThan(-7.15);
+    expect(y - height / 2).toBeGreaterThan(1.5);
+    expect(y + height / 2).toBeLessThan(3.4);
+    expect(x - width / 2).toBeGreaterThan(-4.05);
+    expect(x + width / 2).toBeLessThan(3.25);
+    expect(inPlayVolume(x, z)).toBe(false);
+    expect(width / height).toBeGreaterThan(2.5);
   });
 
   it('uses a local city HDR and a small JPEG fallback', () => {

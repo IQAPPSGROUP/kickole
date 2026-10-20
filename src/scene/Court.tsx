@@ -14,9 +14,7 @@ import { createPennantGeometry, placeRope } from './pennant';
 import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, LAMP_SPOTS, STREET_FILES, streetUrl, wallMapSet, type FenceSlot, type LampSpot } from './streetLayout';
 import { useStreetMaps, useStreetNodes, type StreetMaps } from './streetMaterials';
 
-const NAVY = '#1E2A5A';
 const TEAL = '#00B8A9';
-const LIME = '#FFD93D';
 const CORAL = '#FF4F9A';
 const WHITE = '#F8F9FB';
 
@@ -34,28 +32,6 @@ function makeCanvas(size: number, draw: (g: CanvasRenderingContext2D, n: number)
   t.colorSpace = SRGBColorSpace;
   t.anisotropy = 4;
   return t;
-}
-
-/** KICKOLÉ sign. The canvas aspect (4:1) matches the 3 x 0.75 m plane so letters are not stretched. */
-function useSignTexture() {
-  return useMemo(() => {
-    const c = document.createElement('canvas');
-    c.width = 1024; c.height = 256;
-    const g = c.getContext('2d');
-    if (g) {
-      g.fillStyle = NAVY; g.fillRect(0, 0, 1024, 256);
-      g.strokeStyle = LIME; g.lineWidth = 6; g.strokeRect(12, 12, 1000, 232);
-      g.font = 'italic 900 150px "Trebuchet MS", "Segoe UI", sans-serif';
-      g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillStyle = WHITE; g.fillText('KICKOLÉ', 512, 106, 930);
-      g.font = '700 30px "Trebuchet MS", sans-serif';
-      g.fillStyle = CORAL; g.fillText('FUTEBOL DE RUA', 512, 209);
-    }
-    const t = new CanvasTexture(c);
-    t.colorSpace = SRGBColorSpace;
-    t.anisotropy = 4;
-    return t;
-  }, []);
 }
 
 /** Chain-link fence pattern with transparency. */
@@ -502,12 +478,11 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
   const post = fenceNodes.find((node) => node.name === 'Post');
   const slots = useMemo(() => fenceSlots(profile.fence), [profile.fence]);
   const posts = useMemo(() => fencePosts(profile.fence), [profile.fence]);
-  const sign = useSignTexture();
   const fence = useFenceTexture();
   const blob = useBlobTexture();
   useEffect(() => () => {
-    sign.dispose(); fence.dispose(); blob.dispose();
-  }, [sign, fence, blob]);
+    fence.dispose(); blob.dispose();
+  }, [fence, blob]);
   return (
     <group>
       <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
@@ -569,10 +544,6 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
       <mesh position={[0, 1.5, -4.2]} receiveShadow={shadows}>
         <boxGeometry args={[7.6, 0.16, 0.9]} />
         <ConcreteSkin maps={concrete} />
-      </mesh>
-      <mesh position={[-1.55, 2.05, -3.48]}>
-        <planeGeometry args={[3.2, 0.8]} />
-        <meshBasicMaterial map={sign} transparent toneMapped={false} />
       </mesh>
       <Poster x={2.15} y={1.35} color={CORAL} />
       <Poster x={3.15} y={1.5} color={TEAL} w={0.9} h={0.7} />

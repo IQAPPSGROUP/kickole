@@ -50,6 +50,14 @@ export function alleyViewFromSearch(search: string): AlleyView | null {
   }
 }
 
+/** Wordmark painted on the camera-facing brick, above the player and inside the wall. */
+export const ALLEY_WORDMARK = 'brand/kickole-wordmark.webp';
+
+export const ALLEY_MURAL = {
+  position: [-0.15, 2.5, -7.03] as const,
+  size: [4.5, 1.62] as const,
+};
+
 /** Two strings across the alley mouth, above head height. */
 export const ALLEY_BUNTING: readonly { z: number; y: number; x0: number; x1: number; count: number }[] = [
   { z: -2.15, y: 3.42, x0: -3.5, x1: 3.15, count: 16 },

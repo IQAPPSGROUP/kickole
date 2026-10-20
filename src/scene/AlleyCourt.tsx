@@ -1,6 +1,6 @@
 import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, useTexture } from '@react-three/drei';
 import {
   CanvasTexture,
   Color,
@@ -20,8 +20,11 @@ import { createPennantGeometry, placeRope } from './pennant';
 import {
   ALLEY_BUNTING,
   ALLEY_FLOOR_TINT,
+  ALLEY_MURAL,
   ALLEY_OFFSET,
+  ALLEY_WORDMARK,
   alleyModelUrl,
+  alleyUrl,
 } from './alleyLayout';
 
 const FESTA = ['#d64545', '#e6b325', '#3aa6a0', '#f4f0e6', '#e07a3d', '#3d6ea8'];
@@ -109,8 +112,8 @@ function Posters() {
   const textures = useMemo(() => [posterTexture(true), posterTexture(false)], []);
   useEffect(() => () => { textures.forEach((texture) => texture.dispose()); }, [textures]);
   const spots = [
-    { position: [-1.55, 1.72, -6.9] as const, rotation: [0, 0.04, -0.03] as const },
-    { position: [0.35, 1.58, -6.9] as const, rotation: [0, -0.05, 0.02] as const },
+    { position: [-2.55, 1.12, -7.02] as const, rotation: [0, 0.02, -0.03] as const },
+    { position: [2.15, 1.02, -7.02] as const, rotation: [0, -0.03, 0.02] as const },
   ];
   return (
     <group>
@@ -122,6 +125,69 @@ function Posters() {
       ))}
     </group>
   );
+}
+
+/**
+ * Spray the wordmark into the brick: the letters stay, the mortar and chips
+ * let the wall show through, and a lit standard material takes the sun.
+ */
+function paintMural(image: CanvasImageSource): CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 368;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('mural');
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = pixels.data;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      const i = (y * canvas.width + x) * 4;
+      const ink = (data[i + 3] ?? 0) / 255;
+      if (ink < 0.04) {
+        data[i + 3] = 0;
+        continue;
+      }
+      const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+      const grit = 0.9 + 0.1 * (n - Math.floor(n));
+      const chip = Math.sin(x * 0.37 + y * 1.91) * 43758.5453;
+      const pit = chip - Math.floor(chip) < 0.06 ? 0.42 : 1;
+      data[i + 3] = Math.round(ink * 0.84 * grit * pit * 255);
+    }
+  }
+  ctx.putImageData(pixels, 0, 0);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  texture.anisotropy = 8;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function WallMural() {
+  const source = useTexture(alleyUrl(ALLEY_WORDMARK));
+  const map = useMemo(() => paintMural(source.image as CanvasImageSource), [source]);
+  useEffect(() => () => { map.dispose(); }, [map]);
+  return (
+    <mesh position={ALLEY_MURAL.position} receiveShadow>
+      <planeGeometry args={[ALLEY_MURAL.size[0], ALLEY_MURAL.size[1]]} />
+      <meshStandardMaterial
+        map={map}
+        transparent
+        roughness={0.84}
+        metalness={0}
+        envMapIntensity={0.35}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
+class MuralBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? null : this.props.children; }
 }
 
 /** Cloth pennants on a sagging cord. Above the play box, across the alley. */
@@ -193,6 +259,11 @@ export function AlleyCourt({ shadows, quality }: { shadows: boolean; quality: Qu
     <group>
       <Bunting sway={sway} />
       <Posters />
+      <MuralBoundary>
+        <Suspense fallback={null}>
+          <WallMural />
+        </Suspense>
+      </MuralBoundary>
       <AlleyBoundary key={url} fallback={<ConcretePad />}>
         <Suspense fallback={<ConcretePad />}>
           <AlleyModel quality={quality} shadows={shadows} />

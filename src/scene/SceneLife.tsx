@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { Color, DoubleSide, Group, InstancedMesh, Object3D } from 'three';
 import type { GameEngine } from '../engine/engine';
 import type { Quality } from '../game/storage';
+import { ENVIRONMENT_THEME } from './environment';
 import { crowdBob, prefersReducedMotion, sceneLifeBudget } from './juice';
 
 const CROWD = ['#FF4F9A', '#FFD93D', '#00B8A9', '#6C5CE7', '#FF8A5B', '#F8F9FB'];
@@ -17,7 +18,7 @@ export function SceneLife({ engine, quality }: { engine: GameEngine; quality: Qu
   const budget = sceneLifeBudget(quality, reduced);
   return (
     <group>
-      <Crowd count={budget.crowd} engine={engine} reduced={reduced} />
+      {ENVIRONMENT_THEME === 'beach' && <Crowd count={budget.crowd} engine={engine} reduced={reduced} />}
       <Palms count={budget.palms} sway={budget.buntingSway} />
       <Flags count={budget.flags} sway={budget.buntingSway} />
       <Clouds count={budget.clouds} drift={budget.cameraSway} />

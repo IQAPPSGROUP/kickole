@@ -1,81 +1,110 @@
 import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Color, InstancedMesh, Object3D } from 'three';
+import type { CrowdLod } from './qualityTier';
+import { crowdModel, crowdPlacements, type Spectator } from './streetLayout';
+import { useStreetNodes, type StreetNode } from './streetMaterials';
+import { prefersReducedMotion } from './juice';
 
-const SHIRTS = ['#6e4b3a', '#2f3d4a', '#8a4a3a', '#3d5348', '#c4b49a', '#1e2430', '#a36b45', '#4d5d73'];
-const SKIN = ['#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', '#5c3317'];
+const dummy = new Object3D();
+const tint = new Color();
 
-function mulberry32(seed: number) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function partPeople(name: string, lod: CrowdLod, people: Spectator[]): Spectator[] {
+  if (name === 'Hat') return people.filter((person) => person.hat);
+  if (name === 'Afro') return people.filter((person) => person.afro);
+  if (name === 'Hair' && lod === 0) return people.filter((person) => !person.hat && !person.afro);
+  return people;
 }
 
-/**
- * Instanced spectators outside the touchlines. One body draw and one head draw.
- * Count comes from the quality tier so low devices stay light.
- */
-export function Crowd({ count }: { count: number }) {
-  const body = useRef<InstancedMesh>(null);
-  const head = useRef<InstancedMesh>(null);
-  const layout = useMemo(() => {
-    const random = mulberry32(1962);
-    const dummy = new Object3D();
-    const bodies: { matrix: number[]; color: string }[] = [];
-    const heads: { matrix: number[]; color: string }[] = [];
-    for (let i = 0; i < count; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const row = Math.floor(i / 2);
-      const rows = Math.ceil(count / 2);
-      const along = (row / Math.max(1, rows - 1) - 0.5) * 7.4;
-      const scale = 0.86 + random() * 0.22;
-      const x = side * (5.05 + random() * 0.25);
-      const z = along + (random() - 0.5) * 0.2;
-      dummy.position.set(x, 0.72 * scale, z);
-      dummy.rotation.set(0, side > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
-      dummy.scale.set(scale, scale, scale);
+function partColor(name: string, person: Spectator): string {
+  switch (name) {
+    case 'Torso':
+    case 'Body':
+      return person.shirt;
+    case 'Shorts':
+      return person.shorts;
+    case 'Head':
+    case 'ArmL':
+    case 'ArmR':
+    case 'LegL':
+    case 'LegR':
+      return person.skin;
+    case 'Hair':
+    case 'Afro':
+      return person.hair;
+    case 'Hat':
+      return person.hatColor;
+    default:
+      return person.shirt;
+  }
+}
+
+function CrowdPart({ node, people, lod, idle }: { node: StreetNode; people: Spectator[]; lod: CrowdLod; idle: boolean }) {
+  const meshRef = useRef<InstancedMesh>(null);
+  const mine = useMemo(() => partPeople(node.name, lod, people), [node.name, lod, people]);
+  const paint = (time: number, colors: boolean) => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const swayOn = idle && !prefersReducedMotion();
+    for (let i = 0; i < mine.length; i++) {
+      const person = mine[i];
+      if (!person) continue;
+      const bob = swayOn ? Math.sin(time * 1.55 + person.phase) * 0.018 : 0;
+      const lean = swayOn ? Math.sin(time * 1.1 + person.phase) * 0.045 : 0;
+      const swing = swayOn ? Math.sin(time * 1.85 + person.phase) * 0.32 : 0;
+      let rx = 0;
+      let ry = person.yaw;
+      let rz = 0;
+      if (node.name === 'ArmL') rx = swing;
+      else if (node.name === 'ArmR') rx = -swing;
+      else if (node.name === 'Torso' || node.name === 'Body' || node.name === 'Shorts') rz = lean;
+      else if (node.name === 'Head' || node.name === 'Hair' || node.name === 'Afro' || node.name === 'Hat') {
+        rz = -lean * 0.45;
+        ry += Math.sin(time * 0.6 + person.phase) * (swayOn ? 0.12 : 0);
+      }
+      dummy.rotation.order = 'YXZ';
+      dummy.position.set(
+        person.x + node.pivot[0] * person.scale,
+        person.y + node.pivot[1] * person.scale + bob,
+        person.z + node.pivot[2] * person.scale,
+      );
+      dummy.rotation.set(rx, ry, rz);
+      const bulk = node.name === 'Afro' ? 1.08 : 1;
+      dummy.scale.setScalar(person.scale * bulk);
       dummy.updateMatrix();
-      bodies.push({ matrix: dummy.matrix.toArray(), color: SHIRTS[i % SHIRTS.length] });
-      dummy.position.set(x, 1.28 * scale, z);
-      dummy.scale.setScalar(scale);
-      dummy.updateMatrix();
-      heads.push({ matrix: dummy.matrix.toArray(), color: SKIN[Math.floor(random() * SKIN.length)] });
+      mesh.setMatrixAt(i, dummy.matrix);
+      if (colors) mesh.setColorAt(i, tint.set(partColor(node.name, person)));
     }
-    return { bodies, heads };
-  }, [count]);
-
-  useLayoutEffect(() => {
-    const color = new Color();
-    const apply = (mesh: InstancedMesh | null, items: { matrix: number[]; color: string }[]) => {
-      if (!mesh) return;
-      items.forEach((item, i) => {
-        scratch.matrix.fromArray(item.matrix);
-        mesh.setMatrixAt(i, scratch.matrix);
-        mesh.setColorAt(i, color.set(item.color));
-      });
-      mesh.instanceMatrix.needsUpdate = true;
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    };
-    apply(body.current, layout.bodies);
-    apply(head.current, layout.heads);
-  }, [layout]);
-
-  if (count <= 0) return null;
+    mesh.instanceMatrix.needsUpdate = true;
+    if (colors && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  };
+  useLayoutEffect(() => { paint(0, true); }, [mine, node, idle]);
+  useFrame((state) => {
+    if (!idle || prefersReducedMotion()) return;
+    paint(state.clock.elapsedTime, false);
+  });
+  if (mine.length === 0) return null;
+  const rough = node.name === 'Hair' || node.name === 'Afro' || node.name === 'Hat' ? 0.58 : 0.74;
   return (
-    <group>
-      <instancedMesh ref={body} args={[undefined, undefined, count]} frustumCulled={false}>
-        <capsuleGeometry args={[0.18, 0.62, 3, 6]} />
-        <meshStandardMaterial roughness={0.82} metalness={0} />
-      </instancedMesh>
-      <instancedMesh ref={head} args={[undefined, undefined, count]} frustumCulled={false}>
-        <sphereGeometry args={[0.13, 8, 6]} />
-        <meshStandardMaterial roughness={0.7} metalness={0} />
-      </instancedMesh>
-    </group>
+    <instancedMesh ref={meshRef} args={[node.geometry, undefined, mine.length]} frustumCulled={false}>
+      <meshStandardMaterial roughness={rough} metalness={0} />
+    </instancedMesh>
   );
 }
 
-const scratch = new Object3D();
+/**
+ * Instanced spectators. High uses the detailed mesh and an idle sway.
+ * Medium and low swap in smaller LODs. Everyone stands outside the play box.
+ */
+export function Crowd({ count, lod, idle }: { count: number; lod: CrowdLod; idle: boolean }) {
+  const people = useMemo(() => crowdPlacements(count), [count]);
+  const nodes = useStreetNodes(count > 0 ? crowdModel(lod) : null);
+  if (count <= 0 || nodes.length === 0) return null;
+  return (
+    <group>
+      {nodes.map((node) => (
+        <CrowdPart key={`${lod}-${node.name}`} node={node} people={people} lod={lod} idle={idle} />
+      ))}
+    </group>
+  );
+}

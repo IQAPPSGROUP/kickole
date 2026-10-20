@@ -76,11 +76,11 @@ public/models/env/alley_game_low.glb
   standalone downloads. The phone file is the same meshes with smaller
   textures. Rebuild it with `node tools/build_alley_low.mjs`.
 
-public/textures/alley/homecoming_1k.hdr
-public/textures/alley/alley_sky.jpg
-  Poly Haven homecoming_center_rooftop, 1K HDR and a tone-mapped JPEG, CC0.
-  https://polyhaven.com/a/homecoming_center_rooftop
-  Sunny Cape Town skyline behind the open side of the alley.
+public/textures/alley/modern_buildings_2_1k.hdr
+public/textures/alley/modern_buildings_2.jpg
+  Poly Haven modern_buildings_2, 1K HDR and a tone-mapped JPEG, CC0.
+  Alexander Scholten. https://polyhaven.com/a/modern_buildings_2
+  Daytime glass and concrete towers behind the open side of the alley.
 
 Quaternius sources still in this folder
 ---------------------------------------

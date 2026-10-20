@@ -70,7 +70,7 @@ function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
   cam.updateProjectionMatrix();
 }
 
-/** Three-quarter front camera that fits the play area in portrait and landscape, with kick push-in and shake. */
+/** Head-height camera aimed at the back brick, with kick push-in and shake. */
 function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
   const { camera, size } = useThree();
   useEffect(() => {

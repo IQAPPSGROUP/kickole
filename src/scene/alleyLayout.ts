@@ -4,10 +4,10 @@ import type { Quality } from '../game/storage';
 export const ALLEY_OFFSET = { x: 1.43, y: -0.261502, z: 6.3 } as const;
 
 /**
- * Pitch lifts the photographed sky into the downward gameplay frame.
- * Yaw puts the Cape Town towers on the open side, behind the player.
+ * Yaw turns the city towers onto the open end of the alley.
+ * Pitch stays level so a head-height camera meets the horizon, not the plaza.
  */
-export const ALLEY_SKY_LOOK = { yaw: 2.2, pitch: 0, background: 1.08, environment: 0.38 } as const;
+export const ALLEY_SKY_LOOK = { yaw: 1.6, pitch: 0, background: 1.05, environment: 0.34 } as const;
 
 /** Floor map multiplier. The photograph is already mid-grey; this stops the sun blowing it white. */
 export const ALLEY_FLOOR_TINT = '#b9b9b9';
@@ -15,8 +15,8 @@ export const ALLEY_FLOOR_TINT = '#b9b9b9';
 export const ALLEY_FILES = {
   model: 'models/env/alley_game.glb',
   modelLow: 'models/env/alley_game_low.glb',
-  sky: 'textures/alley/homecoming_1k.hdr',
-  skyLow: 'textures/alley/alley_sky.jpg',
+  sky: 'textures/alley/modern_buildings_2_1k.hdr',
+  skyLow: 'textures/alley/modern_buildings_2.jpg',
 } as const;
 
 export function alleyUrl(file: string): string {
@@ -33,8 +33,8 @@ export function alleySkyUrl(quality: Quality): string {
 
 /** Contact-sheet cameras. Gameplay framing is unchanged when the query is absent. */
 export const ALLEY_VIEWS = {
-  wide: { fov: 52, position: [6.6, 7.4, 12.2] as const, look: [0.3, 1.2, -4.8] as const },
-  reverse: { fov: 50, position: [-0.2, 1.55, -4.6] as const, look: [0.2, 2.8, 9.5] as const },
+  wide: { fov: 46, position: [2.6, 2.2, 8.8] as const, look: [0.05, 2.05, -5.4] as const },
+  reverse: { fov: 48, position: [0.15, 1.6, -2.7] as const, look: [0.4, 3.2, 9] as const },
 } as const;
 
 export type AlleyView = keyof typeof ALLEY_VIEWS;
@@ -50,19 +50,20 @@ export function alleyViewFromSearch(search: string): AlleyView | null {
   }
 }
 
-/** Wordmark painted on the camera-facing brick, above the player and inside the wall. */
+/** Wordmark painted high on the camera-facing brick, inside the wall face. */
 export const ALLEY_WORDMARK = 'brand/kickole-wordmark.webp';
 
 export const ALLEY_MURAL = {
-  position: [0.18, 2.28, -7.03] as const,
-  size: [3.7, 1.33] as const,
+  position: [0, 2.94, -7.03] as const,
+  size: [3.36, 1.208] as const,
 };
 
 /**
- * Two strings across the open sky, above the brick the wordmark is painted on.
+ * Two strings under the wordmark, in front of the back brick and behind the fence.
+ * The rope stays below the letters so the pennants cannot cover them.
  * `sag` is how far the middle of the rope drops.
  */
 export const ALLEY_BUNTING: readonly { z: number; y: number; x0: number; x1: number; count: number; sag: number }[] = [
-  { z: -2.0, y: 4.0, x0: -3.5, x1: 3.2, count: 14, sag: 0.22 },
-  { z: -3.4, y: 4.0, x0: -2.6, x1: 2.9, count: 12, sag: 0.18 },
+  { z: -5.9, y: 2.12, x0: -2.5, x1: 2.4, count: 12, sag: 0.07 },
+  { z: -6.55, y: 2.2, x0: -2.2, x1: 2.15, count: 10, sag: 0.05 },
 ];

@@ -45,7 +45,7 @@ function BrightFallback() {
 }
 
 /**
- * Cape Town rooftop HDRI behind the open side of the alley.
+ * City-tower HDRI behind the open side of the alley.
  * High and medium use the 1K HDR for the background and image light.
  * Low uses the tone-mapped JPEG and skips PMREM.
  */

@@ -35,8 +35,23 @@ function materialNames(material: { name: string } | Array<{ name: string }>): st
 // Leather only. A sock vertex inside the ankle can satisfy a distance check while the boot still sits clear of the ball.
 const LEG_MATERIALS = new Set(['Boots', 'Boots_Sole', 'Boot_Laces', 'Boot_Trim']);
 
-/** Closest skinned vertex on the named materials. That is the surface the ball would hit first. */
-function closestSkinnedVertex(scene: Object3D, target: Vector3, materials: Set<string>): Vector3 | null {
+/** Boot, shirt and skin sets used by contact tests and the freestyle seat. */
+export const BOOT_MATERIALS = LEG_MATERIALS;
+export const BODY_MATERIALS = new Set(['Skin', 'Shirt', 'Shorts']);
+export const UPPER_MATERIALS = new Set(['Skin', 'Shirt']);
+export const THIGH_MATERIALS = new Set(['Skin', 'Shorts']);
+
+/**
+ * Closest skinned vertex on the named materials.
+ * `near` / `nearRadius` keep the search on one body part (the instep, not the other boot).
+ */
+export function closestSkinnedVertex(
+  scene: Object3D,
+  target: Vector3,
+  materials: Set<string>,
+  near?: Vector3,
+  nearRadius = Infinity,
+): Vector3 | null {
   let best = Number.POSITIVE_INFINITY;
   let bestPoint: Vector3 | null = null;
   scene.updateMatrixWorld(true);
@@ -50,6 +65,7 @@ function closestSkinnedVertex(scene: Object3D, target: Vector3, materials: Set<s
       const position = plain.geometry.attributes.position;
       for (let i = 0; i < position.count; i++) {
         skinnedWorld.fromBufferAttribute(position, i).applyMatrix4(plain.matrixWorld);
+        if (near && skinnedWorld.distanceTo(near) > nearRadius) continue;
         const distance = skinnedWorld.distanceTo(target);
         if (distance < best) {
           best = distance;
@@ -74,6 +90,7 @@ function closestSkinnedVertex(scene: Object3D, target: Vector3, materials: Set<s
         boneWorld.multiplyMatrices(bone.matrixWorld, mesh.skeleton.boneInverses[boneIndex]);
         skinnedWorld.addScaledVector(weighted.copy(bindPosition).applyMatrix4(boneWorld), weight);
       }
+      if (near && skinnedWorld.distanceTo(near) > nearRadius) continue;
       const distance = skinnedWorld.distanceTo(target);
       if (distance < best) {
         best = distance;
@@ -178,6 +195,29 @@ function instepStrike(scene: Object3D, foot: Vector3, toe: Vector3): { point: Ve
   if (outward.lengthSq() < 1e-8 || outward.dot(instep) < 0) outward.copy(instep);
   outward.normalize();
   return { point, outward };
+}
+
+/** Signed gap: closest surface vertex to the ball centre, minus the radius. Negative means the mesh is inside the ball. */
+export function surfaceGap(
+  scene: Object3D,
+  center: Vector3,
+  radius: number,
+  materials: Set<string>,
+  near?: Vector3,
+  nearRadius = Infinity,
+): number {
+  const hit = closestSkinnedVertex(scene, center, materials, near, nearRadius);
+  if (!hit) return Number.POSITIVE_INFINITY;
+  return hit.distanceTo(center) - radius;
+}
+
+/** Instep vertex in the foot bone's local space, for the pose currently on `scene`. */
+export function instepLocalPoint(scene: Object3D, foot: Object3D, toe: Object3D | undefined): Vector3 | null {
+  const footPosition = foot.getWorldPosition(new Vector3());
+  const toePosition = toe ? toe.getWorldPosition(new Vector3()) : footPosition.clone().add(new Vector3(0, -0.04, 0.16));
+  const seated = instepStrike(scene, footPosition, toePosition);
+  if (!seated) return null;
+  return foot.worldToLocal(seated.point.clone());
 }
 
 /**

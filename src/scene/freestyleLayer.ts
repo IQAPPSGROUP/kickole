@@ -11,6 +11,14 @@ import type { GameEngine } from '../engine/engine';
 import type { TrickKind } from '../engine/tricks';
 import { aimPoint, pinAnkle, solveTwoBone, forwardPole } from './footIk';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
+import {
+  BOOT_MATERIALS,
+  THIGH_MATERIALS,
+  UPPER_MATERIALS,
+  closestSkinnedVertex,
+  instepLocalPoint,
+  surfaceGap,
+} from './measureFootContact';
 import type { Pose } from './pose';
 import type { AnimationState } from './rig';
 import { KICK_CLIP_CONTACT_TIME } from './rig';
@@ -129,12 +137,12 @@ function chain(scene: Object3D, side: Side): LegChain | null {
 }
 
 const footWorld = new Vector3();
-const thighOffset = new Vector3();
-const FOREHEAD = new Vector3(0, 0.1, 0.09);
 const NAPE = new Vector3(0, 0.06, -0.1);
-const target = new Vector3();
-const shifted = new Vector3();
+const hipRest = new Vector3();
+const segB = new Vector3();
 const ball = new Vector3();
+const hipDelta = new Vector3();
+const kneeWorld = new Vector3();
 const pole = new Vector3();
 const hipWorld = new Vector3();
 const euler = new Euler();
@@ -142,8 +150,28 @@ const swing = new Quaternion();
 const headPosed = new Quaternion();
 const clipThigh = new Quaternion();
 const clipShin = new Quaternion();
+const clipFoot = new Quaternion();
 const solvedThigh = new Quaternion();
 const solvedShin = new Quaternion();
+const solvedFoot = new Quaternion();
+const orientQ = new Quaternion();
+const localScratch = new Vector3();
+const restScratch = new Vector3();
+const approach = new Vector3();
+const surface = new Vector3();
+const ankleTarget = new Vector3();
+const strikeDir = new Vector3();
+const landmark = new Vector3();
+const instepLocal: Record<Side, Vector3> = {
+  left: new Vector3(0, -0.02, 0.12),
+  right: new Vector3(0, -0.02, 0.12),
+};
+const thighLocal: Record<Side, Vector3> = {
+  left: new Vector3(0, -0.2, 0.06),
+  right: new Vector3(0, -0.2, 0.06),
+};
+const backLocal = new Vector3(0, 0.08, -0.1);
+const foreheadLocal = new Vector3(0, 0.1, 0.09);
 
 function other(side: Side): Side {
   return side === 'left' ? 'right' : 'left';
@@ -171,6 +199,7 @@ export function createFreestyleRig() {
     right: { plant: new Vector3(), contact: new Vector3(), follow: new Vector3(), ball: new Vector3() },
   };
   let bones: FreestyleBones | null = null;
+  let skinned: Object3D | null = null;
   let ready = false;
   const secondary = createSecondaryMotion();
   const shown = new Map<string, Quaternion>();
@@ -195,6 +224,10 @@ export function createFreestyleRig() {
       scene.updateMatrixWorld(true);
     }
     limb.foot.getWorldPosition(anchors[side][slot]);
+    if (slot === 'contact') {
+      const local = instepLocalPoint(scene, limb.foot, limb.toe);
+      if (local) instepLocal[side].copy(local);
+    }
     mixer.stopAllAction();
     mixer.uncacheRoot(scene);
   }
@@ -235,14 +268,247 @@ export function createFreestyleRig() {
     return out.set(engine.ball.x, engine.ball.y, engine.ball.z);
   }
 
-  function contactAnkle(side: Side, engine: GameEngine, out: Vector3): Vector3 {
-    const anchor = anchors[side];
-    ballNow(engine, ball);
-    shifted.copy(ball).sub(anchor.ball);
-    shifted.x = Math.min(0.14, Math.max(-0.14, shifted.x));
-    shifted.y = Math.min(0.12, Math.max(-0.12, shifted.y));
-    shifted.z = Math.min(0.12, Math.max(-0.12, shifted.z));
-    return out.copy(anchor.contact).add(shifted);
+  /** Move the hips in world space. The support foot is pinned again by the caller. */
+  function shiftHips(worldDelta: Vector3) {
+    if (!bones) return;
+    const parent = bones.hips.parent;
+    bones.hips.updateWorldMatrix(true, false);
+    bones.hips.getWorldPosition(hipDelta);
+    hipDelta.add(worldDelta);
+    if (parent) {
+      parent.updateWorldMatrix(true, false);
+      parent.worldToLocal(hipDelta);
+    }
+    bones.hips.position.copy(hipDelta);
+    bones.hips.updateMatrix();
+    bones.hips.updateWorldMatrix(true, true);
+  }
+
+  /** Point the instep local offset along `worldDir` without moving the ankle. */
+  function orientInstep(side: Side, worldDir: Vector3) {
+    const limb = leg(side);
+    const local = instepLocal[side];
+    limb.shin.updateWorldMatrix(true, false);
+    limb.shin.getWorldQuaternion(orientQ);
+    localScratch.copy(worldDir).applyQuaternion(orientQ.invert());
+    if (local.lengthSq() < 1e-8 || localScratch.lengthSq() < 1e-8) return;
+    restScratch.copy(local).normalize();
+    limb.foot.quaternion.setFromUnitVectors(restScratch, localScratch.normalize());
+    limb.foot.updateMatrix();
+    limb.foot.updateWorldMatrix(true, true);
+  }
+
+  function legReach(side: Side): number {
+    const limb = leg(side);
+    return limb.shin.position.length() + limb.foot.position.length() - 0.02;
+  }
+
+  /** True when every planted ankle is still inside its leg length after `delta`. */
+  function withinReach(delta: Vector3, planted: readonly Side[]): boolean {
+    if (!bones) return false;
+    bones.hips.getWorldPosition(hipWorld);
+    const x = hipWorld.x + delta.x;
+    const y = hipWorld.y + delta.y;
+    const z = hipWorld.z + delta.z;
+    for (const side of planted) {
+      const plant = anchors[side].plant;
+      const dist = Math.hypot(x - plant.x, y - plant.y, z - plant.z);
+      if (dist > legReach(side)) return false;
+    }
+    return true;
+  }
+
+  function shiftClamped(delta: Vector3, planted: readonly Side[]): number {
+    let scale = 1;
+    for (let i = 0; i < 8; i++) {
+      restScratch.copy(delta).multiplyScalar(scale);
+      if (withinReach(restScratch, planted)) {
+        shiftHips(restScratch);
+        return scale;
+      }
+      scale *= 0.5;
+    }
+    return 0;
+  }
+
+  /** Drop the hips so a straight support leg can step without leaving the plant. */
+  function crouch(planted: readonly Side[], amount = 0.045, floor = 0.62) {
+    if (!bones || amount <= 0) return;
+    bones.hips.getWorldPosition(hipWorld);
+    const drop = Math.min(amount, Math.max(0, hipWorld.y - floor));
+    if (drop < 0.004) return;
+    kneeWorld.set(0, -drop, 0);
+    if (withinReach(kneeWorld, planted)) shiftHips(kneeWorld);
+  }
+
+  /**
+   * Move the hips until `ankle` is inside the striking leg, while planted feet stay down.
+   * A straight Fab leg has almost no spare reach, so the hips drop before they step.
+   */
+  function ensureAnkleReach(side: Side, ankle: Vector3, planted: readonly Side[]) {
+    const maxStrike = legReach(side) + 0.015;
+    for (let pass = 0; pass < 8; pass++) {
+      const limb = leg(side);
+      limb.thigh.getWorldPosition(hipWorld);
+      const strikeDist = hipWorld.distanceTo(ankle);
+      let supportOk = true;
+      for (const plantedSide of planted) {
+        if (hipWorld.distanceTo(anchors[plantedSide].plant) > legReach(plantedSide)) supportOk = false;
+      }
+      if (strikeDist <= maxStrike && supportOk) return;
+      if (!supportOk) crouch(planted, 0.05);
+      if (strikeDist > maxStrike) {
+        limb.thigh.getWorldPosition(hipWorld);
+        const excess = strikeDist - maxStrike + 0.03;
+        localScratch.copy(ankle).sub(hipWorld).multiplyScalar(excess / Math.max(strikeDist, 1e-4));
+        // Prefer a crouch over lifting the hips, which locks the support leg.
+        if (localScratch.y > 0) localScratch.y *= 0.25;
+        crouch(planted, 0.03);
+        shiftClamped(localScratch, planted);
+      }
+    }
+  }
+
+  function solveStrike(side: Side, ankle: Vector3, towardBall: Vector3, wideKnee = false) {
+    const limb = leg(side);
+    limb.thigh.getWorldPosition(hipWorld);
+    if (wideKnee) {
+      const outward = side === 'left' ? -1 : 1;
+      pole.set(hipWorld.x + outward * 0.55, hipWorld.y + 0.05, hipWorld.z + 0.5);
+    } else {
+      forwardPole(hipWorld, pole);
+    }
+    solveTwoBone(limb.thigh, limb.shin, limb.foot, ankle, pole);
+    orientInstep(side, towardBall);
+  }
+
+  /**
+   * Put the instep on the ball surface. `fromBall` is the direction from the ball
+   * toward the foot (the player side for a kick, downward for a flick).
+   * The correction uses the skinned boot, in world space, so a clip ankle cannot pass the test.
+   */
+  function seatFoot(side: Side, ballCenter: Vector3, radius: number, fromBall: Vector3) {
+    const limb = leg(side);
+    const len = Math.max(0.05, instepLocal[side].length());
+    approach.copy(fromBall);
+    if (approach.lengthSq() < 1e-8) approach.set(0, -0.2, -1);
+    approach.normalize();
+    surface.copy(ballCenter).addScaledVector(approach, radius);
+    ankleTarget.copy(surface).addScaledVector(approach, len);
+    strikeDir.copy(approach).negate();
+    solveStrike(side, ankleTarget, strikeDir);
+    if (!skinned) return;
+    for (let pass = 0; pass < 6; pass++) {
+      limb.foot.getWorldPosition(footWorld);
+      const gap = surfaceGap(skinned, ballCenter, radius, BOOT_MATERIALS, footWorld, 0.45);
+      if (!Number.isFinite(gap) || Math.abs(gap) < 0.01) break;
+      // Positive gap: the leather is still short of the ball. Step the ankle toward it.
+      const step = Math.max(-0.06, Math.min(0.1, gap));
+      ankleTarget.addScaledVector(approach, -step);
+      strikeDir.copy(approach).negate();
+      solveStrike(side, ankleTarget, strikeDir);
+    }
+  }
+
+  /**
+   * Aim `landmark`, then walk the hips until a skinned vertex on that landmark
+   * sits on the ball. Support feet stay inside leg reach.
+   */
+  function bringSurface(
+    ballCenter: Vector3,
+    radius: number,
+    materials: Set<string>,
+    nearPoint: Vector3,
+    near: number,
+    planted: readonly Side[],
+    aim: () => void,
+  ): number {
+    let gap = Number.POSITIVE_INFINITY;
+    if (!skinned || !bones) {
+      aim();
+      return gap;
+    }
+    const nudge = (rotate: boolean): number => {
+      if (rotate) aim();
+      if (!skinned || !bones) return Number.POSITIVE_INFINITY;
+      bones.hips.updateWorldMatrix(true, true);
+      const hit = closestSkinnedVertex(skinned, ballCenter, materials, nearPoint, near);
+      if (!hit) return Number.POSITIVE_INFINITY;
+      const next = hit.distanceTo(ballCenter) - radius;
+      if (Math.abs(next) < 0.01) return next;
+      approach.copy(ballCenter).sub(hit);
+      if (approach.lengthSq() < 1e-8) return next;
+      approach.normalize();
+      localScratch.copy(approach).multiplyScalar(Math.max(-0.05, Math.min(0.06, next)));
+      if (!withinReach(localScratch, planted)) crouch(planted, 0.03);
+      if (shiftClamped(localScratch, planted) > 0) nearPoint.add(restScratch);
+      return next;
+    };
+    for (let pass = 0; pass < 6; pass++) {
+      gap = nudge(true);
+      if (Math.abs(gap) < 0.01) return gap;
+    }
+    for (let pass = 0; pass < 4; pass++) {
+      gap = nudge(false);
+      if (Math.abs(gap) < 0.01) return gap;
+    }
+    return gap;
+  }
+
+  /** Tricks start from the idle hips. A previous contact must not keep walking the body. */
+  function resetHipPlanar() {
+    if (!bones) return;
+    bones.hips.position.x = hipRest.x;
+    bones.hips.position.z = hipRest.z;
+    bones.hips.updateMatrix();
+    bones.hips.updateWorldMatrix(true, true);
+  }
+
+  function segmentDistance(point: Vector3, a: Vector3, b: Vector3): number {
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const abz = b.z - a.z;
+    const lenSq = abx * abx + aby * aby + abz * abz;
+    if (lenSq < 1e-8) return point.distanceTo(a);
+    const t = Math.min(1, Math.max(0, ((point.x - a.x) * abx + (point.y - a.y) * aby + (point.z - a.z) * abz) / lenSq));
+    segB.set(a.x + abx * t, a.y + aby * t, a.z + abz * t);
+    return point.distanceTo(segB);
+  }
+
+  /** Push the circling foot back outside the standing leg. Returns the closest approach in metres. */
+  function separateFromSupport(side: Side, support: Side): number {
+    const limb = leg(side);
+    const stood = leg(support);
+    const outward = side === 'left' ? -1 : 1;
+    let closest = Number.POSITIVE_INFINITY;
+    for (let pass = 0; pass < 4; pass++) {
+      limb.shin.getWorldPosition(kneeWorld);
+      limb.foot.getWorldPosition(footWorld);
+      const toe = limb.toe;
+      if (toe) toe.getWorldPosition(surface);
+      else surface.copy(footWorld);
+      stood.thigh.getWorldPosition(hipWorld);
+      stood.shin.getWorldPosition(pole);
+      stood.foot.getWorldPosition(strikeDir);
+      closest = Math.min(
+        segmentDistance(kneeWorld, hipWorld, pole),
+        segmentDistance(footWorld, hipWorld, pole),
+        segmentDistance(footWorld, pole, strikeDir),
+        segmentDistance(surface, hipWorld, pole),
+        segmentDistance(surface, pole, strikeDir),
+      );
+      if (closest >= 0.06) break;
+      ankleTarget.copy(footWorld);
+      ankleTarget.x += outward * 0.05;
+      ankleTarget.z += 0.04;
+      ankleTarget.y += 0.03;
+      limb.thigh.getWorldPosition(hipWorld);
+      pole.set(hipWorld.x + outward * 0.6, hipWorld.y + 0.2, hipWorld.z + 0.4);
+      solveTwoBone(limb.thigh, limb.shin, limb.foot, ankleTarget, pole);
+      strikeDir.copy(ball).sub(ankleTarget);
+      if (strikeDir.lengthSq() > 1e-8) orientInstep(side, strikeDir);
+    }
+    return closest;
   }
 
   function applyIdle(engine: GameEngine, pose: Pose) {
@@ -270,7 +536,7 @@ export function createFreestyleRig() {
     pin('right', anchors.right.plant);
   }
 
-  function applyStrike(engine: GameEngine, side: Side, since: number, underBall = false) {
+  function applyStrike(engine: GameEngine, side: Side, since: number) {
     const limb = leg(side);
     const held = engine.contact?.side === side;
     const weight = held
@@ -285,25 +551,22 @@ export function createFreestyleRig() {
     if (weight > 0.001) {
       clipThigh.copy(limb.thigh.quaternion);
       clipShin.copy(limb.shin.quaternion);
-      limb.foot.getWorldPosition(footWorld);
-      if (underBall) {
-        ballNow(engine, target);
-        target.y -= 0.09;
-        target.z -= 0.03;
-      } else {
-        contactAnkle(side, engine, target);
-      }
-      footWorld.lerp(target, weight);
+      clipFoot.copy(limb.foot.quaternion);
+      ballNow(engine, ball);
       limb.thigh.getWorldPosition(hipWorld);
-      solveTwoBone(limb.thigh, limb.shin, limb.foot, footWorld, forwardPole(hipWorld, pole));
-      // Full contact lands on the ball. Earlier frames keep the clip's knee so the swing does not pop.
+      approach.copy(hipWorld).sub(ball);
+      seatFoot(side, ball, engine.config.ballRadius, approach);
+      // Full contact stays on the leather. Earlier frames keep some of the clip so the swing does not pop.
       if (weight < 0.999) {
         solvedThigh.copy(limb.thigh.quaternion);
         solvedShin.copy(limb.shin.quaternion);
+        solvedFoot.copy(limb.foot.quaternion);
         limb.thigh.quaternion.copy(clipThigh).slerp(solvedThigh, weight);
         limb.shin.quaternion.copy(clipShin).slerp(solvedShin, weight);
+        limb.foot.quaternion.copy(clipFoot).slerp(solvedFoot, weight);
         limb.thigh.updateMatrix();
         limb.shin.updateMatrix();
+        limb.foot.updateMatrix();
         limb.shin.updateWorldMatrix(true, true);
       }
     }
@@ -318,59 +581,304 @@ export function createFreestyleRig() {
     }
   }
 
-  function applyThigh(engine: GameEngine, side: Side) {
-    pin(other(side), anchors[other(side)].plant);
+  function refreshThigh(side: Side) {
     const limb = leg(side);
-    ballNow(engine, ball);
-    // The authored thigh contact sits near the knee. A mid-thigh point cannot reach it.
-    thighOffset.set(0, -0.4, 0.06);
-    aimPoint(limb.thigh, thighOffset, ball, 1.55);
+    limb.thigh.updateWorldMatrix(true, true);
+    limb.thigh.localToWorld(landmark.copy(thighLocal[side]));
   }
 
-  function applyHead(engine: GameEngine, local: Vector3, maxAngle: number) {
-    if (!bones?.head) return;
+  /** Step and crouch until `worldPoint` is `distance` from the hips and the plants still reach. */
+  function placeHipNear(worldPoint: Vector3, distance: number, planted: readonly Side[]) {
+    if (!bones) return;
+    for (let pass = 0; pass < 6; pass++) {
+      bones.hips.getWorldPosition(hipWorld);
+      approach.copy(worldPoint).sub(hipWorld);
+      const dist = approach.length();
+      const excess = dist - distance;
+      if (Math.abs(excess) < 0.012 || dist < 1e-4) return;
+      approach.multiplyScalar(excess / dist);
+      if (!withinReach(approach, planted)) crouch(planted, 0.04, 0.8);
+      let scale = shiftClamped(approach, planted);
+      if (scale < 0.25) scale = shiftClamped(approach.multiplyScalar(0.5), planted);
+      if (scale < 0.05) return;
+    }
+  }
+
+  function applyThigh(engine: GameEngine, side: Side) {
+    const limb = leg(side);
+    const planted: Side[] = [other(side)];
+    resetHipPlanar();
+    clipThigh.copy(limb.thigh.quaternion);
     ballNow(engine, ball);
-    aimPoint(bones.head, local, ball, maxAngle);
-    hold(bones.head);
+    const radius = engine.config.ballRadius;
+    surface.copy(ball);
+    surface.y -= radius * 0.9;
+    const midLen = Math.min(0.28, Math.max(0.16, thighLocal[side].length()));
+    placeHipNear(surface, midLen, planted);
+    bringSurface(ball, radius, THIGH_MATERIALS, landmark, 0.28, planted, () => {
+      limb.thigh.quaternion.copy(clipThigh);
+      limb.thigh.updateMatrix();
+      refreshThigh(side);
+      surface.copy(ball);
+      surface.y -= radius * 0.9;
+      aimPoint(limb.thigh, thighLocal[side], surface, 2.2);
+      refreshThigh(side);
+    });
+    pin(other(side), anchors[other(side)].plant);
+  }
+
+  function applyHead(engine: GameEngine) {
+    const head = bones?.head;
+    const spine = bones?.spine;
+    if (!head) return;
+    resetHipPlanar();
+    clipFoot.copy(head.quaternion);
+    if (spine) clipThigh.copy(spine.quaternion);
+    ballNow(engine, ball);
+    const radius = engine.config.ballRadius;
+    const planted: Side[] = ['left', 'right'];
+    let lean = 0;
+    bringSurface(ball, radius, UPPER_MATERIALS, landmark, 0.16, planted, () => {
+      if (spine) {
+        spine.quaternion.copy(clipThigh);
+        if (lean > 0) spine.quaternion.multiply(swing.setFromEuler(euler.set(lean, 0, 0)));
+        spine.updateMatrix();
+      }
+      head.quaternion.copy(clipFoot);
+      head.updateMatrix();
+      head.updateWorldMatrix(true, true);
+      head.localToWorld(landmark.copy(foreheadLocal));
+      aimPoint(head, foreheadLocal, ball, 1.35);
+      head.updateWorldMatrix(true, true);
+      head.localToWorld(landmark.copy(foreheadLocal));
+      lean += 0.16;
+    });
+    hold(head);
+    hold(spine);
+    hold(bones?.chest);
     pin('left', anchors.left.plant);
     pin('right', anchors.right.plant);
   }
 
   function applyNeck(engine: GameEngine) {
-    if (!bones?.neck) return;
+    const shelf = bones?.chest ?? bones?.spine;
+    if (!shelf) return;
+    resetHipPlanar();
+    clipThigh.copy(shelf.quaternion);
+    if (bones?.neck) clipShin.copy(bones.neck.quaternion);
+    if (bones?.head) clipFoot.copy(bones.head.quaternion);
     ballNow(engine, ball);
-    aimPoint(bones.neck, NAPE, ball, 0.9);
-    hold(bones.neck);
-    hold(bones.head);
+    const radius = engine.config.ballRadius;
+    const planted: Side[] = ['left', 'right'];
+    bringSurface(ball, radius, UPPER_MATERIALS, landmark, 0.36, planted, () => {
+      shelf.quaternion.copy(clipThigh);
+      shelf.updateMatrix();
+      if (bones?.neck) {
+        bones.neck.quaternion.copy(clipShin);
+        bones.neck.updateMatrix();
+      }
+      shelf.updateWorldMatrix(true, true);
+      // Search the whole upper back, not one vertex the hinge swung off the leather.
+      shelf.getWorldPosition(landmark);
+      landmark.y += 0.06;
+      landmark.z -= 0.05;
+      surface.copy(ball);
+      surface.y -= radius * 0.35;
+      aimPoint(shelf, backLocal, surface, 1.2);
+      if (bones?.neck) aimPoint(bones.neck, NAPE, ball, 0.9);
+      // Face stays in front of the stall so the ball reads on the upper back.
+      if (bones?.head) {
+        bones.head.quaternion.copy(clipFoot);
+        bones.head.quaternion.multiply(swing.setFromEuler(euler.set(0.45, 0, 0)));
+        bones.head.updateMatrix();
+      }
+      shelf.updateWorldMatrix(true, true);
+      shelf.getWorldPosition(landmark);
+      landmark.y += 0.06;
+      landmark.z -= 0.05;
+    });
+    hold(bones?.spine);
+    hold(bones?.neck);
+    hold(bones?.head);
+    hold(shelf);
     pin('left', anchors.left.plant);
     pin('right', anchors.right.plant);
+  }
+
+  /**
+   * Foot circles the ball on the outside, instep on the leather.
+   * The arc never crosses the standing leg: x stays on the free-leg side and z stays in front.
+   */
+  function applyAtw(engine: GameEngine, side: Side) {
+    const support = other(side);
+    const planted: Side[] = [support];
+    resetHipPlanar();
+    const rev = engine.trick?.revolution ?? 0;
+    ballNow(engine, ball);
+    const radius = engine.config.ballRadius;
+    const len = Math.max(0.05, instepLocal[side].length());
+    const outward = side === 'left' ? -1 : 1;
+    const ang = Math.min(1, Math.max(0, rev)) * Math.PI;
+    const lift = Math.sin(ang);
+    // Stay on the face of the ball the hip can actually reach. A far-side target
+    // locks the leg and the boot spears through the leather.
+    leg(side).thigh.getWorldPosition(hipWorld);
+    approach.copy(hipWorld).sub(ball);
+    if (approach.lengthSq() < 1e-6) approach.set(-outward, 0.2, 0.4);
+    approach.normalize();
+    strikeDir.set(outward * (0.85 + 0.15 * Math.cos(ang)), 0.15 + 0.85 * lift, 0.55 + 0.35 * lift);
+    strikeDir.normalize();
+    approach.lerp(strikeDir, 0.35).normalize();
+    surface.copy(ball).addScaledVector(approach, radius);
+    ankleTarget.copy(surface).addScaledVector(approach, len);
+    ensureAnkleReach(side, ankleTarget, planted);
+    pin(support, anchors[support].plant);
+    strikeDir.copy(approach).negate();
+    solveStrike(side, ankleTarget, strikeDir, true);
+    separateFromSupport(side, support);
+    if (skinned) {
+      const limb = leg(side);
+      limb.foot.getWorldPosition(ankleTarget);
+      for (let pass = 0; pass < 5; pass++) {
+        const hit = closestSkinnedVertex(skinned, ball, BOOT_MATERIALS, ankleTarget, 0.45);
+        if (!hit) break;
+        const gap = hit.distanceTo(ball) - radius;
+        if (Math.abs(gap) < 0.01) break;
+        strikeDir.copy(hit).sub(ball);
+        if (strikeDir.lengthSq() < 1e-8) break;
+        strikeDir.normalize();
+        const step = Math.max(-0.035, Math.min(0.035, gap));
+        ankleTarget.addScaledVector(strikeDir, -step);
+        approach.copy(ball).sub(ankleTarget);
+        if (approach.lengthSq() > 1e-8) orientInstep(side, approach);
+        solveStrike(side, ankleTarget, approach.lengthSq() > 1e-8 ? approach : strikeDir, true);
+        limb.foot.getWorldPosition(ankleTarget);
+      }
+    }
+  }
+
+  /**
+   * High flick: the foot chambers under the ball, the instep meets the underside,
+   * then the leg carries on upward. Not a second copy of the straight kick.
+   */
+  function applyFlick(engine: GameEngine, side: Side, since: number) {
+    const limb = leg(side);
+    const support = other(side);
+    resetHipPlanar();
+    pin(support, anchors[support].plant);
+    ballNow(engine, ball);
+    const radius = engine.config.ballRadius;
+    const len = Math.max(0.05, instepLocal[side].length());
+    const contact = since >= 0.03 && since <= 0.08;
+    if (contact) {
+      // Instep meets the underside, then the leg carries the ball upward.
+      seatFoot(side, ball, radius, approach.set(0, -1, -0.12));
+    } else if (since < 0.03) {
+      const u = (since / 0.03) ** 2;
+      footWorld.copy(anchors[side].plant);
+      footWorld.y += 0.22;
+      footWorld.z += 0.02;
+      surface.copy(ball);
+      surface.y -= radius + len;
+      surface.z -= 0.04;
+      ankleTarget.copy(footWorld).lerp(surface, u);
+      limb.thigh.getWorldPosition(hipWorld);
+      solveTwoBone(limb.thigh, limb.shin, limb.foot, ankleTarget, forwardPole(hipWorld, pole));
+      strikeDir.set(0, 1, 0.15);
+      orientInstep(side, strikeDir);
+    } else {
+      const rise = Math.min(1, (since - 0.08) / 0.16);
+      const recover = since < 0.3 ? 0 : Math.min(1, (since - 0.3) / 0.2);
+      // Follow-through climbs past the ball instead of repeating the straight kick.
+      ankleTarget.set(ball.x, ball.y + 0.22 + 0.62 * rise, ball.z + 0.02 + 0.08 * rise);
+      if (recover > 0) ankleTarget.lerp(anchors[side].plant, recover);
+      limb.thigh.getWorldPosition(hipWorld);
+      solveTwoBone(limb.thigh, limb.shin, limb.foot, ankleTarget, forwardPole(hipWorld, pole));
+      strikeDir.set(0, 1, 0.2);
+      orientInstep(side, strikeDir);
+    }
+    if (bones?.spine) {
+      const lean = since < 0.22 ? since / 0.22 : Math.max(0, 1 - (since - 0.22) / 0.24);
+      bones.spine.quaternion.multiply(swing.setFromEuler(euler.set(-0.42 * lean, 0, 0)));
+      bones.spine.updateMatrix();
+    }
+    const counter = since < 0.32 ? Math.min(1, since / 0.08) : Math.max(0, 1 - (since - 0.32) / 0.18);
+    if (bones?.armLeft && bones.armRight) {
+      const leftLead = side === 'right' ? 1 : -0.25;
+      const rightLead = side === 'left' ? 1 : -0.25;
+      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(-0.55 * counter, 0, 0.15 * counter + 0.4 * leftLead * counter)));
+      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(-0.55 * counter, 0, -0.15 * counter + 0.4 * rightLead * counter)));
+    }
+    pin(support, anchors[support].plant);
   }
 
   function applyTrick(engine: GameEngine, kind: TrickKind) {
     const side = kickingSide(engine, null) ?? 'left';
     switch (kind) {
       case 'aroundTheWorld':
-        pin(other(side), anchors[other(side)].plant);
+        applyAtw(engine, side);
         return;
       case 'thigh':
         applyThigh(engine, side);
         return;
       case 'header':
-        applyHead(engine, FOREHEAD, 0.35);
+        applyHead(engine);
         return;
       case 'neckStall':
         applyNeck(engine);
         return;
       case 'highFlick':
-        applyStrike(engine, side, Math.max(0, engine.time - engine.lastKick[side]), true);
+        applyFlick(engine, side, Math.max(0, engine.time - engine.lastKick[side]));
         return;
       case 'groove':
-        // Dance steps own the feet. Planting both ankles would erase the shuffle.
+        resetHipPlanar();
+        pin('left', anchors.left.plant);
+        pin('right', anchors.right.plant);
         return;
       default: {
         const exhaustive: never = kind;
         return exhaustive;
       }
+    }
+  }
+
+  function storeLocal(joint: Object3D, world: Vector3, out: Vector3) {
+    joint.updateWorldMatrix(true, false);
+    out.copy(world);
+    joint.worldToLocal(out);
+  }
+
+  function captureBodyLandmarks() {
+    if (!bones || !skinned) return;
+    const skin = new Set(['Skin']);
+    for (const side of ['left', 'right'] as const) {
+      const limb = leg(side);
+      limb.thigh.updateWorldMatrix(true, true);
+      limb.thigh.getWorldPosition(hipWorld);
+      limb.shin.getWorldPosition(footWorld);
+      landmark.copy(hipWorld).lerp(footWorld, 0.58);
+      landmark.y += 0.04;
+      landmark.z += 0.05;
+      landmark.x += side === 'left' ? -0.02 : 0.02;
+      const hit = closestSkinnedVertex(skinned, landmark, THIGH_MATERIALS, landmark, 0.12);
+      if (hit) storeLocal(limb.thigh, hit, thighLocal[side]);
+    }
+    const shelf = bones.chest ?? bones.spine;
+    shelf.updateWorldMatrix(true, true);
+    shelf.getWorldPosition(hipWorld);
+    landmark.copy(hipWorld);
+    landmark.y += 0.07;
+    landmark.z -= 0.1;
+    const backHit = closestSkinnedVertex(skinned, landmark, UPPER_MATERIALS, landmark, 0.18);
+    if (backHit) storeLocal(shelf, backHit, backLocal);
+    if (bones.head) {
+      bones.head.updateWorldMatrix(true, true);
+      bones.head.getWorldPosition(hipWorld);
+      landmark.copy(hipWorld);
+      landmark.y += 0.08;
+      landmark.z += 0.1;
+      const face = closestSkinnedVertex(skinned, landmark, skin, landmark, 0.16);
+      if (face) storeLocal(bones.head, face, foreheadLocal);
     }
   }
 
@@ -385,6 +893,7 @@ export function createFreestyleRig() {
       secondary.reset();
     },
     measure(scene: Object3D, clips: AnimationClip[]): boolean {
+      skinned = scene;
       const hips = bone(scene, 'Hips');
       const spine = bone(scene, 'Spine');
       const left = chain(scene, 'left');
@@ -426,6 +935,8 @@ export function createFreestyleRig() {
         mixer.stopAllAction();
         mixer.uncacheRoot(scene);
       }
+      captureBodyLandmarks();
+      hipRest.copy(bones.hips.position);
       if (chest) chestRest.copy(chest.quaternion);
       headLagReady = false;
       ready = true;
@@ -447,7 +958,9 @@ export function createFreestyleRig() {
         const kickSide = state === 'KickLeft' ? 'left' : 'right';
         applyStrike(engine, kickSide, Math.max(0, engine.time - engine.lastKick[kickSide]));
       } else if (engine.celebration) {
-        // The dance pose owns the feet. Idle planting would glue a shuffle to the floor.
+        resetHipPlanar();
+        pin('left', anchors.left.plant);
+        pin('right', anchors.right.plant);
       } else if (state === 'Idle' || state === null) {
         applyIdle(engine, pose);
       } else if (state === 'Miss') {
@@ -475,7 +988,7 @@ export function createFreestyleRig() {
         torsoRoll: pose.torsoRoll,
         torsoPitch: pose.torsoPitch,
       }, engine.reducedMotion);
-      if (bones.chest) {
+      if (bones.chest && !exact.has(bones.chest.uuid)) {
         bones.chest.quaternion.copy(chestRest).multiply(swing.setFromEuler(euler.set(sec.kitPitch, 0, sec.kitRoll)));
         bones.chest.updateMatrix();
       }

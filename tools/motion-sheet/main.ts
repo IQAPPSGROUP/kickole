@@ -232,8 +232,8 @@ function kickRow(side: 'left' | 'right'): Row {
       const engine = fresh('playing');
       engine.time = 2 + t;
       engine.lastKick[side] = 2;
-      const shifted = t >= 0.03 && t <= 0.12 ? 0.06 * sign : 0;
-      engine.ball.x = sign * engine.config.footX * 0.6 + shifted;
+      // The labelled 0.04 s cell is the contact frame: ball on the config point, no extra shift.
+      engine.ball.x = sign * engine.config.footX * 0.6;
       engine.ball.y = t < 0.04 ? 0.92 - t * 4 : engine.config.contactHeight + Math.max(0, t - 0.04) * 1.4;
       engine.ball.z = engine.config.ballZ + (t > 0.04 ? (t - 0.04) * 0.4 : 0);
       engine.ball.vy = t < 0.04 ? -2 : 3;
@@ -264,21 +264,39 @@ function neckRow(): Row {
 }
 
 function atwRow(): Row {
-  const revs = [0.02, 0.2, 0.4, 0.55, 0.75, 0.95];
   return {
     title: 'ATW',
-    times: [0, 1, 2, 3, 4, 5].map((i) => i / 60),
+    times: [0.02, 0.2, 0.35, 0.55, 0.75, 0.95],
     step(t) {
-      const index = Math.round(t * 60);
       const engine = fresh('playing');
       engine.time = 2 + t;
       engine.trick = {
         kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 1.4,
-        awarded: false, revolution: revs[index] ?? 1, held: 0,
+        awarded: false, revolution: t, held: 0,
       };
-      engine.ball.x = -0.02;
-      engine.ball.y = 0.72;
-      engine.ball.z = 0.48;
+      engine.ball.x = -engine.config.atwHoverX;
+      engine.ball.y = engine.config.atwHoverY;
+      engine.ball.z = engine.config.atwHoverZ;
+      showPose(engine);
+      placeBall(engine, true);
+    },
+  };
+}
+
+function headerRow(): Row {
+  return {
+    title: 'Header',
+    times: [0.02, 0.06, 0.1, 0.16, 0.24, 0.36],
+    step(t) {
+      const engine = fresh('playing');
+      engine.time = 2 + t;
+      engine.trick = {
+        kind: 'header', phase: t < 0.12 ? 'contact' : 'recover', side: null, startedAt: 2,
+        awarded: false, revolution: 0, held: 0,
+      };
+      engine.ball.x = 0;
+      engine.ball.y = engine.config.contacts.forehead.y + Math.max(0, t - 0.1) * 1.2;
+      engine.ball.z = engine.config.contacts.forehead.z;
       showPose(engine);
       placeBall(engine, true);
     },
@@ -313,7 +331,7 @@ function thighRow(): Row {
 function flickRow(): Row {
   return {
     title: 'Flick',
-    times: [0, 0.03, 0.05, 0.12, 0.2, 0.32],
+    times: [0, 0.05, 0.12, 0.2, 0.3, 0.42],
     step(t) {
       const engine = fresh('playing');
       engine.time = 2 + t;
@@ -323,9 +341,10 @@ function flickRow(): Row {
         awarded: false, revolution: 0, held: 0,
       };
       engine.ball.x = engine.config.footX * 0.6;
-      engine.ball.y = engine.config.contactHeight + Math.max(0, t - 0.04) * 1.8;
-      engine.ball.z = engine.config.ballZ + t * 0.15;
-      engine.ball.vy = 4;
+      // Chamber and the underside touch share the contact point. After that the ball climbs.
+      engine.ball.y = t <= 0.08 ? engine.config.contactHeight : engine.config.contactHeight + (t - 0.08) * 3.4;
+      engine.ball.z = engine.config.ballZ + (t > 0.08 ? (t - 0.08) * 0.2 : 0);
+      engine.ball.vy = t <= 0.08 ? -0.2 : 6;
       showPose(engine);
       placeBall(engine, true);
     },
@@ -412,28 +431,30 @@ async function loadModel(): Promise<AnimationClip[]> {
 
 function paintRow(index: number, row: Row) {
   rig.reset();
-  const last = Math.max(...row.times.map((t) => Math.round(t * 60)));
-  const want = new Map(row.times.map((t) => [Math.round(t * 60), t]));
+  const samples = [...row.times].sort((a, b) => a - b);
   const y = HEADER + index * CELL_H;
   ctx.fillStyle = '#17191d';
   ctx.fillRect(0, y, sheet.width, CELL_H);
   ctx.fillStyle = '#f4f0e6';
   ctx.font = '600 15px sans-serif';
   ctx.fillText(row.title, 12, y + 28);
-  let col = 0;
-  for (let frame = 0; frame <= last; frame++) {
-    row.step(frame / 60);
-    if (!want.has(frame)) continue;
+  let clock = 0;
+  samples.forEach((t, col) => {
+    // Advance crossfades on the frames between labels, then draw the exact time.
+    while (clock + 1 / 60 < t - 1e-4) {
+      clock += 1 / 60;
+      row.step(clock);
+    }
+    row.step(t);
+    clock = t;
     scene.updateMatrixWorld(true);
     renderer.render(scene, camera);
     const x = LABEL_W + col * CELL_W;
     ctx.drawImage(renderer.domElement, x, y + 22, CELL_W, CELL_H - 22);
     ctx.fillStyle = '#f4f0e6';
     ctx.font = '12px sans-serif';
-    const shown = want.get(frame) ?? frame / 60;
-    ctx.fillText(`${shown.toFixed(2)}s`, x + 8, y + 16);
-    col += 1;
-  }
+    ctx.fillText(`${t.toFixed(2)}s`, x + 8, y + 16);
+  });
 }
 
 async function main() {
@@ -444,6 +465,7 @@ async function main() {
     kickRow('right'),
     kickRow('left'),
     neckRow(),
+    headerRow(),
     atwRow(),
     thighRow(),
     flickRow(),

@@ -597,8 +597,25 @@ async function writeGlb(file: string, parts: Part[]) {
   return { tris, bytes };
 }
 
+/** Line-free tile of asphalt_02 for the apron around the marked court. */
+async function buildStreetAsphalt() {
+  const size = 1024;
+  const asphalt = await rawRgb(join(sources, 'asphalt_diff.jpg'), size, size);
+  for (let i = 0; i < asphalt.length; i += 3) {
+    asphalt[i] = Math.min(255, Math.round(asphalt[i] * 1.12 + 8));
+    asphalt[i + 1] = Math.min(255, Math.round(asphalt[i + 1] * 1.08 + 6));
+    asphalt[i + 2] = Math.min(255, Math.round(asphalt[i + 2] * 1.02 + 3));
+  }
+  await encodeRgb(asphalt, size, size, 'srgb', 'etc1s', join(street, 'street_asphalt.ktx2'));
+}
+
 async function main() {
   mkdirSync(srcDir, { recursive: true });
+  mkdirSync(street, { recursive: true });
+  if (process.argv.includes('--asphalt-only')) {
+    await buildStreetAsphalt();
+    return;
+  }
   mkdirSync(models, { recursive: true });
   await fetchFile(DAMAGE.diff, join(srcDir, 'damage_diff.jpg'));
   await fetchFile(DAMAGE.nor, join(srcDir, 'damage_nor.jpg'));
@@ -626,6 +643,7 @@ async function main() {
   await encodeRgb(normal1k, 1024, 1024, 'linear', 'uastc', join(street, 'court_normal.ktx2'));
   await encodeRgb(rough512, 512, 512, 'linear', 'etc1s', join(street, 'court_rough.ktx2'));
   await encodeRgb(courtLow, low, low, 'srgb', 'etc1s', join(street, 'court_color_low.ktx2'));
+  await buildStreetAsphalt();
 
   const wallW = 2048;
   const wallH = 592;

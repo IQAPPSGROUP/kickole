@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { BufferGeometry, CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
+import { BufferGeometry, CanvasTexture, Color, DoubleSide, InstancedMesh, MeshStandardMaterial, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
 import { BeachCourt } from './BeachCourt';
@@ -8,7 +8,7 @@ import { ENVIRONMENT_THEME } from './environment';
 import { Crowd } from './Crowd';
 import { profileFor } from './qualityTier';
 import { prefersReducedMotion, sceneLifeBudget } from './juice';
-import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, STREET_FILES, streetUrl, wallMapSet, type FenceSlot } from './streetLayout';
+import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, LAMP_SPOTS, STREET_FILES, streetUrl, wallMapSet, type FenceSlot, type LampSpot } from './streetLayout';
 import { useStreetMaps, useStreetNodes, type StreetMaps } from './streetMaterials';
 
 const NAVY = '#1E2A5A';
@@ -133,8 +133,8 @@ function Floodlight({ x, z }: { x: number; z: number }) {
         <meshStandardMaterial color="#2c3136" roughness={0.62} metalness={0.25} />
       </mesh>
       <mesh position={[0, 3.65, 0]}>
-        <boxGeometry args={[0.5, 0.12, 0.2]} />
-        <meshStandardMaterial color={WHITE} emissive={WHITE} emissiveIntensity={5} roughness={0.28} />
+        <boxGeometry args={[0.55, 0.16, 0.22]} />
+        <meshBasicMaterial color="#ffc98a" toneMapped={false} />
       </mesh>
     </group>
   );
@@ -264,6 +264,80 @@ function HillsideNeighbourhood() {
 }
 
 const slotDummy = new Object3D();
+const LINE_W = 0.14;
+
+function useLineMaterial() {
+  const material = useMemo(() => new MeshStandardMaterial({
+    color: '#f7f4ec',
+    roughness: 0.4,
+    metalness: 0,
+    emissive: '#e4dccb',
+    emissiveIntensity: 0.65,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -12,
+  }), []);
+  useEffect(() => () => { material.dispose(); }, [material]);
+  return material;
+}
+
+/** Painted markings as geometry. A 9 cm texture line disappears in the grazing mip. */
+function CourtLines() {
+  const material = useLineMaterial();
+  const boxZ = (z0: number, z1: number) => ({ z: (z0 + z1) / 2, d: Math.abs(z1 - z0) });
+  const near = boxZ(1.8, 2.95);
+  const far = boxZ(-2.75, -1.6);
+  return (
+    <group>
+      {[-3.15, 3.15].map((x) => (
+        <mesh key={`touch-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.02, 0.1]} material={material}>
+          <planeGeometry args={[LINE_W, 5.7]} />
+        </mesh>
+      ))}
+      {[-2.75, 2.95].map((z) => (
+        <mesh key={`goal-${z}`} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, z]} material={material}>
+          <planeGeometry args={[6.3, LINE_W]} />
+        </mesh>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0.05]} material={material}>
+        <planeGeometry args={[6.3, 0.12]} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0.05]} material={material}>
+        <ringGeometry args={[1.01, 1.14, 48]} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.021, 0.05]} material={material}>
+        <circleGeometry args={[0.13, 20]} />
+      </mesh>
+      {[-2.3, 2.3].map((x) => (
+        <mesh key={`near-box-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.02, near.z]} material={material}>
+          <planeGeometry args={[0.1, near.d]} />
+        </mesh>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 1.8]} material={material}>
+        <planeGeometry args={[4.6, 0.1]} />
+      </mesh>
+      {[-2.3, 2.3].map((x) => (
+        <mesh key={`far-box-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.02, far.z]} material={material}>
+          <planeGeometry args={[0.1, far.d]} />
+        </mesh>
+      ))}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, -1.6]} material={material}>
+        <planeGeometry args={[4.6, 0.1]} />
+      </mesh>
+    </group>
+  );
+}
+
+function LampGlow({ spot }: { spot: LampSpot }) {
+  const headX = spot.x + Math.cos(spot.ry) * 0.72;
+  const headZ = spot.z - Math.sin(spot.ry) * 0.72;
+  return (
+    <mesh position={[headX, 3.28, headZ + 0.16]}>
+      <planeGeometry args={[0.52, 0.16]} />
+      <meshBasicMaterial color="#ffc98a" toneMapped={false} />
+    </mesh>
+  );
+}
 
 function ConcreteSkin({ maps }: { maps: StreetMaps }) {
   return (
@@ -308,6 +382,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
   const court = useStreetMaps(courtMaps.color, courtMaps.normal, courtMaps.rough, 1, 1);
   const wall = useStreetMaps(wallMaps.color, wallMaps.normal, wallMaps.rough, 1, 1);
   const concrete = useStreetMaps(concreteMaps.color, concreteMaps.normal, concreteMaps.rough, 2, 2);
+  const apron = useStreetMaps(streetUrl(STREET_FILES.streetAsphalt), null, null, 18, 18);
   const skid = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalSkid) : null, null, null, 1, 1);
   const stencil = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalStencil) : null, null, null, 1, 1);
   const tag = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalTag) : null, null, null, 1, 1);
@@ -326,6 +401,15 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
   return (
     <group>
       <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow={shadows}>
+        <planeGeometry args={[40.5, 40.5]} />
+        <meshStandardMaterial
+          map={apron.color ?? undefined}
+          color={apron.color ? '#ffffff' : '#5e5b58'}
+          roughness={0.96}
+          metalness={0}
+        />
+      </mesh>
       <mesh position={[0, -0.08, 0]} receiveShadow={shadows}>
         <boxGeometry args={[9.45, 0.16, 9.45]} />
         <ConcreteSkin maps={concrete} />
@@ -342,6 +426,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
           envMapIntensity={0.85}
         />
       </mesh>
+      <CourtLines />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.014, -3.35]}>
         <planeGeometry args={[9, 0.7]} />
         <meshBasicMaterial map={blob} transparent opacity={0.55} depthWrite={false} />
@@ -421,19 +506,16 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         <meshBasicMaterial map={blob} transparent depthWrite={false} />
       </mesh>
       <Bunting sway={sceneLifeBudget(quality, prefersReducedMotion()).buntingSway} />
-      {profile.lamp === 'simple' && (
-        <>
-          <Floodlight x={-3.75} z={-3.15} />
-          <Floodlight x={3.75} z={-3.15} />
-        </>
-      )}
+      {profile.lamp === 'simple' && LAMP_SPOTS.map((spot) => (
+        <Floodlight key={`flood-${spot.x}`} x={spot.x} z={spot.z} />
+      ))}
       {lampNodes.map((node) => (
-        [-3.75, 3.75].map((x) => (
+        LAMP_SPOTS.map((spot) => (
           <mesh
-            key={`${node.name}-${x}`}
+            key={`${node.name}-${spot.x}`}
             geometry={node.geometry}
-            position={[x, 0, -3.15]}
-            rotation={[0, x > 0 ? Math.PI : 0, 0]}
+            position={[spot.x, 0, spot.z]}
+            rotation={[0, spot.ry, 0]}
             castShadow={node.name !== 'Lens'}
           >
             {node.name === 'Lens'
@@ -442,12 +524,19 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
           </mesh>
         ))
       ))}
-      {profile.lamp === 'lit' && (
-        <>
-          <pointLight position={[-3.02, 3.25, -2.85]} color="#ffc48a" intensity={5.5} distance={5.2} decay={2} />
-          <pointLight position={[3.02, 3.25, -2.85]} color="#ffc48a" intensity={5.5} distance={5.2} decay={2} />
-        </>
-      )}
+      {profile.lamp !== 'simple' && LAMP_SPOTS.map((spot) => (
+        <LampGlow key={`glow-${spot.x}`} spot={spot} />
+      ))}
+      {profile.lamp === 'lit' && LAMP_SPOTS.map((spot) => (
+        <pointLight
+          key={`lamp-light-${spot.x}`}
+          position={[spot.x + Math.cos(spot.ry) * 0.55, 3.3, spot.z + 0.35]}
+          color="#ffc48a"
+          intensity={7}
+          distance={6.5}
+          decay={2}
+        />
+      ))}
     </group>
   );
 }

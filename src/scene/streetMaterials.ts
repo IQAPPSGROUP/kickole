@@ -3,8 +3,20 @@ import { useThree } from '@react-three/fiber';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { BufferGeometry, Mesh, NoColorSpace, RepeatWrapping, SRGBColorSpace, Texture } from 'three';
+import { BufferGeometry, Mesh, NoColorSpace, RepeatWrapping, SRGBColorSpace, Texture, type WebGLRenderer } from 'three';
 import { KTX2_TRANSCODER_PATH } from './decoders';
+
+const ktxLoaders = new WeakMap<WebGLRenderer, KTX2Loader>();
+
+function ktxLoaderFor(gl: WebGLRenderer): KTX2Loader {
+  const existing = ktxLoaders.get(gl);
+  if (existing) return existing;
+  const loader = new KTX2Loader();
+  loader.setTranscoderPath(KTX2_TRANSCODER_PATH);
+  loader.detectSupport(gl);
+  ktxLoaders.set(gl, loader);
+  return loader;
+}
 
 export interface StreetMaps {
   color: Texture | null;
@@ -19,9 +31,7 @@ export function useStreetMaps(colorUrl: string | null, normalUrl: string | null,
   const gl = useThree((state) => state.gl);
   const [maps, setMaps] = useState<StreetMaps>(EMPTY);
   useEffect(() => {
-    const loader = new KTX2Loader();
-    loader.setTranscoderPath(KTX2_TRANSCODER_PATH);
-    loader.detectSupport(gl);
+    const loader = ktxLoaderFor(gl);
     let alive = true;
     const loaded: Texture[] = [];
     const grab = (url: string | null) => new Promise<Texture | null>((resolve) => {
@@ -44,7 +54,6 @@ export function useStreetMaps(colorUrl: string | null, normalUrl: string | null,
     });
     return () => {
       alive = false;
-      loader.dispose();
       for (const tex of loaded) tex.dispose();
       setMaps(EMPTY);
     };

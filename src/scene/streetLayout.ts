@@ -6,6 +6,7 @@ export const STREET_FILES = {
   courtNormal: 'textures/street/court_normal.ktx2',
   courtRough: 'textures/street/court_rough.ktx2',
   courtColorLow: 'textures/street/court_color_low.ktx2',
+  streetAsphalt: 'textures/street/street_asphalt.ktx2',
   wallColor: 'textures/street/wall_color.ktx2',
   wallNormal: 'textures/street/wall_normal.ktx2',
   wallRough: 'textures/street/wall_rough.ktx2',
@@ -113,7 +114,7 @@ function makeSpectator(random: () => number, x: number, z: number, yaw: number):
   const hatRoll = random();
   return {
     x,
-    y: Math.abs(x) > 4.4 ? 0 : 1.58,
+    y: Math.abs(x) > 4.4 ? 0 : 2.22,
     z,
     scale: 0.92 + random() * 0.2,
     yaw: yaw + (random() - 0.5) * 0.35,
@@ -143,8 +144,9 @@ export function crowdPlacements(count: number): Spectator[] {
     const col = Math.floor(i / 2);
     const cols = Math.ceil(back / 2);
     const u = cols <= 1 ? 0.5 : col / (cols - 1);
-    const x = -2.55 + u * 5.1 + (row === 1 ? 0.16 : -0.04);
-    const z = row === 0 ? -3.88 : -4.28;
+    // The phone camera sits to the right, so the visible back wall is negative X.
+    const x = -4.35 + u * 3.7 + (row === 1 ? 0.14 : 0);
+    const z = row === 0 ? -3.92 : -4.3;
     spots.push(makeSpectator(random, x, z, Math.PI));
   }
   for (let i = 0; i < side; i++) {
@@ -196,3 +198,20 @@ export function fencePosts(detail: FenceDetail): FenceSlot[] {
 export function inPlayVolume(x: number, z: number): boolean {
   return Math.abs(x) < 2.05 && z > -3.45 && z < 3.3;
 }
+
+export interface LampSpot {
+  x: number;
+  z: number;
+  /** Y rotation. 0 points the lamp arm toward +X, into the court from the left. */
+  ry: number;
+}
+
+/**
+ * Two lamps sit on the negative-X wall, which is the side the portrait camera sees.
+ * The third stays on the positive-X side for the wide camera.
+ */
+export const LAMP_SPOTS: readonly LampSpot[] = [
+  { x: -3.5, z: -3.18, ry: 0 },
+  { x: -2.15, z: -3.18, ry: 0 },
+  { x: 3.45, z: -3.18, ry: Math.PI },
+];

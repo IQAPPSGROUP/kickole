@@ -63,9 +63,10 @@ function CrowdPart({ node, people, lod, idle }: { node: StreetNode; people: Spec
         ry += Math.sin(time * 0.6 + person.phase) * (swayOn ? 0.12 : 0);
       }
       dummy.rotation.order = 'YXZ';
+      const yLift = lod === 2 ? 0.5 : 0;
       dummy.position.set(
         person.x + node.pivot[0] * person.scale,
-        person.y + node.pivot[1] * person.scale + bob,
+        person.y + yLift + node.pivot[1] * person.scale + bob,
         person.z + node.pivot[2] * person.scale,
       );
       dummy.rotation.set(rx, ry, rz);

@@ -132,7 +132,9 @@ describe('GameController', () => {
     const { c, ls } = await make(QUIET);
     c.updateSettings({ quality: 'low' });
     expect(c.getSnapshot().settings.quality).toBe('low');
+    expect(c.getSnapshot().settings.graphics).toBe('low');
     expect(JSON.parse(ls.data['kicky.settings.v1']).quality).toBe('low');
+    expect(JSON.parse(ls.data['kicky.settings.v1']).graphics).toBe('low');
     c.setAppearance({
       ...c.getSnapshot().save.appearance,
       skinTone: '#8D5A3C',

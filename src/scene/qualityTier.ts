@@ -1,26 +1,42 @@
-import type { Quality } from '../game/storage';
+import type { GraphicsChoice, Quality } from '../game/storage';
 
 /** Device signals used to pick a starting graphics tier. Missing memory is treated as a desktop. */
 export interface DeviceHints {
   cores: number;
   memoryGb?: number;
+  /** Unmasked WebGL renderer. Empty when the browser hides it. */
+  gpu?: string;
 }
 
 export interface TierProfile {
   lod: 0 | 1;
-  shadows: 'none' | 'single' | 'cascaded';
+  /** Tight box around the player, or no dynamic shadows. */
+  shadows: 'none' | 'tight';
   shadowMap: number;
+  /** PCSS reads a basic depth map. Variance is the softer medium filter. */
+  shadowFilter: 'off' | 'vsm' | 'pcss';
+  /** Ortho half-extent, in metres, centred on the player. */
+  shadowExtent: number;
+  /** Light size in texels for PCSS, or the variance blur radius. */
+  shadowRadius: number;
   contactShadows: boolean;
   ssao: boolean;
   bloom: boolean;
   dof: boolean;
-  fxaa: boolean;
+  aa: 'none' | 'fxaa' | 'smaa';
   ibl: boolean;
   dpr: [number, number];
   crowd: number;
 }
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high'];
+
+export const FPS_FLOOR = 30;
+export const FPS_DROP_AFTER_SEC = 5;
+
+export interface FpsGuardState {
+  underSec: number;
+}
 
 function rank(tier: Quality): number {
   switch (tier) {
@@ -34,55 +50,171 @@ function rank(tier: Quality): number {
   }
 }
 
+/** Name a GPU from its unmasked renderer string. Unknown names return null so the CPU hint is used. */
+export function gpuTier(renderer: string): Quality | null {
+  const g = renderer.toLowerCase().trim();
+  if (!g) return null;
+  if (/swiftshader|llvmpipe|softpipe|microsoft basic render/.test(g)) return 'low';
+
+  const adreno = g.match(/adreno \(tm\) (\d{3})/);
+  if (adreno) {
+    const model = Number(adreno[1]);
+    if (model < 610) return 'low';
+    if (model < 620) return 'medium';
+    return 'high';
+  }
+
+  const mali = g.match(/mali-([tg])(\d+)/);
+  if (mali) {
+    if (mali[1] === 't') return 'low';
+    const model = Number(mali[2]);
+    if (model <= 51) return 'low';
+    if (model <= 57) return 'medium';
+    return 'high';
+  }
+
+  if (/powervr|videocore|video core/.test(g)) return 'low';
+  if (/apple m\d|apple gpu/.test(g)) return 'high';
+
+  if (g.includes('intel')) {
+    if (/arc|iris xe|iris\(r\) xe|iris plus/.test(g)) return 'high';
+    if (/hd graphics (3|4|5|6)00|hd graphics 3000|hd graphics 4000|uhd graphics 6/.test(g)) return 'low';
+    return 'medium';
+  }
+
+  if (/nvidia|geforce|quadro|rtx|gtx/.test(g)) return 'high';
+
+  if (/radeon|amd/.test(g)) {
+    if (/vega [38]|vega 11|radeon\(tm\) graphics|radeon graphics/.test(g)) return 'medium';
+    return 'high';
+  }
+
+  return null;
+}
+
 /** Browser hints. `deviceMemory` is in gigabytes when the browser exposes it. */
 export function readDevice(): DeviceHints {
-  if (typeof navigator === 'undefined') return { cores: 8, memoryGb: 8 };
+  if (typeof navigator === 'undefined') return { cores: 8, memoryGb: 8, gpu: gpuName };
   const nav = navigator as Navigator & { deviceMemory?: number };
   return {
     cores: nav.hardwareConcurrency || 8,
     memoryGb: typeof nav.deviceMemory === 'number' ? nav.deviceMemory : undefined,
+    gpu: gpuName,
   };
 }
 
-/** Phones with few cores or little RAM start lower. Desktops stay on the requested tier. */
-export function detectTier(device: DeviceHints): Quality {
+let gpuName = '';
+let deviceSnapshot: DeviceHints | null = null;
+const deviceListeners = new Set<() => void>();
+
+export function getDeviceSnapshot(): DeviceHints {
+  if (!deviceSnapshot) deviceSnapshot = readDevice();
+  return deviceSnapshot;
+}
+
+export function subscribeDevice(listener: () => void): () => void {
+  deviceListeners.add(listener);
+  return () => deviceListeners.delete(listener);
+}
+
+/** Remember the live WebGL renderer so auto tier selection can use the GPU. */
+export function rememberGpu(renderer: string): void {
+  const next = renderer.trim();
+  if (gpuName === next && deviceSnapshot) return;
+  gpuName = next;
+  deviceSnapshot = readDevice();
+  deviceListeners.forEach((listener) => listener());
+}
+
+function cpuTier(device: DeviceHints): Quality {
   const memory = device.memoryGb ?? 8;
   if (device.cores <= 4 || memory <= 2) return 'low';
   if (device.cores <= 6 || memory <= 4) return 'medium';
   return 'high';
 }
 
-/** The saved setting is a ceiling. Auto detection can only go lower. */
-export function startingTier(requested: Quality, detected: Quality): Quality {
-  return ORDER[Math.min(rank(requested), rank(detected))];
+/** GPU name first. A software renderer forces Low. A strong GPU on a small phone still steps down. */
+export function detectTier(device: DeviceHints): Quality {
+  const cpu = cpuTier(device);
+  const gpu = device.gpu ? gpuTier(device.gpu) : null;
+  if (!gpu) return cpu;
+  if (gpu === 'low' || (device.memoryGb ?? 8) <= 2) return 'low';
+  if (gpu === 'high' && cpu === 'low' && device.cores >= 4 && (device.memoryGb ?? 8) >= 4) return 'medium';
+  return ORDER[Math.min(rank(gpu), rank(cpu))];
+}
+
+/** Auto follows the device. An explicit choice is the tier the player asked to save. */
+export function resolveTier(preference: GraphicsChoice, detected: Quality): Quality {
+  switch (preference) {
+    case 'auto':
+      return detected;
+    case 'low':
+    case 'medium':
+    case 'high':
+      return preference;
+    default: {
+      const neverChoice: never = preference;
+      return neverChoice;
+    }
+  }
+}
+
+export function createFpsGuard(): FpsGuardState {
+  return { underSec: 0 };
 }
 
 /**
- * Drop one step when a tier misses its target.
- * High aims for 60 fps. Every tier keeps a 30 fps floor.
+ * Drop one tier after the smoothed frame rate stays under 30 for five seconds.
+ * A single long frame, or a return above 30, clears the timer. Low stays put.
  */
-export function fallbackTier(current: Quality, fps: number): Quality {
-  if (current === 'high' && fps < 55) return 'medium';
-  if (fps < 30 && rank(current) > 0) return ORDER[rank(current) - 1];
-  return current;
+export function stepFpsGuard(state: FpsGuardState, tier: Quality, fps: number, dt: number): Quality {
+  if (!(dt > 0) || dt > 0.5 || fps >= FPS_FLOOR || rank(tier) === 0) {
+    state.underSec = 0;
+    return tier;
+  }
+  state.underSec += dt;
+  if (state.underSec < FPS_DROP_AFTER_SEC) return tier;
+  state.underSec = 0;
+  return ORDER[rank(tier) - 1];
+}
+
+let runningTier: Quality | null = null;
+const runningListeners = new Set<() => void>();
+
+export function getRunningTier(): Quality | null {
+  return runningTier;
+}
+
+export function subscribeRunningTier(listener: () => void): () => void {
+  runningListeners.add(listener);
+  return () => runningListeners.delete(listener);
+}
+
+export function publishRunningTier(tier: Quality): void {
+  if (runningTier === tier) return;
+  runningTier = tier;
+  runningListeners.forEach((listener) => listener());
 }
 
 export function profileFor(tier: Quality): TierProfile {
   switch (tier) {
     case 'low':
       return {
-        lod: 1, shadows: 'none', shadowMap: 0, contactShadows: false, ssao: false, bloom: false,
-        dof: false, fxaa: false, ibl: false, dpr: [1, 1], crowd: 8,
+        lod: 1, shadows: 'none', shadowMap: 0, shadowFilter: 'off', shadowExtent: 0, shadowRadius: 0,
+        contactShadows: false, ssao: false, bloom: false, dof: false, aa: 'none', ibl: false,
+        dpr: [1, 1], crowd: 8,
       };
     case 'medium':
       return {
-        lod: 0, shadows: 'single', shadowMap: 512, contactShadows: true, ssao: false, bloom: false,
-        dof: false, fxaa: true, ibl: true, dpr: [1, 1.25], crowd: 16,
+        lod: 0, shadows: 'tight', shadowMap: 512, shadowFilter: 'vsm', shadowExtent: 4.8, shadowRadius: 4,
+        contactShadows: true, ssao: false, bloom: false, dof: false, aa: 'fxaa', ibl: true,
+        dpr: [1, 1.25], crowd: 16,
       };
     case 'high':
       return {
-        lod: 0, shadows: 'cascaded', shadowMap: 1024, contactShadows: true, ssao: true, bloom: true,
-        dof: true, fxaa: true, ibl: true, dpr: [1, 1.5], crowd: 28,
+        lod: 0, shadows: 'tight', shadowMap: 1024, shadowFilter: 'pcss', shadowExtent: 3.2, shadowRadius: 28,
+        contactShadows: true, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
+        dpr: [1, 1.5], crowd: 28,
       };
     default: {
       const neverTier: never = tier;

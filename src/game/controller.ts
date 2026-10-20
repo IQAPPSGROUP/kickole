@@ -42,6 +42,7 @@ import {
 } from './shop';
 import {
   choosePlayerBody,
+  applyGraphicsPatch,
   loadSave,
   loadSettings,
   persistSave,
@@ -602,7 +603,7 @@ export class GameController {
   }
 
   updateSettings(patch: Partial<Settings>) {
-    this.settings = { ...this.settings, ...patch };
+    this.settings = applyGraphicsPatch(this.settings, patch);
     if (patch.hints === false) this.prompts = freshClock(this.save.learnedTricks, false);
     if (patch.hints === true) this.prompts = beginRun(this.save.learnedTricks, true);
     saveSettings(this.settings);

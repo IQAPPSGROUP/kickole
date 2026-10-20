@@ -170,6 +170,23 @@ describe('storage', () => {
     expect(loadSettings().hints).toBe(false);
   });
 
+  it('keeps an explicit graphics choice and treats a legacy high setting as auto', async () => {
+    const { loadSettings, saveSettings, graphicsFromSaved, applyGraphicsPatch, DEFAULT_SETTINGS } = await load({
+      'kicky.settings.v1': JSON.stringify({ quality: 'high', sound: true, vibration: true }),
+    });
+    expect(loadSettings().graphics).toBe('auto');
+    expect(graphicsFromSaved({ quality: 'medium' })).toBe('medium');
+    expect(graphicsFromSaved({ graphics: 'high', quality: 'low' })).toBe('high');
+    const saved = applyGraphicsPatch(loadSettings(), { graphics: 'low' });
+    saveSettings(saved);
+    expect(loadSettings().graphics).toBe('low');
+    expect(loadSettings().quality).toBe('low');
+    const back = applyGraphicsPatch(loadSettings(), { graphics: 'auto' });
+    expect(back.graphics).toBe('auto');
+    expect(back.quality).toBe('low');
+    expect(DEFAULT_SETTINGS.graphics).toBe('auto');
+  });
+
   it('persists learned tricks and drops unknown ids', async () => {
     const raw = JSON.stringify({
       best: 0,

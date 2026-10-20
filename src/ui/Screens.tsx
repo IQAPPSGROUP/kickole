@@ -1,5 +1,14 @@
+import { useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
-import type { Quality, RunRecord, Settings } from '../game/storage';
+import type { GraphicsChoice, RunRecord, Settings } from '../game/storage';
+import {
+  detectTier,
+  getDeviceSnapshot,
+  getRunningTier,
+  resolveTier,
+  subscribeDevice,
+  subscribeRunningTier,
+} from '../scene/qualityTier';
 
 const brand = (file: string) => `${import.meta.env.BASE_URL}${file}`;
 
@@ -106,10 +115,27 @@ function Toggle({ label, value, onChange }: { label: string; value: boolean; onC
   );
 }
 
+function graphicsLabel(choice: GraphicsChoice): string {
+  switch (choice) {
+    case 'auto': return 'AUTO';
+    case 'low': return 'LOW';
+    case 'medium': return 'MEDIUM';
+    case 'high': return 'HIGH';
+    default: {
+      const neverChoice: never = choice;
+      return neverChoice;
+    }
+  }
+}
+
 export function SettingsScreen({
   settings, onChange, onClose,
 }: { settings: Settings; onChange: (p: Partial<Settings>) => void; onClose: () => void }) {
-  const qualities: Quality[] = ['low', 'medium', 'high'];
+  const choices: GraphicsChoice[] = ['auto', 'low', 'medium', 'high'];
+  const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
+  const running = useSyncExternalStore(subscribeRunningTier, getRunningTier);
+  const detected = detectTier(device);
+  const requested = resolveTier(settings.graphics, detected);
   return (
     <div className="screen settings">
       <div className="card">
@@ -121,13 +147,23 @@ export function SettingsScreen({
         <Toggle label="Trick hints" value={settings.hints} onChange={(hints) => onChange({ hints })} />
         <div className="group">
           <label>Graphics quality</label>
-          <div className="seg">
-            {qualities.map((q) => (
-              <button key={q} className={settings.quality === q ? 'on' : ''} onClick={() => onChange({ quality: q })}>
-                {q.toUpperCase()}
+          <div className="seg graphics">
+            {choices.map((choice) => (
+              <button
+                key={choice}
+                className={settings.graphics === choice ? 'on' : ''}
+                onClick={() => onChange({ graphics: choice })}
+              >
+                {graphicsLabel(choice)}
               </button>
             ))}
           </div>
+          <p className="tier-note">
+            {settings.graphics === 'auto'
+              ? `This device starts on ${detected.toUpperCase()}. The choice is saved on this device.`
+              : `Saved on this device. Auto would start on ${detected.toUpperCase()}.`}
+            {running && running !== requested ? ` Playing on ${running.toUpperCase()} after a slow stretch under 30 fps.` : ''}
+          </p>
         </div>
         <div className="group help">
           <label>How to play</label>

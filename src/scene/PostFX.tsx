@@ -2,20 +2,14 @@ import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   DataTexture,
-  DepthFormat,
-  DepthTexture,
-  MeshDepthMaterial,
   NearestFilter,
-  NoBlending,
   NoColorSpace,
   RGBAFormat,
   ShaderMaterial,
   UnsignedByteType,
-  UnsignedIntType,
   Vector2,
+  Vector3,
   WebGLRenderTarget,
-  type Camera,
-  type Scene,
   type WebGLRenderer,
 } from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -23,10 +17,13 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { FullScreenQuad, Pass } from 'three/examples/jsm/postprocessing/Pass.js';
 import type { GameEngine } from '../engine/engine';
+import { depthOfFieldActive, depthOfFieldFocus, depthOfFieldScale, gradeDisplayColor } from './presentation';
 import type { TierProfile } from './qualityTier';
+import { SsaoPass } from './ssaoPass';
 
 interface SceneStats {
   triangles: number;
@@ -36,32 +33,19 @@ interface SceneStats {
 
 let sceneStats: SceneStats | null = null;
 
-/** Display grade packed as slices. 32 steps keeps a face photograph from posterising into flat decals. */
+/** Display grade packed as slices. Applied after AgX so skin stays out of the crushed blacks. */
 function streetLut(): DataTexture {
   const size = 32;
   const data = new Uint8Array(size * size * size * 4);
-  // AgX already shapes contrast. Pushing contrast here, before it, crushed the
-  // face photograph into flat black and a few dark reds.
-  const grade = (c: number) => c;
   for (let b = 0; b < size; b++) {
     for (let g = 0; g < size; g++) {
       for (let r = 0; r < size; r++) {
-        let red = grade(r / (size - 1));
-        let green = grade(g / (size - 1));
-        let blue = grade(b / (size - 1));
-        const luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
-        if (luma > 0.45) {
-          red = Math.min(1, red * 1.04);
-          blue = Math.min(1, blue * 0.97);
-        }
-        red = luma + (red - luma) * 1.04;
-        green = luma + (green - luma) * 1.02;
-        blue = luma + (blue - luma) * 0.98;
+        const [red, green, blue] = gradeDisplayColor(r / (size - 1), g / (size - 1), b / (size - 1));
         const x = b * size + r;
         const i = (g * size * size + x) * 4;
-        data[i] = Math.round(Math.min(1, Math.max(0, red)) * 255);
-        data[i + 1] = Math.round(Math.min(1, Math.max(0, green)) * 255);
-        data[i + 2] = Math.round(Math.min(1, Math.max(0, blue)) * 255);
+        data[i] = Math.round(red * 255);
+        data[i + 1] = Math.round(green * 255);
+        data[i + 2] = Math.round(blue * 255);
         data[i + 3] = 255;
       }
     }
@@ -138,31 +122,6 @@ const BLOOM_FRAGMENT = /* glsl */ `
     vec3 scene = texture2D(tDiffuse, vUv).rgb;
     vec3 bloom = texture2D(tBloom, vUv).rgb;
     gl_FragColor = vec4(scene + bloom * uStrength, 1.0);
-  }
-`;
-
-const AO_FRAGMENT = /* glsl */ `
-  uniform sampler2D tDiffuse;
-  uniform sampler2D tDepth;
-  uniform vec2 uTexel;
-  varying vec2 vUv;
-  void main() {
-    vec3 color = texture2D(tDiffuse, vUv).rgb;
-    float center = texture2D(tDepth, vUv).r;
-    float shade = 1.0;
-    if (center > 0.001 && center < 0.999) {
-      float occ = 0.0;
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(uTexel.x, 0.0)).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(-uTexel.x, 0.0)).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(0.0, uTexel.y)).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(0.0, -uTexel.y)).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(uTexel.x, uTexel.y) * 2.0).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(-uTexel.x, -uTexel.y) * 2.0).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(uTexel.x, -uTexel.y) * 2.0).r);
-      occ += smoothstep(0.0008, 0.02, center - texture2D(tDepth, vUv + vec2(-uTexel.x, uTexel.y) * 2.0).r);
-      shade = mix(0.7, 1.0, 1.0 - occ / 8.0);
-    }
-    gl_FragColor = vec4(color * shade, 1.0);
   }
 `;
 
@@ -276,76 +235,6 @@ class SafeBloomPass extends Pass {
   }
 }
 
-/**
- * Depth-aware darkening. The occlusion is multiplied in the shader that
- * writes the next buffer, so a missing depth sample leaves the colour alone.
- */
-class SafeAoPass extends Pass {
-  private readonly depthTarget: WebGLRenderTarget;
-  private readonly depthMaterial: MeshDepthMaterial;
-  private readonly composite: ShaderMaterial;
-  private readonly quad: FullScreenQuad;
-  private readonly scene: Scene;
-  private readonly camera: Camera;
-
-  constructor(scene: Scene, camera: Camera, width: number, height: number) {
-    super();
-    this.needsSwap = true;
-    this.scene = scene;
-    this.camera = camera;
-    this.depthTarget = byteTarget(width, height);
-    const depth = new DepthTexture(width, height);
-    depth.format = DepthFormat;
-    depth.type = UnsignedIntType;
-    this.depthTarget.depthTexture = depth;
-    this.depthTarget.depthBuffer = false;
-    this.depthMaterial = new MeshDepthMaterial();
-    this.depthMaterial.blending = NoBlending;
-    this.composite = new ShaderMaterial({
-      uniforms: {
-        tDiffuse: { value: null },
-        tDepth: { value: depth },
-        uTexel: { value: new Vector2(2 / width, 2 / height) },
-      },
-      vertexShader: FULLSCREEN_VERTEX,
-      fragmentShader: AO_FRAGMENT,
-      depthTest: false,
-      depthWrite: false,
-    });
-    this.quad = new FullScreenQuad(this.composite);
-  }
-
-  override setSize(width: number, height: number) {
-    this.depthTarget.setSize(Math.max(1, width), Math.max(1, height));
-    const texel = this.composite.uniforms.uTexel.value as Vector2;
-    texel.set(2 / Math.max(1, width), 2 / Math.max(1, height));
-  }
-
-  override render(renderer: WebGLRenderer, writeBuffer: WebGLRenderTarget, readBuffer: WebGLRenderTarget) {
-    const previous = this.scene.overrideMaterial;
-    this.scene.overrideMaterial = this.depthMaterial;
-    renderer.setRenderTarget(this.depthTarget);
-    const gl = renderer.getContext();
-    const complete = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
-    if (complete) {
-      renderer.clear();
-      renderer.render(this.scene, this.camera);
-    }
-    this.scene.overrideMaterial = previous;
-    this.composite.uniforms.tDiffuse.value = readBuffer.texture;
-    this.quad.material = this.composite;
-    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
-    this.quad.render(renderer);
-  }
-
-  override dispose() {
-    this.depthTarget.dispose();
-    this.depthMaterial.dispose();
-    this.composite.dispose();
-    this.quad.dispose();
-  }
-}
-
 class CountingRenderPass extends RenderPass {
   override render(
     renderer: WebGLRenderer,
@@ -364,9 +253,12 @@ class CountingRenderPass extends RenderPass {
   }
 }
 
+const FORWARD = new Vector3();
+
 /**
  * Post stack for mid and high. A priority-1 frame replaces the default render.
- * Depth of field only opens on the game-over hold, which is the replay view.
+ * AgX runs in OutputPass. The street LUT grades that display image.
+ * Depth of field opens on the title, celebration, and game-over holds.
  */
 export function PostFX({ profile, engine }: { profile: TierProfile; engine: GameEngine }) {
   const { gl, scene, camera, size } = useThree();
@@ -374,14 +266,16 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
   const stack = useMemo(() => {
     const effect = new EffectComposer(gl as WebGLRenderer);
     effect.addPass(new CountingRenderPass(scene, camera));
-    if (profile.ssao) effect.addPass(new SafeAoPass(scene, camera, size.width, size.height));
-    if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.28, 0.62));
+    if (profile.ssao) effect.addPass(new SsaoPass(scene, camera, size.width, size.height));
+    if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.2, 0.74));
     let bokeh: BokehPass | null = null;
     if (profile.dof) {
-      bokeh = new BokehPass(scene, camera, { focus: 7.2, aperture: 0.00012, maxblur: 0.006 });
+      bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.00014, maxblur: 0.006 });
       bokeh.enabled = false;
       effect.addPass(bokeh);
     }
+    if (profile.aa === 'smaa') effect.addPass(new SMAAPass());
+    effect.addPass(new OutputPass());
     effect.addPass(new ShaderPass({
       uniforms: {
         tDiffuse: { value: null },
@@ -390,10 +284,9 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: LUT_FRAGMENT,
     }));
-    effect.addPass(new OutputPass());
-    if (profile.fxaa) effect.addPass(new ShaderPass(FXAAShader));
+    if (profile.aa === 'fxaa') effect.addPass(new ShaderPass(FXAAShader));
     return { effect, bokeh };
-  }, [gl, scene, camera, profile.ssao, profile.bloom, profile.dof, profile.fxaa, lut, size.width, size.height]);
+  }, [gl, scene, camera, profile.ssao, profile.bloom, profile.dof, profile.aa, lut, size.width, size.height]);
 
   useEffect(() => {
     stack.effect.setSize(size.width, size.height);
@@ -404,11 +297,23 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
 
   useEffect(() => () => {
     lut.dispose();
+    for (const pass of stack.effect.passes) pass.dispose();
     stack.effect.dispose();
   }, [stack, lut]);
 
   useFrame(() => {
-    if (stack.bokeh) stack.bokeh.enabled = engine.phase === 'over';
+    if (stack.bokeh) {
+      const celebrating = engine.celebration != null;
+      stack.bokeh.enabled = depthOfFieldActive(engine.phase, celebrating);
+      if (stack.bokeh.enabled) {
+        camera.getWorldDirection(FORWARD);
+        const scale = depthOfFieldScale(engine.phase, celebrating);
+        const uniforms = stack.bokeh.uniforms as { focus: { value: number }; aperture: { value: number }; maxblur: { value: number } };
+        uniforms.focus.value = depthOfFieldFocus(camera.position, FORWARD);
+        uniforms.aperture.value = scale.aperture;
+        uniforms.maxblur.value = scale.maxblur;
+      }
+    }
     stack.effect.render();
     if (sceneStats) {
       (globalThis as { __KICKOLE_PERF?: SceneStats }).__KICKOLE_PERF = sceneStats;

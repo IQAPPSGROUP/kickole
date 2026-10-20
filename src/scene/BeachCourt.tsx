@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
+import { CanvasTexture, Color, DoubleSide, InstancedMesh, NoColorSpace, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
 import {
   BEACH_BUNTING_COUNT,
@@ -127,30 +127,127 @@ function BeachCarnival({ sway }: { sway: boolean }) {
   );
 }
 
+/** Beige-gold sand. The material colour stays white so this albedo is not multiplied back into clay. */
+const SAND_BASE = '#e4c486';
+
 function useSand() {
   return useMemo(() => {
-    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 512;
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const normalCanvas = document.createElement('canvas');
+    normalCanvas.width = normalCanvas.height = size;
     const g = canvas.getContext('2d');
-    let seed = 20261019;
+    const ng = normalCanvas.getContext('2d');
+    let seed = 20261020;
     const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-    if (g) {
-      g.fillStyle = '#e0a04a'; g.fillRect(0, 0, 512, 512);
-      for (let i = 0; i < 13000; i++) {
-        g.fillStyle = i % 3 ? 'rgba(255,196,92,.28)' : 'rgba(122,68,18,.24)';
-        g.fillRect(random() * 512, random() * 512, 1 + random(), 1 + random());
+    if (g && ng) {
+      g.fillStyle = SAND_BASE;
+      g.fillRect(0, 0, size, size);
+      for (let i = 0; i < 18; i++) {
+        const x = random() * size;
+        const y = random() * size;
+        const rad = 36 + random() * 78;
+        const shade = g.createRadialGradient(x, y, rad * 0.15, x, y, rad);
+        shade.addColorStop(0, 'rgba(168, 128, 72, 0.20)');
+        shade.addColorStop(1, 'rgba(168, 128, 72, 0)');
+        g.fillStyle = shade;
+        g.beginPath();
+        g.arc(x, y, rad, 0, Math.PI * 2);
+        g.fill();
       }
-      for (let row = 0; row < 14; row++) {
-        g.strokeStyle = 'rgba(138,112,67,.09)'; g.lineWidth = 1.3; g.beginPath();
-        for (let x = 0; x <= 512; x += 4) {
-          const y = row * 38 + Math.sin(x / 28 + row) * 4;
-          if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      for (let i = 0; i < 12; i++) {
+        const x = random() * size;
+        const y = random() * size;
+        const rad = 24 + random() * 46;
+        const shade = g.createRadialGradient(x, y, 0, x, y, rad);
+        shade.addColorStop(0, 'rgba(236, 214, 168, 0.28)');
+        shade.addColorStop(1, 'rgba(236, 214, 168, 0)');
+        g.fillStyle = shade;
+        g.beginPath();
+        g.arc(x, y, rad, 0, Math.PI * 2);
+        g.fill();
+      }
+      for (let i = 0; i < 14000; i++) {
+        g.fillStyle = random() > 0.46 ? 'rgba(244, 226, 176, 0.34)' : 'rgba(156, 116, 62, 0.26)';
+        g.fillRect(random() * size, random() * size, 1 + random() * 1.5, 1 + random() * 1.5);
+      }
+      for (let row = 0; row < 16; row++) {
+        g.strokeStyle = 'rgba(150, 114, 62, 0.11)';
+        g.lineWidth = 1.5;
+        g.beginPath();
+        for (let x = 0; x <= size; x += 3) {
+          const y = row * (size / 16) + Math.sin(x / 24 + row * 1.6) * 5;
+          if (x === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
         }
         g.stroke();
       }
+      const stamp = (x: number, y: number, angle: number) => {
+        g.save();
+        g.translate(x, y);
+        g.rotate(angle);
+        g.fillStyle = 'rgba(124, 92, 48, 0.30)';
+        g.beginPath();
+        g.ellipse(0, 7, 5.5, 8, 0, 0, Math.PI * 2);
+        g.fill();
+        g.beginPath();
+        g.ellipse(0, -9, 6.4, 9, 0, 0, Math.PI * 2);
+        g.fill();
+        g.restore();
+      };
+      for (let i = 0; i < 6; i++) {
+        const x = 48 + random() * (size - 96);
+        const y = 48 + random() * (size - 96);
+        const angle = random() * Math.PI * 2;
+        stamp(x, y, angle);
+        stamp(x + Math.cos(angle + 1.15) * 24, y + Math.sin(angle + 1.15) * 24, angle + 0.12);
+      }
+      const painted = g.getImageData(0, 0, size, size);
+      const height = new Float32Array(size * size);
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const i = (y * size + x) * 4;
+          const luma = (painted.data[i] * 0.3 + painted.data[i + 1] * 0.5 + painted.data[i + 2] * 0.2) / 255;
+          const ripple = Math.sin(x * 0.08 + y * 0.018) * 0.34 + Math.sin(x * 0.028 - y * 0.09 + 1.1) * 0.24;
+          height[y * size + x] = (luma - 0.74) * 1.6 + ripple;
+        }
+      }
+      const pixels = ng.createImageData(size, size);
+      const slope = 2.6;
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const xm = height[y * size + ((x + size - 1) % size)];
+          const xp = height[y * size + ((x + 1) % size)];
+          const ym = height[((y + size - 1) % size) * size + x];
+          const yp = height[((y + 1) % size) * size + x];
+          let nx = (xm - xp) * slope;
+          let ny = (ym - yp) * slope;
+          let nz = 1;
+          const len = Math.hypot(nx, ny, nz) || 1;
+          nx /= len;
+          ny /= len;
+          nz /= len;
+          const o = (y * size + x) * 4;
+          pixels.data[o] = Math.round((nx * 0.5 + 0.5) * 255);
+          pixels.data[o + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+          pixels.data[o + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+          pixels.data[o + 3] = 255;
+        }
+      }
+      ng.putImageData(pixels, 0, 0);
     }
-    const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace;
-    texture.wrapS = texture.wrapT = RepeatWrapping; texture.repeat.set(6, 6); texture.anisotropy = 4;
-    return texture;
+    const color = new CanvasTexture(canvas);
+    color.colorSpace = SRGBColorSpace;
+    color.wrapS = color.wrapT = RepeatWrapping;
+    color.repeat.set(4, 4);
+    color.anisotropy = 4;
+    const normal = new CanvasTexture(normalCanvas);
+    normal.colorSpace = NoColorSpace;
+    normal.wrapS = normal.wrapT = RepeatWrapping;
+    normal.repeat.set(4, 4);
+    normal.anisotropy = 4;
+    return { color, normal };
   }, []);
 }
 
@@ -170,7 +267,10 @@ function BeachFallback() {
 /** Visual replacement only: the simulation and player floor remain at their original coordinates. */
 export function BeachCourt({ shadows, quality }: { shadows: boolean; quality: Quality }) {
   const sand = useSand();
-  useEffect(() => () => sand.dispose(), [sand]);
+  useEffect(() => () => {
+    sand.color.dispose();
+    sand.normal.dispose();
+  }, [sand]);
   return <group>
     <EnvironmentBackdrop quality={quality} theme="beach" fallback={<BeachFallback />} />
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, -16]} receiveShadow={shadows}>
@@ -179,7 +279,15 @@ export function BeachCourt({ shadows, quality }: { shadows: boolean; quality: Qu
     </mesh>
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.9]} receiveShadow={shadows}>
       <planeGeometry args={[16, 10.6]} />
-      <meshStandardMaterial map={sand} color="#e8b15c" roughness={0.9} metalness={0} envMapIntensity={0.2} />
+      <meshStandardMaterial
+        map={sand.color}
+        normalMap={sand.normal}
+        normalScale={[0.62, 0.62]}
+        color="#ffffff"
+        roughness={0.94}
+        metalness={0}
+        envMapIntensity={0.12}
+      />
     </mesh>
     <BeachCarnival sway={sceneLifeBudget(quality, prefersReducedMotion()).buntingSway} />
     {/* Freestyle circle and touch-area boundary ropes are cosmetic, with no colliders. */}

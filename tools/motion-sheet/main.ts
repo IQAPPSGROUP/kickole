@@ -423,7 +423,7 @@ function grooveRow(): Row {
   engine.press('right');
   engine.release('right');
   const shots: GameEngine[] = [];
-  const marks = [0.08, 0.55, 1.05, 1.5];
+  const marks = [0.08, 0.283, 0.45, 1.5];
   let caught = false;
   stepUntil(engine, () => {
     const trick = engine.trick?.kind === 'groove' ? engine.trick : null;
@@ -438,8 +438,9 @@ function grooveRow(): Row {
     return shots.length >= 6 || (caught && engine.trick == null);
   });
   return shotRow('Groove', ['watch', 'samba', 'samba', 'eyes up', 'cushion', 'control'], shots, {
-    pos: [3.1, 2.4, 4.2],
-    look: [0, 2.1, 0.4],
+    // Three-quarter view at the body so the samba step, hip sway and arm swing read.
+    pos: [1.65, 1.2, 2.55],
+    look: [0, 1.02, 0.28],
   });
 }
 

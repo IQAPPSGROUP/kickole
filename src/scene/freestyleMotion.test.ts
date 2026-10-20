@@ -378,8 +378,12 @@ describe('fab foot contact', () => {
     engine.equippedDance = 'shuffle';
     engine.celebration = null;
     show(engine);
-    expect(bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3()).distanceTo(rig.anchors.left.plant)).toBeLessThan(0.012);
-    expect(bone(gltf.scene, 'Foot_R').getWorldPosition(new Vector3()).distanceTo(rig.anchors.right.plant)).toBeLessThan(0.012);
+    // Age 1.0 is inside the samba: the standing foot stays put and the other steps.
+    const grooveLeft = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
+    const grooveRight = bone(gltf.scene, 'Foot_R').getWorldPosition(new Vector3());
+    expect(grooveRight.distanceTo(rig.anchors.right.plant)).toBeLessThan(0.012);
+    expect(grooveLeft.y).toBeGreaterThan(grooveRight.y + 0.02);
+    expect(grooveLeft.distanceTo(rig.anchors.left.plant)).toBeLessThan(0.12);
     engine.trick = null;
     engine.celebration = { danceId: 'heelrock', reason: 'test', startedAt: 1, until: 9 };
     engine.beatPhase = 0.4;

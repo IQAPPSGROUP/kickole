@@ -28,12 +28,17 @@ describe('corner fan', () => {
     expect(byName.atw.x).toBeGreaterThan(byName.left.x);
     const angle = Math.atan2(layout.dy, layout.dx) * (180 / Math.PI);
     expect(angle).toBeCloseTo(35, 4);
+    expect(Math.hypot(layout.dx, layout.dy)).toBeCloseTo(layout.d, 3);
+    expect(byName.neck.y).toBeGreaterThan(byName.head.y + 24);
+    expect(byName.neck.y).toBeLessThan(byName.left.y - 24);
+    expect(byName.thigh.y).toBeGreaterThan(byName.flick.y + 24);
+    expect(byName.thigh.y).toBeLessThan(byName.right.y - 24);
     expect(byName.flick.x).toBeCloseTo(byName.right.x, 4);
     expect(byName.groove.y).toBeCloseTo(byName.right.y, 4);
     expect(byName.thigh.x).toBeLessThan(byName.right.x);
   });
 
-  it('keeps 72px buttons from overlapping on a 375x667 phone and a large phone', () => {
+  it('keeps the fan buttons from overlapping on a 375x667 phone and a large phone', () => {
     for (const [width, height] of [[375, 667], [390, 844], [430, 932]] as const) {
       const { nearest, pair, rects } = nearestGap(width, height);
       expect(nearest, `${width} ${pair}`).toBeGreaterThanOrEqual(6);

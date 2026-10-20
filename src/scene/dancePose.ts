@@ -102,18 +102,20 @@ function applyHeelRock(out: Pose, angle: number, k: number) {
 export function applySambaStep(out: Pose, phase: number, intensity = 1): void {
   const step = Math.sin(phase * Math.PI * 2);
   const k = Math.max(0, Math.min(1, intensity));
-  out.bodyYaw = 0.18 * step * k;
-  out.torsoRoll = 0.12 * step * k;
-  out.torsoYaw = -0.1 * step * k;
-  out.legs.left.knee = 0.12 + 0.26 * Math.max(0, step) * k;
-  out.legs.right.knee = 0.12 + 0.26 * Math.max(0, -step) * k;
-  out.legs.left.thigh = -0.06 * Math.max(0, step) * k;
-  out.legs.right.thigh = -0.06 * Math.max(0, -step) * k;
-  out.armLeft = 0.42 + 0.22 * step * k;
-  out.armRight = 0.42 - 0.22 * step * k;
-  out.elbowLeft = 0.5 * k;
-  out.elbowRight = 0.46 * k;
-  out.bodyY += 0.012 * Math.abs(step) * k;
+  out.bodyYaw = 0.38 * step * k;
+  out.torsoRoll = 0.16 * step * k;
+  out.torsoYaw = -0.28 * step * k;
+  out.legs.left.knee = 0.12 + 0.5 * Math.max(0, step) * k;
+  out.legs.right.knee = 0.12 + 0.5 * Math.max(0, -step) * k;
+  out.legs.left.thigh = -0.2 * Math.max(0, step) * k;
+  out.legs.right.thigh = -0.2 * Math.max(0, -step) * k;
+  out.armLeft = 0.32;
+  out.armRight = 0.32;
+  out.armLeftPitch = 0.65 * step * k;
+  out.armRightPitch = -0.65 * step * k;
+  out.elbowLeft = 0.85 * k;
+  out.elbowRight = 0.85 * k;
+  out.bodyY += 0.02 * Math.abs(step) * k;
   out.lockMotion = true;
 }
 

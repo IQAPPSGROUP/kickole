@@ -422,6 +422,12 @@ export function TouchZones({ controller }: { controller: GameController }) {
       >
         {trick.kind === 'groove' && <BeatRing active={playing || Boolean(clue?.beat)} />}
         {clueOn(trick.control) && clue && <ClueMark gesture={clue.gesture} />}
+        {!playing && (
+          <svg className="trick-lock" viewBox="0 0 12 12" aria-hidden>
+            <rect x="2.2" y="5.2" width="7.6" height="5.4" rx="1" fill="currentColor" />
+            <path d="M3.6 5.2V3.7a2.4 2.4 0 0 1 4.8 0v1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          </svg>
+        )}
         <TrickIcon kind={trick.kind} />
         <span className="trick-label">{trickName(trick.kind)}</span>
         {trick.kind === 'neck' && playing && <small className="trick-sub">HOLD</small>}

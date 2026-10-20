@@ -1,12 +1,17 @@
-/** Corner fan for the two foot buttons and six tricks. */
+/**
+ * Quarter-circle fan around each corner kick button.
+ * The three tricks sit on one radius: beside (0°), 35° up-and-inward, and straight up (90°).
+ * The radius is the chord that keeps the 0° and 35° faces `gap` apart, capped so the two
+ * inner tricks still clear each other on a phone.
+ */
 
 const FAN_RAD = (35 * Math.PI) / 180;
-/** Centre distance along 35° is chosen so that button just clears the horizontal neighbour. */
-const DX_PER_D = 2 * Math.cos(FAN_RAD) * Math.cos(FAN_RAD);
-const TAN_35 = Math.tan(FAN_RAD);
+const COS_35 = Math.cos(FAN_RAD);
+const SIN_35 = Math.sin(FAN_RAD);
+const CHORD_35 = 2 * Math.sin(FAN_RAD / 2);
 
-export const FAN_BUTTON = 72;
-export const FAN_GAP = 8;
+export const FAN_BUTTON = 48;
+export const FAN_GAP = 6;
 const MIN_INSET_X = 4;
 const MIN_INSET_BOTTOM = 8;
 
@@ -34,12 +39,13 @@ export function fanLayout(
   const insetLeft = Math.max(MIN_INSET_X, safeLeft);
   const insetRight = Math.max(MIN_INSET_X, safeRight);
   const insetBottom = Math.max(MIN_INSET_BOTTOM, safeBottom);
-  const dIdeal = button + gap;
-  const dxIdeal = dIdeal * DX_PER_D;
-  const dxMax = (width - insetLeft - insetRight - button * 2 - gap) / 2;
-  const dx = Math.min(dxIdeal, Math.max(0, dxMax));
-  const d = dx / DX_PER_D;
-  const dy = dx * TAN_35;
+  const dClear = (button + gap) / CHORD_35;
+  const dMax = (width - insetLeft - insetRight - button * 2 - gap) / 2;
+  // Largest radius that still keeps the two inner tricks apart. The minimum
+  // chord packs the 35° trick against the top button, so the fan reads as two rows.
+  const d = dMax >= dClear ? dMax : Math.max(dClear, button + gap);
+  const dx = d * COS_35;
+  const dy = d * SIN_35;
   return { button, insetLeft, insetRight, insetBottom, d, dx, dy };
 }
 

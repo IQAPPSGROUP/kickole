@@ -161,10 +161,10 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
     out.neckPitch = lerp(-0.08, 0, recover);
     out.headPitch = lerp(-0.7, -0.25, recover);
     out.headYaw *= 0.2;
-    out.armLeft = lerp(0.72, 0.3, recover);
-    out.armRight = lerp(0.78, 0.28, recover);
-    out.elbowLeft = lerp(0.42, 0.1, recover);
-    out.elbowRight = lerp(0.38, 0.1, recover);
+    out.armLeft = lerp(0.38, 0.22, recover);
+    out.armRight = lerp(0.4, 0.22, recover);
+    out.elbowLeft = lerp(0.7, 0.35, recover);
+    out.elbowRight = lerp(0.68, 0.35, recover);
     return;
   }
 
@@ -206,10 +206,10 @@ function applyTrickPose(engine: GameEngine, out: Pose, t: number) {
     out.torsoYaw = -sideSign * 0.24 * hip + sideSign * 0.08 * Math.sin(angle);
     out.torsoPitch += 0.08;
     out.torsoRoll = sideSign * 0.08;
-    out.armLeft = 0.5 + (side === 'right' ? 0.4 : 0.1);
-    out.armRight = 0.5 + (side === 'left' ? 0.4 : 0.1);
-    out.elbowLeft = 0.45;
-    out.elbowRight = 0.45;
+    out.armLeft = 0.36 + (side === 'right' ? 0.16 : 0.04);
+    out.armRight = 0.36 + (side === 'left' ? 0.16 : 0.04);
+    out.elbowLeft = 0.62;
+    out.elbowRight = 0.62;
     if (trick.phase === 'recover') {
       softKnees(out, 0.2);
       out.headPitch = clamp(out.headPitch, -0.4, 0.3);

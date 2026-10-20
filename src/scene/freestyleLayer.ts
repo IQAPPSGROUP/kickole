@@ -1,6 +1,7 @@
 import {
   AnimationMixer,
   Euler,
+  Matrix4,
   Quaternion,
   Vector3,
   type AnimationClip,
@@ -148,6 +149,12 @@ const pole = new Vector3();
 const hipWorld = new Vector3();
 const euler = new Euler();
 const swing = new Quaternion();
+const aimWorld = new Vector3();
+const aimFrom = new Vector3();
+const aimTo = new Vector3();
+const aimInv = new Matrix4();
+const forearmL = new Vector3();
+const forearmR = new Vector3();
 const headPosed = new Quaternion();
 const clipThigh = new Quaternion();
 const clipShin = new Quaternion();
@@ -514,6 +521,60 @@ export function createFreestyleRig() {
     return closest;
   }
 
+  function captureForearm(elbow: Object3D | undefined, handName: string, out: Vector3) {
+    if (!elbow) return;
+    const hand = elbow.getObjectByName(handName);
+    if (!hand) {
+      out.set(0, 0.22, 0);
+      return;
+    }
+    if (hand.parent === elbow) {
+      out.copy(hand.position);
+      return;
+    }
+    elbow.updateWorldMatrix(true, true);
+    hand.getWorldPosition(out);
+    elbow.worldToLocal(out);
+  }
+
+  /**
+   * Point a limb at `worldDir`. The bone's rest quaternion already holds a T-pose,
+   * so writing a local Euler leaves the arm out to the side. This aims the child offset.
+   */
+  function aimLimb(bone: Object3D, localOffset: Vector3, worldDir: Vector3) {
+    const parent = bone.parent;
+    if (!parent || localOffset.lengthSq() < 1e-8 || worldDir.lengthSq() < 1e-8) return;
+    parent.updateWorldMatrix(true, false);
+    aimInv.copy(parent.matrixWorld).invert();
+    aimTo.copy(worldDir).transformDirection(aimInv).normalize();
+    aimFrom.copy(localOffset).normalize();
+    if (aimFrom.dot(aimTo) < -0.999) aimTo.x += 0.02;
+    bone.quaternion.setFromUnitVectors(aimFrom, aimTo);
+    bone.updateMatrix();
+  }
+
+  /** Arms hang slightly out, elbows bent. `pitch` swings the hand forward (+Z). */
+  function poseArm(side: Side, abduct: number, pitch: number, elbowBend: number) {
+    if (!bones) return;
+    const arm = side === 'left' ? bones.armLeft : bones.armRight;
+    const elbow = side === 'left' ? bones.elbowLeft : bones.elbowRight;
+    if (!arm || !elbow) return;
+    const outward = side === 'left' ? 1 : -1;
+    const spread = Math.sin(Math.min(1.15, Math.abs(abduct)));
+    aimWorld.set(outward * spread * 0.38, -0.78, Math.sin(pitch) * 1.15);
+    aimLimb(arm, elbow.position, aimWorld);
+    const forearm = side === 'left' ? forearmL : forearmR;
+    const bend = Math.max(0.2, elbowBend);
+    aimWorld.set(outward * 0.1, -0.62, 0.12 + Math.sin(bend) * 0.9 + Math.sin(pitch) * 0.55);
+    if (forearm.lengthSq() > 1e-6) aimLimb(elbow, forearm, aimWorld);
+    else {
+      elbow.rotation.set(bend, 0, 0);
+      elbow.updateMatrix();
+    }
+    hold(arm);
+    hold(elbow);
+  }
+
   function applyIdle(engine: GameEngine, pose: Pose) {
     if (!bones) return;
     const t = engine.time;
@@ -524,7 +585,7 @@ export function createFreestyleRig() {
     const falling = engine.phase === 'playing' && engine.ball.vy < 0;
     const load = approachWeight(engine.timeToContact(), falling) * amp;
     bones.hips.position.x += shift * 0.016 * amp;
-    bones.hips.position.y += (-0.01 + breath * 0.007) * amp - load * 0.012;
+    bones.hips.position.y += (-0.07 + breath * 0.007) * amp - load * 0.02;
     bones.hips.updateMatrix();
     bones.hips.updateWorldMatrix(true, true);
     bones.spine.quaternion.multiply(swing.setFromEuler(euler.set(
@@ -532,9 +593,9 @@ export function createFreestyleRig() {
       shift * 0.03 * amp,
       -shift * 0.045 * amp + balance * 0.012 * amp,
     )));
-    const arm = 0.06 * amp + load * 0.12;
-    bones.armLeft?.quaternion.multiply(swing.setFromEuler(euler.set(0.04 * shift, 0, -arm)));
-    bones.armRight?.quaternion.multiply(swing.setFromEuler(euler.set(-0.04 * shift, 0, arm)));
+    const ready = 0.32 + load * 0.08;
+    poseArm('left', ready, 0.06 * shift * amp, 0.5);
+    poseArm('right', ready, -0.06 * shift * amp, 0.5);
     pin('left', anchors.left.plant);
     pin('right', anchors.right.plant);
   }
@@ -576,12 +637,9 @@ export function createFreestyleRig() {
     pin(other(side), anchors[other(side)].plant);
     const env = since < CONTACT_DELAY ? easeIn(since / CONTACT_DELAY) : since < RECOVER_TIME ? 1 - smooth((since - FOLLOW_TIME) / (RECOVER_TIME - FOLLOW_TIME)) : 0;
     const counter = Math.min(1, Math.max(0, env));
-    if (bones?.armLeft && bones.armRight) {
-      const leftLead = side === 'right' ? 1 : -0.4;
-      const rightLead = side === 'left' ? 1 : -0.4;
-      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.22 * leftLead * counter, 0, 0.18 * counter)));
-      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0.22 * rightLead * counter, 0, -0.18 * counter)));
-    }
+    const lead = side === 'left' ? -1 : 1;
+    poseArm('left', 0.34, lead * 0.35 * counter, 0.6);
+    poseArm('right', 0.34, -lead * 0.35 * counter, 0.6);
   }
 
   function refreshThigh(side: Side) {
@@ -628,6 +686,8 @@ export function createFreestyleRig() {
       refreshThigh(side);
     });
     pin(other(side), anchors[other(side)].plant);
+    poseArm('left', 0.34, 0.1, 0.6);
+    poseArm('right', 0.34, -0.08, 0.6);
   }
 
   function applyHead(engine: GameEngine) {
@@ -691,14 +751,8 @@ export function createFreestyleRig() {
       break;
     }
     if (!tipped) head.quaternion.copy(clipShin);
-    if (bones.armLeft && bones.armRight) {
-      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.12, 0, -0.65)));
-      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0.12, 0, 0.7)));
-    }
-    if (bones.elbowLeft && bones.elbowRight) {
-      bones.elbowLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.4, 0, 0)));
-      bones.elbowRight.quaternion.multiply(swing.setFromEuler(euler.set(0.4, 0, 0)));
-    }
+    poseArm('left', 0.36, 0.08, 0.72);
+    poseArm('right', 0.36, 0.08, 0.72);
     hold(head);
     hold(spine);
     hold(bones.chest);
@@ -751,6 +805,8 @@ export function createFreestyleRig() {
     hold(bones?.neck);
     hold(bones?.head);
     hold(shelf);
+    poseArm('left', 0.7, -0.15, 0.55);
+    poseArm('right', 0.7, -0.15, 0.55);
     pin('left', anchors.left.plant);
     pin('right', anchors.right.plant);
   }
@@ -793,11 +849,9 @@ export function createFreestyleRig() {
     if (bones?.spine) {
       bones.spine.quaternion.multiply(swing.setFromEuler(euler.set(0.1, outward * 0.12 * counter, -outward * 0.1)));
     }
-    if (bones?.armLeft && bones.armRight) {
-      const same = side === 'left' ? -1 : 1;
-      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(-0.15 * counter, 0, -0.55 + same * 0.35 * counter)));
-      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(-0.15 * counter, 0, 0.55 + same * 0.35 * counter)));
-    }
+    const lead = side === 'left' ? 1 : -1;
+    poseArm('left', 0.4, lead * 0.2 * counter, 0.65);
+    poseArm('right', 0.4, -lead * 0.2 * counter, 0.65);
     if (bones?.head) {
       bones.head.quaternion.multiply(swing.setFromEuler(euler.set(0.58, 0, 0)));
       hold(bones.head);
@@ -817,18 +871,34 @@ export function createFreestyleRig() {
     const dancing = trick?.phase === 'execute' && age >= danceStart && age < danceEnd && !reacquire;
     if (dancing) {
       const beat = Math.sin((age - danceStart) * Math.PI * 6);
-      bones.hips.position.x = hipRest.x + beat * 0.025;
-      bones.hips.position.y += 0.01 * Math.abs(beat);
+      bones.hips.position.x = hipRest.x + beat * 0.09;
+      bones.hips.position.y = hipRest.y - 0.06 + Math.abs(beat) * 0.03;
       bones.hips.updateMatrix();
       bones.hips.updateWorldMatrix(true, true);
-      if (bones.spine) bones.spine.quaternion.multiply(swing.setFromEuler(euler.set(0, beat * 0.08, beat * 0.12)));
-      if (bones.armLeft && bones.armRight) {
-        bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0.05, 0, -0.48 - 0.22 * beat)));
-        bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0.05, 0, 0.48 + 0.22 * beat)));
+      if (bones.spine) {
+        bones.spine.rotation.set(0.04, -beat * 0.4, beat * 0.14);
+        bones.spine.updateMatrix();
+        hold(bones.spine);
       }
-    } else if (trick?.phase === 'execute' && bones.head) {
-      bones.head.quaternion.multiply(swing.setFromEuler(euler.set(age < danceStart ? -0.5 : -0.6, 0, 0)));
-      hold(bones.head);
+      poseArm('left', 0.42, 0.95 * beat, 0.95);
+      poseArm('right', 0.42, -0.95 * beat, 0.95);
+      plantLiftL.copy(anchors.left.plant);
+      plantLiftR.copy(anchors.right.plant);
+      plantLiftL.y += Math.max(0, beat) * 0.11;
+      plantLiftR.y += Math.max(0, -beat) * 0.11;
+      plantLiftL.z += Math.max(0, beat) * 0.03;
+      plantLiftR.z += Math.max(0, -beat) * 0.03;
+      pin('left', plantLiftL);
+      pin('right', plantLiftR);
+      return;
+    } else if (trick?.phase === 'execute') {
+      const look = age < danceStart ? 0.4 : 0.2;
+      poseArm('left', 0.34, look, 0.62);
+      poseArm('right', 0.34, look, 0.62);
+      if (bones.head) {
+        bones.head.quaternion.multiply(swing.setFromEuler(euler.set(age < danceStart ? -0.5 : -0.6, 0, 0)));
+        hold(bones.head);
+      }
     }
     const catching = trick?.phase === 'recover';
     if (catching) {
@@ -837,6 +907,8 @@ export function createFreestyleRig() {
       approach.set(0, -1, -0.08);
       seatFoot(side, ball, engine.config.ballRadius, approach);
       pin(other(side), anchors[other(side)].plant);
+      poseArm('left', 0.32, 0.12, 0.58);
+      poseArm('right', 0.32, 0.12, 0.58);
       return;
     }
     pin('left', anchors.left.plant);
@@ -889,12 +961,9 @@ export function createFreestyleRig() {
       bones.spine.updateMatrix();
     }
     const counter = since < 0.32 ? Math.min(1, since / 0.08) : Math.max(0, 1 - (since - 0.32) / 0.18);
-    if (bones?.armLeft && bones.armRight) {
-      const leftLead = side === 'right' ? 1 : -0.25;
-      const rightLead = side === 'left' ? 1 : -0.25;
-      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(-0.55 * counter, 0, 0.15 * counter + 0.4 * leftLead * counter)));
-      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(-0.55 * counter, 0, -0.15 * counter + 0.4 * rightLead * counter)));
-    }
+    const lead = side === 'right' ? 1 : -1;
+    poseArm('left', 0.34, lead * 0.4 * counter, 0.65);
+    poseArm('right', 0.34, -lead * 0.4 * counter, 0.65);
     pin(support, anchors[support].plant);
   }
 
@@ -994,6 +1063,8 @@ export function createFreestyleRig() {
         elbowRight: bone(scene, 'LowerArm_R'),
         left, right,
       };
+      captureForearm(bones.elbowLeft, 'Hand_L', forearmL);
+      captureForearm(bones.elbowRight, 'Hand_R', forearmR);
       const idle = clipNamed(clips, 'Idle');
       if (idle) {
         const mixer = poseClip(scene, idle, 0);

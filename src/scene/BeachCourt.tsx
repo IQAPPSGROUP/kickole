@@ -127,8 +127,11 @@ function BeachCarnival({ sway }: { sway: boolean }) {
   );
 }
 
-/** Beige-gold sand. The material colour stays white so this albedo is not multiplied back into clay. */
-const SAND_BASE = '#e4c486';
+/**
+ * Deeper beige-gold albedo. The street key lifts this into the #e8c98a–#dcb878
+ * range. A lighter fill clips to pale clay.
+ */
+const SAND_BASE = '#c4a056';
 
 function useSand() {
   return useMemo(() => {
@@ -144,37 +147,37 @@ function useSand() {
     if (g && ng) {
       g.fillStyle = SAND_BASE;
       g.fillRect(0, 0, size, size);
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 22; i++) {
         const x = random() * size;
         const y = random() * size;
-        const rad = 36 + random() * 78;
-        const shade = g.createRadialGradient(x, y, rad * 0.15, x, y, rad);
-        shade.addColorStop(0, 'rgba(168, 128, 72, 0.20)');
-        shade.addColorStop(1, 'rgba(168, 128, 72, 0)');
+        const rad = 40 + random() * 90;
+        const shade = g.createRadialGradient(x, y, rad * 0.1, x, y, rad);
+        shade.addColorStop(0, 'rgba(112, 78, 36, 0.34)');
+        shade.addColorStop(1, 'rgba(112, 78, 36, 0)');
         g.fillStyle = shade;
         g.beginPath();
         g.arc(x, y, rad, 0, Math.PI * 2);
         g.fill();
       }
-      for (let i = 0; i < 12; i++) {
+      for (let i = 0; i < 10; i++) {
         const x = random() * size;
         const y = random() * size;
-        const rad = 24 + random() * 46;
+        const rad = 22 + random() * 40;
         const shade = g.createRadialGradient(x, y, 0, x, y, rad);
-        shade.addColorStop(0, 'rgba(236, 214, 168, 0.28)');
-        shade.addColorStop(1, 'rgba(236, 214, 168, 0)');
+        shade.addColorStop(0, 'rgba(216, 186, 122, 0.35)');
+        shade.addColorStop(1, 'rgba(216, 186, 122, 0)');
         g.fillStyle = shade;
         g.beginPath();
         g.arc(x, y, rad, 0, Math.PI * 2);
         g.fill();
       }
       for (let i = 0; i < 14000; i++) {
-        g.fillStyle = random() > 0.46 ? 'rgba(244, 226, 176, 0.34)' : 'rgba(156, 116, 62, 0.26)';
-        g.fillRect(random() * size, random() * size, 1 + random() * 1.5, 1 + random() * 1.5);
+        g.fillStyle = random() > 0.5 ? 'rgba(214, 184, 118, 0.40)' : 'rgba(120, 82, 40, 0.32)';
+        g.fillRect(random() * size, random() * size, 1 + random() * 1.6, 1 + random() * 1.6);
       }
       for (let row = 0; row < 16; row++) {
-        g.strokeStyle = 'rgba(150, 114, 62, 0.11)';
-        g.lineWidth = 1.5;
+        g.strokeStyle = 'rgba(122, 84, 40, 0.16)';
+        g.lineWidth = 2;
         g.beginPath();
         for (let x = 0; x <= size; x += 3) {
           const y = row * (size / 16) + Math.sin(x / 24 + row * 1.6) * 5;
@@ -187,12 +190,12 @@ function useSand() {
         g.save();
         g.translate(x, y);
         g.rotate(angle);
-        g.fillStyle = 'rgba(124, 92, 48, 0.30)';
+        g.fillStyle = 'rgba(78, 50, 22, 0.55)';
         g.beginPath();
-        g.ellipse(0, 7, 5.5, 8, 0, 0, Math.PI * 2);
+        g.ellipse(0, 14, 11, 16, 0, 0, Math.PI * 2);
         g.fill();
         g.beginPath();
-        g.ellipse(0, -9, 6.4, 9, 0, 0, Math.PI * 2);
+        g.ellipse(0, -16, 13, 18, 0, 0, Math.PI * 2);
         g.fill();
         g.restore();
       };
@@ -282,7 +285,7 @@ export function BeachCourt({ shadows, quality }: { shadows: boolean; quality: Qu
       <meshStandardMaterial
         map={sand.color}
         normalMap={sand.normal}
-        normalScale={[0.62, 0.62]}
+        normalScale={[0.95, 0.95]}
         color="#ffffff"
         roughness={0.94}
         metalness={0}

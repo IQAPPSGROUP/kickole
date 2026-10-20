@@ -1,6 +1,6 @@
-import { useMemo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CanvasTexture, Color, DoubleSide, InstancedMesh, NoColorSpace, Object3D, RepeatWrapping, SRGBColorSpace, Texture, TextureLoader } from 'three';
+import { BufferGeometry, CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
 import { BeachCourt } from './BeachCourt';
@@ -8,6 +8,8 @@ import { ENVIRONMENT_THEME } from './environment';
 import { Crowd } from './Crowd';
 import { profileFor } from './qualityTier';
 import { prefersReducedMotion, sceneLifeBudget } from './juice';
+import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, STREET_FILES, streetUrl, wallMapSet, type FenceSlot } from './streetLayout';
+import { useStreetMaps, useStreetNodes, type StreetMaps } from './streetMaterials';
 
 const NAVY = '#1E2A5A';
 const TEAL = '#00B8A9';
@@ -166,7 +168,7 @@ function Bunting({ sway }: { sway: boolean }) {
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, N]}>
       <circleGeometry args={[0.1, 3]} />
-      <meshBasicMaterial side={DoubleSide} />
+      <meshStandardMaterial side={DoubleSide} roughness={0.72} metalness={0} />
     </instancedMesh>
   );
 }
@@ -261,200 +263,191 @@ function HillsideNeighbourhood() {
   );
 }
 
-const STREET = `${import.meta.env.BASE_URL}textures/street/`;
+const slotDummy = new Object3D();
 
-function useFileTexture(url: string | null, color: boolean, repeatX: number, repeatY = repeatX, anisotropy = 4) {
-  const [tex, setTex] = useState<Texture | null>(null);
-  useEffect(() => {
-    if (!url) return;
-    let alive = true;
-    const loader = new TextureLoader();
-    loader.load(url, (loaded) => {
-      if (!alive) { loaded.dispose(); return; }
-      loaded.wrapS = loaded.wrapT = RepeatWrapping;
-      loaded.repeat.set(repeatX, repeatY);
-      loaded.colorSpace = color ? SRGBColorSpace : NoColorSpace;
-      loaded.anisotropy = anisotropy;
-      setTex(loaded);
-    });
-    return () => {
-      alive = false;
-      setTex((current) => { current?.dispose(); return null; });
-    };
-  }, [url, color, repeatX, repeatY, anisotropy]);
-  return tex;
-}
-
-/** Seeded pitch scuffs. The 2K court plates are upscales, so the wear is painted here. */
-function useWearTexture() {
-  return useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 1024;
-    const g = canvas.getContext('2d');
-    const rand = seededRandom(20261020);
-    if (g) {
-      g.clearRect(0, 0, 1024, 1024);
-      for (let i = 0; i < 36; i++) {
-        g.save();
-        g.translate(512 + (rand() - 0.5) * 780, 512 + (rand() - 0.5) * 780);
-        g.rotate(rand() * Math.PI);
-        g.fillStyle = `rgba(16,10,8,${0.42 + rand() * 0.4})`;
-        g.beginPath();
-        g.ellipse(0, 0, 40 + rand() * 170, 10 + rand() * 34, 0, 0, Math.PI * 2);
-        g.fill();
-        g.restore();
-      }
-      for (let i = 0; i < 8; i++) {
-        g.save();
-        g.translate(280 + rand() * 460, 300 + rand() * 420);
-        g.rotate(-0.4 + rand() * 0.8);
-        g.fillStyle = 'rgba(10,8,6,0.72)';
-        g.fillRect(-90, -7, 180, 14);
-        g.restore();
-      }
-      for (let i = 0; i < 10; i++) {
-        g.fillStyle = `rgba(234,244,74,${0.28 + rand() * 0.35})`;
-        g.fillRect(300 + rand() * 420, 320 + rand() * 380, 8 + rand() * 28, 3 + rand() * 6);
-      }
-    }
-    const texture = new CanvasTexture(canvas);
-    texture.colorSpace = SRGBColorSpace;
-    return texture;
-  }, []);
-}
-
-/** Seats on the camera side of the back fence. A stand behind the hillside mesh never enters this portrait frame. */
-function BackStand() {
-  const seats = [-2.8, -1.4, 0, 1.4, 2.8];
+function ConcreteSkin({ maps }: { maps: StreetMaps }) {
   return (
-    <group position={[0, 3.42, -3.15]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[7.2, 0.22, 0.38]} />
-        <meshStandardMaterial color="#3e3834" roughness={0.9} metalness={0.02} />
-      </mesh>
-      {seats.map((x) => (
-        <mesh key={x} position={[x, 0.28, 0]} castShadow>
-          <boxGeometry args={[0.34, 0.32, 0.28]} />
-          <meshStandardMaterial color={Math.abs(x) < 0.1 || Math.abs(x) > 2.5 ? '#6e4b3a' : '#2f3d4a'} roughness={0.78} />
-        </mesh>
-      ))}
-    </group>
+    <meshStandardMaterial
+      map={maps.color ?? undefined}
+      normalMap={maps.normal ?? undefined}
+      roughnessMap={maps.rough ?? undefined}
+      color={maps.color ? '#ffffff' : '#6a655f'}
+      roughness={0.9}
+      metalness={0.02}
+    />
+  );
+}
+
+function SlottedMesh({ geometry, slots, color, metalness, roughness }: { geometry: BufferGeometry; slots: FenceSlot[]; color: string; metalness: number; roughness: number }) {
+  const ref = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const mesh = ref.current;
+    if (!mesh) return;
+    slots.forEach((slot, index) => {
+      slotDummy.position.set(slot.x, slot.y, slot.z);
+      slotDummy.rotation.set(0, slot.ry, 0);
+      slotDummy.scale.set(1, 1, 1);
+      slotDummy.updateMatrix();
+      mesh.setMatrixAt(index, slotDummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [slots]);
+  if (slots.length === 0) return null;
+  return (
+    <instancedMesh ref={ref} args={[geometry, undefined, slots.length]} frustumCulled={false} castShadow>
+      <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} envMapIntensity={1.2} />
+    </instancedMesh>
   );
 }
 
 function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality }) {
   const profile = profileFor(quality);
-  const high = quality === 'high';
-  const [detail, setDetail] = useState(false);
-  useEffect(() => {
-    if (quality === 'low') return;
-    const id = window.setTimeout(() => setDetail(true), 500);
-    return () => window.clearTimeout(id);
-  }, [quality]);
-  // High loads lanczos 2K plates derived from the 1K set. There is no separate 2K photoshoot.
-  const plate = profile.texture === 2048 ? '2k/' : '';
-  const aniso = profile.anisotropy;
-  const asphalt = useFileTexture(`${STREET}${plate}asphalt_diff.jpg`, true, 4, 4, aniso);
-  const asphaltN = useFileTexture(detail ? `${STREET}${plate}asphalt_nor.jpg` : null, false, 4, 4, aniso);
-  const asphaltR = useFileTexture(detail ? `${STREET}${plate}asphalt_rough.jpg` : null, false, 4, 4, aniso);
-  const wall = useFileTexture(`${STREET}${plate}wall_graffiti.jpg`, true, 1, 1, aniso);
-  const wallN = useFileTexture(detail ? `${STREET}${plate}concrete_nor.jpg` : null, false, 1, 1, aniso);
-  const wallR = useFileTexture(detail ? `${STREET}${plate}concrete_rough.jpg` : null, false, 1, 1, aniso);
+  const courtMaps = courtMapSet(profile.courtMaps);
+  const wallMaps = wallMapSet(profile.courtMaps);
+  const concreteMaps = concreteMapSet(profile.courtMaps);
+  const court = useStreetMaps(courtMaps.color, courtMaps.normal, courtMaps.rough, 1, 1);
+  const wall = useStreetMaps(wallMaps.color, wallMaps.normal, wallMaps.rough, 1, 1);
+  const concrete = useStreetMaps(concreteMaps.color, concreteMaps.normal, concreteMaps.rough, 2, 2);
+  const skid = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalSkid) : null, null, null, 1, 1);
+  const stencil = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalStencil) : null, null, null, 1, 1);
+  const tag = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalTag) : null, null, null, 1, 1);
+  const fenceNodes = useStreetNodes(fenceModel(profile.fence));
+  const lampNodes = useStreetNodes(profile.lamp === 'simple' ? null : streetUrl(STREET_FILES.lamp));
+  const panel = fenceNodes.find((node) => node.name === 'Panel');
+  const post = fenceNodes.find((node) => node.name === 'Post');
+  const slots = useMemo(() => fenceSlots(profile.fence), [profile.fence]);
+  const posts = useMemo(() => fencePosts(profile.fence), [profile.fence]);
   const sign = useSignTexture();
   const fence = useFenceTexture();
   const blob = useBlobTexture();
-  const wear = useWearTexture();
   useEffect(() => () => {
-    sign.dispose(); fence.dispose(); blob.dispose(); wear.dispose();
-  }, [sign, fence, blob, wear]);
+    sign.dispose(); fence.dispose(); blob.dispose();
+  }, [sign, fence, blob]);
   return (
     <group>
       <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow={shadows}>
+      <mesh position={[0, -0.08, 0]} receiveShadow={shadows}>
+        <boxGeometry args={[9.45, 0.16, 9.45]} />
+        <ConcreteSkin maps={concrete} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} receiveShadow={shadows}>
         <planeGeometry args={[9, 9]} />
-        <meshStandardMaterial map={asphalt ?? undefined} normalMap={asphaltN ?? undefined} roughnessMap={asphaltR ?? undefined} color={asphalt ? '#ffffff' : '#6d6a66'} roughness={0.92} metalness={0} />
+        <meshStandardMaterial
+          map={court.color ?? undefined}
+          normalMap={court.normal ?? undefined}
+          roughnessMap={court.rough ?? undefined}
+          color={court.color ? '#ffffff' : '#6d6a66'}
+          roughness={court.rough ? 1 : 0.92}
+          metalness={0.02}
+          envMapIntensity={0.85}
+        />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <ringGeometry args={[1.17, 1.24, 64]} />
-        <meshBasicMaterial color={WHITE} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.014, -3.35]}>
+        <planeGeometry args={[9, 0.7]} />
+        <meshBasicMaterial map={blob} transparent opacity={0.55} depthWrite={false} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
-        <circleGeometry args={[0.06, 16]} />
-        <meshBasicMaterial color={WHITE} />
-      </mesh>
-      {[-3.4, 3.4].map((x) => (
-        <mesh key={x} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.003, 0]}>
-          <planeGeometry args={[0.06, 9]} />
-          <meshBasicMaterial color={WHITE} />
+      {skid.color && (
+        <mesh rotation={[-Math.PI / 2, 0, 0.35]} position={[0.7, 0.02, 0.45]}>
+          <planeGeometry args={[1.7, 1.05]} />
+          <meshStandardMaterial map={skid.color} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} roughness={0.9} />
         </mesh>
-      ))}
-      {/* Fake ambient occlusion where the walls meet the floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.004, -3.3]}>
-        <planeGeometry args={[9, 0.8]} />
-        <meshBasicMaterial map={blob} transparent opacity={0.8} depthWrite={false} />
-      </mesh>
-      {/* Back wall */}
+      )}
+      {stencil.color && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[-1.35, 0.02, -0.7]}>
+          <planeGeometry args={[1.15, 1.15]} />
+          <meshStandardMaterial map={stencil.color} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-2} roughness={0.48} metalness={0.04} />
+        </mesh>
+      )}
       <mesh position={[0, 1.3, -3.6]} receiveShadow={shadows}>
         <boxGeometry args={[9, 2.6, 0.2]} />
-        <meshStandardMaterial map={wall ?? undefined} normalMap={wallN ?? undefined} roughnessMap={wallR ?? undefined} color={wall ? '#ffffff' : '#8a8178'} roughness={0.86} metalness={0} />
+        <meshStandardMaterial
+          map={wall.color ?? undefined}
+          normalMap={wall.normal ?? undefined}
+          roughnessMap={wall.rough ?? undefined}
+          color={wall.color ? '#ffffff' : '#8a8178'}
+          roughness={wall.rough ? 1 : 0.86}
+          metalness={0}
+        />
       </mesh>
-      <mesh position={[-1.6, 2.02, -3.48]}>
+      <mesh position={[0, 1.5, -4.2]} receiveShadow={shadows}>
+        <boxGeometry args={[7.6, 0.16, 0.9]} />
+        <ConcreteSkin maps={concrete} />
+      </mesh>
+      <mesh position={[-1.55, 2.05, -3.48]}>
         <planeGeometry args={[3.2, 0.8]} />
         <meshBasicMaterial map={sign} transparent toneMapped={false} />
       </mesh>
-      <Poster x={1.9} y={1.4} color={CORAL} />
-      <Poster x={3.1} y={1.45} color={TEAL} w={0.9} h={0.7} />
-      {/* Chain-link fence along the top of the wall */}
-      <mesh position={[0, 2.9, -3.4]}>
-        <planeGeometry args={[9, 0.7]} />
-        <meshStandardMaterial map={fence} transparent alphaTest={0.3} side={DoubleSide} color="#c5ced4" roughness={0.35} metalness={0.72} />
-      </mesh>
-      {[-4, -2, 0, 2, 4].map((x) => (
-        <mesh key={x} position={[x, 2.9, -3.4]}>
-          <boxGeometry args={[0.06, 0.8, 0.06]} />
-          <meshStandardMaterial color="#2c3136" roughness={0.62} metalness={0.25} />
+      <Poster x={2.15} y={1.35} color={CORAL} />
+      <Poster x={3.15} y={1.5} color={TEAL} w={0.9} h={0.7} />
+      {tag.color && [-1, 1].map((side) => (
+        <mesh key={side} position={[side * 4.28, 0.5, -0.4]} rotation={[0, side > 0 ? -Math.PI / 2 : Math.PI / 2, 0]}>
+          <planeGeometry args={[0.72, 0.72]} />
+          <meshStandardMaterial map={tag.color} transparent roughness={0.68} polygonOffset polygonOffsetFactor={-1} />
         </mesh>
       ))}
-      {/* Low side walls */}
-      {[-4.4, 4.4].map((x) => (
-        <mesh key={x} position={[x, 0.45, 0]}>
-          <boxGeometry args={[0.2, 0.9, 9]} />
-          <meshStandardMaterial color="#3e4650" roughness={0.88} metalness={0.05} />
-        </mesh>
-      ))}
-      {high && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0.15]}>
-          <planeGeometry args={[8.2, 8.2]} />
-          <meshBasicMaterial map={wear} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+      {(profile.fence === 'plane' || !panel) && (
+        <mesh position={[0, 3.02, -3.48]}>
+          <planeGeometry args={[9, 0.78]} />
+          <meshStandardMaterial map={fence} transparent alphaTest={0.3} side={DoubleSide} color="#c5ced4" roughness={0.35} metalness={0.72} />
         </mesh>
       )}
-      <Crowd count={profile.crowd} />
-      {high && <BackStand />}
-      {/* Painted court corners; simple geometry adds no texture downloads. */}
-      {[-2.6, 2.6].map((x) => (
-        <mesh key={`paint-${x}`} rotation={[-Math.PI / 2, 0, 0]} position={[x, 0.004, 1.2]}>
-          <planeGeometry args={[0.09, 3.4]} />
-          <meshBasicMaterial color={LIME} />
+      {panel && <SlottedMesh geometry={panel.geometry} slots={slots} color="#c5ced4" metalness={0.78} roughness={0.34} />}
+      {post && <SlottedMesh geometry={post.geometry} slots={posts} color="#9aa3a8" metalness={0.82} roughness={0.3} />}
+      {!post && posts.map((item, index) => (
+        <mesh key={`post-${index}`} position={[item.x, item.y + 0.42, item.z]} castShadow>
+          <cylinderGeometry args={[0.028, 0.024, 0.84, 5]} />
+          <meshStandardMaterial color="#8e989e" metalness={0.75} roughness={0.38} />
         </mesh>
       ))}
-      {/* Props */}
+      {[-4.4, 4.4].map((x) => (
+        <mesh key={x} position={[x, 0.45, 0]} receiveShadow={shadows}>
+          <boxGeometry args={[0.18, 0.9, 9]} />
+          <ConcreteSkin maps={concrete} />
+        </mesh>
+      ))}
+      <Crowd count={profile.crowd} lod={profile.crowdLod} idle={profile.crowdIdle} />
       <Bin x={-3.7} z={-3} color={TEAL} />
-      <Bin x={-3.1} z={-3.1} color={CORAL} />
-      <mesh position={[2.9, 0.3, -2.9]}>
-        <boxGeometry args={[1.2, 0.08, 0.35]} />
+      <Bin x={-3.15} z={-3.05} color={CORAL} />
+      <mesh position={[3.05, 0.32, -2.85]} castShadow>
+        <boxGeometry args={[1.15, 0.07, 0.34]} />
         <meshStandardMaterial color="#b9a06a" roughness={0.72} />
       </mesh>
-      <mesh position={[2.9, 0.15, -2.9]}>
-        <boxGeometry args={[1.1, 0.3, 0.3]} />
-        <meshStandardMaterial color="#2c3136" roughness={0.62} metalness={0.25} />
+      <mesh position={[3.05, 0.16, -2.85]}>
+        <boxGeometry args={[1.05, 0.28, 0.28]} />
+        <meshStandardMaterial color="#2c3136" roughness={0.55} metalness={0.35} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[2.9, 0.005, -2.9]}>
-        <planeGeometry args={[1.8, 0.9]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3.05, 0.016, -2.85]}>
+        <planeGeometry args={[1.6, 0.8]} />
         <meshBasicMaterial map={blob} transparent depthWrite={false} />
       </mesh>
       <Bunting sway={sceneLifeBudget(quality, prefersReducedMotion()).buntingSway} />
-      <Floodlight x={-3.8} z={-3.2} />
-      <Floodlight x={3.8} z={-3.2} />
+      {profile.lamp === 'simple' && (
+        <>
+          <Floodlight x={-3.75} z={-3.15} />
+          <Floodlight x={3.75} z={-3.15} />
+        </>
+      )}
+      {lampNodes.map((node) => (
+        [-3.75, 3.75].map((x) => (
+          <mesh
+            key={`${node.name}-${x}`}
+            geometry={node.geometry}
+            position={[x, 0, -3.15]}
+            rotation={[0, x > 0 ? Math.PI : 0, 0]}
+            castShadow={node.name !== 'Lens'}
+          >
+            {node.name === 'Lens'
+              ? <meshStandardMaterial color="#ffe0b8" emissive="#ffb15e" emissiveIntensity={profile.lamp === 'lit' ? 3.4 : 1.8} roughness={0.22} />
+              : <meshStandardMaterial color="#b7c0c4" metalness={0.84} roughness={0.32} envMapIntensity={1.25} />}
+          </mesh>
+        ))
+      ))}
+      {profile.lamp === 'lit' && (
+        <>
+          <pointLight position={[-3.02, 3.25, -2.85]} color="#ffc48a" intensity={5.5} distance={5.2} decay={2} />
+          <pointLight position={[3.02, 3.25, -2.85]} color="#ffc48a" intensity={5.5} distance={5.2} decay={2} />
+        </>
+      )}
     </group>
   );
 }

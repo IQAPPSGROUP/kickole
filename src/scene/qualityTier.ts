@@ -13,6 +13,11 @@ export interface DeviceHints {
 
 /** `soft` is PCF soft. `variance` is a variance shadow map (Three has no PCSS). */
 export type ShadowFilter = 'none' | 'soft' | 'variance';
+export type CourtMaps = 'full' | 'rough' | 'color';
+export type FenceDetail = 'link' | 'sparse' | 'plane';
+export type CrowdLod = 0 | 1 | 2;
+export type SkyMode = 'hdri' | 'reflect' | 'flat';
+export type LampMode = 'lit' | 'emissive' | 'simple';
 
 export interface TierProfile {
   lod: 0 | 1;
@@ -31,6 +36,15 @@ export interface TierProfile {
   anisotropy: number;
   dpr: [number, number];
   crowd: number;
+  /** Albedo, or albedo+roughness, or albedo+normal+roughness. */
+  courtMaps: CourtMaps;
+  fence: FenceDetail;
+  decals: boolean;
+  crowdLod: CrowdLod;
+  crowdIdle: boolean;
+  /** hdri draws the sunset as the sky. reflect keeps the sky colour and still lights metal. */
+  sky: SkyMode;
+  lamp: LampMode;
 }
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high'];
@@ -104,19 +118,24 @@ export function profileFor(tier: Quality): TierProfile {
         lod: 1, shadows: 'none', shadowFilter: 'none', shadowMap: 0, contactShadows: false,
         ssao: false, bloom: false, dof: false, fxaa: false, ibl: false,
         texture: 1024, anisotropy: 1, dpr: [1, 1], crowd: 8,
+        courtMaps: 'color', fence: 'plane', decals: false, crowdLod: 2, crowdIdle: false,
+        sky: 'flat', lamp: 'simple',
       };
     case 'medium':
       return {
         lod: 0, shadows: 'single', shadowFilter: 'soft', shadowMap: 512, contactShadows: true,
         ssao: false, bloom: false, dof: false, fxaa: true, ibl: true,
-        texture: 1024, anisotropy: 4, dpr: [1, 1.25], crowd: 16,
+        texture: 1024, anisotropy: 4, dpr: [1, 1.25], crowd: 14,
+        courtMaps: 'rough', fence: 'sparse', decals: true, crowdLod: 1, crowdIdle: true,
+        sky: 'reflect', lamp: 'emissive',
       };
     case 'high':
       return {
-        // 1024 VSM rather than a 2048 map: softness from the variance blur, still aiming at 60 fps.
         lod: 0, shadows: 'cascaded', shadowFilter: 'variance', shadowMap: 1024, contactShadows: true,
         ssao: true, bloom: true, dof: true, fxaa: true, ibl: true,
-        texture: 2048, anisotropy: 16, dpr: [1, 1.5], crowd: 40,
+        texture: 2048, anisotropy: 16, dpr: [1, 1.5], crowd: 22,
+        courtMaps: 'full', fence: 'link', decals: true, crowdLod: 0, crowdIdle: true,
+        sky: 'hdri', lamp: 'lit',
       };
     default: {
       const neverTier: never = tier;

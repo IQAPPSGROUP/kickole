@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { characterModelUrl } from './rig';
-import { characterLod, detectTier, fallbackTier, profileFor, rendererShadows, startingTier } from './qualityTier';
+import { characterLod, detectTier, fallbackTier, profileFor, startingTier } from './qualityTier';
 
 describe('quality tiers', () => {
   it('detects low, mid and high devices', () => {
@@ -54,14 +54,22 @@ describe('quality tiers', () => {
     expect(profileFor('high').shadowFilter).toBe('variance');
     expect(profileFor('medium').shadowFilter).toBe('soft');
     expect(profileFor('low').shadowFilter).toBe('none');
-    expect(profileFor('high').texture).toBe(2048);
-    expect(profileFor('medium').texture).toBe(1024);
-    expect(profileFor('high').lod).toBe(0);
+    expect(profileFor('high').courtMaps).toBe('full');
+    expect(profileFor('high').fence).toBe('link');
+    expect(profileFor('high').sky).toBe('hdri');
+    expect(profileFor('high').lamp).toBe('lit');
+    expect(profileFor('high').crowdIdle).toBe(true);
+    expect(profileFor('medium').courtMaps).toBe('rough');
+    expect(profileFor('medium').fence).toBe('sparse');
+    expect(profileFor('medium').sky).toBe('reflect');
+    expect(profileFor('medium').decals).toBe(true);
+    expect(profileFor('low').courtMaps).toBe('color');
+    expect(profileFor('low').fence).toBe('plane');
+    expect(profileFor('low').sky).toBe('flat');
+    expect(profileFor('low').decals).toBe(false);
+    expect(profileFor('low').crowdIdle).toBe(false);
     expect(profileFor('high').crowd).toBeGreaterThan(profileFor('medium').crowd);
-    expect(rendererShadows('variance', true)).toBe('variance');
-    expect(rendererShadows('soft', true)).toBe('soft');
-    expect(rendererShadows('none', true)).toBe(false);
-    expect(rendererShadows('variance', false)).toBe(false);
+    expect(profileFor('medium').crowd).toBeGreaterThan(profileFor('low').crowd);
     expect(characterModelUrl(0)).toMatch(/kickole_player_v4\.glb$/);
     expect(characterModelUrl(1)).toMatch(/kickole_player_v4_lod1\.glb$/);
     expect(characterModelUrl(0, 'female')).toMatch(/kickole_player_v4_female\.glb$/);

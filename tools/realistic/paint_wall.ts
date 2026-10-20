@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '../../public/textures/street');
+const root = join(dirname(fileURLToPath(import.meta.url)), '../street-sources');
 const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <g opacity="0.92">

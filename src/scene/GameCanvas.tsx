@@ -190,8 +190,8 @@ function StreetTone() {
   return null;
 }
 
-/** CC0 sunset IBL. Loaded after the first paint so the character and court colour maps win the initial budget. */
-function SunsetIbl() {
+/** CC0 sunset IBL. High draws it as the sky; medium uses it for reflections only. */
+function SunsetIbl({ sky }: { sky: 'hdri' | 'reflect' }) {
   const { gl, scene } = useThree();
   useEffect(() => {
     let alive = true;
@@ -202,13 +202,16 @@ function SunsetIbl() {
         if (!alive) { hdr.dispose(); pm.dispose(); return; }
         env = pm.fromEquirectangular(hdr).texture;
         scene.environment = env;
-        scene.background = env;
-        scene.backgroundBlurriness = 0.55;
-        scene.environmentIntensity = 0.42;
+        scene.environmentIntensity = sky === 'hdri' ? 0.5 : 0.42;
+        if (sky === 'hdri') {
+          scene.background = env;
+          scene.backgroundBlurriness = 0.08;
+          scene.backgroundIntensity = 1;
+        }
         hdr.dispose();
         pm.dispose();
       });
-    }, 400);
+    }, sky === 'hdri' ? 180 : 400);
     return () => {
       alive = false;
       window.clearTimeout(timer);
@@ -216,7 +219,7 @@ function SunsetIbl() {
       scene.background = null;
       env?.dispose();
     };
-  }, [gl, scene]);
+  }, [gl, scene, sky]);
   return null;
 }
 
@@ -268,7 +271,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <color attach="background" args={[street ? '#3a2a28' : '#8dc5cb']} />
       <fog attach="fog" args={street ? ['#5c3a32', 22, 48] : ['#8dc5cb', 24, 52]} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {street && profile.ibl && <SunsetIbl />}
+      {street && profile.sky !== 'flat' && <SunsetIbl sky={profile.sky} />}
       {!street && quality === 'high' && <Environment />}
       <Simulation controller={controller} />
       <PerfProbe />

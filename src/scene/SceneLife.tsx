@@ -144,7 +144,7 @@ function Flags({ count, sway }: { count: number; sway: boolean }) {
         <group key={x} position={[x, 0, -3.15]}>
           <mesh position={[0, 1.7, 0]}>
             <cylinderGeometry args={[0.03, 0.03, 3.4, 5]} />
-            <meshBasicMaterial color="#1E2A5A" />
+            <meshBasicMaterial color="#fff6ea" />
           </mesh>
           <mesh position={[0.22, 3.15, 0]}>
             <planeGeometry args={[0.46, 0.28]} />

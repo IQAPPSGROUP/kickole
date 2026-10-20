@@ -2,7 +2,6 @@ import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalSt
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
 import { AgXToneMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
@@ -157,19 +156,6 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
   return null;
 }
 
-/** Soft image-based lighting from a procedural room (no external HDR download). */
-function Environment() {
-  const { gl, scene } = useThree();
-  useEffect(() => {
-    const pm = new PMREMGenerator(gl);
-    const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environment = env;
-    scene.environmentIntensity = 0.35;
-    return () => { scene.environment = null; env.dispose(); pm.dispose(); };
-  }, [gl, scene]);
-  return null;
-}
-
 function Simulation({ controller }: { controller: GameController }) {
   useFrame((_, dt) => { if (!inspector.active) controller.tick(dt); });
   return null;
@@ -301,12 +287,11 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const post = street && (profile.ssao || profile.bloom || profile.dof || profile.aa !== 'none');
   return (
     <>
-      {street && <StreetTone />}
-      <color attach="background" args={[street ? '#b7e4f8' : '#8dc5cb']} />
-      <fog attach="fog" args={street ? ['#f8edd4', 28, 70] : ['#8dc5cb', 24, 52]} />
+      <StreetTone />
+      <color attach="background" args={[street ? '#b7e4f8' : '#c5ebf6']} />
+      <fog attach="fog" args={street ? ['#f8edd4', 28, 70] : ['#f6f1e4', 32, 76]} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {street && profile.sky !== 'flat' && <StreetSky sky={profile.sky} />}
-      {!street && quality === 'high' && <Environment />}
+      {profile.sky !== 'flat' && <StreetSky sky={profile.sky} />}
       <Simulation controller={controller} />
       <PerfProbe />
       {street ? (
@@ -317,12 +302,12 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         </>
       ) : (
         <>
-          <hemisphereLight args={['#fff1dc', '#12363f', 0.95]} />
-          <ambientLight intensity={0.32} />
+          <hemisphereLight args={['#fff8e8', '#d7f3ea', 0.72]} />
+          <ambientLight intensity={0.22} />
           <directionalLight
-            position={[2.6, 7, 3.2]}
-            intensity={2.3}
-            color="#ffe9c7"
+            position={[5.4, 10.2, 2.6]}
+            intensity={3.15}
+            color="#fff4d4"
             castShadow={shadows}
             shadow-mapSize={[quality === 'high' ? 1024 : 512, quality === 'high' ? 1024 : 512]}
             shadow-camera-left={-3}
@@ -341,12 +326,12 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       {((street && profile.contactShadows && profile.shadowFilter !== 'pcss') || (!street && quality === 'high')) && (
         <ContactShadows
           position={[0, 0.006, 0.2]}
-          opacity={street ? 0.4 : 0.38}
+          opacity={street ? 0.4 : 0.26}
           scale={4}
           blur={2.2}
           far={1.2}
           resolution={256}
-          color={street ? '#6b5344' : '#1E2A5A'}
+          color={street ? '#6b5344' : '#c4a56a'}
         />
       )}
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />

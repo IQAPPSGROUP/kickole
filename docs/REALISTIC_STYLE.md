@@ -14,7 +14,7 @@ Clips are sampled from the procedural pose at 30 fps, eased between keys, with t
 
 ## Ball and court
 
-The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), with an original mural on the wall, a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is the sky and the image light: bright sky, warm ground bounce, and the key-light sun. The court package also includes the CC0 `sunflowers_puresky_1k.hdr`. The sky loads after the first paint.
+The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), white-balanced to warm grey so the blue sky does not leave a lavender cast on the floor. The wall has an original mural, with a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is the sky and the image light: bright sky, warm ground bounce, and the key-light sun. The court package also includes the CC0 `sunflowers_puresky_1k.hdr`. The sky loads after the first paint.
 
 ## Rendering tiers
 

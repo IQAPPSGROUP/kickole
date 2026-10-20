@@ -337,10 +337,10 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       )}
       <Court shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
-      {((street && profile.contactShadows) || (!street && quality === 'high')) && (
+      {((street && profile.contactShadows && profile.shadowFilter !== 'pcss') || (!street && quality === 'high')) && (
         <ContactShadows
           position={[0, 0.006, 0.2]}
-          opacity={street ? (profile.shadowFilter === 'pcss' ? 0.22 : 0.4) : 0.38}
+          opacity={street ? 0.4 : 0.38}
           scale={4}
           blur={2.2}
           far={1.2}

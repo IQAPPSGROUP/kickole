@@ -18,18 +18,18 @@ The ball is a clear-coat leather sphere with a stitched normal map and panel tin
 
 ## Rendering tiers
 
-Graphics defaults to Auto. `detectTier` reads the GPU name when the browser exposes it, and otherwise the core and memory hints. Low, Medium and High in Settings are a saved choice and are not clamped by the device. `stepFpsGuard` drops one runtime tier after the frame rate stays under 30 for five seconds, without writing settings. `?tier=low|medium|high` forces a tier for captures and skips the guard.
+Graphics defaults to Auto. `detectTier` reads the GPU name when the browser exposes it, and otherwise the core and memory hints. A15 and newer iPhones, Apple M, Adreno 7xx, Mali-G7xx and Immortalis start on High. Safari only reports "Apple GPU", so that unnamed string is treated as a recent iPhone. An explicit A14 or older name is not. Low, Medium and High in Settings are a saved choice and are not clamped by the device. `stepFpsGuard` drops one runtime tier after the frame rate stays under 30 for five seconds, without writing settings. `?tier=low|medium|high` forces a tier for captures and skips the guard.
 
 | | Low | Medium | High |
 | --- | --- | --- | --- |
 | Player | LOD1 | LOD0 | LOD0 |
 | Shadows | off | variance, 512 map, tight box | PCSS, 1024 map, tighter box on the player |
-| Contact shadows | off | on | light, under the PCSS contact |
+| Contact shadows | off | on | off while PCSS is the shadow |
 | IBL | off | sunset HDR | sunset HDR |
 | Post | hardware AA, AgX | FXAA, LUT, AgX | SSAO, bloom, title and celebration DOF, SMAA, LUT, AgX |
 | Crowd | 8 | 16 | 28 |
 
-AgX tone mapping is applied on the street theme. The colour LUT runs after AgX. Depth of field is on for the title (`menu`), a milestone celebration, and the game-over hold. SSAO is a hemisphere sample of the depth buffer; a failed depth target copies the colour through. Bloom adds a blurred highlight on top of the beauty pass. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player.
+AgX tone mapping is applied on the street theme. The colour LUT runs after AgX. Depth of field is on for the title (`menu`), a milestone celebration, and the game-over hold. SSAO is a hemisphere sample of the depth buffer; a failed depth target copies the colour through. Bloom blurs near-white highlights, including the floodlight heads, and adds that glow back onto the picture. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player.
 
 ## Download
 

@@ -48,7 +48,9 @@ function photographTexture(source: Texture): CanvasTexture | null {
     if (px[i + 3] < 16) continue;
     for (let channel = 0; channel < 3; channel += 1) {
       const u = px[i + channel] / 255;
-      const lifted = Math.min(1, Math.pow(u, 0.48) * 0.72 + 0.26);
+      // Open the photograph enough to take the street key light, and leave
+      // headroom so the cheeks do not clip into the sclera.
+      const lifted = Math.min(1, Math.pow(u, 0.62) * 0.82 + 0.14);
       px[i + channel] = Math.round(lifted * 255);
     }
   }
@@ -64,8 +66,8 @@ function photographTexture(source: Texture): CanvasTexture | null {
   return map;
 }
 
-/** Visible eye radius in head-bone space. Covers the painted socket without flooding the cheek. */
-const FACE_EYE_RADIUS = 0.012;
+/** Visible eye radius in head-bone space. Large enough that the iris is a few pixels in the gameplay camera. */
+const FACE_EYE_RADIUS = 0.015;
 
 function paintEye(canvas: HTMLCanvasElement, sclera: string, irisColour: string) {
   const size = canvas.width;
@@ -75,8 +77,12 @@ function paintEye(canvas: HTMLCanvasElement, sclera: string, irisColour: string)
   context.fillRect(0, 0, size, size);
   const cx = size / 2;
   const cy = size / 2;
-  // Dark centre stays small enough that the two pupils do not merge at the play camera.
-  const iris = size * 0.24;
+  // Most of the disc is iris. A thin sclera rim is what still reads when the face is bright.
+  const iris = size * 0.36;
+  context.fillStyle = irisColour === '#000000' ? '#000000' : '#140c09';
+  context.beginPath();
+  context.arc(cx, cy, iris + size * 0.035, 0, Math.PI * 2);
+  context.fill();
   context.fillStyle = irisColour;
   context.beginPath();
   context.arc(cx, cy, iris, 0, Math.PI * 2);
@@ -219,10 +225,11 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
         if (dx * dx + dy * dy > reach * reach) continue;
         if (p[2] > z) z = p[2];
       }
-      socket.z = z + 0.009;
+      socket.y -= 0.004;
+      socket.z = z + 0.006;
     }
   } else {
-    for (const socket of sockets) socket.z += 0.008;
+    for (const socket of sockets) socket.z += 0.006;
   }
   for (const mesh of hide) mesh.visible = false;
   if (sockets.length === 0) return;
@@ -238,7 +245,7 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
     // trips the street bloom and turns the eye into a white plate.
     emissive: '#fff6ea',
     emissiveMap: eyeGlow(),
-    emissiveIntensity: 0.16,
+    emissiveIntensity: 0.1,
     polygonOffset: true,
     polygonOffsetFactor: -4,
     polygonOffsetUnits: -4,
@@ -246,8 +253,9 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
   for (const socket of sockets) {
     const eye = new Mesh(geometry, material);
     eye.name = 'FaceEye';
+    eye.userData.billboardEye = true;
     eye.position.set(socket.x, socket.y, socket.z);
-    eye.scale.set(1, 0.66, 1);
+    eye.scale.set(1, 0.64, 1);
     eye.castShadow = false;
     eye.receiveShadow = false;
     eye.frustumCulled = false;
@@ -324,13 +332,25 @@ function patternIndex(pattern: SurfacePattern): number {
   }
 }
 
-/** Subtle weave so kit patterns survive a flat colour tint. */
-function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
+const DETAIL_NORMAL_SNIPPET = `
+        vec3 detailN = texture2D(uDetailN, vViewPosition.xy * uDetailScale).xyz * 2.0 - 1.0;
+        normal = normalize(normal + vec3(detailN.xy * uDetailStrength, 0.0));`;
+
+/** Subtle weave so kit patterns survive a flat colour tint. High adds the weave normal. */
+function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern, quality: Quality) {
   const id = patternIndex(pattern);
+  const detail = quality === 'high';
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uPattern = { value: id };
+    let common = '#include <common>\nuniform float uPattern;';
+    if (detail) {
+      shader.uniforms.uDetailN = { value: kitDetail().normal };
+      shader.uniforms.uDetailScale = { value: 6 };
+      shader.uniforms.uDetailStrength = { value: 0.55 };
+      common += '\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;';
+    }
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uPattern;')
+      .replace('#include <common>', common)
       .replace('#include <map_fragment>', `#include <map_fragment>
         float weave = 1.0;
         if (uPattern > 0.5 && uPattern < 1.5) weave = mix(0.78, 1.0, step(0.5, fract(vMapUv.x * 5.0)));
@@ -340,10 +360,15 @@ function tintKit(material: MeshStandardMaterial, pattern: SurfacePattern) {
         else if (uPattern > 4.5 && uPattern < 5.5) weave = 0.9 + 0.1 * sin(vMapUv.x * 80.0);
         else if (uPattern > 5.5 && uPattern < 6.5) weave = mix(0.7, 1.0, step(0.5, fract(vMapUv.x * 2.0 + vMapUv.y)));
         else if (uPattern > 6.5) weave = 0.84 + 0.16 * sin((vMapUv.x + vMapUv.y) * 28.0);
-        float thread = mix(0.82, 1.0, step(0.5, fract(vViewPosition.y * 90.0)));
-        diffuseColor.rgb *= weave * thread;`);
+        float thread = mix(0.86, 1.0, step(0.5, fract(vViewPosition.y * 220.0)));
+        float cross = mix(0.9, 1.0, step(0.5, fract(vViewPosition.x * 220.0)));
+        diffuseColor.rgb *= weave * thread * cross;`)
+      .replace(
+        '#include <normal_fragment_maps>',
+        detail ? `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}` : '#include <normal_fragment_maps>',
+      );
   };
-  material.customProgramCacheKey = () => `kit-${id}`;
+  material.customProgramCacheKey = () => `kit-${id}${detail ? '-weave' : ''}`;
   material.needsUpdate = true;
 }
 
@@ -415,6 +440,10 @@ function applyKitDetail(material: MeshStandardMaterial, name: string, quality: Q
       material.roughnessMap = (material.userData.authoredRough as Texture | null) ?? null;
       const scale = (material.userData.authoredNormalScale as number) ?? 1;
       material.normalScale = new Vector2(scale, scale);
+      if (name !== MATERIAL_NAMES.shirt) {
+        material.onBeforeCompile = () => {};
+        material.customProgramCacheKey = () => 'kit';
+      }
       material.userData.kitDetail = false;
       material.needsUpdate = true;
     }
@@ -434,6 +463,20 @@ function applyKitDetail(material: MeshStandardMaterial, name: string, quality: Q
   }
   if (!material.userData.authoredRough) material.roughnessMap = maps.rough;
   material.userData.kitDetail = true;
+  if (name !== MATERIAL_NAMES.shirt) {
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.uDetailN = { value: maps.normal };
+      shader.uniforms.uDetailScale = { value: 6 };
+      shader.uniforms.uDetailStrength = { value: 0.5 };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;',
+        )
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}`);
+    };
+    material.customProgramCacheKey = () => 'kit-weave';
+  }
   material.needsUpdate = true;
 }
 
@@ -511,14 +554,23 @@ function applySkinDetail(material: MeshStandardMaterial, name: string, quality: 
   material.userData.skinDetail = true;
   if (!material.userData.skinPores) {
     material.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-          float pore = fract(sin(dot(floor(vViewPosition.xy * vec2(70.0, 55.0)), vec2(12.9898, 78.233))) * 43758.5453);
-          diffuseColor.rgb *= mix(0.76, 1.0, step(0.42, pore));`,
-      );
+      shader.uniforms.uDetailN = { value: maps.normal };
+      shader.uniforms.uDetailScale = { value: 9 };
+      shader.uniforms.uDetailStrength = { value: 0.7 };
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          '#include <common>\nuniform sampler2D uDetailN;\nuniform float uDetailScale;\nuniform float uDetailStrength;',
+        )
+        .replace(
+          '#include <map_fragment>',
+          `#include <map_fragment>
+          float pore = fract(sin(dot(floor(vViewPosition.xy * vec2(420.0, 360.0)), vec2(12.9898, 78.233))) * 43758.5453);
+          diffuseColor.rgb *= mix(0.84, 1.0, smoothstep(0.35, 0.7, pore));`,
+        )
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>${DETAIL_NORMAL_SNIPPET}`);
     };
-    material.customProgramCacheKey = () => 'skin-pores';
+    material.customProgramCacheKey = () => 'skin-pores-v2';
     material.userData.skinPores = true;
   }
   material.needsUpdate = true;
@@ -603,6 +655,7 @@ interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; express
  */
 export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quality = 'high' }: Props) {
   const gl = useThree((state) => state.gl);
+  const camera = useThree((state) => state.camera);
   ktxRenderer.gl = gl;
   // drei types GLTFLoader from three-stdlib, which does not match three's KTX2Loader.
   const gltf = useGLTF(characterModelUrl(characterLod(quality), skin.playerBody), DRACO_DECODER_PATH, true, extendCharacterLoader as never);
@@ -739,7 +792,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         continue;
       }
       const standard = m as MeshStandardMaterial;
-      if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern);
+      if (name === MATERIAL_NAMES.shirt) tintKit(standard, skin.kitPattern, quality);
       applyKitDetail(standard, name, quality);
       applySkinDetail(standard, name, quality);
     }
@@ -822,6 +875,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     return map;
   }, [clips, mixer]);
 
+  const faceEyes = useMemo(() => {
+    const list: Mesh[] = [];
+    scene.traverse((node) => {
+      const mesh = node as Mesh;
+      if (mesh.isMesh && mesh.userData.billboardEye) list.push(mesh);
+    });
+    return list;
+  }, [scene]);
   const pose = useMemo(() => createPose(), []);
   const motion = useMemo(() => createPlayerMotion(), []);
   const motionRig = useMemo(() => createMotionRig({ root: scene, spine: bones.spine, head: bones.head,
@@ -849,6 +910,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     current.state = null;
     current.token = -1;
   }, [mixer, current, motionRig]);
+
+  const aimEyes = () => {
+    if (faceEyes.length === 0) return;
+    scene.updateMatrixWorld(true);
+    for (const eye of faceEyes) {
+      eye.lookAt(camera.position);
+      eye.rotateY(Math.PI);
+    }
+  };
 
   useFrame((_, dt) => {
     motionRig.restore();
@@ -935,6 +1005,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         }
         inspector.trace.push({ state: current.state ?? '', clip: next.clipTime ?? null, t: engine.time, joints });
       }
+      aimEyes();
       return;
     }
     if (kind === 'ue') {
@@ -964,6 +1035,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         const selected = selectAnimationState(engine);
         inspector.trace.push({ state: selected.state, clip: selected.clipTime ?? null, t: engine.time, joints });
       }
+      aimEyes();
       return;
     }
     // Fallback for rigs without clips: apply the procedural pose on top of the rest pose.
@@ -986,6 +1058,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     set('footLeft', pose.legs.left.foot, pose.legs.left.ankleYaw, pose.legs.left.ankleRoll);
     set('footRight', pose.legs.right.foot, pose.legs.right.ankleYaw, pose.legs.right.ankleRoll);
     if (expressive && !pose.lockMotion) motionRig.apply(computePlayerMotion(engine, motion), false);
+    aimEyes();
   });
 
   return (

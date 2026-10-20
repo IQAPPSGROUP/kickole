@@ -10,7 +10,7 @@ const COS_35 = Math.cos(FAN_RAD);
 const SIN_35 = Math.sin(FAN_RAD);
 const CHORD_35 = 2 * Math.sin(FAN_RAD / 2);
 
-export const FAN_BUTTON = 48;
+export const FAN_BUTTON = 52;
 export const FAN_GAP = 6;
 const MIN_INSET_X = 4;
 const BOTTOM_LIFT = 16;

@@ -180,12 +180,12 @@ interface SceneProps {
   onReady: () => void;
 }
 
-function StreetTone() {
+function StreetTone({ exposure }: { exposure: number }) {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = STREET_EXPOSURE;
-  }, [gl]);
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
   return null;
 }
 
@@ -231,7 +231,7 @@ function CarnivalSky() {
   );
 }
 
-/** Shared sunny HDR for reflections only. The visible sky is CarnivalSky. */
+/** Shared sunny HDR for reflections. CarnivalSky is the visible sky. */
 function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
   useEffect(() => {
@@ -257,7 +257,7 @@ function SunnyIbl({ ibl }: { ibl: boolean }) {
         }
         disposePm();
       });
-    }, 180);
+    }, 400);
     return () => {
       alive = false;
       window.clearTimeout(timer);
@@ -329,16 +329,18 @@ function forcedTier(): Quality | null {
 }
 
 function World({ controller, skin, quality, onReady }: SceneProps) {
+  const street = ENVIRONMENT_THEME !== 'beach';
   const profile = profileFor(quality);
   const shadows = profile.shadows !== 'none';
   useEffect(() => { onReady(); }, [onReady]);
+  const postProfile = street ? profile : { ...profile, bloom: false, dof: false };
   return (
     <>
-      <StreetTone />
+      <StreetTone exposure={STREET_EXPOSURE} />
       <color attach="background" args={['#1a6fd0']} />
       <CarnivalSky />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      <SunnyIbl ibl={profile.ibl} />
+      {(street || profile.sky !== 'flat') && <SunnyIbl ibl={profile.ibl} />}
       <Simulation controller={controller} />
       <PerfProbe />
       <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
@@ -349,7 +351,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       {profile.contactShadows && (
         <ContactShadows
           position={[0, 0.006, 0.15]}
-          opacity={0.45}
+          opacity={0.42}
           scale={3.1}
           blur={2.1}
           far={1.5}
@@ -360,7 +362,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
-      <PostFX profile={profile} engine={controller.engine} />
+      <PostFX profile={postProfile} engine={controller.engine} />
     </>
   );
 }

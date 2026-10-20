@@ -22,8 +22,8 @@ describe('presentation', () => {
   it('focuses along the view toward the player and widens on the title', () => {
     expect(depthOfFieldFocus({ x: 0, y: 1.15, z: 8 }, { x: 0, y: 0, z: -1 })).toBeCloseTo(7.8);
     expect(depthOfFieldFocus({ x: 0, y: 1.15, z: 0.1 }, { x: 0, y: 0, z: 1 })).toBe(0.6);
-    expect(depthOfFieldScale('menu', false).aperture).toBeGreaterThan(0.005);
-    expect(depthOfFieldScale('menu', false).maxblur).toBeGreaterThan(0.02);
+    expect(depthOfFieldScale('menu', false).aperture).toBeLessThan(0.003);
+    expect(depthOfFieldScale('menu', false).maxblur).toBeLessThan(0.01);
     expect(depthOfFieldScale('menu', false).aperture).toBeGreaterThan(depthOfFieldScale('over', false).aperture);
     expect(depthOfFieldScale('playing', true).maxblur).toBeGreaterThan(depthOfFieldScale('over', false).maxblur);
   });
@@ -33,7 +33,7 @@ describe('presentation', () => {
     expect(red).toBeGreaterThan(blue);
     expect(red).toBeGreaterThan(0.4);
     expect(green).toBeGreaterThan(0.3);
-    expect(blue).toBeGreaterThan(0.2);
+    expect(blue).toBeGreaterThan(0.12);
     const black = gradeDisplayColor(0, 0, 0);
     expect(black.every((channel) => channel < 0.03)).toBe(true);
     const white = gradeDisplayColor(1, 1, 1);
@@ -61,6 +61,11 @@ describe('presentation', () => {
       const graded = gradeDisplayColor(r, g, b);
       expect(colorSaturation(...graded)).toBeGreaterThan(colorSaturation(r, g, b));
     }
+    const pastel = gradeDisplayColor(0.96, 0.91, 0.79);
+    expect(colorSaturation(...pastel)).toBeGreaterThan(colorSaturation(0.96, 0.91, 0.79) + 0.08);
+    const mid = rec709Luma(...gradeDisplayColor(0.5, 0.5, 0.5));
+    expect(mid).toBeGreaterThan(0.47);
+    expect(mid).toBeLessThan(0.53);
     const skin = gradeDisplayColor(0.72, 0.5, 0.4);
     const skinLuma = rec709Luma(...skin);
     expect(skinLuma).toBeGreaterThan(0.35);

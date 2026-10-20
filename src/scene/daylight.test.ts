@@ -3,14 +3,19 @@ import { describe, expect, it } from 'vitest';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import {
   STREET_BLOOM,
+  STREET_COURT_ENV,
+  STREET_COURT_TINT,
   STREET_EXPOSURE,
   STREET_FILL,
   STREET_HEMI,
+  balanceCourtSample,
+  courtTintChannels,
   displayLuminance,
   meanStreetLuminance,
   streetDaylightSamples,
   streetPostPassNames,
 } from './daylight';
+import { gradeDisplayColor } from './presentation';
 import { profileFor } from './qualityTier';
 
 describe('street daylight', () => {
@@ -34,6 +39,17 @@ describe('street daylight', () => {
     expect(sky).toBeGreaterThan(0.75);
     expect(sky).toBeLessThan(0.92);
     expect(sunlit - shadow).toBeGreaterThan(0.18);
+  });
+
+  it('keeps the court floor a warm grey instead of a sky-tinted lavender', () => {
+    const [red, green, blue] = courtTintChannels(STREET_COURT_TINT);
+    expect(red).toBeGreaterThan(green);
+    expect(green).toBeGreaterThan(blue);
+    expect(STREET_COURT_ENV).toBeLessThan(0.35);
+    const measured = balanceCourtSample(187 / 255, 188 / 255, 198 / 255);
+    expect(measured[0]).toBeGreaterThan(measured[2]);
+    const graded = gradeDisplayColor(measured[0], measured[1], measured[2]);
+    expect(graded[0]).toBeGreaterThan(graded[2] + 0.04);
   });
 
   it('keeps bloom in linear light, ahead of AgX, on every tier that blooms', () => {

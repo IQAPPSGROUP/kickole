@@ -14,7 +14,7 @@ Clips are sampled from the procedural pose at 30 fps, eased between keys, with t
 
 ## Ball and court
 
-The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), with an original mural on the wall, a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is an original sunny equirect: bright sky, warm ground bounce, and the key-light sun. It is the sky on every tier, street and beach, and the image light where IBL is on. It loads after the first paint. The beach keeps its GLB kit and adds golden sand, a saturated blue sea, and triangular bunting.
+The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), white-balanced to warm grey so the blue sky does not leave a lavender cast on the floor. The wall has an original mural, with a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is the sky and the image light: bright sky, warm ground bounce, and the key-light sun. The court package also includes the CC0 `sunflowers_puresky_1k.hdr`. The sky loads after the first paint.
 
 ## Rendering tiers
 
@@ -24,12 +24,12 @@ Graphics defaults to Auto. `detectTier` reads the GPU name when the browser expo
 | --- | --- | --- | --- |
 | Player | LOD1 | LOD0 | LOD0 |
 | Shadows | off | variance, 512 map, tight box | PCSS, 1024 map, tighter box on the player |
-| Contact shadows | on | on | on, with PCSS |
+| Contact shadows | off | on | off while PCSS is the shadow |
 | IBL | sunny HDR | sunny HDR | sunny HDR |
 | Post | AgX, warm grade | FXAA, warm grade, AgX | SSAO, linear bloom, DOF, AgX, warm grade, SMAA |
 | Crowd | 8 | 16 | 28 |
 
-AgX tone mapping stays on the street theme at an exposure of about 1.3. Faces stay lit by the fill light, not by lifting the whole frame. The street has no fog. The colour LUT runs after AgX: a gentle S-curve restores contrast, blacks stay slightly deep, and vibrance pushes the pinks, teals and yellows. Bloom samples the linear beauty pass before AgX and stays tight so highlights glow without a milk haze. Anti-aliasing follows the grade. Depth of field is on for the title (`menu`), a milestone celebration, and the game-over hold. SSAO is a hemisphere sample of the depth buffer; a failed depth target copies the colour through. The shadow itself is wide and lighter than black. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player. The home label and tagline sit on a dark scrim so the light type stays readable on the sky.
+AgX tone mapping stays on at an exposure of about 1.3 on the street and 1 on the beach. Faces stay lit by the fill light, not by lifting the whole frame. Neither theme uses fog, and the street sky is sharp. The colour LUT runs after AgX: an S-curve restores contrast, mid grey is not lifted, blacks stay slightly deep, and vibrance pushes dull pinks, teals and yellows. Bloom samples only very bright linear highlights, before AgX, so the sky does not throw a veil. Anti-aliasing follows the grade. Depth of field on the title is a small hint, not a fog over the wall. SSAO is a hemisphere sample of the depth buffer on street High; a failed depth target copies the colour through. The shadow itself is wide and lighter than black. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player. The home label and tagline sit on a dark scrim so the light type stays readable on the sky.
 
 ## Download
 
@@ -37,4 +37,4 @@ The active player GLB is about 7 MB. Court colour maps and the Basis transcoder 
 
 ## Licence
 
-The footballers are Fab Standard licence assets, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group. They ship inside the app and the web build. The raw download does not. Poly Haven `asphalt_02` and `concrete_wall_001` are CC0. The sunny sky, mural, ball shading and clips are original. Full text is in `public/models/LICENSE`.
+The footballers are Fab Standard licence assets, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group. They ship inside the app and the web build. The raw download does not. Poly Haven `asphalt_02`, `concrete_wall_001` and `sunflowers_puresky` are CC0. The sunny sky, mural, ball shading and clips are original. Full text is in `public/models/LICENSE`.

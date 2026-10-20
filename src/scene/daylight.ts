@@ -7,8 +7,29 @@ export const STREET_KEY = { color: '#fff4e2', intensity: 3.15 };
 export const STREET_HEMI = { sky: '#fff1d4', ground: '#c8966a', intensity: 0.85 };
 export const STREET_FILL = { color: '#ffe3bf', intensity: 1.25 };
 export const STREET_ENV_INTENSITY = 0.62;
-/** Tight enough that white court lines stay paint, not a halo. */
-export const STREET_BLOOM = { strength: 0.05, threshold: 3.4 };
+/**
+ * Court white balance. The sky is blue, so the floor tint stays golden
+ * and the lines stay lighter than the asphalt. Env intensity stays low
+ * so the sky reflection does not lift the ground.
+ */
+export const STREET_COURT_TINT = '#a56d3c';
+export const STREET_COURT_ENV = 0.16;
+export const STREET_APRON_TINT = '#b18452';
+export const STREET_APRON_ENV = 0.18;
+export const STREET_CONCRETE_TINT = '#efe2d0';
+export const STREET_CONCRETE_ENV = 0.2;
+
+/** sRGB channels of a court tint, 0–1. Red leads, blue trails. */
+export function courtTintChannels(hex: string): [number, number, number] {
+  return [0, 1, 2].map((index) => parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255) as [number, number, number];
+}
+
+/** White-balance a floor sample. A cool grey comes back warm. */
+export function balanceCourtSample(r: number, g: number, b: number, tint = STREET_COURT_TINT): [number, number, number] {
+  const [tr, tg, tb] = courtTintChannels(tint);
+  return [r * tr, g * tg, b * tb];
+}
+export const STREET_BLOOM = { strength: 0.05, threshold: 4.5, spread: 1.4 };
 export const STREET_HDR_URL = 'textures/street_day_1k.hdr';
 
 type RGB = [number, number, number];

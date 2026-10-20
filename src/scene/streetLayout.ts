@@ -6,6 +6,7 @@ export const STREET_FILES = {
   courtNormal: 'textures/street/court_normal.ktx2',
   courtRough: 'textures/street/court_rough.ktx2',
   courtColorLow: 'textures/street/court_color_low.ktx2',
+  streetAsphalt: 'textures/street/street_asphalt.ktx2',
   wallColor: 'textures/street/wall_color.ktx2',
   wallNormal: 'textures/street/wall_normal.ktx2',
   wallRough: 'textures/street/wall_rough.ktx2',
@@ -22,7 +23,7 @@ export const STREET_FILES = {
   crowdLod0: 'models/environment/street/crowd-lod0.glb',
   crowdLod1: 'models/environment/street/crowd-lod1.glb',
   crowdLod2: 'models/environment/street/crowd-lod2.glb',
-  hdri: 'textures/venice_sunset_1k.hdr',
+  hdri: 'textures/sunflowers_puresky_1k.hdr',
 } as const;
 
 export function streetUrl(file: string): string {
@@ -93,11 +94,11 @@ export interface Spectator {
   hatColor: string;
 }
 
-const SHIRTS = ['#c4534a', '#1f6f78', '#e6e1d6', '#243044', '#d7b15a', '#2c3338', '#3f6b4e', '#a85a32'];
-const SHORTS = ['#1c2430', '#2a3038', '#3d342c', '#1e2a5a'];
+const SHIRTS = ['#ff4f9a', '#ffd93d', '#2ee6d6', '#ffffff', '#ff8a3d', '#7c6bff', '#5ee08a', '#ff5a4e'];
+const SHORTS = ['#fff6ea', '#1e2a5a', '#ff4f9a', '#2ee6d6', '#ffd93d'];
 const SKIN = ['#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', '#5c3317', '#a56b3c'];
 const HAIR = ['#1a120e', '#3b2416', '#6b4423', '#111111', '#8a5a2b', '#cbb59a'];
-const HATS = ['#1f6f78', '#c4534a', '#243044', '#d7b15a', '#f4f1ea'];
+const HATS = ['#ffd93d', '#ff4f9a', '#2ee6d6', '#ffffff', '#7c6bff'];
 
 function mulberry32(seed: number) {
   return () => {
@@ -113,7 +114,7 @@ function makeSpectator(random: () => number, x: number, z: number, yaw: number):
   const hatRoll = random();
   return {
     x,
-    y: Math.abs(x) > 4.4 ? 0 : 1.58,
+    y: Math.abs(x) > 4.4 ? 0 : 2.22,
     z,
     scale: 0.92 + random() * 0.2,
     yaw: yaw + (random() - 0.5) * 0.35,
@@ -143,8 +144,9 @@ export function crowdPlacements(count: number): Spectator[] {
     const col = Math.floor(i / 2);
     const cols = Math.ceil(back / 2);
     const u = cols <= 1 ? 0.5 : col / (cols - 1);
-    const x = -2.55 + u * 5.1 + (row === 1 ? 0.16 : -0.04);
-    const z = row === 0 ? -3.88 : -4.28;
+    // The phone camera sits to the right, so the visible back wall is negative X.
+    const x = -4.35 + u * 3.7 + (row === 1 ? 0.14 : 0);
+    const z = row === 0 ? -3.92 : -4.3;
     spots.push(makeSpectator(random, x, z, Math.PI));
   }
   for (let i = 0; i < side; i++) {
@@ -196,3 +198,20 @@ export function fencePosts(detail: FenceDetail): FenceSlot[] {
 export function inPlayVolume(x: number, z: number): boolean {
   return Math.abs(x) < 2.05 && z > -3.45 && z < 3.3;
 }
+
+export interface LampSpot {
+  x: number;
+  z: number;
+  /** Y rotation. 0 points the lamp arm toward +X, into the court from the left. */
+  ry: number;
+}
+
+/**
+ * Two lamps sit on the negative-X wall, which is the side the portrait camera sees.
+ * The third stays on the positive-X side for the wide camera.
+ */
+export const LAMP_SPOTS: readonly LampSpot[] = [
+  { x: -3.5, z: -3.18, ry: 0 },
+  { x: -2.15, z: -3.18, ry: 0 },
+  { x: 3.45, z: -3.18, ry: Math.PI },
+];

@@ -39,7 +39,7 @@ export interface TierProfile {
   decals: boolean;
   crowdLod: CrowdLod;
   crowdIdle: boolean;
-  /** hdri draws the sunset as the sky. reflect keeps the sky colour and still lights metal. */
+  /** hdri draws the sunny daytime sky. reflect keeps the sky colour and still lights metal. */
   sky: SkyMode;
   lamp: LampMode;
 }

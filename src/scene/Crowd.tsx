@@ -63,14 +63,16 @@ function CrowdPart({ node, people, lod, idle }: { node: StreetNode; people: Spec
         ry += Math.sin(time * 0.6 + person.phase) * (swayOn ? 0.12 : 0);
       }
       dummy.rotation.order = 'YXZ';
+      const yLift = lod === 2 ? 0.5 : 0;
       dummy.position.set(
         person.x + node.pivot[0] * person.scale,
-        person.y + node.pivot[1] * person.scale + bob,
+        person.y + yLift + node.pivot[1] * person.scale + bob,
         person.z + node.pivot[2] * person.scale,
       );
       dummy.rotation.set(rx, ry, rz);
       const bulk = node.name === 'Afro' ? 1.08 : 1;
-      dummy.scale.setScalar(person.scale * bulk);
+      const fitted = person.scale * bulk;
+      dummy.scale.set(node.scale[0] * fitted, node.scale[1] * fitted, node.scale[2] * fitted);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       if (colors) mesh.setColorAt(i, tint.set(partColor(node.name, person)));

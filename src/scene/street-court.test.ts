@@ -2,7 +2,7 @@
 import { readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { profileFor } from './qualityTier';
-import { STREET_FILES, crowdPlacements, fenceSlots, inPlayVolume, streetUrl } from './streetLayout';
+import { LAMP_SPOTS, STREET_FILES, crowdPlacements, fenceSlots, inPlayVolume, streetUrl } from './streetLayout';
 
 const KTX2 = Buffer.from([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb]);
 
@@ -41,8 +41,15 @@ describe('street court delivery', () => {
     }
   });
 
+  it('bundles a local sunny HDRI instead of a remote sky', () => {
+    const bytes = readFileSync(new URL(`../../public/${STREET_FILES.hdri}`, import.meta.url));
+    const head = bytes.subarray(0, 10).toString('ascii');
+    expect(head.startsWith('#?RADIANCE') || head.startsWith('#?RGBE')).toBe(true);
+    expect(bytes.length).toBeLessThan(4_000_000);
+  });
+
   it('ships KTX2 textures and a smaller low-tier court', () => {
-    for (const file of [STREET_FILES.courtColor, STREET_FILES.courtNormal, STREET_FILES.courtRough, STREET_FILES.courtColorLow, STREET_FILES.wallColor, STREET_FILES.wallColorLow, STREET_FILES.concreteColor, STREET_FILES.decalSkid, STREET_FILES.decalStencil, STREET_FILES.decalTag]) {
+    for (const file of [STREET_FILES.courtColor, STREET_FILES.courtNormal, STREET_FILES.courtRough, STREET_FILES.courtColorLow, STREET_FILES.streetAsphalt, STREET_FILES.wallColor, STREET_FILES.wallColorLow, STREET_FILES.concreteColor, STREET_FILES.decalSkid, STREET_FILES.decalStencil, STREET_FILES.decalTag]) {
       const bytes = readFileSync(new URL(`../../public/${file}`, import.meta.url));
       expect(bytes.subarray(0, 8).equals(KTX2)).toBe(true);
     }
@@ -81,5 +88,7 @@ describe('street court delivery', () => {
     }
     expect(fenceSlots('plane')).toHaveLength(0);
     expect(fenceSlots('link').length).toBeGreaterThan(fenceSlots('sparse').length);
+    for (const lamp of LAMP_SPOTS) expect(inPlayVolume(lamp.x, lamp.z)).toBe(false);
+    expect(LAMP_SPOTS.filter((lamp) => lamp.x < 0).length).toBeGreaterThan(1);
   });
 });

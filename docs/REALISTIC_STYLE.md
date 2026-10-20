@@ -14,7 +14,7 @@ Clips are sampled from the procedural pose at 30 fps, eased between keys, with t
 
 ## Ball and court
 
-The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), with an original mural on the wall, a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is an original sunny equirect: bright sky, warm ground bounce, and the key-light sun. It is the sky on every street tier and the image light where IBL is on. It loads after the first paint.
+The ball is a clear-coat leather sphere with a stitched normal map and panel tint from the skin. The court uses Poly Haven asphalt and concrete (1K), with an original mural on the wall, a chain-link fence, bins and an instanced crowd outside the touchlines. `street_day_1k.hdr` is the sky and the image light: bright sky, warm ground bounce, and the key-light sun. The court package also includes the CC0 `sunflowers_puresky_1k.hdr`. The sky loads after the first paint.
 
 ## Rendering tiers
 
@@ -37,4 +37,4 @@ The active player GLB is about 7 MB. Court colour maps and the Basis transcoder 
 
 ## Licence
 
-The footballers are Fab Standard licence assets, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group. They ship inside the app and the web build. The raw download does not. Poly Haven `asphalt_02` and `concrete_wall_001` are CC0. The sunny sky, mural, ball shading and clips are original. Full text is in `public/models/LICENSE`.
+The footballers are Fab Standard licence assets, Personal tier, licensed to Rob Stancombe t/a IQ Apps Group. They ship inside the app and the web build. The raw download does not. Poly Haven `asphalt_02`, `concrete_wall_001` and `sunflowers_puresky` are CC0. The sunny sky, mural, ball shading and clips are original. Full text is in `public/models/LICENSE`.

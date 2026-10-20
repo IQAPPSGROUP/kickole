@@ -1,7 +1,8 @@
-import { AnimationMixer, Matrix4, Vector3, type AnimationClip, type Bone, type Mesh, type Object3D, type SkinnedMesh } from 'three';
+import { AnimationMixer, Matrix4, Quaternion, Vector3, type AnimationClip, type Bone, type Mesh, type Object3D, type SkinnedMesh } from 'three';
 import { DEFAULT_CONFIG } from '../engine/config';
 import { ballOnBoot, type BallCenter } from '../engine/footContact';
 import type { Side } from '../engine/config';
+import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { KICK_CLIP_CONTACT_TIME } from './rig';
 
 export interface KickAnchor {
@@ -81,6 +82,25 @@ function closestSkinnedVertex(scene: Object3D, target: Vector3, materials: Set<s
     }
   });
   return bestPoint;
+}
+
+/** Contract rigs pitch the foot at the contact frame. Quaternius clips do not. Measure the pose that is actually drawn. */
+function usesContactToeLift(scene: Object3D): boolean {
+  let clavicle = false;
+  scene.traverse((obj) => {
+    if (clavicle) return;
+    if ((obj as Bone).isBone && obj.name === 'Clavicle_L') clavicle = true;
+  });
+  return !clavicle;
+}
+
+function applyContactToeLift(scene: Object3D, side: Side) {
+  if (!usesContactToeLift(scene)) return;
+  const foot = boneNamed(scene, footBoneName(side));
+  const pitch = kickToeClearance(KICK_CLIP_CONTACT_TIME);
+  if (!foot || pitch === 0) return;
+  foot.quaternion.multiply(toeClearanceQuaternion(pitch, new Quaternion()));
+  scene.updateMatrixWorld(true);
 }
 
 function poseClip(scene: Object3D, clips: AnimationClip[], name: string, time: number): AnimationMixer | null {
@@ -166,6 +186,7 @@ function instepStrike(scene: Object3D, foot: Vector3, toe: Vector3): { point: Ve
  */
 export function ballCenterForKick(scene: Object3D, clips: AnimationClip[], side: Side): KickAnchor | null {
   const mixer = poseClip(scene, clips, clipName(side), KICK_CLIP_CONTACT_TIME);
+  applyContactToeLift(scene, side);
   const foot = boneNamed(scene, footBoneName(side));
   if (!mixer || !foot) {
     releaseMixer(mixer, scene);

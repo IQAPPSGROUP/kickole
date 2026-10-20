@@ -464,6 +464,15 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 /* Street-court presentation. Keep the player clear between header and controls. */
 .home-top { width: 100%; padding-top: max(20px, 3vh); }
 .court-label { margin: 0 0 12px; font-size: 9px; font-weight: 800; letter-spacing: 2px; color: #f5c94d; }
+.home .court-label,
+.home .tagline,
+.home .home-help {
+  display: inline-block;
+  background: rgba(12, 22, 32, 0.8);
+  border-radius: 8px;
+  padding: 3px 10px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+}
 .court-label span { margin: 0 6px; color: var(--coral); }
 .home .logo-word { width: min(78vw, 400px); }
 .tagline { color: #f7e9c5; text-transform: none; letter-spacing: .5px; font-size: 13px; margin-top: 14px; }

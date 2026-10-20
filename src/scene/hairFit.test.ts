@@ -8,12 +8,14 @@ import { HAIR_STYLES, type HairStyle } from '../game/appearance';
 import {
   HAIR_SKULLS,
   HAIR_SPRING_LIMIT,
+  hairBounds,
   hairEyePlaneHits,
   hairFaceHits,
   hairParts,
   hairScalpGap,
-  uncoveredScalp,
   pointInFaceBox,
+  scalpSurfacePoints,
+  uncoveredScalp,
   type HairBody,
   type HairSpring,
 } from './hairFit';
@@ -126,29 +128,61 @@ describe('hair fit', () => {
 
   it('covers the crown for a full afro and a seated high-top', () => {
     for (const body of ['male', 'female', 'primitive'] as const) {
+      const skull = HAIR_SKULLS[body];
       expect(uncoveredScalp('afro', body, [0.12, 0.7]), `afro ${body}`).toEqual([]);
       expect(uncoveredScalp('highTop', body, [0.12, 0.38]), `high-top ${body}`).toEqual([]);
-      const part = hairParts('highTop', body)[0];
-      expect(part.shape).toBe('cylinder');
-      if (part.shape !== 'cylinder') continue;
-      const eyeZ = Math.min(HAIR_SKULLS[body].landmarks.leftEye.z, HAIR_SKULLS[body].landmarks.rightEye.z);
-      const front = part.position[2] + part.radiusBottom;
-      expect(front, `${body} visor`).toBeLessThan(eyeZ - 0.01);
-      expect(part.position[1] + part.height / 2, `${body} height`).toBeGreaterThan(HAIR_SKULLS[body].crownY + HAIR_SKULLS[body].radius * 0.45);
+      const bounds = hairBounds('highTop', body);
+      const eyeZ = Math.min(skull.landmarks.leftEye.z, skull.landmarks.rightEye.z);
+      expect(bounds.max.z, `${body} visor`).toBeLessThan(eyeZ - 0.01);
+      expect(bounds.max.y, `${body} height`).toBeGreaterThan(skull.crownY + skull.radius * 0.45);
+      const flat = hairParts('highTop', body).filter((card) => card.id.startsWith('high-top-'));
+      expect(flat.length, `${body} flat top`).toBeGreaterThan(8);
+      for (const card of flat) {
+        for (const sample of [bounds.max.y]) {
+          expect(Math.abs(card.position[1] - sample), card.id).toBeLessThan(0.02);
+        }
+      }
     }
   });
 
-  it('gives the afro volume outside the scalp without a face-covering sphere', () => {
+  it('gives each style its own shape and keeps the authored short hair', () => {
     for (const body of ['male', 'female'] as const) {
-      const [afro] = hairParts('afro', body);
-      expect(afro.shape).toBe('sphere');
-      if (afro.shape !== 'sphere') continue;
-      expect(afro.radius).toBeGreaterThan(HAIR_SKULLS[body].radius + 0.03);
-      expect(afro.phiLength).toBeLessThan(Math.PI * 2);
+      const skull = HAIR_SKULLS[body];
+      const afro = hairBounds('afro', body);
+      const curls = hairBounds('curls', body);
+      const mohawk = hairBounds('mohawk', body);
+      const spikes = hairBounds('spikes', body);
+      const shaved = hairBounds('shaved', body);
+      const braids = hairBounds('braids', body);
+      const afroR = afro.max.distanceTo(skull.center);
+      const curlR = curls.max.distanceTo(skull.center);
+      expect(afroR, body).toBeGreaterThan(skull.radius + 0.03);
+      expect(afroR, body).toBeGreaterThan(curlR + 0.015);
+      expect(mohawk.max.x - mohawk.min.x, body).toBeLessThan(0.055);
+      expect(mohawk.max.y, body).toBeGreaterThan(skull.crownY + skull.radius * 0.4);
+      expect(braids.min.y, body).toBeLessThan(skull.center.y - 0.04);
+      expect(new Set(hairParts('braids', body).map((card) => card.atlas))).toEqual(new Set(['braid']));
+      expect(new Set(hairParts('curls', body).map((card) => card.atlas))).toEqual(new Set(['curl']));
+      expect(new Set(hairParts('shaved', body).map((card) => card.atlas))).toEqual(new Set(['stubble']));
+      expect(Math.max(...hairParts('shaved', body).map((card) => card.height)), body).toBeLessThan(0.016);
+      expect(spikes.max.y, body).toBeGreaterThan(shaved.max.y + skull.radius * 0.4);
+      expect(hairParts('afro', body).some((card) => card.atlas === 'strand')).toBe(true);
     }
     expect(hairParts('bald', 'male')).toEqual([]);
     expect(hairParts('short', 'male')).toEqual([]);
     expect(hairParts('short', 'primitive').length).toBeGreaterThan(0);
+  });
+
+  it('covers painted hair with a scalp cap that stays off the face', () => {
+    for (const body of BODIES) {
+      const skull = HAIR_SKULLS[body];
+      const points = scalpSurfacePoints(body);
+      expect(points.length).toBeGreaterThan(20);
+      const faceHits = points.filter((p) => pointInFaceBox(p, skull.face));
+      expect(faceHits, body).toEqual([]);
+      const crown = points.some((p) => p.y > skull.crownY - skull.radius * 0.15);
+      expect(crown, body).toBe(true);
+    }
   });
 
   it('keeps authored short hair and the ponytail out of the face volume', async () => {

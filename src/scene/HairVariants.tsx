@@ -1,14 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { DoubleSide, Group, type Bone, type BufferGeometry, type Object3D } from 'three';
+import { useGLTF } from '@react-three/drei';
+import { Group, Mesh, MeshStandardMaterial, type Bone, type Object3D } from 'three';
 import type { HairStyle } from '../game/appearance';
+import { DRACO_DECODER_PATH } from './decoders';
 import { hairSpring } from './secondaryMotion';
-import { createHairGeometry, hairParts, type HairBody, type HairPart } from './hairFit';
+import type { HairBody } from './hairFit';
+
+const HAIR_URL = `${import.meta.env.BASE_URL}models/hair/kickole_hair.glb`;
 
 /**
- * Procedural hair silhouettes parented to the head bone so they follow every animation.
- * The authored Hair material mesh is hidden when a non-short style is active.
- * Placements come from hairFit so the face volume stays clear on both skulls.
+ * Alpha-card hairstyles parented to the head bone.
+ * Short keeps the purchased hair mesh. Every other style hides it and
+ * shows an opaque scalp cap so the head photograph's painted hair stays covered.
  */
 export function HairVariants({
   head,
@@ -23,8 +27,27 @@ export function HairVariants({
   hairMesh?: Object3D[];
   body?: HairBody;
 }) {
+  const gltf = useGLTF(HAIR_URL, DRACO_DECODER_PATH, true);
   const group = useRef<Group>(null);
-  const parts = useMemo(() => hairParts(style, body), [style, body]);
+  const showScalp = style !== 'short';
+  const showCards = style !== 'bald' && (style !== 'short' || body === 'primitive');
+
+  const scalp = useMemo(() => {
+    if (!showScalp) return null;
+    const source = gltf.scene.getObjectByName(`${body}-scalp`);
+    return source ? cloneHair(source, color, false) : null;
+  }, [body, color, gltf.scene, showScalp]);
+
+  const cards = useMemo(() => {
+    if (!showCards) return null;
+    const source = gltf.scene.getObjectByName(`${body}-${style}`);
+    return source ? cloneHair(source, color, true) : null;
+  }, [body, color, gltf.scene, showCards, style]);
+
+  useEffect(() => () => {
+    disposeMaterials(scalp);
+    disposeMaterials(cards);
+  }, [scalp, cards]);
 
   useLayoutEffect(() => {
     if (!head || !group.current) return;
@@ -35,50 +58,44 @@ export function HairVariants({
   }, [head]);
 
   useFrame(() => {
-    const hideAuthored = style !== 'short';
-    if (hairMesh) for (const mesh of hairMesh) mesh.visible = !hideAuthored;
-    if (group.current) {
-      group.current.visible = parts.length > 0;
-      group.current.rotation.set(hairSpring.pitch, hairSpring.yaw, hairSpring.roll);
-    }
+    if (hairMesh) for (const mesh of hairMesh) mesh.visible = style === 'short';
+    if (group.current) group.current.rotation.set(hairSpring.pitch, hairSpring.yaw, hairSpring.roll);
   });
 
   if (!head) return null;
 
   return (
     <group ref={group}>
-      {parts.map((part) => (
-        <HairPartMesh key={part.id} part={part} color={color} />
-      ))}
+      {scalp && <primitive object={scalp} />}
+      {cards && <primitive object={cards} />}
     </group>
   );
 }
 
-function HairPartMesh({ part, color }: { part: HairPart; color: string }) {
-  const geometry = useMemo(() => createHairGeometry(part), [part]);
-  useEffect(() => () => disposeGeometry(geometry), [geometry]);
-  const rotation: [number, number, number] = part.rotation ?? [0, 0, 0];
-  const scale: [number, number, number] = part.shape === 'sphere' ? (part.scale ?? [1, 1, 1]) : [1, 1, 1];
-  return (
-    <mesh
-      name={`hair-${part.id}`}
-      geometry={geometry}
-      position={part.position}
-      rotation={rotation}
-      scale={scale}
-      castShadow
-    >
-      <meshStandardMaterial
-        color={color}
-        roughness={0.82}
-        metalness={0}
-        envMapIntensity={0.35}
-        side={DoubleSide}
-      />
-    </mesh>
-  );
+function cloneHair(source: Object3D, color: string, tint: boolean): Object3D {
+  const clone = source.clone(true);
+  clone.traverse((obj) => {
+    const mesh = obj as Mesh;
+    if (!mesh.isMesh) return;
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const next = list.map((material) => {
+      const copy = (material as MeshStandardMaterial).clone();
+      if (tint && copy.name.startsWith('hair')) copy.color.set(color);
+      copy.depthWrite = true;
+      return copy;
+    });
+    mesh.material = next.length === 1 ? next[0] : next;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+  });
+  return clone;
 }
 
-function disposeGeometry(geometry: BufferGeometry) {
-  geometry.dispose();
+function disposeMaterials(root: Object3D | null) {
+  root?.traverse((obj) => {
+    const mesh = obj as Mesh;
+    if (!mesh.isMesh) return;
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (const material of list) material.dispose();
+  });
 }

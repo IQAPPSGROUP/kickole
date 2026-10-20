@@ -1,10 +1,8 @@
 import {
-  BoxGeometry,
   BufferGeometry,
-  ConeGeometry,
-  CylinderGeometry,
   Euler,
   Matrix4,
+  PlaneGeometry,
   Quaternion,
   SphereGeometry,
   Vector3,
@@ -76,244 +74,580 @@ export const HAIR_SKULLS: Record<HairBody, Skull> = {
   },
 };
 
-export type HairPart =
-  | {
-      id: string;
-      shape: 'sphere';
-      position: Vec3;
-      radius: number;
-      rotation?: Vec3;
-      scale?: Vec3;
-      phiStart?: number;
-      phiLength?: number;
-      thetaStart?: number;
-      thetaLength?: number;
-    }
-  | {
-      id: string;
-      shape: 'box';
-      position: Vec3;
-      size: Vec3;
-      rotation?: Vec3;
-    }
-  | {
-      id: string;
-      shape: 'cylinder';
-      position: Vec3;
-      radiusTop: number;
-      radiusBottom: number;
-      height: number;
-      rotation?: Vec3;
-    }
-  | {
-      id: string;
-      shape: 'cone';
-      position: Vec3;
-      radius: number;
-      height: number;
-      rotation?: Vec3;
-    };
+export type HairAtlas = 'strand' | 'braid' | 'curl' | 'spike' | 'stubble';
 
+/** One alpha card. Local +Y runs root to tip, local +Z is the card normal. */
+export interface HairCard {
+  id: string;
+  atlas: HairAtlas;
+  position: Vec3;
+  rotation: Vec3;
+  width: number;
+  height: number;
+}
+
+export type HairPart = HairCard;
+
+const SEAT = 0.008;
+/** A card covers a scalp probe this far from its rectangle. */
+const COVER = 0.04;
+
+const UP = new Vector3(0, 1, 0);
 const point = new Vector3();
 const localPoint = new Vector3();
-const scaleVec = new Vector3();
+const scaleVec = new Vector3(1, 1, 1);
 const matrix = new Matrix4();
 const inverse = new Matrix4();
 const quaternion = new Quaternion();
 const euler = new Euler();
+const sideAxis = new Vector3();
+const growthAxis = new Vector3();
+const normalAxis = new Vector3();
+const rootPoint = new Vector3();
 
-/** Face opening, in radians, cut out of a sphere around +Z. */
-function faceCut(open: number): { phiStart: number; phiLength: number } {
-  return { phiStart: Math.PI / 2 + open, phiLength: Math.PI * 2 - open * 2 };
+export interface HairSpring {
+  pitch: number;
+  yaw: number;
+  roll: number;
 }
 
-function shell(
-  skull: Skull,
-  opts: { id: string; puff: number; open: number; thetaStart: number; thetaLength: number; lift?: number; back?: number },
-): HairPart {
-  const cut = faceCut(opts.open);
+/** Largest lag secondaryMotion will write onto the hair group. */
+export const HAIR_SPRING_LIMIT: HairSpring = { pitch: 0.14, yaw: 0.2, roll: 0.042 };
+
+const SPRINGS: HairSpring[] = [
+  { pitch: 0, yaw: 0, roll: 0 },
+  { pitch: HAIR_SPRING_LIMIT.pitch, yaw: HAIR_SPRING_LIMIT.yaw, roll: HAIR_SPRING_LIMIT.roll },
+  { pitch: -HAIR_SPRING_LIMIT.pitch, yaw: -HAIR_SPRING_LIMIT.yaw, roll: -HAIR_SPRING_LIMIT.roll },
+  { pitch: HAIR_SPRING_LIMIT.pitch, yaw: -HAIR_SPRING_LIMIT.yaw, roll: HAIR_SPRING_LIMIT.roll },
+  { pitch: -HAIR_SPRING_LIMIT.pitch, yaw: HAIR_SPRING_LIMIT.yaw, roll: -HAIR_SPRING_LIMIT.roll },
+];
+
+export interface ScalpSpec {
+  center: Vec3;
+  radius: number;
+  phiStart: number;
+  phiLength: number;
+  thetaStart: number;
+  thetaLength: number;
+  /** Linear RGB, matched to the photographed scalp so the cap hides painted hair. */
+  color: Vec3;
+}
+
+/** Opaque crown shell. Hides the photograph's painted hair without covering the face. */
+export function scalpSpec(body: HairBody): ScalpSpec {
+  const skull = HAIR_SKULLS[body];
+  const open = 1.08;
+  const color: Vec3 = body === 'male'
+    ? [0x8b / 255, 0x64 / 255, 0x52 / 255]
+    : body === 'female'
+      ? [0xa0 / 255, 0x80 / 255, 0x70 / 255]
+      : [0xc4 / 255, 0xa4 / 255, 0x84 / 255];
   return {
-    id: opts.id,
-    shape: 'sphere',
-    position: [
-      skull.center.x,
-      skull.center.y + (opts.lift ?? skull.radius * 0.06),
-      skull.center.z - (opts.back ?? skull.radius * 0.12),
-    ],
-    radius: skull.radius + opts.puff,
-    phiStart: cut.phiStart,
-    phiLength: cut.phiLength,
-    thetaStart: opts.thetaStart,
-    thetaLength: opts.thetaLength,
+    center: [skull.center.x, skull.center.y, skull.center.z],
+    radius: skull.radius * 1.025,
+    phiStart: Math.PI / 2 + open,
+    phiLength: Math.PI * 2 - open * 2,
+    thetaStart: 0,
+    thetaLength: 2.05,
+    color,
   };
 }
 
-function afro(skull: Skull): HairPart[] {
-  // Closed at the crown (theta 0). The old cap started below the pole and left a bald spot.
-  return [shell(skull, {
-    id: 'afro',
-    puff: 0.038,
-    open: 1.28,
-    thetaStart: 0,
-    thetaLength: 2.45,
-    lift: 0,
-    back: 0,
-  })];
+function spherical(theta: number, phi: number, target: Vector3): Vector3 {
+  return target.set(
+    -Math.sin(theta) * Math.cos(phi),
+    Math.cos(theta),
+    Math.sin(theta) * Math.sin(phi),
+  );
 }
 
-function mohawk(skull: Skull): HairPart[] {
-  const depth = skull.radius * 0.85;
-  const height = skull.radius * 1.15;
-  return [{
-    id: 'mohawk',
-    shape: 'box',
-    position: [
-      skull.center.x,
-      skull.crownY + height * 0.28,
-      skull.center.z - skull.radius * 0.12,
-    ],
-    size: [skull.radius * 0.34, height, depth],
-  }];
+function frame(growth: Vector3, align: Vector3, twist: number) {
+  growthAxis.copy(growth).normalize();
+  normalAxis.copy(align).addScaledVector(growthAxis, -align.dot(growthAxis));
+  if (normalAxis.lengthSq() < 1e-8) {
+    const ref = Math.abs(growthAxis.y) > 0.92 ? point.set(1, 0, 0) : UP;
+    normalAxis.crossVectors(growthAxis, ref);
+  }
+  normalAxis.normalize();
+  sideAxis.crossVectors(growthAxis, normalAxis).normalize();
+  const c = Math.cos(twist);
+  const s = Math.sin(twist);
+  const sx = sideAxis.x * c + normalAxis.x * s;
+  const sy = sideAxis.y * c + normalAxis.y * s;
+  const sz = sideAxis.z * c + normalAxis.z * s;
+  const nx = normalAxis.x * c - sideAxis.x * s;
+  const ny = normalAxis.y * c - sideAxis.y * s;
+  const nz = normalAxis.z * c - sideAxis.z * s;
+  sideAxis.set(sx, sy, sz);
+  normalAxis.set(nx, ny, nz);
 }
 
-function highTop(skull: Skull): HairPart[] {
-  const height = skull.radius * 1.15;
-  const radius = skull.radius * 0.94;
+function eulerOf(side: Vector3, growth: Vector3, normal: Vector3): Vec3 {
+  matrix.makeBasis(side, growth, normal);
+  quaternion.setFromRotationMatrix(matrix);
+  euler.setFromQuaternion(quaternion, 'XYZ');
+  return [euler.x, euler.y, euler.z];
+}
+
+export function pointInFaceBox(p: Vector3, face: FaceBox): boolean {
+  return p.x >= face.min[0] && p.x <= face.max[0]
+    && p.y >= face.min[1] && p.y <= face.max[1]
+    && p.z >= face.min[2] && p.z <= face.max[2];
+}
+
+function overEyes(skull: Skull, p: Vector3): boolean {
   const eyeZ = Math.min(skull.landmarks.leftEye.z, skull.landmarks.rightEye.z);
-  // Wide enough to cover the crown, with the front rim behind the eyes so it
-  // does not read as a visor from the front.
-  const frontZ = eyeZ - skull.radius * 0.28;
-  const bottom = skull.crownY - skull.radius * 0.22;
-  return [{
-    id: 'high-top',
-    shape: 'cylinder',
-    position: [
-      skull.center.x,
-      bottom + height / 2,
-      frontZ - radius,
-    ],
-    radiusTop: radius * 0.9,
-    radiusBottom: radius,
+  const across = p.x >= skull.face.min[0] && p.x <= skull.face.max[0];
+  if (!across) return false;
+  const band = p.y <= skull.landmarks.brow.y + 0.05 && p.y >= skull.landmarks.nose.y;
+  return band && p.z > eyeZ - 0.02;
+}
+
+export function createHairGeometry(part: HairPart): BufferGeometry {
+  return new PlaneGeometry(part.width, part.height, 1, 1);
+}
+
+export function hairMatrix(part: HairPart, target = matrix): Matrix4 {
+  euler.set(part.rotation[0], part.rotation[1], part.rotation[2], 'XYZ');
+  quaternion.setFromEuler(euler);
+  return target.compose(
+    point.set(part.position[0], part.position[1], part.position[2]),
+    quaternion,
+    scaleVec,
+  );
+}
+
+export function hairSurfacePoints(part: HairPart): Vector3[] {
+  const geometry = createHairGeometry(part);
+  const position = geometry.getAttribute('position');
+  const posed = hairMatrix(part);
+  const points: Vector3[] = [];
+  for (let i = 0; i < position.count; i++) {
+    points.push(new Vector3().fromBufferAttribute(position, i).applyMatrix4(posed));
+  }
+  geometry.dispose();
+  return points;
+}
+
+/** True when the point lies on the card or just behind it, against the scalp. */
+export function hairCoversPoint(part: HairPart, world: Vector3): boolean {
+  localPoint.copy(world);
+  inverse.copy(hairMatrix(part)).invert();
+  localPoint.applyMatrix4(inverse);
+  const dx = Math.abs(localPoint.x) - part.width / 2;
+  const dy = Math.abs(localPoint.y) - part.height / 2;
+  const dist = Math.hypot(Math.max(dx, 0), Math.max(dy, 0), localPoint.z);
+  return dist <= COVER;
+}
+
+function springQuaternion(spring: HairSpring, target: Quaternion): Quaternion {
+  euler.set(spring.pitch, spring.yaw, spring.roll, 'XYZ');
+  return target.setFromEuler(euler);
+}
+
+function cardBlocked(skull: Skull, card: HairCard): boolean {
+  const samples = hairSurfacePoints(card);
+  for (let i = 0; i < 4; i++) samples.push(samples[i].clone().lerp(samples[(i + 1) % 4], 0.5));
+  const spin = new Quaternion();
+  const unwind = new Quaternion();
+  const sample = new Vector3();
+  for (const spring of SPRINGS) {
+    springQuaternion(spring, spin);
+    unwind.copy(spin).invert();
+    for (const corner of samples) {
+      sample.copy(corner).applyQuaternion(spin);
+      if (pointInFaceBox(sample, skull.face) || overEyes(skull, sample)) return true;
+    }
+    for (const landmark of Object.values(skull.landmarks)) {
+      sample.copy(landmark).applyQuaternion(unwind);
+      if (hairCoversPoint(card, sample)) return true;
+    }
+  }
+  let buried = 0;
+  for (const corner of samples) {
+    buried = Math.min(buried, corner.distanceTo(skull.center) - skull.radius);
+  }
+  return buried < -0.02;
+}
+
+function placeAt(
+  skull: Skull,
+  opts: {
+    id: string;
+    atlas: HairAtlas;
+    root: Vector3;
+    growth: Vector3;
+    align: Vector3;
+    width: number;
+    height: number;
+    twist?: number;
+  },
+): HairCard | null {
+  frame(opts.growth, opts.align, opts.twist ?? 0);
+  const position = rootPoint.copy(opts.root).addScaledVector(growthAxis, opts.height / 2);
+  const card: HairCard = {
+    id: opts.id,
+    atlas: opts.atlas,
+    position: [position.x, position.y, position.z],
+    rotation: eulerOf(sideAxis, growthAxis, normalAxis),
+    width: opts.width,
+    height: opts.height,
+  };
+  if (cardBlocked(skull, card)) return null;
+  return card;
+}
+
+function add(list: HairCard[], skull: Skull, opts: Parameters<typeof placeAt>[1]) {
+  const card = placeAt(skull, opts);
+  if (card) list.push(card);
+}
+
+function seatRoot(skull: Skull, outward: Vector3, target: Vector3): Vector3 {
+  return target.copy(skull.center).addScaledVector(outward, skull.radius + SEAT);
+}
+
+function shellCards(
+  skull: Skull,
+  opts: {
+    prefix: string;
+    atlas: HairAtlas;
+    thetas: number[];
+    phiCount: number;
+    width: number;
+    height: number;
+    twists: number[];
+    lift: number;
+    faceZ: number;
+  },
+): HairCard[] {
+  const cards: HairCard[] = [];
+  const outward = new Vector3();
+  const growth = new Vector3();
+  const root = new Vector3();
+  let n = 0;
+  for (const theta of opts.thetas) {
+    for (let i = 0; i < opts.phiCount; i++) {
+      const phi = (i / opts.phiCount) * Math.PI * 2;
+      spherical(theta, phi, outward);
+      if (outward.z > opts.faceZ && outward.y < 0.72) continue;
+      growth.copy(outward).lerp(UP, opts.lift).normalize();
+      seatRoot(skull, outward, root);
+      for (const twist of opts.twists) {
+        add(cards, skull, {
+          id: `${opts.prefix}-${n++}`,
+          atlas: opts.atlas,
+          root,
+          growth,
+          align: outward,
+          width: opts.width,
+          height: opts.height,
+          twist,
+        });
+      }
+    }
+  }
+  return cards;
+}
+
+function afro(skull: Skull): HairCard[] {
+  const height = Math.max(0.052, skull.radius * 0.62);
+  const outer = shellCards(skull, {
+    prefix: 'afro',
+    atlas: 'strand',
+    thetas: [0.12, 0.32, 0.52, 0.7, 0.95, 1.18, 1.42, 1.66],
+    phiCount: 16,
+    width: Math.max(0.028, skull.radius * 0.36),
     height,
-  }];
+    twists: [0, Math.PI / 2],
+    lift: 0.12,
+    faceZ: 0.38,
+  });
+  const inner = shellCards(skull, {
+    prefix: 'afro-in',
+    atlas: 'strand',
+    thetas: [0.22, 0.6, 0.95, 1.3],
+    phiCount: 12,
+    width: Math.max(0.024, skull.radius * 0.3),
+    height: height * 0.55,
+    twists: [0.6],
+    lift: 0.2,
+    faceZ: 0.36,
+  });
+  return [...outer, ...inner];
 }
 
-function curls(skull: Skull): HairPart[] {
-  const cap = shell(skull, {
-    id: 'curl-cap',
-    puff: 0.02,
-    open: 1.28,
-    thetaStart: 0,
-    thetaLength: 2.05,
-    lift: skull.radius * 0.02,
-    back: skull.radius * 0.04,
+function curls(skull: Skull): HairCard[] {
+  return shellCards(skull, {
+    prefix: 'curl',
+    atlas: 'curl',
+    thetas: [0.12, 0.36, 0.6, 0.88, 1.16, 1.42],
+    phiCount: 14,
+    width: Math.max(0.02, skull.radius * 0.26),
+    height: 0.03,
+    twists: [0.35, 1.7],
+    lift: 0.42,
+    faceZ: 0.34,
   });
-  const curlRadius = Math.min(0.028, skull.radius * 0.28);
-  const spots: Array<[number, number, number]> = [
-    [0, 1.02, -0.22],
-    [-1.28, 0.72, -0.55],
-    [1.28, 0.72, -0.55],
-    [-1.35, 0.28, -0.72],
-    [1.35, 0.28, -0.72],
-    [0, 0.48, -1.05],
+}
+
+function mohawk(skull: Skull): HairCard[] {
+  const cards: HairCard[] = [];
+  const outward = new Vector3();
+  const growth = new Vector3();
+  const root = new Vector3();
+  const steps = 9;
+  let n = 0;
+  for (let i = 0; i < steps; i++) {
+    const t = i / (steps - 1);
+    spherical(0.18 + t * 1.25, Math.PI * 1.5, outward);
+    growth.copy(UP).lerp(outward, 0.35).normalize();
+    seatRoot(skull, outward, root);
+    const height = skull.radius * (1.2 - t * 0.35);
+    for (const twist of [0, 0.7, 1.25, Math.PI / 2]) {
+      add(cards, skull, {
+        id: `mohawk-${n++}`,
+        atlas: 'strand',
+        root,
+        growth,
+        align: outward,
+        width: 0.016,
+        height,
+        twist,
+      });
+    }
+  }
+  return cards;
+}
+
+function highTop(skull: Skull): HairCard[] {
+  const cards: HairCard[] = [];
+  const eyeZ = Math.min(skull.landmarks.leftEye.z, skull.landmarks.rightEye.z);
+  const halfW = skull.radius * 0.76;
+  const top = skull.crownY + skull.radius * 1.08;
+  const frontZ = Math.min(eyeZ - skull.radius * 0.36, skull.center.z + skull.radius * 0.16);
+  const depth = skull.radius * 1.2;
+  const backZ = frontZ - depth;
+  const bottom = Math.max(skull.crownY - skull.radius * 0.02, skull.landmarks.brow.y + 0.07);
+  const outward = new Vector3();
+  const root = new Vector3();
+  let n = 0;
+  for (const theta of [0.12, 0.28, 0.38, 0.55]) {
+    for (let i = 0; i < 12; i++) {
+      spherical(theta, (i / 12) * Math.PI * 2, outward);
+      const probe = root.copy(skull.center).addScaledVector(outward, skull.radius);
+      if (probe.x < skull.center.x - halfW || probe.x > skull.center.x + halfW) continue;
+      if (probe.z < backZ + 0.004 || probe.z > frontZ - 0.004) continue;
+      seatRoot(skull, outward, root);
+      const height = Math.max(0.03, top - root.y);
+      for (const twist of [0, Math.PI / 2]) {
+        add(cards, skull, {
+          id: `high-${n++}`,
+          atlas: 'strand',
+          root,
+          growth: UP,
+          align: outward,
+          width: Math.max(0.016, skull.radius * 0.28),
+          height,
+          twist,
+        });
+      }
+    }
+  }
+  const cols = 4;
+  const rows = 3;
+  const wallH = Math.max(0.03, top - bottom);
+  for (let ix = 0; ix < cols; ix++) {
+    for (let iy = 0; iy < rows; iy++) {
+      const x = skull.center.x - halfW + ((ix + 0.5) / cols) * halfW * 2;
+      const y0 = bottom + (iy / rows) * wallH;
+      const h = wallH / rows + 0.004;
+      add(cards, skull, {
+        id: `high-front-${n++}`,
+        atlas: 'strand',
+        root: root.set(x, y0, frontZ),
+        growth: UP,
+        align: point.set(0, 0, 1),
+        width: (halfW * 2) / cols + 0.004,
+        height: h,
+      });
+      add(cards, skull, {
+        id: `high-back-${n++}`,
+        atlas: 'strand',
+        root: root.set(x, y0, backZ),
+        growth: UP,
+        align: point.set(0, 0, -1),
+        width: (halfW * 2) / cols + 0.004,
+        height: h,
+      });
+    }
+  }
+  for (let iz = 0; iz < cols; iz++) {
+    for (let iy = 0; iy < rows; iy++) {
+      const z = backZ + ((iz + 0.5) / cols) * depth;
+      const y0 = bottom + (iy / rows) * wallH;
+      const h = wallH / rows + 0.004;
+      add(cards, skull, {
+        id: `high-left-${n++}`,
+        atlas: 'strand',
+        root: root.set(skull.center.x - halfW, y0, z),
+        growth: UP,
+        align: point.set(-1, 0, 0),
+        width: depth / cols + 0.004,
+        height: h,
+      });
+      add(cards, skull, {
+        id: `high-right-${n++}`,
+        atlas: 'strand',
+        root: root.set(skull.center.x + halfW, y0, z),
+        growth: UP,
+        align: point.set(1, 0, 0),
+        width: depth / cols + 0.004,
+        height: h,
+      });
+    }
+  }
+  const topCols = 5;
+  const topRows = 4;
+  for (let ix = 0; ix < topCols; ix++) {
+    for (let iz = 0; iz < topRows; iz++) {
+      const x = skull.center.x - halfW + (ix / topCols) * halfW * 2;
+      const z = backZ + (iz / topRows) * depth;
+      add(cards, skull, {
+        id: `high-top-${n++}`,
+        atlas: 'strand',
+        root: root.set(x, top, z),
+        growth: point.set(0, 0, 1),
+        align: UP,
+        width: (halfW * 2) / topCols + 0.003,
+        height: depth / topRows + 0.003,
+      });
+    }
+  }
+  return cards;
+}
+
+function braids(skull: Skull): HairCard[] {
+  const cards: HairCard[] = [];
+  const outward = new Vector3();
+  const growth = new Vector3();
+  const root = new Vector3();
+  const prev = new Vector3();
+  let n = 0;
+  for (const row of [-2, -1, 0, 1, 2]) {
+    const lateral = row * 0.2;
+    const steps = 8;
+    let hasPrev = false;
+    for (let i = 0; i < steps; i++) {
+      const theta = 0.3 + (i / (steps - 1)) * 1.28;
+      outward.set(lateral, Math.cos(theta), -Math.sin(theta)).normalize();
+      seatRoot(skull, outward, root);
+      if (hasPrev) growth.copy(root).sub(prev);
+      else growth.set(0, Math.sin(theta), -Math.cos(theta));
+      if (growth.dot(outward) < 0) growth.addScaledVector(outward, 0.45);
+      growth.normalize();
+      add(cards, skull, {
+        id: `braid-${n++}`,
+        atlas: 'braid',
+        root,
+        growth,
+        align: outward,
+        width: 0.012,
+        height: skull.radius * 0.32,
+      });
+      prev.copy(root);
+      hasPrev = true;
+    }
+    outward.set(lateral, Math.cos(1.55), -Math.sin(1.55)).normalize();
+    seatRoot(skull, outward, root);
+    add(cards, skull, {
+      id: `braid-hang-${n++}`,
+      atlas: 'braid',
+      root,
+      growth: growth.set(lateral * 0.12, -1, -0.22).normalize(),
+      align: outward,
+      width: 0.013,
+      height: 0.15,
+    });
+  }
+  return cards;
+}
+
+function spikes(skull: Skull): HairCard[] {
+  const cards = shellCards(skull, {
+    prefix: 'spike-bed',
+    atlas: 'spike',
+    thetas: [0.12, 0.45, 0.75, 1.05],
+    phiCount: 10,
+    width: Math.max(0.014, skull.radius * 0.16),
+    height: 0.02,
+    twists: [0.3],
+    lift: 0.2,
+    faceZ: 0.32,
+  });
+  const outward = new Vector3();
+  const growth = new Vector3();
+  const root = new Vector3();
+  const spots: Array<[number, number]> = [
+    [0.22, Math.PI],
+    [0.34, 0],
+    [0.4, Math.PI * 1.5],
+    [0.48, Math.PI * 0.35],
+    [0.48, Math.PI * 0.65],
+    [0.62, Math.PI * 1.2],
+    [0.62, Math.PI * 1.8],
+    [0.78, Math.PI * 1.5],
   ];
-  const tufts: HairPart[] = spots.map(([x, y, z], i) => ({
-    id: `curl-${i}`,
-    shape: 'sphere' as const,
-    position: [
-      skull.center.x + x * skull.radius,
-      skull.center.y + y * skull.radius,
-      skull.center.z + z * skull.radius,
-    ],
-    radius: curlRadius,
-  }));
-  return [cap, ...tufts];
+  spots.forEach(([theta, phi], index) => {
+    spherical(theta, phi, outward);
+    if (outward.z > 0.4 && outward.y < 0.7) return;
+    growth.copy(outward).lerp(UP, 0.4).normalize();
+    seatRoot(skull, outward, root);
+    for (const twist of [0, Math.PI / 2]) {
+      add(cards, skull, {
+        id: `spike-${index}-${twist.toFixed(2)}`,
+        atlas: 'spike',
+        root,
+        growth,
+        align: outward,
+        width: 0.012,
+        height: skull.radius * 0.78,
+        twist,
+      });
+    }
+  });
+  return cards;
 }
 
-function braids(skull: Skull): HairPart[] {
-  const cap = shell(skull, {
-    id: 'braid-cap',
-    puff: 0.022,
-    open: 1.38,
-    thetaStart: 0,
-    thetaLength: 2.2,
-    lift: skull.radius * 0.02,
-    back: skull.radius * 0.04,
+function shaved(skull: Skull): HairCard[] {
+  return shellCards(skull, {
+    prefix: 'stubble',
+    atlas: 'stubble',
+    thetas: [0.12, 0.4, 0.7, 1.05, 1.35],
+    phiCount: 12,
+    width: Math.max(0.014, skull.radius * 0.2),
+    height: 0.011,
+    twists: [0.2],
+    lift: 0.05,
+    faceZ: 0.28,
   });
-  const ropes: HairPart[] = [-1, 1].map((side) => {
-    const height = 0.22;
-    return {
-      id: side < 0 ? 'braid-l' : 'braid-r',
-      shape: 'cylinder' as const,
-      position: [
-        skull.center.x + side * skull.radius * 1.22,
-        skull.center.y - height * 0.22,
-        skull.center.z - skull.radius * 0.12,
-      ],
-      radiusTop: 0.02,
-      radiusBottom: 0.014,
-      height,
-      rotation: [0.22, 0, side * -0.18],
-    };
-  });
-  return [cap, ...ropes];
 }
 
-function spikes(skull: Skull): HairPart[] {
-  const cap = shell(skull, {
-    id: 'spike-cap',
-    puff: 0.016,
-    open: 1.42,
-    thetaStart: 0,
-    thetaLength: 1.9,
-    lift: skull.radius * 0.04,
-    back: skull.radius * 0.04,
+function shortCap(skull: Skull): HairCard[] {
+  return shellCards(skull, {
+    prefix: 'short',
+    atlas: 'strand',
+    thetas: [0.2, 0.55, 0.9],
+    phiCount: 10,
+    width: skull.radius * 0.22,
+    height: 0.02,
+    twists: [0.4],
+    lift: 0.5,
+    faceZ: 0.3,
   });
-  const spots: Array<[number, number, number]> = [
-    [0, 0.01, -0.22],
-    [-0.55, 0, -0.42],
-    [0.55, 0, -0.42],
-    [-0.28, 0.02, -0.12],
-    [0.28, 0.02, -0.12],
-  ];
-  const cones: HairPart[] = spots.map(([x, y, z], i) => {
-    const height = skull.radius * 0.62;
-    return {
-      id: `spike-${i}`,
-      shape: 'cone' as const,
-      position: [
-        skull.center.x + x * skull.radius * 0.7,
-        skull.crownY + height / 2 - 0.01 + y,
-        skull.center.z + z * skull.radius * 0.55,
-      ],
-      radius: Math.min(0.018, skull.radius * 0.16),
-      height,
-      rotation: [z * 0.2, 0, -x * 0.2],
-    };
-  });
-  return [cap, ...cones];
 }
 
-function shaved(skull: Skull): HairPart[] {
-  const cap = shell(skull, {
-    id: 'shaved',
-    puff: 0.014,
-    open: 1.62,
-    thetaStart: 0,
-    thetaLength: 1.85,
-    lift: skull.radius * 0.12,
-    back: skull.radius * 0.04,
-  });
-  if (cap.shape !== 'sphere') return [cap];
-  return [{ ...cap, scale: [1, 0.72, 0.96] }];
-}
-
-function shortCap(skull: Skull): HairPart[] {
-  return [shell(skull, { id: 'short', puff: 0.02, open: 1.35, thetaStart: 0.05, thetaLength: Math.PI * 0.48, lift: skull.radius * 0.35, back: skull.radius * 0.02 })];
-}
-
-/** Procedural hair in head-bone space. Short on a GLB body keeps the authored mesh. */
-export function hairParts(style: HairStyle, body: HairBody): HairPart[] {
+/** Alpha cards in head-bone space. Short on a GLB body keeps the authored mesh. */
+export function hairParts(style: HairStyle, body: HairBody): HairCard[] {
   const skull = HAIR_SKULLS[body];
   switch (style) {
     case 'bald':
@@ -341,129 +675,10 @@ export function hairParts(style: HairStyle, body: HairBody): HairPart[] {
   }
 }
 
-export function createHairGeometry(part: HairPart): BufferGeometry {
-  switch (part.shape) {
-    case 'sphere':
-      return new SphereGeometry(
-        part.radius,
-        32,
-        22,
-        part.phiStart ?? 0,
-        part.phiLength ?? Math.PI * 2,
-        part.thetaStart ?? 0,
-        part.thetaLength ?? Math.PI,
-      );
-    case 'box':
-      return new BoxGeometry(part.size[0], part.size[1], part.size[2]);
-    case 'cylinder':
-      return new CylinderGeometry(part.radiusTop, part.radiusBottom, part.height, 12);
-    case 'cone':
-      return new ConeGeometry(part.radius, part.height, 8);
-    default: {
-      const unknown: never = part;
-      return unknown;
-    }
-  }
-}
-
-export function hairMatrix(part: HairPart, target = matrix): Matrix4 {
-  const rot = part.rotation ?? [0, 0, 0];
-  const scale = part.shape === 'sphere' ? (part.scale ?? [1, 1, 1]) : [1, 1, 1];
-  euler.set(rot[0], rot[1], rot[2]);
-  quaternion.setFromEuler(euler);
-  scaleVec.set(scale[0], scale[1], scale[2]);
-  return target.compose(
-    point.set(part.position[0], part.position[1], part.position[2]),
-    quaternion,
-    scaleVec,
-  );
-}
-
-export function hairSurfacePoints(part: HairPart): Vector3[] {
-  const geometry = createHairGeometry(part);
-  const position = geometry.getAttribute('position');
-  const posed = hairMatrix(part);
-  const points: Vector3[] = [];
-  for (let i = 0; i < position.count; i++) {
-    points.push(new Vector3().fromBufferAttribute(position, i).applyMatrix4(posed));
-  }
-  geometry.dispose();
-  return points;
-}
-
-function phiInside(phi: number, start: number, length: number): boolean {
-  let value = phi;
-  while (value < start - 1e-4) value += Math.PI * 2;
-  while (value > start + Math.PI * 2 - 1e-4) value -= Math.PI * 2;
-  return value >= start - 1e-3 && value <= start + length + 1e-3;
-}
-
-/** True when the point sits inside the solid hair primitive, in head-bone space. */
-export function hairCoversPoint(part: HairPart, world: Vector3): boolean {
-  localPoint.copy(world);
-  inverse.copy(hairMatrix(part)).invert();
-  localPoint.applyMatrix4(inverse);
-  const x = localPoint.x;
-  const y = localPoint.y;
-  const z = localPoint.z;
-  switch (part.shape) {
-    case 'sphere': {
-      const radius = Math.hypot(x, y, z);
-      if (radius > part.radius + 1e-4) return false;
-      if (radius < 1e-5) return true;
-      const theta = Math.acos(Math.min(1, Math.max(-1, y / radius)));
-      const thetaStart = part.thetaStart ?? 0;
-      const thetaLength = part.thetaLength ?? Math.PI;
-      if (theta < thetaStart - 1e-3 || theta > thetaStart + thetaLength + 1e-3) return false;
-      const phiStart = part.phiStart ?? 0;
-      const phiLength = part.phiLength ?? Math.PI * 2;
-      return phiInside(Math.atan2(z, -x), phiStart, phiLength);
-    }
-    case 'box':
-      return Math.abs(x) <= part.size[0] / 2 && Math.abs(y) <= part.size[1] / 2 && Math.abs(z) <= part.size[2] / 2;
-    case 'cylinder': {
-      const along = y / part.height + 0.5;
-      if (along < 0 || along > 1) return false;
-      const radius = part.radiusBottom + (part.radiusTop - part.radiusBottom) * along;
-      return Math.hypot(x, z) <= radius;
-    }
-    case 'cone': {
-      if (y < -part.height / 2 || y > part.height / 2) return false;
-      const fromBase = (part.height / 2 - y) / part.height;
-      return Math.hypot(x, z) <= part.radius * fromBase;
-    }
-    default: {
-      const unknown: never = part;
-      return unknown;
-    }
-  }
-}
-
-export function pointInFaceBox(p: Vector3, face: FaceBox): boolean {
-  return p.x >= face.min[0] && p.x <= face.max[0]
-    && p.y >= face.min[1] && p.y <= face.max[1]
-    && p.z >= face.min[2] && p.z <= face.max[2];
-}
-
-export interface HairSpring {
-  pitch: number;
-  yaw: number;
-  roll: number;
-}
-
-/** Largest lag secondaryMotion will write onto the hair group. */
-export const HAIR_SPRING_LIMIT: HairSpring = { pitch: 0.14, yaw: 0.2, roll: 0.042 };
-
-/**
- * Surface samples and landmarks that the hair occupies inside the face volume.
- * `spring` is the local lag on the head bone; the skull itself does not rotate.
- */
 export function hairFaceHits(style: HairStyle, body: HairBody, spring?: HairSpring): string[] {
   const skull = HAIR_SKULLS[body];
   const hits: string[] = [];
-  euler.set(spring?.pitch ?? 0, spring?.yaw ?? 0, spring?.roll ?? 0);
-  quaternion.setFromEuler(euler);
-  const spin = new Quaternion().copy(quaternion);
+  const spin = springQuaternion(spring ?? { pitch: 0, yaw: 0, roll: 0 }, new Quaternion());
   const unwind = spin.clone().invert();
   for (const part of hairParts(style, body)) {
     for (const sample of hairSurfacePoints(part)) {
@@ -487,16 +702,14 @@ export function hairEyePlaneHits(style: HairStyle, body: HairBody, spring?: Hair
   const eyeZ = Math.min(skull.landmarks.leftEye.z, skull.landmarks.rightEye.z);
   const brow = skull.landmarks.brow;
   const hits: string[] = [];
-  euler.set(spring?.pitch ?? 0, spring?.yaw ?? 0, spring?.roll ?? 0);
-  quaternion.setFromEuler(euler);
-  const spin = new Quaternion().copy(quaternion);
+  const spin = springQuaternion(spring ?? { pitch: 0, yaw: 0, roll: 0 }, new Quaternion());
   for (const part of hairParts(style, body)) {
     for (const sample of hairSurfacePoints(part)) {
       sample.applyQuaternion(spin);
       const across = sample.x >= skull.face.min[0] && sample.x <= skull.face.max[0];
       if (!across) continue;
-      const overEyes = sample.y <= brow.y + 0.05 && sample.y >= skull.landmarks.nose.y;
-      if (overEyes && sample.z > eyeZ - 0.02) hits.push(`${part.id}:eye-plane`);
+      const over = sample.y <= brow.y + 0.05 && sample.y >= skull.landmarks.nose.y;
+      if (over && sample.z > eyeZ - 0.02) hits.push(`${part.id}:eye-plane`);
     }
   }
   return hits;
@@ -516,13 +729,10 @@ export function uncoveredScalp(style: HairStyle, body: HairBody, thetas = [0.12,
     [`right-${theta.toFixed(2)}`, theta, 0],
   ]);
   const missed: string[] = [];
+  const probe = new Vector3();
   for (const [name, theta, phi] of samples) {
     const radius = skull.radius * 0.97;
-    const probe = skull.center.clone().add(new Vector3(
-      -Math.sin(theta) * Math.cos(phi) * radius,
-      Math.cos(theta) * radius,
-      Math.sin(theta) * Math.sin(phi) * radius,
-    ));
+    spherical(theta, phi, probe).multiplyScalar(radius).add(skull.center);
     if (pointInFaceBox(probe, skull.face)) continue;
     if (!parts.some((part) => hairCoversPoint(part, probe))) missed.push(name);
   }
@@ -539,4 +749,36 @@ export function hairScalpGap(style: HairStyle, body: HairBody): number {
     }
   }
   return gap;
+}
+
+export function hairBounds(style: HairStyle, body: HairBody): { min: Vector3; max: Vector3 } {
+  const min = new Vector3(Infinity, Infinity, Infinity);
+  const max = new Vector3(-Infinity, -Infinity, -Infinity);
+  for (const part of hairParts(style, body)) {
+    for (const sample of hairSurfacePoints(part)) {
+      min.min(sample);
+      max.max(sample);
+    }
+  }
+  return { min, max };
+}
+
+export function scalpSurfacePoints(body: HairBody): Vector3[] {
+  const spec = scalpSpec(body);
+  const geometry = new SphereGeometry(
+    spec.radius,
+    24,
+    16,
+    spec.phiStart,
+    spec.phiLength,
+    spec.thetaStart,
+    spec.thetaLength,
+  );
+  const position = geometry.getAttribute('position');
+  const points: Vector3[] = [];
+  for (let i = 0; i < position.count; i++) {
+    points.push(new Vector3().fromBufferAttribute(position, i).add(new Vector3(...spec.center)));
+  }
+  geometry.dispose();
+  return points;
 }

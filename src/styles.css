@@ -28,6 +28,15 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   --fan-inset-b: 8px;
   --control-lift: calc(var(--fan-d) + var(--btn) + 12px);
 }
+@media (min-width: 360px) and (max-width: 430px) {
+  .app {
+    --fan-inset-l: max(16px, env(safe-area-inset-left, 0px));
+    --fan-inset-r: max(16px, env(safe-area-inset-right, 0px));
+    --fan-d: 117px;
+    --fan-dx: 96px;
+    --fan-dy: 67px;
+  }
+}
 .app canvas { display: block; touch-action: none; }
 
 .opening-skip {

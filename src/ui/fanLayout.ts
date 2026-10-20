@@ -14,6 +14,11 @@ export const FAN_BUTTON = 48;
 export const FAN_GAP = 6;
 const MIN_INSET_X = 4;
 const MIN_INSET_BOTTOM = 8;
+/** Phones in this width keep a side safe inset and a centre gap so the inner chips and the R label stay on screen. */
+const PHONE_MIN_W = 360;
+const PHONE_MAX_W = 430;
+const PHONE_INSET_X = 16;
+const PHONE_MIDDLE = 28;
 
 export interface FanLayout {
   button: number;
@@ -36,11 +41,13 @@ export function fanLayout(
   button = FAN_BUTTON,
   gap = FAN_GAP,
 ): FanLayout {
-  const insetLeft = Math.max(MIN_INSET_X, safeLeft);
-  const insetRight = Math.max(MIN_INSET_X, safeRight);
+  const phone = width >= PHONE_MIN_W && width <= PHONE_MAX_W;
+  const insetLeft = Math.max(phone ? PHONE_INSET_X : MIN_INSET_X, safeLeft);
+  const insetRight = Math.max(phone ? PHONE_INSET_X : MIN_INSET_X, safeRight);
   const insetBottom = Math.max(MIN_INSET_BOTTOM, safeBottom);
   const dClear = (button + gap) / CHORD_35;
-  const dMax = (width - insetLeft - insetRight - button * 2 - gap) / 2;
+  const middle = phone ? PHONE_MIDDLE : gap;
+  const dMax = (width - insetLeft - insetRight - button * 2 - middle) / 2;
   // Largest radius that still keeps the two inner tricks apart. The minimum
   // chord packs the 35° trick against the top button, so the fan reads as two rows.
   const d = dMax >= dClear ? dMax : Math.max(dClear, button + gap);

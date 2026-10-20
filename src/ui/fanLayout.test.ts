@@ -46,6 +46,21 @@ describe('corner fan', () => {
     }
   });
 
+  it('insets 360–430px phones so GROOVE clears ATW and RIGHT stays on screen', () => {
+    for (const width of [360, 375, 390, 414, 430]) {
+      const { layout, rects } = nearestGap(width, 800);
+      const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
+      expect(layout.insetLeft, `${width} left`).toBeGreaterThanOrEqual(16);
+      expect(layout.insetRight, `${width} right`).toBeGreaterThanOrEqual(16);
+      expect(byName.right.x + byName.right.w, `${width} right edge`).toBeLessThanOrEqual(width - 16);
+      expect(circleGap(byName.atw, byName.groove), `${width} atw/groove`).toBeGreaterThanOrEqual(16);
+    }
+    const narrow = fanLayout(320);
+    const wide = fanLayout(500);
+    expect(narrow.insetLeft).toBe(4);
+    expect(wide.insetRight).toBe(4);
+  });
+
   it('keeps the fan inside the screen when the safe area grows', () => {
     const { rects, nearest } = nearestGap(390, 844, 12, 12, 34);
     expect(nearest).toBeGreaterThanOrEqual(6);

@@ -270,7 +270,7 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
     if (profile.bloom) effect.addPass(new SafeBloomPass(size.width, size.height, 0.2, 0.74));
     let bokeh: BokehPass | null = null;
     if (profile.dof) {
-      bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.00014, maxblur: 0.006 });
+      bokeh = new BokehPass(scene, camera, { focus: 8, aperture: 0.0014, maxblur: 0.009 });
       bokeh.enabled = false;
       effect.addPass(bokeh);
     }

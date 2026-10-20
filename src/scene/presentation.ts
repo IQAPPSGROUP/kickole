@@ -26,9 +26,13 @@ export function depthOfFieldFocus(
   return along > 0.6 ? along : 0.6;
 }
 
+/**
+ * three r186 bokeh blur is `clamp((focus + viewZ) * aperture, ±maxblur)` in screen space.
+ * A 4 m miss at 0.0026 aperture is about a 1% blur; the player stays inside a sharp metre.
+ */
 export function depthOfFieldScale(phase: Phase, celebrating: boolean): { aperture: number; maxblur: number } {
-  if (phase === 'menu' || celebrating) return { aperture: 0.00028, maxblur: 0.012 };
-  return { aperture: 0.00014, maxblur: 0.006 };
+  if (phase === 'menu' || celebrating) return { aperture: 0.0026, maxblur: 0.018 };
+  return { aperture: 0.0014, maxblur: 0.009 };
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

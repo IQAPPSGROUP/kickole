@@ -197,7 +197,7 @@ function StreetTone() {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = 1;
+    gl.toneMappingExposure = 1.05;
   }, [gl]);
   return null;
 }

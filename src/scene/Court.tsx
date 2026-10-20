@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { BufferGeometry, CanvasTexture, Color, DoubleSide, InstancedMesh, MeshStandardMaterial, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
+import { AlleyCourt } from './AlleyCourt';
 import { BeachCourt } from './BeachCourt';
 import { ENVIRONMENT_THEME } from './environment';
 import { Crowd } from './Crowd';
@@ -654,5 +655,13 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
 }
 
 export function Court(props: { shadows: boolean; quality: Quality }) {
-  return ENVIRONMENT_THEME === 'beach' ? <BeachCourt {...props} /> : <StreetCourt {...props} />;
+  switch (ENVIRONMENT_THEME) {
+    case 'alley': return <AlleyCourt {...props} />;
+    case 'beach': return <BeachCourt {...props} />;
+    case 'street': return <StreetCourt {...props} />;
+    default: {
+      const neverTheme: never = ENVIRONMENT_THEME;
+      return neverTheme;
+    }
+  }
 }

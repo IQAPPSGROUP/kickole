@@ -6,7 +6,7 @@ import { sampleOpeningCamera } from './openingCamera';
 const aspects = [375 / 667, 390 / 844, 430 / 932, 844 / 390];
 
 describe('opening camera endpoint', () => {
-  for (const theme of ['beach', 'street'] as const) {
+  for (const theme of ['alley', 'beach', 'street'] as const) {
     for (const aspect of aspects) {
       it(`${theme} u=1 matches gameplay camera at aspect ${aspect.toFixed(3)}`, () => {
         const pos = new Vector3();
@@ -29,6 +29,17 @@ describe('opening camera endpoint', () => {
       expect(pos.z).toBeGreaterThan(1.2);
       expect(pos.y).toBeGreaterThan(1.4);
       // Looking into the set, not behind unfinished backs.
+      expect(target.z).toBeLessThan(pos.z);
+    }
+  });
+
+  it('looks into the alley corner during the opening pan', () => {
+    const pos = new Vector3();
+    const target = new Vector3();
+    const aspect = 1440 / 810;
+    for (let i = 0; i <= 20; i++) {
+      sampleOpeningCamera(i / 20, aspect, 'alley', pos, target);
+      expect(pos.z).toBeGreaterThan(1.2);
       expect(target.z).toBeLessThan(pos.z);
     }
   });

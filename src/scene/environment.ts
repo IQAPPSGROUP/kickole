@@ -7,14 +7,28 @@ export const ENVIRONMENT_OFFSET_X = -1.6;
 export const ENVIRONMENT_OFFSET_Y = -0.7;
 export const ENVIRONMENT_OFFSET_Z = -1.8;
 
-export type EnvironmentTheme = 'street' | 'beach';
+export type EnvironmentTheme = 'alley' | 'street' | 'beach';
+
+/**
+ * The shipped court is the alley. Street and beach stay available when a
+ * build sets VITE_LEGACY_LOCATIONS=true, or when the URL asks for them.
+ */
 export function resolveEnvironmentTheme(build?: string, preview?: string | null): EnvironmentTheme {
-  return (preview ?? build) === 'beach' ? 'beach' : 'street';
+  const requested = preview && preview.length > 0 ? preview : build;
+  switch (requested) {
+    case 'alley':
+    case 'street':
+    case 'beach':
+      return requested;
+    default:
+      return 'alley';
+  }
 }
 
-/** Production uses a build setting. Only the dev viewer accepts a URL override. */
+const legacyLocations = import.meta.env.VITE_LEGACY_LOCATIONS === 'true';
+
+/** Alley unless a legacy build flag or `?environment=` names street or beach. */
 export const ENVIRONMENT_THEME = resolveEnvironmentTheme(
-  import.meta.env.VITE_ENVIRONMENT_THEME,
-  import.meta.env.DEV && typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('environment') : undefined,
+  legacyLocations ? import.meta.env.VITE_ENVIRONMENT_THEME : 'alley',
+  typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('environment') : undefined,
 );

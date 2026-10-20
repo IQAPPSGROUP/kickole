@@ -67,6 +67,21 @@ public/models/environment/street/*.glb
   Original fence, lamp and spectator meshes, EXT_meshopt_compression.
   No downloaded character models. Rebuild with npm run build:street.
 
+public/models/env/alley_game.glb
+public/models/env/alley_game_low.glb
+  TurboSquid Standard licence, purchased by IQ Apps Group, not redistributable.
+  Optimised game copies only (Draco + WebP). The raw TurboSquid download
+  is not in this repository. These files ship inside the Kickolé app and
+  the web build. They are not part of the environment kit, mod packs, or
+  standalone downloads. The phone file is the same meshes with smaller
+  textures. Rebuild it with `node tools/build_alley_low.mjs`.
+
+public/textures/alley/homecoming_1k.hdr
+public/textures/alley/alley_sky.jpg
+  Poly Haven homecoming_center_rooftop, 1K HDR and a tone-mapped JPEG, CC0.
+  https://polyhaven.com/a/homecoming_center_rooftop
+  Sunny Cape Town skyline behind the open side of the alley.
+
 Quaternius sources still in this folder
 ---------------------------------------
 kickole_player_v2.glb and kickole_player_v3.glb are derived from the

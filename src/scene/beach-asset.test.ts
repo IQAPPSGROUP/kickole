@@ -16,11 +16,13 @@ describe('beach visual theme',()=>{
   it('keeps carnival cloth behind the rope and in front of the goal',()=>{
     expect(beachCarnivalClearOfPlay()).toBe(true);
   });
-  it('preserves street by default and only accepts the explicit beach theme',()=>{
-    expect(resolveEnvironmentTheme()).toBe('street');
-    expect(resolveEnvironmentTheme('anything')).toBe('street');
+  it('ships the alley unless a legacy theme is named',()=>{
+    expect(resolveEnvironmentTheme()).toBe('alley');
+    expect(resolveEnvironmentTheme('anything')).toBe('alley');
+    expect(resolveEnvironmentTheme('alley')).toBe('alley');
     expect(resolveEnvironmentTheme('beach')).toBe('beach');
-    expect(resolveEnvironmentTheme('street','beach')).toBe('beach');
+    expect(resolveEnvironmentTheme('street')).toBe('street');
+    expect(resolveEnvironmentTheme('alley','beach')).toBe('beach');
     expect(resolveEnvironmentTheme('beach','street')).toBe('street');
   });
   it('keeps all backdrop geometry behind play and within descending mobile budgets',()=>{

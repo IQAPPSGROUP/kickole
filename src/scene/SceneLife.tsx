@@ -17,15 +17,16 @@ const CROWD = ['#FF4F9A', '#FFD93D', '#00B8A9', '#6C5CE7', '#FF8A5B', '#F8F9FB']
 export function SceneLife({ engine, quality }: { engine: GameEngine; quality: Quality }) {
   const reduced = prefersReducedMotion();
   const budget = sceneLifeBudget(quality, reduced);
+  const legacy = ENVIRONMENT_THEME !== 'alley';
   return (
     <group>
       {ENVIRONMENT_THEME === 'beach' && <Crowd count={budget.crowd} engine={engine} reduced={reduced} />}
-      <Palms count={budget.palms} sway={budget.buntingSway} />
-      <Flags count={budget.flags} sway={budget.buntingSway} />
-      <Clouds count={budget.clouds} drift={budget.cameraSway} />
-      {budget.birds > 0 && <Birds count={budget.birds} />}
-      {budget.balloons > 0 && <Balloons count={budget.balloons} />}
-      {budget.lightSweep && <LightSweep />}
+      {legacy && <Palms count={budget.palms} sway={budget.buntingSway} />}
+      {legacy && <Flags count={budget.flags} sway={budget.buntingSway} />}
+      {legacy && <Clouds count={budget.clouds} drift={budget.cameraSway} />}
+      {legacy && budget.birds > 0 && <Birds count={budget.birds} />}
+      {legacy && budget.balloons > 0 && <Balloons count={budget.balloons} />}
+      {legacy && budget.lightSweep && <LightSweep />}
     </group>
   );
 }

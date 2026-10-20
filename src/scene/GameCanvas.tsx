@@ -15,6 +15,8 @@ import { fx } from './fx';
 import { KeyLight } from './KeyLight';
 import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
+import { AlleySky } from './AlleySky';
+import { ALLEY_VIEWS, alleyViewFromSearch } from './alleyLayout';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
 import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
@@ -49,6 +51,13 @@ interface Kickcam {
 }
 
 function devKickcam(): Kickcam | null {
+  if (typeof location !== 'undefined') {
+    const view = alleyViewFromSearch(location.search);
+    if (view) {
+      const framed = ALLEY_VIEWS[view];
+      return { fov: framed.fov, pos: [...framed.position], look: [...framed.look] };
+    }
+  }
   if (!import.meta.env.DEV) return null;
   return (window as unknown as { __kickcam?: Kickcam | null }).__kickcam ?? null;
 }
@@ -329,18 +338,19 @@ function forcedTier(): Quality | null {
 }
 
 function World({ controller, skin, quality, onReady }: SceneProps) {
-  const street = ENVIRONMENT_THEME !== 'beach';
+  const alley = ENVIRONMENT_THEME === 'alley';
+  const street = ENVIRONMENT_THEME === 'street';
   const profile = profileFor(quality);
   const shadows = profile.shadows !== 'none';
   useEffect(() => { onReady(); }, [onReady]);
-  const postProfile = street ? profile : { ...profile, bloom: false, dof: false };
+  const postProfile = ENVIRONMENT_THEME === 'beach' ? { ...profile, bloom: false, dof: false } : profile;
   return (
     <>
       <StreetTone exposure={STREET_EXPOSURE} />
-      <color attach="background" args={['#1a6fd0']} />
-      <CarnivalSky />
+      <color attach="background" args={[alley ? '#8ec6ef' : '#1a6fd0']} />
+      {alley ? <AlleySky quality={quality} /> : <CarnivalSky />}
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {(street || profile.sky !== 'flat') && <SunnyIbl ibl={profile.ibl} />}
+      {!alley && (street || profile.sky !== 'flat') && <SunnyIbl ibl={profile.ibl} />}
       <Simulation controller={controller} />
       <PerfProbe />
       <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />

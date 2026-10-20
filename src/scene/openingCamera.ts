@@ -27,24 +27,39 @@ function easeInOutCubic(t: number) {
 function keysFor(theme: EnvironmentTheme, end: Vector3): Key[] {
   const ex = end.x, ey = end.y, ez = end.z;
   const endTarget = [GAMEPLAY_TARGET.x, GAMEPLAY_TARGET.y, GAMEPLAY_TARGET.z] as const;
-  if (theme === 'beach') {
-    // Palms / kiosk / tower sit behind the court on −Z; stay on the +Z side and look over the wall.
-    return [
-      { u: 0, pos: [ex + 2.35, ey + 2.05, ez + 0.55], target: [-3.4, 2.55, -9.8], fov: 44 },
-      { u: 0.26, pos: [ex + 0.85, ey + 2.4, ez + 1.05], target: [0.2, 2.85, -11.2], fov: 43 },
-      { u: 0.52, pos: [ex - 1.75, ey + 1.9, ez + 0.45], target: [3.1, 2.35, -8.6], fov: 42 },
-      { u: 0.76, pos: [ex - 0.4, ey + 0.75, ez + 0.18], target: [0.25, 1.6, -2.0], fov: 41 },
-      { u: 1, pos: [ex, ey, ez], target: endTarget, fov: GAMEPLAY_FOV },
-    ];
+  switch (theme) {
+    case 'beach':
+      // Palms / kiosk / tower sit behind the court on −Z; stay on the +Z side and look over the wall.
+      return [
+        { u: 0, pos: [ex + 2.35, ey + 2.05, ez + 0.55], target: [-3.4, 2.55, -9.8], fov: 44 },
+        { u: 0.26, pos: [ex + 0.85, ey + 2.4, ez + 1.05], target: [0.2, 2.85, -11.2], fov: 43 },
+        { u: 0.52, pos: [ex - 1.75, ey + 1.9, ez + 0.45], target: [3.1, 2.35, -8.6], fov: 42 },
+        { u: 0.76, pos: [ex - 0.4, ey + 0.75, ez + 0.18], target: [0.25, 1.6, -2.0], fov: 41 },
+        { u: 1, pos: [ex, ey, ez], target: endTarget, fov: GAMEPLAY_FOV },
+      ];
+    case 'street':
+      // Elevated hillside facade sweep, still facing the pastel fronts.
+      return [
+        { u: 0, pos: [ex + 2.15, ey + 2.35, ez + 0.5], target: [-2.8, 3.4, -10.2], fov: 44 },
+        { u: 0.32, pos: [ex - 0.15, ey + 2.55, ez + 0.95], target: [0.6, 3.7, -11.5], fov: 43 },
+        { u: 0.58, pos: [ex - 1.85, ey + 1.75, ez + 0.35], target: [2.4, 2.9, -8.2], fov: 42 },
+        { u: 0.8, pos: [ex - 0.3, ey + 0.6, ez + 0.12], target: [0.15, 1.55, -1.6], fov: 41 },
+        { u: 1, pos: [ex, ey, ez], target: endTarget, fov: GAMEPLAY_FOV },
+      ];
+    case 'alley':
+      // Brick corner, fence and dumpster, then the gameplay camera.
+      return [
+        { u: 0, pos: [ex + 1.4, ey + 1.6, ez + 0.4], target: [1.8, 2.1, -6.6], fov: 44 },
+        { u: 0.34, pos: [ex - 0.2, ey + 1.9, ez + 0.7], target: [0.2, 2.4, -7.2], fov: 43 },
+        { u: 0.62, pos: [ex - 1.5, ey + 1.2, ez + 0.25], target: [2.2, 1.8, -5.4], fov: 42 },
+        { u: 0.82, pos: [ex - 0.25, ey + 0.45, ez + 0.1], target: [0.2, 1.4, -2.2], fov: 41 },
+        { u: 1, pos: [ex, ey, ez], target: endTarget, fov: GAMEPLAY_FOV },
+      ];
+    default: {
+      const neverTheme: never = theme;
+      return neverTheme;
+    }
   }
-  // Street: elevated hillside facade sweep, still facing the pastel fronts.
-  return [
-    { u: 0, pos: [ex + 2.15, ey + 2.35, ez + 0.5], target: [-2.8, 3.4, -10.2], fov: 44 },
-    { u: 0.32, pos: [ex - 0.15, ey + 2.55, ez + 0.95], target: [0.6, 3.7, -11.5], fov: 43 },
-    { u: 0.58, pos: [ex - 1.85, ey + 1.75, ez + 0.35], target: [2.4, 2.9, -8.2], fov: 42 },
-    { u: 0.8, pos: [ex - 0.3, ey + 0.6, ez + 0.12], target: [0.15, 1.55, -1.6], fov: 41 },
-    { u: 1, pos: [ex, ey, ez], target: endTarget, fov: GAMEPLAY_FOV },
-  ];
 }
 
 const tmpA = new Vector3();

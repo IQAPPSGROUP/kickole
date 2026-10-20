@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
 import { AgXToneMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
@@ -6,18 +6,30 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
-import type { Quality } from '../game/storage';
+import type { GraphicsChoice, Quality } from '../game/storage';
 import { CharacterSwitch } from './CharacterSwitch';
 import { Ball } from './Ball';
 import { Court } from './Court';
 import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
+import { KeyLight } from './KeyLight';
 import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
-import { detectTier, fallbackTier, profileFor, readDevice, rendererShadows, startingTier } from './qualityTier';
+import { installPcss, restorePcss } from './pcss';
+import {
+  createFpsGuard,
+  detectTier,
+  getDeviceSnapshot,
+  profileFor,
+  publishRunningTier,
+  rememberGpu,
+  resolveTier,
+  stepFpsGuard,
+  subscribeDevice,
+} from './qualityTier';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
 import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
@@ -185,7 +197,7 @@ function StreetTone() {
   const gl = useThree((state) => state.gl);
   useEffect(() => {
     gl.toneMapping = AgXToneMapping;
-    gl.toneMappingExposure = 1;
+    gl.toneMappingExposure = 1.05;
   }, [gl]);
   return null;
 }
@@ -224,16 +236,39 @@ function SunsetIbl({ sky }: { sky: 'hdri' | 'reflect' }) {
 }
 
 function FpsWatch({ tier, onTier }: { tier: Quality; onTier: (next: Quality) => void }) {
+  const guard = useMemo(() => createFpsGuard(), []);
   const samples = useMemo(() => [] as number[], []);
   useFrame((_, dt) => {
-    if (dt <= 0 || dt > 0.5) return;
-    samples.push(1000 / (dt * 1000));
-    if (samples.length < 45) return;
-    const fps = samples.reduce((sum, n) => sum + n, 0) / samples.length;
-    samples.length = 0;
-    const next = fallbackTier(tier, fps);
+    if (dt <= 0 || dt > 0.5) {
+      guard.underSec = 0;
+      samples.length = 0;
+      return;
+    }
+    samples.push(dt);
+    let span = 0;
+    for (let i = samples.length - 1; i >= 0; i--) {
+      span += samples[i];
+      if (span >= 1) {
+        samples.splice(0, i);
+        break;
+      }
+    }
+    const total = samples.reduce((sum, n) => sum + n, 0);
+    const fps = samples.length / total;
+    const next = stepFpsGuard(guard, tier, fps, dt);
     if (next !== tier) onTier(next);
   });
+  return null;
+}
+
+function GpuProbe() {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    const context = gl.getContext();
+    const info = context.getExtension('WEBGL_debug_renderer_info');
+    const renderer = info ? context.getParameter(info.UNMASKED_RENDERER_WEBGL) : '';
+    rememberGpu(typeof renderer === 'string' ? renderer : '');
+  }, [gl]);
   return null;
 }
 
@@ -262,9 +297,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const profile = profileFor(quality);
   const shadows = street ? profile.shadows !== 'none' : quality !== 'low';
   useEffect(() => { onReady(); }, [onReady]);
-  const mapSize = street ? (profile.shadowMap || 512) : quality === 'high' ? 1024 : 512;
-  const wide = street && profile.shadows === 'cascaded';
-  const post = street && (profile.ssao || profile.bloom || profile.dof || profile.fxaa);
+  const post = street && (profile.ssao || profile.bloom || profile.dof || profile.aa !== 'none');
   return (
     <>
       {street && <StreetTone />}
@@ -279,35 +312,35 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
         <>
           <hemisphereLight args={['#ffd2a8', '#1c1614', 0.28]} />
           <directionalLight position={[-4.2, 3.2, -2]} intensity={0.22} color="#8aa4c8" />
+          <KeyLight quality={quality} engine={controller.engine} />
         </>
       ) : (
         <>
           <hemisphereLight args={['#fff1dc', '#12363f', 0.95]} />
           <ambientLight intensity={0.32} />
+          <directionalLight
+            position={[2.6, 7, 3.2]}
+            intensity={2.3}
+            color="#ffe9c7"
+            castShadow={shadows}
+            shadow-mapSize={[quality === 'high' ? 1024 : 512, quality === 'high' ? 1024 : 512]}
+            shadow-camera-left={-3}
+            shadow-camera-right={3}
+            shadow-camera-top={4}
+            shadow-camera-bottom={-3}
+            shadow-camera-near={1}
+            shadow-camera-far={14}
+            shadow-bias={-0.0004}
+            shadow-radius={quality === 'high' ? 3 : 1}
+          />
         </>
       )}
-      <directionalLight
-        position={street ? [6.2, 8.4, 2.4] : [2.6, 7, 3.2]}
-        intensity={street ? 3.4 : 2.3}
-        color={street ? '#ffe2b0' : '#ffe9c7'}
-        castShadow={shadows}
-        shadow-mapSize={[mapSize, mapSize]}
-        shadow-camera-left={wide ? -6 : -3}
-        shadow-camera-right={wide ? 6 : 3}
-        shadow-camera-top={wide ? 6 : 4}
-        shadow-camera-bottom={wide ? -4 : -3}
-        shadow-camera-near={1}
-        shadow-camera-far={street ? 22 : 14}
-        shadow-bias={profile.shadowFilter === 'variance' ? -0.0008 : -0.0004}
-        shadow-normalBias={profile.shadowFilter === 'variance' ? 0.03 : 0}
-        shadow-radius={profile.shadowFilter === 'variance' ? 8 : wide ? 3 : 1}
-      />
       <Court shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
       {((street && profile.contactShadows) || (!street && quality === 'high')) && (
         <ContactShadows
           position={[0, 0.006, 0.2]}
-          opacity={street ? 0.45 : 0.38}
+          opacity={street ? (profile.shadowFilter === 'pcss' ? 0.22 : 0.4) : 0.38}
           scale={4}
           blur={2.2}
           far={1.2}
@@ -349,17 +382,21 @@ function GlError({ message }: { message: string }) {
   );
 }
 
-export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
+export function GameCanvas({ controller, skin, graphics }: { controller: GameController; skin: Skin; graphics: GraphicsChoice }) {
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
   const street = ENVIRONMENT_THEME !== 'beach';
-  const detected = useMemo(() => readDevice(), []);
+  const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
+  const detected = useMemo(() => detectTier(device), [device]);
   const forced = useMemo(() => forcedTier(), []);
-  const [tier, setTier] = useState<Quality>(() => forced ?? (street ? startingTier(props.quality, detectTier(detected)) : props.quality));
+  const requested = forced ?? resolveTier(graphics, detected);
+  const [tier, setTier] = useState<Quality>(requested);
+  useEffect(() => { setTier(requested); }, [requested]);
   useEffect(() => {
-    setTier(forced ?? (street ? startingTier(props.quality, detectTier(detected)) : props.quality));
-  }, [props.quality, detected, forced, street]);
+    publishRunningTier(tier);
+    (globalThis as { __KICKOLE_TIER?: Quality }).__KICKOLE_TIER = tier;
+  }, [tier]);
   const markReady = useCallback(() => setReady(true), []);
   const markLost = useCallback(() => setLost(true), []);
 
@@ -367,26 +404,34 @@ export function GameCanvas(props: Omit<SceneProps, 'onReady'>) {
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
 
   const profile = profileFor(tier);
-  const dpr = street ? profile.dpr : (props.quality === 'low' ? [1, 1] : props.quality === 'medium' ? [1, 1.25] : [1, 1.5]) as [number, number];
-  const shadowsOn = street ? profile.shadows !== 'none' : props.quality !== 'low';
+  if (street && profile.shadowFilter === 'pcss') installPcss();
+  else restorePcss();
+  const dpr = street ? profile.dpr : (tier === 'low' ? [1, 1] : tier === 'medium' ? [1, 1.25] : [1, 1.5]) as [number, number];
+  const shadowsOn = street ? profile.shadows !== 'none' : tier !== 'low';
+  const shadowType = !shadowsOn
+    ? false
+    : street
+      ? (profile.shadowFilter === 'pcss' ? 'basic' : 'variance')
+      : 'percentage';
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}
       {tier !== 'low' && <div className="vignette" />}
       <Canvas
         key={tier}
-        shadows={rendererShadows(profile.shadowFilter, shadowsOn)}
+        shadows={shadowType}
         dpr={dpr}
         gl={{
-          antialias: street ? !profile.fxaa : props.quality !== 'low',
+          antialias: street ? profile.aa === 'none' : tier !== 'low',
           powerPreference: 'high-performance',
-          ...(street ? { toneMapping: AgXToneMapping } : {}),
+          ...(street ? { toneMapping: AgXToneMapping, toneMappingExposure: 1.05 } : {}),
         }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >
         <ContextLossGuard onLost={markLost} />
-        {street && !forced && <FpsWatch tier={tier} onTier={setTier} />}
-        <World {...props} quality={tier} onReady={markReady} />
+        <GpuProbe />
+        {!forced && <FpsWatch tier={tier} onTier={setTier} />}
+        <World controller={controller} skin={skin} quality={tier} onReady={markReady} />
       </Canvas>
     </Boundary>
   );

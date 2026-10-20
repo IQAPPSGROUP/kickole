@@ -19,6 +19,9 @@ export interface RunRecord {
 
 export type Quality = 'low' | 'medium' | 'high';
 
+/** Auto follows the GPU. The other three are a saved choice. */
+export type GraphicsChoice = 'auto' | Quality;
+
 export interface Settings {
   /** Master mute. Music and effects also have their own switches. */
   sound: boolean;
@@ -29,6 +32,9 @@ export interface Settings {
   vibration: boolean;
   /** On-screen trick prompts, glowing controls and tutorial tips. */
   hints: boolean;
+  /** Saved graphics choice. Auto lets the device pick the tier. */
+  graphics: GraphicsChoice;
+  /** Explicit tier. Kept in step with graphics when the player picks Low, Medium, or High. */
   quality: Quality;
   /** @deprecated Prefer wardrobe kit + appearance; kept for migration. */
   skinId: string;
@@ -50,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sfx: true,
   vibration: true,
   hints: true,
+  graphics: 'auto',
   quality: 'high',
   skinId: 'kicky-teal',
 };
@@ -136,15 +143,43 @@ export function persistSave(save: SaveData) {
   write(SAVE_KEY, save);
 }
 
+function isQuality(value: unknown): value is Quality {
+  return value === 'low' || value === 'medium' || value === 'high';
+}
+
+function isGraphics(value: unknown): value is GraphicsChoice {
+  return value === 'auto' || isQuality(value);
+}
+
+/**
+ * Missing graphics means an older save. Low and Medium were explicit choices.
+ * High was the old default, so it becomes Auto and the device decides.
+ */
+export function graphicsFromSaved(raw: { graphics?: unknown; quality?: unknown }): GraphicsChoice {
+  if (isGraphics(raw.graphics)) return raw.graphics;
+  if (raw.quality === 'low' || raw.quality === 'medium') return raw.quality;
+  return 'auto';
+}
+
+/** Keep the saved choice and the legacy quality field pointing at the same tier. */
+export function applyGraphicsPatch(current: Settings, patch: Partial<Settings>): Settings {
+  const next: Settings = { ...current, ...patch };
+  if (patch.graphics && patch.graphics !== 'auto') next.quality = patch.graphics;
+  else if (patch.quality && patch.graphics === undefined) next.graphics = patch.quality;
+  return next;
+}
+
 export function loadSettings(): Settings {
   const d = read<Settings>(SETTINGS_KEY) ?? {};
+  const graphics = graphicsFromSaved(d);
   return {
     sound: typeof d.sound === 'boolean' ? d.sound : DEFAULT_SETTINGS.sound,
     music: typeof d.music === 'boolean' ? d.music : DEFAULT_SETTINGS.music,
     sfx: typeof d.sfx === 'boolean' ? d.sfx : DEFAULT_SETTINGS.sfx,
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
     hints: typeof d.hints === 'boolean' ? d.hints : DEFAULT_SETTINGS.hints,
-    quality: d.quality === 'low' || d.quality === 'medium' || d.quality === 'high' ? d.quality : DEFAULT_SETTINGS.quality,
+    graphics,
+    quality: graphics !== 'auto' ? graphics : (isQuality(d.quality) ? d.quality : DEFAULT_SETTINGS.quality),
     skinId: typeof d.skinId === 'string' ? d.skinId : DEFAULT_SETTINGS.skinId,
   };
 }

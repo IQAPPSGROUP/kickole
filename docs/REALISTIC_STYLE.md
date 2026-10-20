@@ -18,18 +18,18 @@ The ball is a clear-coat leather sphere with a stitched normal map and panel tin
 
 ## Rendering tiers
 
-Saved graphics quality is a ceiling. `detectTier` can only go lower, and `fallbackTier` drops high under 55 fps and any tier under 30 fps without writing settings. `?tier=low|medium|high` forces a tier for captures.
+Graphics defaults to Auto. `detectTier` reads the GPU name when the browser exposes it, and otherwise the core and memory hints. Low, Medium and High in Settings are a saved choice and are not clamped by the device. `stepFpsGuard` drops one runtime tier after the frame rate stays under 30 for five seconds, without writing settings. `?tier=low|medium|high` forces a tier for captures and skips the guard.
 
 | | Low | Medium | High |
 | --- | --- | --- | --- |
 | Player | LOD1 | LOD0 | LOD0 |
-| Shadows | off | one 512 map | soft 1024 map, wider frustum |
-| Contact shadows | off | on | on |
+| Shadows | off | variance, 512 map, tight box | PCSS, 1024 map, tighter box on the player |
+| Contact shadows | off | on | light, under the PCSS contact |
 | IBL | off | sunset HDR | sunset HDR |
-| Post | hardware AA | FXAA, LUT, AgX | SSAO, bloom, replay DOF, FXAA, LUT, AgX |
+| Post | hardware AA, AgX | FXAA, LUT, AgX | SSAO, bloom, title and celebration DOF, SMAA, LUT, AgX |
 | Crowd | 8 | 16 | 28 |
 
-AgX tone mapping is applied on the street theme. Depth of field turns on only while `phase === 'over'`. Ground contact is the contact-shadow pass plus a high-tier depth darkening that writes the next buffer as beauty times a clamped occlusion, so a missing depth sample leaves the colour unchanged. Bloom is the same kind of write: the beauty sample plus a blurred highlight, not an in-place blend onto the colour target.
+AgX tone mapping is applied on the street theme. The colour LUT runs after AgX. Depth of field is on for the title (`menu`), a milestone celebration, and the game-over hold. SSAO is a hemisphere sample of the depth buffer; a failed depth target copies the colour through. Bloom adds a blurred highlight on top of the beauty pass. PCSS replaces the basic shadow function: a blocker search widens the penumbra, and the ortho box stays on the player.
 
 ## Download
 

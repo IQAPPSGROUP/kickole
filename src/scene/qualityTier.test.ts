@@ -1,43 +1,78 @@
 import { describe, expect, it } from 'vitest';
 import { characterModelUrl } from './rig';
-import { characterLod, detectTier, fallbackTier, profileFor, startingTier } from './qualityTier';
+import {
+  characterLod,
+  createFpsGuard,
+  detectTier,
+  gpuTier,
+  profileFor,
+  resolveTier,
+  stepFpsGuard,
+} from './qualityTier';
 
 describe('quality tiers', () => {
-  it('detects low, mid and high devices', () => {
+  it('detects low, mid and high devices from the CPU when the GPU is unknown', () => {
     expect(detectTier({ cores: 4, memoryGb: 2 })).toBe('low');
     expect(detectTier({ cores: 6, memoryGb: 4 })).toBe('medium');
     expect(detectTier({ cores: 8, memoryGb: 8 })).toBe('high');
     expect(detectTier({ cores: 8 })).toBe('high');
-    expect(detectTier({
-      cores: 4,
-      memoryGb: 4,
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
-      screenWidth: 393,
-      dpr: 3,
-    })).toBe('high');
-    expect(detectTier({
-      cores: 4,
-      memoryGb: 2,
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
-      screenWidth: 375,
-      dpr: 2,
-    })).toBe('medium');
-    expect(detectTier({ cores: 8, memoryGb: 6, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8)' })).toBe('high');
-    expect(detectTier({ cores: 4, memoryGb: 3, userAgent: 'Mozilla/5.0 (Linux; Android 12)' })).toBe('low');
   });
 
-  it('treats the saved quality as a ceiling', () => {
-    expect(startingTier('high', 'low')).toBe('low');
-    expect(startingTier('low', 'high')).toBe('low');
-    expect(startingTier('medium', 'high')).toBe('medium');
+  it('classifies GPU names and lets a weak GPU win', () => {
+    expect(gpuTier('ANGLE (NVIDIA, NVIDIA GeForce RTX 4070)')).toBe('high');
+    expect(gpuTier('ANGLE (Apple, ANGLE Metal Renderer: Apple M2, Unspecified Version)')).toBe('high');
+    expect(gpuTier('Apple GPU')).toBe('high');
+    expect(gpuTier('Adreno (TM) 740')).toBe('high');
+    expect(gpuTier('Adreno (TM) 610')).toBe('medium');
+    expect(gpuTier('Adreno (TM) 505')).toBe('low');
+    expect(gpuTier('Mali-G78')).toBe('high');
+    expect(gpuTier('Mali-G52')).toBe('medium');
+    expect(gpuTier('Mali-T880')).toBe('low');
+    expect(gpuTier('Intel(R) Iris(R) Xe Graphics')).toBe('high');
+    expect(gpuTier('Intel(R) UHD Graphics')).toBe('medium');
+    expect(gpuTier('Intel(R) HD Graphics 4000')).toBe('low');
+    expect(gpuTier('llvmpipe (LLVM 15.0.7, 256 bits)')).toBe('low');
+    expect(gpuTier('')).toBeNull();
+    expect(detectTier({ cores: 16, memoryGb: 16, gpu: 'llvmpipe' })).toBe('low');
+    expect(detectTier({ cores: 8, memoryGb: 8, gpu: 'NVIDIA GeForce RTX 3060' })).toBe('high');
+    expect(detectTier({ cores: 6, memoryGb: 4, gpu: 'Apple GPU' })).toBe('medium');
+    expect(detectTier({ cores: 8, memoryGb: 8, gpu: 'Adreno (TM) 505' })).toBe('low');
   });
 
-  it('drops high below 60 fps and every tier below a 30 fps floor', () => {
-    expect(fallbackTier('high', 59)).toBe('high');
-    expect(fallbackTier('high', 48)).toBe('medium');
-    expect(fallbackTier('medium', 31)).toBe('medium');
-    expect(fallbackTier('medium', 24)).toBe('low');
-    expect(fallbackTier('low', 18)).toBe('low');
+  it('uses auto as the device tier and an explicit choice as the saved tier', () => {
+    expect(resolveTier('auto', 'low')).toBe('low');
+    expect(resolveTier('auto', 'high')).toBe('high');
+    expect(resolveTier('high', 'low')).toBe('high');
+    expect(resolveTier('low', 'high')).toBe('low');
+    expect(resolveTier('medium', 'high')).toBe('medium');
+  });
+
+  it('drops one tier only after five seconds under 30 fps', () => {
+    const high = createFpsGuard();
+    expect(stepFpsGuard(high, 'high', 48, 0.2)).toBe('high');
+    let tier: 'low' | 'medium' | 'high' = 'high';
+    for (let i = 0; i < 24; i++) tier = stepFpsGuard(high, tier, 20, 0.2);
+    expect(tier).toBe('high');
+    expect(high.underSec).toBeCloseTo(4.8);
+    expect(stepFpsGuard(high, tier, 20, 0.2)).toBe('medium');
+
+    const recovered = createFpsGuard();
+    for (let i = 0; i < 20; i++) stepFpsGuard(recovered, 'medium', 18, 0.2);
+    expect(stepFpsGuard(recovered, 'medium', 36, 0.016)).toBe('medium');
+    expect(recovered.underSec).toBe(0);
+    for (let i = 0; i < 24; i++) stepFpsGuard(recovered, 'medium', 18, 0.2);
+    expect(recovered.underSec).toBeCloseTo(4.8);
+
+    const stalled = createFpsGuard();
+    for (let i = 0; i < 10; i++) stepFpsGuard(stalled, 'high', 10, 0.2);
+    expect(stepFpsGuard(stalled, 'high', 10, 2)).toBe('high');
+    expect(stalled.underSec).toBe(0);
+
+    const floor = createFpsGuard();
+    expect(stepFpsGuard(floor, 'low', 12, 0.2)).toBe('low');
+    let dropped: 'low' | 'medium' | 'high' = 'medium';
+    for (let i = 0; i < 25; i++) dropped = stepFpsGuard(floor, dropped, 12, 0.2);
+    expect(dropped).toBe('low');
   });
 
   it('selects the heavy player on mid and high, and the mobile LOD on low', () => {
@@ -45,31 +80,18 @@ describe('quality tiers', () => {
     expect(characterLod('medium')).toBe(0);
     expect(characterLod('low')).toBe(1);
     expect(profileFor('low').ssao).toBe(false);
-    expect(profileFor('high').shadows).toBe('cascaded');
+    expect(profileFor('low').aa).toBe('none');
+    expect(profileFor('high').shadows).toBe('tight');
+    expect(profileFor('high').shadowFilter).toBe('pcss');
+    expect(profileFor('medium').shadowFilter).toBe('vsm');
     expect(profileFor('medium').ibl).toBe(true);
     expect(profileFor('medium').bloom).toBe(false);
+    expect(profileFor('medium').aa).toBe('fxaa');
     expect(profileFor('high').ssao).toBe(true);
     expect(profileFor('high').bloom).toBe(true);
     expect(profileFor('high').dof).toBe(true);
-    expect(profileFor('high').shadowFilter).toBe('variance');
-    expect(profileFor('medium').shadowFilter).toBe('soft');
-    expect(profileFor('low').shadowFilter).toBe('none');
-    expect(profileFor('high').courtMaps).toBe('full');
-    expect(profileFor('high').fence).toBe('link');
-    expect(profileFor('high').sky).toBe('hdri');
-    expect(profileFor('high').lamp).toBe('lit');
-    expect(profileFor('high').crowdIdle).toBe(true);
-    expect(profileFor('medium').courtMaps).toBe('rough');
-    expect(profileFor('medium').fence).toBe('sparse');
-    expect(profileFor('medium').sky).toBe('reflect');
-    expect(profileFor('medium').decals).toBe(true);
-    expect(profileFor('low').courtMaps).toBe('color');
-    expect(profileFor('low').fence).toBe('plane');
-    expect(profileFor('low').sky).toBe('flat');
-    expect(profileFor('low').decals).toBe(false);
-    expect(profileFor('low').crowdIdle).toBe(false);
-    expect(profileFor('high').crowd).toBeGreaterThan(profileFor('medium').crowd);
-    expect(profileFor('medium').crowd).toBeGreaterThan(profileFor('low').crowd);
+    expect(profileFor('high').aa).toBe('smaa');
+    expect(profileFor('high').shadowExtent).toBeLessThan(profileFor('medium').shadowExtent);
     expect(characterModelUrl(0)).toMatch(/kickole_player_v4\.glb$/);
     expect(characterModelUrl(1)).toMatch(/kickole_player_v4_lod1\.glb$/);
     expect(characterModelUrl(0, 'female')).toMatch(/kickole_player_v4_female\.glb$/);

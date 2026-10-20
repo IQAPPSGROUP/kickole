@@ -64,7 +64,10 @@ export function useStreetMaps(colorUrl: string | null, normalUrl: string | null,
 export interface StreetNode {
   name: string;
   geometry: BufferGeometry;
+  /** Node translation. Meshopt recenters the vertices, so this is the part's real center. */
   pivot: [number, number, number];
+  /** Node scale that restores the recentered vertices to meters. */
+  scale: [number, number, number];
 }
 
 /** Meshopt GLB. Geometries stay on the component until the tier canvas remounts. */
@@ -86,6 +89,7 @@ export function useStreetNodes(url: string | null): StreetNode[] {
           name: mesh.name || pivotNode.name,
           geometry: mesh.geometry,
           pivot: [pivotNode.position.x, pivotNode.position.y, pivotNode.position.z],
+          scale: [pivotNode.scale.x, pivotNode.scale.y, pivotNode.scale.z],
         });
       });
       setNodes(found);

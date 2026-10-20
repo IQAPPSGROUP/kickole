@@ -5,7 +5,7 @@
  *   Poly Haven asphalt_02 — public/textures/street/asphalt_*.jpg
  *   Poly Haven concrete_wall_001 — public/textures/street/concrete_*.jpg
  *   Poly Haven concrete_floor_damaged_01 — fetched into a temp folder, not committed
- *   Poly Haven venice_sunset — public/textures/venice_sunset_1k.hdr (used at runtime, not re-encoded)
+ *   Poly Haven sunflowers_puresky — public/textures/sunflowers_puresky_1k.hdr (sunny daytime sky, not re-encoded)
  * Paint, wear, court lines, graffiti, fence, lamps and the crowd are original.
  *
  * Outputs KTX2 (toktx) and meshopt GLBs. Run: npm run build:street
@@ -195,21 +195,50 @@ function paintCourt(size: number, asphalt: Buffer, asphaltN: Buffer, asphaltR: B
         rough[o] = rough[o + 1] = rough[o + 2] = mix(rough[o], 200, t * 2);
       }
       if (wz < -2.5) {
-        const t = Math.min(0.45, (-2.5 - wz) / 3);
+        const t = Math.min(0.12, (-2.5 - wz) / 10);
         for (let c = 0; c < 3; c++) color[o + c] = color[o + c] * (1 - t);
       }
       if (Math.abs(wx) > 3.4) {
-        const t = Math.min(0.35, (Math.abs(wx) - 3.4) / 2);
+        const t = Math.min(0.1, (Math.abs(wx) - 3.4) / 6);
         for (let c = 0; c < 3; c++) color[o + c] = color[o + c] * (1 - t);
       }
     }
   }
 
+  liftColor(color, 1.85, 34);
+  softenRough(rough, 0.68);
   return { color, normal, rough, size };
+}
+
+/** Warm, light grade so the court reads in sun instead of as dusk asphalt. */
+function liftColor(buf: Buffer, gain: number, bias: number) {
+  for (let i = 0; i < buf.length; i += 3) {
+    buf[i] = Math.min(255, Math.round(buf[i] * gain + bias));
+    buf[i + 1] = Math.min(255, Math.round(buf[i + 1] * gain * 0.98 + bias * 0.9));
+    buf[i + 2] = Math.min(255, Math.round(buf[i + 2] * gain * 0.9 + bias * 0.62));
+  }
+}
+
+function softenRough(buf: Buffer, scale: number) {
+  for (let i = 0; i < buf.length; i += 3) {
+    const value = Math.max(42, Math.min(210, Math.round(buf[i] * scale)));
+    buf[i] = buf[i + 1] = buf[i + 2] = value;
+  }
 }
 
 const MURAL = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="2048" height="592" viewBox="0 0 2048 592" xmlns="http://www.w3.org/2000/svg">
+  <rect width="2048" height="592" fill="#fff6e4" opacity="0.22"/>
+  <g>
+    <polygon points="80,18 140,18 110,78" fill="#ff4f9a"/>
+    <polygon points="150,18 210,18 180,78" fill="#ffd93d"/>
+    <polygon points="220,18 280,18 250,78" fill="#2ee6d6"/>
+    <polygon points="290,18 350,18 320,78" fill="#7c6bff"/>
+    <polygon points="1680,18 1740,18 1710,78" fill="#ff8a3d"/>
+    <polygon points="1750,18 1810,18 1780,78" fill="#5ee08a"/>
+    <polygon points="1820,18 1880,18 1850,78" fill="#ff4f9a"/>
+    <polygon points="1890,18 1950,18 1920,78" fill="#ffd93d"/>
+  </g>
   <g opacity="0.95">
     <path d="M70 470 C180 80 420 520 560 140" fill="none" stroke="#1a120e" stroke-width="70" stroke-linecap="round" opacity="0.35"/>
     <path d="M90 450 C200 110 400 490 540 170" fill="none" stroke="#d7b15a" stroke-width="28" stroke-linecap="round" opacity="0.8"/>
@@ -602,9 +631,9 @@ async function buildStreetAsphalt() {
   const size = 1024;
   const asphalt = await rawRgb(join(sources, 'asphalt_diff.jpg'), size, size);
   for (let i = 0; i < asphalt.length; i += 3) {
-    asphalt[i] = Math.min(255, Math.round(asphalt[i] * 1.12 + 8));
-    asphalt[i + 1] = Math.min(255, Math.round(asphalt[i + 1] * 1.08 + 6));
-    asphalt[i + 2] = Math.min(255, Math.round(asphalt[i + 2] * 1.02 + 3));
+    asphalt[i] = Math.min(255, Math.round(asphalt[i] * 1.72 + 36));
+    asphalt[i + 1] = Math.min(255, Math.round(asphalt[i + 1] * 1.66 + 32));
+    asphalt[i + 2] = Math.min(255, Math.round(asphalt[i + 2] * 1.5 + 22));
   }
   await encodeRgb(asphalt, size, size, 'srgb', 'etc1s', join(street, 'street_asphalt.ktx2'));
 }
@@ -648,6 +677,7 @@ async function main() {
   const wallW = 2048;
   const wallH = 592;
   const concrete = await rawRgb(join(sources, 'concrete_diff.jpg'), wallW, wallH);
+  liftColor(concrete, 1.22, 16);
   const concreteN = await rawRgb(join(sources, 'concrete_nor.jpg'), wallW, wallH);
   const concreteR = await rawRgb(join(sources, 'concrete_rough.jpg'), wallW, wallH);
   const mural = await sharp(Buffer.from(MURAL)).png().toBuffer();
@@ -662,6 +692,7 @@ async function main() {
   const wallLow = await sharp(wallColor, { raw: { width: wallW, height: wallH, channels: 3 } }).resize(wallLowW, wallLowH).removeAlpha().raw().toBuffer();
   const wallN = await sharp(concreteN, { raw: { width: wallW, height: wallH, channels: 3 } }).resize(1024, 296).removeAlpha().raw().toBuffer();
   const wallR = await sharp(concreteR, { raw: { width: wallW, height: wallH, channels: 3 } }).resize(1024, 296).removeAlpha().raw().toBuffer();
+  softenRough(wallR, 0.78);
   await encodeRgb(wallColor, wallW, wallH, 'srgb', 'etc1s', join(street, 'wall_color.ktx2'));
   await encodeRgb(wallN, 1024, 296, 'linear', 'uastc', join(street, 'wall_normal.ktx2'));
   await encodeRgb(wallR, 1024, 296, 'linear', 'etc1s', join(street, 'wall_rough.ktx2'));
@@ -685,12 +716,15 @@ async function main() {
   const c1024 = await rawRgb(join(sources, 'concrete_diff.jpg'), 1024, 1024);
   const cN = await rawRgb(join(sources, 'concrete_nor.jpg'), 512, 512);
   const cR = await rawRgb(join(sources, 'concrete_rough.jpg'), 512, 512);
+  liftColor(c1024, 1.24, 18);
+  softenRough(cR, 0.8);
   await encodeRgb(c1024, 1024, 1024, 'srgb', 'etc1s', join(street, 'concrete_color.ktx2'));
   await encodeRgb(cN, 512, 512, 'linear', 'uastc', join(street, 'concrete_normal.ktx2'));
   await encodeRgb(cR, 512, 512, 'linear', 'etc1s', join(street, 'concrete_rough.ktx2'));
 
   await encodeRgba(decalSkid(512), 512, 512, join(street, 'decal_skid.ktx2'));
   await encodeRgba(decalStencil(512), 512, 512, join(street, 'decal_stencil.ktx2'));
+  if (process.argv.includes('--maps-only')) return;
 
   const fence0 = fencePanel(0.16);
   const fence1 = fencePanel(0.32);
@@ -700,7 +734,7 @@ async function main() {
       'Poly Haven asphalt_02 CC0',
       'Poly Haven concrete_wall_001 CC0',
       'Poly Haven concrete_floor_damaged_01 CC0',
-      'Poly Haven venice_sunset CC0',
+      'Poly Haven sunflowers_puresky CC0',
       'Original paint, lines, graffiti, fence, lamp and crowd',
     ],
     fenceLod0: await writeGlb(join(models, 'fence-lod0.glb'), [

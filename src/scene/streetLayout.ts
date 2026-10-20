@@ -23,7 +23,7 @@ export const STREET_FILES = {
   crowdLod0: 'models/environment/street/crowd-lod0.glb',
   crowdLod1: 'models/environment/street/crowd-lod1.glb',
   crowdLod2: 'models/environment/street/crowd-lod2.glb',
-  hdri: 'textures/venice_sunset_1k.hdr',
+  hdri: 'textures/sunflowers_puresky_1k.hdr',
 } as const;
 
 export function streetUrl(file: string): string {
@@ -94,11 +94,11 @@ export interface Spectator {
   hatColor: string;
 }
 
-const SHIRTS = ['#c4534a', '#1f6f78', '#e6e1d6', '#243044', '#d7b15a', '#2c3338', '#3f6b4e', '#a85a32'];
-const SHORTS = ['#1c2430', '#2a3038', '#3d342c', '#1e2a5a'];
+const SHIRTS = ['#ff4f9a', '#ffd93d', '#2ee6d6', '#ffffff', '#ff8a3d', '#7c6bff', '#5ee08a', '#ff5a4e'];
+const SHORTS = ['#fff6ea', '#1e2a5a', '#ff4f9a', '#2ee6d6', '#ffd93d'];
 const SKIN = ['#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', '#5c3317', '#a56b3c'];
 const HAIR = ['#1a120e', '#3b2416', '#6b4423', '#111111', '#8a5a2b', '#cbb59a'];
-const HATS = ['#1f6f78', '#c4534a', '#243044', '#d7b15a', '#f4f1ea'];
+const HATS = ['#ffd93d', '#ff4f9a', '#2ee6d6', '#ffffff', '#7c6bff'];
 
 function mulberry32(seed: number) {
   return () => {

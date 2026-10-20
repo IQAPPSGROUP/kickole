@@ -41,6 +41,13 @@ describe('street court delivery', () => {
     }
   });
 
+  it('bundles a local sunny HDRI instead of a remote sky', () => {
+    const bytes = readFileSync(new URL(`../../public/${STREET_FILES.hdri}`, import.meta.url));
+    const head = bytes.subarray(0, 10).toString('ascii');
+    expect(head.startsWith('#?RADIANCE') || head.startsWith('#?RGBE')).toBe(true);
+    expect(bytes.length).toBeLessThan(4_000_000);
+  });
+
   it('ships KTX2 textures and a smaller low-tier court', () => {
     for (const file of [STREET_FILES.courtColor, STREET_FILES.courtNormal, STREET_FILES.courtRough, STREET_FILES.courtColorLow, STREET_FILES.streetAsphalt, STREET_FILES.wallColor, STREET_FILES.wallColorLow, STREET_FILES.concreteColor, STREET_FILES.decalSkid, STREET_FILES.decalStencil, STREET_FILES.decalTag]) {
       const bytes = readFileSync(new URL(`../../public/${file}`, import.meta.url));

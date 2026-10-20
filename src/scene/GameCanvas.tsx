@@ -17,6 +17,7 @@ import { KeyLight } from './KeyLight';
 import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
+import { STREET_FILES, streetUrl } from './streetLayout';
 import { PostFX } from './PostFX';
 import { installPcss, restorePcss } from './pcss';
 import {
@@ -202,23 +203,23 @@ function StreetTone() {
   return null;
 }
 
-/** CC0 sunset IBL. High draws it as the sky; medium uses it for reflections only. */
-function SunsetIbl({ sky }: { sky: 'hdri' | 'reflect' }) {
+/** CC0 sunny daytime IBL. High draws it as the sky; medium uses it for reflections only. */
+function StreetSky({ sky }: { sky: 'hdri' | 'reflect' }) {
   const { gl, scene } = useThree();
   useEffect(() => {
     let alive = true;
     let env: ReturnType<PMREMGenerator['fromEquirectangular']>['texture'] | null = null;
     const pm = new PMREMGenerator(gl);
     const timer = window.setTimeout(() => {
-      new HDRLoader().load(`${import.meta.env.BASE_URL}textures/venice_sunset_1k.hdr`, (hdr) => {
+      new HDRLoader().load(streetUrl(STREET_FILES.hdri), (hdr) => {
         if (!alive) { hdr.dispose(); pm.dispose(); return; }
         env = pm.fromEquirectangular(hdr).texture;
         scene.environment = env;
-        scene.environmentIntensity = sky === 'hdri' ? 0.5 : 0.42;
+        scene.environmentIntensity = sky === 'hdri' ? 0.78 : 0.58;
         if (sky === 'hdri') {
           scene.background = env;
-          scene.backgroundBlurriness = 0.08;
-          scene.backgroundIntensity = 1;
+          scene.backgroundBlurriness = 0.02;
+          scene.backgroundIntensity = 1.05;
         }
         hdr.dispose();
         pm.dispose();
@@ -301,17 +302,17 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   return (
     <>
       {street && <StreetTone />}
-      <color attach="background" args={[street ? '#3a2a28' : '#8dc5cb']} />
-      <fog attach="fog" args={street ? ['#5c3a32', 22, 48] : ['#8dc5cb', 24, 52]} />
+      <color attach="background" args={[street ? '#b7e4f8' : '#8dc5cb']} />
+      <fog attach="fog" args={street ? ['#f8edd4', 28, 70] : ['#8dc5cb', 24, 52]} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {street && profile.sky !== 'flat' && <SunsetIbl sky={profile.sky} />}
+      {street && profile.sky !== 'flat' && <StreetSky sky={profile.sky} />}
       {!street && quality === 'high' && <Environment />}
       <Simulation controller={controller} />
       <PerfProbe />
       {street ? (
         <>
-          <hemisphereLight args={['#ffd2a8', '#1c1614', 0.28]} />
-          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.22} color="#8aa4c8" />
+          <hemisphereLight args={['#fff6df', '#f4e6cc', 0.62]} />
+          <directionalLight position={[-4.2, 3.2, -2]} intensity={0.34} color="#ffe7b0" />
           <KeyLight quality={quality} engine={controller.engine} />
         </>
       ) : (
@@ -345,7 +346,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
           blur={2.2}
           far={1.2}
           resolution={256}
-          color={street ? '#1a120e' : '#1E2A5A'}
+          color={street ? '#6b5344' : '#1E2A5A'}
         />
       )}
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />

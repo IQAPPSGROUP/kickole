@@ -44,10 +44,10 @@ tools/street-sources/wall_graffiti.jpg
   Earlier mural on the concrete photograph. The shipped wall is the
   KTX2 map below. The photograph remains CC0. The mural is original.
 
-public/textures/venice_sunset_1k.hdr
-  Poly Haven venice_sunset, 1K, CC0.
-  https://polyhaven.com/a/venice_sunset
-  Used as the HDRI sky and image-based lighting on the street theme.
+public/textures/sunflowers_puresky_1k.hdr
+  Poly Haven sunflowers_puresky, 1K, CC0.
+  https://polyhaven.com/a/sunflowers_puresky
+  Warm sunny daytime sky and image-based light for the street court.
   It stays an RGBE .hdr because the PMREM pass needs the high range.
   Sampled surface textures are KTX2 instead.
 

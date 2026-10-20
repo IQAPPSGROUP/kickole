@@ -71,7 +71,8 @@ function CrowdPart({ node, people, lod, idle }: { node: StreetNode; people: Spec
       );
       dummy.rotation.set(rx, ry, rz);
       const bulk = node.name === 'Afro' ? 1.08 : 1;
-      dummy.scale.setScalar(person.scale * bulk);
+      const fitted = person.scale * bulk;
+      dummy.scale.set(node.scale[0] * fitted, node.scale[1] * fitted, node.scale[2] * fitted);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       if (colors) mesh.setColorAt(i, tint.set(partColor(node.name, person)));

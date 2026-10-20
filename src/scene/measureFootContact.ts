@@ -220,8 +220,10 @@ export function ballCenterForKick(scene: Object3D, clips: AnimationClip[], side:
       radial.setLength(radius);
       center.copy(strike).add(radial);
     }
-    // A simplified boot can still nick the leather. Step out, then pull back onto the nearest vertex
-    // so the instep meets the ball instead of stopping a centimetre clear of it.
+    // A simplified boot can still nick the leather. Step out, then pull back onto the nearest vertex.
+    // Seat the ball into the leather. A surface kiss still leaves a dark pixel of
+    // background between the boot and the ball in the gameplay camera.
+    const kiss = 0.028;
     let touching: Vector3 | null = null;
     for (let pass = 0; pass < 8; pass++) {
       const hit = closestSkinnedVertex(scene, center, LEG_MATERIALS);
@@ -230,13 +232,14 @@ export function ballCenterForKick(scene: Object3D, clips: AnimationClip[], side:
       const away = center.clone().sub(hit);
       if (away.lengthSq() < 1e-10) break;
       away.normalize();
-      if (distance < radius - 0.001) {
-        center.copy(hit).addScaledVector(away, radius + 0.001);
+      const seated = radius - kiss;
+      if (distance < seated - 0.001) {
+        center.copy(hit).addScaledVector(away, seated + 0.001);
         touching = hit;
         continue;
       }
-      if (distance > radius + 0.002) {
-        center.copy(hit).addScaledVector(away, radius);
+      if (distance > seated + 0.002) {
+        center.copy(hit).addScaledVector(away, seated);
         touching = hit;
         continue;
       }

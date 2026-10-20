@@ -7,33 +7,53 @@ import type { Skin } from '../game/skins';
 
 const TRAIL = 6;
 
-/** Stitched leather normal. The panel colour is applied in the fragment shader. */
-function leatherNormal(): CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 256;
-  const g = canvas.getContext('2d');
-  if (g) {
-    g.fillStyle = 'rgb(128,128,255)';
-    g.fillRect(0, 0, 256, 256);
-    g.strokeStyle = 'rgb(108,116,255)';
-    g.lineWidth = 3;
-    for (let x = 16; x < 256; x += 42) {
-      g.beginPath();
-      g.moveTo(x, 0);
-      g.lineTo(x, 256);
-      g.stroke();
+/** Stitch normal and roughness. High asks for a 2048 map; other tiers stay at 256. */
+function leatherMaps(size: number): { normal: CanvasTexture; rough: CanvasTexture } {
+  const normalCanvas = document.createElement('canvas');
+  const roughCanvas = document.createElement('canvas');
+  normalCanvas.width = normalCanvas.height = size;
+  roughCanvas.width = roughCanvas.height = size;
+  const normalG = normalCanvas.getContext('2d');
+  const roughG = roughCanvas.getContext('2d');
+  if (normalG && roughG) {
+    normalG.fillStyle = 'rgb(128,128,255)';
+    normalG.fillRect(0, 0, size, size);
+    roughG.fillStyle = 'rgb(148,148,148)';
+    roughG.fillRect(0, 0, size, size);
+    const span = size / 6;
+    const width = Math.max(2, size / 128);
+    normalG.strokeStyle = 'rgb(96,108,255)';
+    normalG.lineWidth = width;
+    roughG.strokeStyle = 'rgb(214,214,214)';
+    roughG.lineWidth = width;
+    for (let x = span * 0.5; x < size; x += span) {
+      normalG.beginPath();
+      normalG.moveTo(x, 0);
+      normalG.lineTo(x, size);
+      normalG.stroke();
+      roughG.beginPath();
+      roughG.moveTo(x, 0);
+      roughG.lineTo(x, size);
+      roughG.stroke();
     }
-    for (let y = 20; y < 256; y += 64) {
-      g.beginPath();
-      g.moveTo(0, y);
-      g.lineTo(256, y);
-      g.stroke();
+    for (let y = span * 0.35; y < size; y += span * 1.35) {
+      normalG.beginPath();
+      normalG.moveTo(0, y);
+      normalG.lineTo(size, y);
+      normalG.stroke();
+      roughG.beginPath();
+      roughG.moveTo(0, y);
+      roughG.lineTo(size, y);
+      roughG.stroke();
     }
   }
-  const texture = new CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = RepeatWrapping;
-  texture.repeat.set(2, 1);
-  return texture;
+  const pack = (canvas: HTMLCanvasElement) => {
+    const texture = new CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = RepeatWrapping;
+    texture.repeat.set(2, 1);
+    return texture;
+  };
+  return { normal: pack(normalCanvas), rough: pack(roughCanvas) };
 }
 
 export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin; quality: Quality }) {
@@ -47,15 +67,17 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
   const euler = useMemo(() => new Euler(0, 0, 0, 'XYZ'), []);
   const panel = useMemo(() => new Color(skin.football.panels), [skin.football.panels]);
   const leather = useMemo(() => {
-    const normal = leatherNormal();
+    const maps = leatherMaps(quality === 'high' ? 2048 : 256);
+    const scale = quality === 'high' ? 0.7 : 0.55;
     const material = new MeshPhysicalMaterial({
       color: skin.football.base,
       roughness: 0.55,
       metalness: 0,
       clearcoat: 0.08,
       clearcoatRoughness: 0.4,
-      normalMap: normal,
-      normalScale: new Vector2(0.55, 0.55),
+      normalMap: maps.normal,
+      roughnessMap: maps.rough,
+      normalScale: new Vector2(scale, scale),
     });
     material.onBeforeCompile = (shader) => {
       material.userData.shader = shader;
@@ -70,9 +92,10 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
     };
     material.customProgramCacheKey = () => 'kickole-leather';
     return material;
-  }, [panel, skin.football.base]);
+  }, [panel, skin.football.base, quality]);
   useEffect(() => () => {
     leather.normalMap?.dispose();
+    leather.roughnessMap?.dispose();
     leather.dispose();
   }, [leather]);
 
@@ -119,7 +142,7 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       <group ref={group}>
         <group ref={spin}>
           <mesh castShadow material={leather}>
-            <sphereGeometry args={[r, quality === 'low' ? 24 : 40, quality === 'low' ? 16 : 28]} />
+            <sphereGeometry args={[r, quality === 'low' ? 24 : quality === 'high' ? 48 : 40, quality === 'low' ? 16 : quality === 'high' ? 32 : 28]} />
           </mesh>
         </group>
       </group>

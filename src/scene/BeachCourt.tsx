@@ -1,7 +1,109 @@
-import { useEffect, useMemo } from 'react';
-import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { CanvasTexture, Color, DoubleSide, InstancedMesh, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
+import {
+  BEACH_BUNTING_COUNT,
+  BEACH_FESTA,
+  BEACH_FLAG_X,
+  BEACH_STREAMER_COUNT,
+  beachBuntingSpot,
+  beachFlagSpot,
+  beachPoleSpot,
+  beachStreamerSpot,
+} from './beachCarnival';
 import { EnvironmentBackdrop } from './EnvironmentBackdrop';
+import { prefersReducedMotion, sceneLifeBudget } from './juice';
+
+/** Pennants behind the rope line. The beach GLB stays the scenery. */
+function BeachCarnival({ sway }: { sway: boolean }) {
+  const buntingRef = useRef<InstancedMesh>(null);
+  const flagRef = useRef<InstancedMesh>(null);
+  const poleRef = useRef<InstancedMesh>(null);
+  const streamerRef = useRef<InstancedMesh>(null);
+  const dummy = useMemo(() => new Object3D(), []);
+  const tint = useMemo(() => new Color(), []);
+  const paint = (time: number, colors: boolean) => {
+    const flutter = (u: number) => (sway ? Math.sin(time * 2.1 + u * 7) * 0.07 : 0);
+    const bunting = buntingRef.current;
+    if (bunting) {
+      for (let i = 0; i < BEACH_BUNTING_COUNT; i++) {
+        const u = i / (BEACH_BUNTING_COUNT - 1);
+        const spot = beachBuntingSpot(i, flutter(u));
+        dummy.position.set(spot.x, spot.y, spot.z);
+        dummy.rotation.set(0, 0, Math.PI + flutter(u));
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        bunting.setMatrixAt(i, dummy.matrix);
+        if (colors) bunting.setColorAt(i, tint.set(BEACH_FESTA[i % BEACH_FESTA.length] ?? BEACH_FESTA[0]));
+      }
+      bunting.instanceMatrix.needsUpdate = true;
+      if (colors && bunting.instanceColor) bunting.instanceColor.needsUpdate = true;
+    }
+    BEACH_FLAG_X.forEach((_, i) => {
+      const u = i / (BEACH_FLAG_X.length - 1);
+      const pole = beachPoleSpot(i);
+      if (poleRef.current) {
+        dummy.position.set(pole.x, pole.y, pole.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        poleRef.current.setMatrixAt(i, dummy.matrix);
+      }
+      if (flagRef.current) {
+        const flag = beachFlagSpot(i, flutter(u));
+        dummy.position.set(flag.x, flag.y, flag.z);
+        dummy.rotation.set(0, 0.25, flutter(u) * 1.3);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        flagRef.current.setMatrixAt(i, dummy.matrix);
+        if (colors) flagRef.current.setColorAt(i, tint.set(BEACH_FESTA[i % BEACH_FESTA.length] ?? BEACH_FESTA[0]));
+      }
+    });
+    if (poleRef.current) poleRef.current.instanceMatrix.needsUpdate = true;
+    if (flagRef.current) {
+      flagRef.current.instanceMatrix.needsUpdate = true;
+      if (colors && flagRef.current.instanceColor) flagRef.current.instanceColor.needsUpdate = true;
+    }
+    const streamers = streamerRef.current;
+    if (streamers) {
+      for (let i = 0; i < BEACH_STREAMER_COUNT; i++) {
+        const u = i / (BEACH_STREAMER_COUNT - 1);
+        const spot = beachStreamerSpot(i, flutter(u));
+        dummy.position.set(spot.x, spot.y, spot.z);
+        dummy.rotation.set(flutter(u), 0, flutter(u));
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        streamers.setMatrixAt(i, dummy.matrix);
+        if (colors) streamers.setColorAt(i, tint.set(BEACH_FESTA[(i + 3) % BEACH_FESTA.length] ?? BEACH_FESTA[0]));
+      }
+      streamers.instanceMatrix.needsUpdate = true;
+      if (colors && streamers.instanceColor) streamers.instanceColor.needsUpdate = true;
+    }
+  };
+  useLayoutEffect(() => { paint(0, true); }, []);
+  useFrame((state) => { if (sway) paint(state.clock.elapsedTime, false); });
+  return (
+    <group>
+      <instancedMesh ref={buntingRef} args={[undefined, undefined, BEACH_BUNTING_COUNT]} frustumCulled={false}>
+        <circleGeometry args={[0.16, 3]} />
+        <meshStandardMaterial side={DoubleSide} roughness={0.45} metalness={0} />
+      </instancedMesh>
+      <instancedMesh ref={poleRef} args={[undefined, undefined, BEACH_FLAG_X.length]} frustumCulled={false}>
+        <cylinderGeometry args={[0.02, 0.028, 2.5, 6]} />
+        <meshStandardMaterial color="#fff6ea" roughness={0.45} />
+      </instancedMesh>
+      <instancedMesh ref={flagRef} args={[undefined, undefined, BEACH_FLAG_X.length]} frustumCulled={false}>
+        <planeGeometry args={[0.5, 0.3]} />
+        <meshStandardMaterial side={DoubleSide} roughness={0.42} metalness={0} />
+      </instancedMesh>
+      <instancedMesh ref={streamerRef} args={[undefined, undefined, BEACH_STREAMER_COUNT]} frustumCulled={false}>
+        <planeGeometry args={[0.07, 0.72]} />
+        <meshStandardMaterial side={DoubleSide} roughness={0.45} metalness={0} />
+      </instancedMesh>
+    </group>
+  );
+}
 
 function useSand() {
   return useMemo(() => {
@@ -10,7 +112,7 @@ function useSand() {
     let seed = 20261019;
     const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
     if (g) {
-      g.fillStyle = '#d9bd87'; g.fillRect(0, 0, 512, 512);
+      g.fillStyle = '#f3d7a2'; g.fillRect(0, 0, 512, 512);
       for (let i = 0; i < 13000; i++) {
         g.fillStyle = i % 3 ? 'rgba(255,245,214,.20)' : 'rgba(113,88,48,.14)';
         g.fillRect(random() * 512, random() * 512, 1 + random(), 1 + random());
@@ -34,7 +136,7 @@ function useSand() {
 function BeachFallback() {
   return <group>
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.12, -22]}>
-      <planeGeometry args={[45, 29]} /><meshStandardMaterial color="#4b9ca9" roughness={.85} />
+      <planeGeometry args={[45, 29]} /><meshStandardMaterial color="#6fd0dc" roughness={0.45} metalness={0.04} />
     </mesh>
     {[-1.5, 1.5].map(x => <mesh key={x} position={[x, .92, -5.35]}>
       <cylinderGeometry args={[.05, .05, 1.84, 8]} /><meshStandardMaterial color="#f6e8c7" />
@@ -50,8 +152,10 @@ export function BeachCourt({ shadows, quality }: { shadows: boolean; quality: Qu
   return <group>
     <EnvironmentBackdrop quality={quality} theme="beach" fallback={<BeachFallback />} />
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow={shadows}>
-      <planeGeometry args={[36, 18]} /><meshStandardMaterial map={sand} roughness={1} />
+      <planeGeometry args={[36, 18]} />
+      <meshStandardMaterial map={sand} color="#fff8ee" roughness={0.72} metalness={0.02} envMapIntensity={0.85} />
     </mesh>
+    <BeachCarnival sway={sceneLifeBudget(quality, prefersReducedMotion()).buntingSway} />
     {/* Freestyle circle and touch-area boundary ropes are cosmetic, with no colliders. */}
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, .012, 0]}>
       <torusGeometry args={[1.2, .014, 5, quality === 'low' ? 40 : 72]} /><meshStandardMaterial color="#f6e5b9" roughness={1} />

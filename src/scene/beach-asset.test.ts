@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { beachCarnivalClearOfPlay } from './beachCarnival';
 import { resolveEnvironmentTheme } from './environment';
 
 function asset(file: string) {
@@ -12,6 +13,9 @@ function asset(file: string) {
 }
 
 describe('beach visual theme',()=>{
+  it('keeps carnival cloth behind the rope and in front of the goal',()=>{
+    expect(beachCarnivalClearOfPlay()).toBe(true);
+  });
   it('preserves street by default and only accepts the explicit beach theme',()=>{
     expect(resolveEnvironmentTheme()).toBe('street');
     expect(resolveEnvironmentTheme('anything')).toBe('street');

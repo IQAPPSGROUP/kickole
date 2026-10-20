@@ -41,7 +41,7 @@ describe('graphics juice budgets', () => {
     expect(still.buntingSway).toBe(false);
     expect(still.lightSweep).toBe(false);
     expect(still.cameraSway).toBe(false);
-    expect(high.crowd).toBeLessThanOrEqual(22);
+    expect(high.crowd).toBeLessThanOrEqual(28);
   });
 
   it('bobs the crowd with the combo and holds the camera when motion is reduced', () => {

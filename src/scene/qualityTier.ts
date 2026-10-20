@@ -8,6 +8,12 @@ export interface DeviceHints {
   gpu?: string;
 }
 
+export type CourtMaps = 'full' | 'rough' | 'color';
+export type FenceDetail = 'link' | 'sparse' | 'plane';
+export type CrowdLod = 0 | 1 | 2;
+export type SkyMode = 'hdri' | 'reflect' | 'flat';
+export type LampMode = 'lit' | 'emissive' | 'simple';
+
 export interface TierProfile {
   lod: 0 | 1;
   /** Tight box around the player, or no dynamic shadows. */
@@ -27,6 +33,15 @@ export interface TierProfile {
   ibl: boolean;
   dpr: [number, number];
   crowd: number;
+  /** Albedo, or albedo+roughness, or albedo+normal+roughness. */
+  courtMaps: CourtMaps;
+  fence: FenceDetail;
+  decals: boolean;
+  crowdLod: CrowdLod;
+  crowdIdle: boolean;
+  /** hdri draws the sunny daytime sky. reflect keeps the sky colour and still lights metal. */
+  sky: SkyMode;
+  lamp: LampMode;
 }
 
 const ORDER: readonly Quality[] = ['low', 'medium', 'high'];
@@ -237,18 +252,24 @@ export function profileFor(tier: Quality): TierProfile {
         lod: 1, shadows: 'none', shadowMap: 0, shadowFilter: 'off', shadowExtent: 0, shadowRadius: 0,
         contactShadows: false, ssao: false, bloom: false, dof: false, aa: 'none', ibl: true,
         dpr: [1, 1], crowd: 8,
+        courtMaps: 'color', fence: 'plane', decals: false, crowdLod: 2, crowdIdle: false,
+        sky: 'flat', lamp: 'simple',
       };
     case 'medium':
       return {
         lod: 0, shadows: 'tight', shadowMap: 512, shadowFilter: 'vsm', shadowExtent: 4.8, shadowRadius: 8,
         contactShadows: true, ssao: false, bloom: false, dof: false, aa: 'fxaa', ibl: true,
         dpr: [1, 1.25], crowd: 16,
+        courtMaps: 'rough', fence: 'sparse', decals: true, crowdLod: 1, crowdIdle: true,
+        sky: 'reflect', lamp: 'emissive',
       };
     case 'high':
       return {
         lod: 0, shadows: 'tight', shadowMap: 1024, shadowFilter: 'pcss', shadowExtent: 3.2, shadowRadius: 42,
         contactShadows: false, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
         dpr: [1, 1.5], crowd: 28,
+        courtMaps: 'full', fence: 'link', decals: true, crowdLod: 0, crowdIdle: true,
+        sky: 'hdri', lamp: 'lit',
       };
     default: {
       const neverTier: never = tier;

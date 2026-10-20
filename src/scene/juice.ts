@@ -106,7 +106,7 @@ export function sceneLifeBudget(quality: Quality, reducedMotion: boolean): Scene
       };
     case 'high':
       return {
-        crowd: 22,
+        crowd: 28,
         palms: 4,
         flags: 4,
         clouds: 5,

@@ -582,21 +582,41 @@ function braids(skull: Skull): HairCard[] {
       height: 0.2,
     });
   }
-  // Box braids beside the cheeks, facing the camera, outside the face volume.
+  // Box braids beside the cheeks, clear of the skull, facing the camera.
   for (const side of [-1, 1]) {
-    for (const [yBias, zBias] of [[0.72, -0.25], [0.35, -0.55]] as const) {
-      outward.set(side * 0.95, yBias, zBias).normalize();
-      seatRoot(skull, outward, root);
+    for (const zOfs of [0.02, -0.03]) {
+      root.set(
+        skull.center.x + side * (skull.radius + 0.055),
+        skull.landmarks.brow.y + 0.02,
+        skull.center.z + zOfs,
+      );
       add(cards, skull, {
         id: `braid-side-${n++}`,
         atlas: 'braid',
         root,
-        growth: growth.set(side * 0.12, -1, 0.02).normalize(),
+        growth: growth.set(side * 0.06, -1, 0).normalize(),
         align: new Vector3(0, 0, 1),
-        width: 0.02,
-        height: 0.2,
+        width: 0.022,
+        height: 0.24,
       });
     }
+  }
+  // Cornrows on the crown, entirely above the eye band so the close-up shows the rows.
+  for (const row of [-2, -1, 0, 1, 2]) {
+    root.set(
+      skull.center.x + row * skull.radius * 0.3,
+      skull.crownY - skull.radius * 0.22,
+      skull.center.z - skull.radius * 0.05,
+    );
+    add(cards, skull, {
+      id: `braid-front-${n++}`,
+      atlas: 'braid',
+      root,
+      growth: growth.set(0, 0.15, -1).normalize(),
+      align: new Vector3(0, 0.85, 0.45),
+      width: skull.radius * 0.28,
+      height: skull.radius * 0.85,
+    });
   }
   return cards;
 }

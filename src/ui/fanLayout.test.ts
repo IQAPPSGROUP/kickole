@@ -54,6 +54,8 @@ describe('corner fan', () => {
       expect(layout.insetRight, `${width} right`).toBeGreaterThanOrEqual(16);
       expect(byName.right.x + byName.right.w, `${width} right edge`).toBeLessThanOrEqual(width - 16);
       expect(circleGap(byName.atw, byName.groove), `${width} atw/groove`).toBeGreaterThanOrEqual(16);
+      expect(layout.insetBottom, `${width} bottom`).toBe(16);
+      expect(byName.left.y + byName.left.h, `${width} bottom edge`).toBeLessThanOrEqual(800 - 16);
     }
     const narrow = fanLayout(320);
     const wide = fanLayout(500);
@@ -62,7 +64,8 @@ describe('corner fan', () => {
   });
 
   it('keeps the fan inside the screen when the safe area grows', () => {
-    const { rects, nearest } = nearestGap(390, 844, 12, 12, 34);
+    const { layout, rects, nearest } = nearestGap(390, 844, 12, 12, 34);
+    expect(layout.insetBottom).toBe(34 + 16);
     expect(nearest).toBeGreaterThanOrEqual(6);
     for (const rect of rects) {
       expect(rect.x).toBeGreaterThanOrEqual(12);

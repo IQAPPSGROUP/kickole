@@ -25,7 +25,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   --fan-dy: 80px;
   --fan-inset-l: 4px;
   --fan-inset-r: 4px;
-  --fan-inset-b: 8px;
+  --fan-inset-b: calc(env(safe-area-inset-bottom, 0px) + 16px);
   --control-lift: calc(var(--fan-d) + var(--btn) + 12px);
 }
 @media (min-width: 360px) and (max-width: 430px) {

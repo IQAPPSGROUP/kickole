@@ -35,7 +35,7 @@ export const DANCES: readonly DanceDesign[] = [
     name: 'Soft Sway',
     milestone: 0,
     productId: null,
-    note: 'Starter dance. A low weight shift on the steel-pan beat.',
+    note: 'Starter dance. A low weight shift on the beat.',
   },
   {
     id: 'pendulum',

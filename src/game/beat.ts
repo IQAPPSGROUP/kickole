@@ -1,9 +1,9 @@
-/** Quarter-note clock for the steel band. Rendering and scoring share this math. */
+/** Quarter-note clock shared by the boom-bap bed and groove scoring. */
 
-/** Gameplay tempo. The menu bed is slower and lives in audio.ts. */
-export const GAMEPLAY_BPM = 112;
+/** Gameplay tempo. The menu bed sits a touch slower, in audio.ts. */
+export const GAMEPLAY_BPM = 92;
 
-export const MENU_BPM = 78;
+export const MENU_BPM = 90;
 
 /** Used when the audio device has not reported output latency. */
 export const DEFAULT_OUTPUT_LATENCY_SEC = 0.045;

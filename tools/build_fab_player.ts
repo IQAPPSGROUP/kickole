@@ -1036,7 +1036,13 @@ async function encodeTextures(prims: Prim[], preserveSkin = false) {
   const present = [...new Set(body.map((prim) => prim.role))];
   for (const role of present) {
     const packed = await atlas(body, role, preserveSkin);
-    const kind = role === 'Hair' ? 'hair' : role === 'Eyes' || role === 'InnerMouth' || role === 'Skin' ? 'keep' : 'cloth';
+    // Female hair keeps the purchased photograph. Greying it for a wardrobe tint
+    // left the ponytail a flat pale shell, and the runtime no longer tints Hair.
+    // The male scalp still uses that grey atlas only as a placeholder: at runtime
+    // it samples the head photograph.
+    const kind = role === 'Hair'
+      ? (preserveSkin ? 'keep' : 'hair')
+      : role === 'Eyes' || role === 'InnerMouth' || role === 'Skin' ? 'keep' : 'cloth';
     const albedo = neutralize(packed.raw, packed.width, packed.height, kind);
     const normal = detailNormal(albedo, packed.width, packed.height, role === 'Skin' || role === 'Hair' ? 0.45 : 0.35);
     const hash = createHash('sha1').update(albedo).digest('hex').slice(0, 10);

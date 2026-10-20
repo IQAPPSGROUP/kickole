@@ -231,7 +231,7 @@ function CarnivalSky() {
   );
 }
 
-/** Shared sunny HDR for reflections only. The visible sky is CarnivalSky. */
+/** Shared sunny HDR for reflections. CarnivalSky is the visible sky. */
 function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
   useEffect(() => {
@@ -331,56 +331,32 @@ function forcedTier(): Quality | null {
 function World({ controller, skin, quality, onReady }: SceneProps) {
   const street = ENVIRONMENT_THEME !== 'beach';
   const profile = profileFor(quality);
-  const shadows = street ? profile.shadows !== 'none' : quality !== 'low';
+  const shadows = profile.shadows !== 'none';
   useEffect(() => { onReady(); }, [onReady]);
-  const postProfile = street ? profile : { ...profile, ssao: false, bloom: false, dof: false };
+  const postProfile = street ? profile : { ...profile, bloom: false, dof: false };
   return (
     <>
-      <StreetTone exposure={street ? STREET_EXPOSURE : 1} />
+      <StreetTone exposure={STREET_EXPOSURE} />
       <color attach="background" args={['#1a6fd0']} />
       <CarnivalSky />
       <CameraRig shake={quality !== 'low'} quality={quality} />
       {(street || profile.sky !== 'flat') && <SunnyIbl ibl={profile.ibl} />}
       <Simulation controller={controller} />
       <PerfProbe />
-      {street ? (
-        <>
-          <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
-          <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
-          <KeyLight quality={quality} engine={controller.engine} />
-        </>
-      ) : (
-        <>
-          <hemisphereLight args={['#fff8e8', '#d7f3ea', 0.72]} />
-          <ambientLight intensity={0.22} />
-          <directionalLight
-            position={[5.4, 10.2, 2.6]}
-            intensity={3.15}
-            color="#fff4d4"
-            castShadow={shadows}
-            shadow-mapSize={[quality === 'high' ? 1024 : 512, quality === 'high' ? 1024 : 512]}
-            shadow-camera-left={-3}
-            shadow-camera-right={3}
-            shadow-camera-top={4}
-            shadow-camera-bottom={-3}
-            shadow-camera-near={1}
-            shadow-camera-far={14}
-            shadow-bias={-0.0004}
-            shadow-radius={quality === 'high' ? 3 : 1}
-          />
-        </>
-      )}
+      <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
+      <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
+      <KeyLight quality={quality} engine={controller.engine} />
       <Court shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
-      {((street && profile.contactShadows && profile.shadowFilter !== 'pcss') || (!street && quality === 'high')) && (
+      {profile.contactShadows && (
         <ContactShadows
-          position={[0, 0.006, 0.2]}
-          opacity={street ? 0.16 : 0.26}
-          scale={4}
-          blur={3.4}
-          far={1.2}
-          resolution={256}
-          color={street ? '#6a5344' : '#c4a56a'}
+          position={[0, 0.006, 0.15]}
+          opacity={0.42}
+          scale={3.1}
+          blur={2.1}
+          far={1.5}
+          resolution={quality === 'low' ? 128 : 256}
+          color="#3d2a22"
         />
       )}
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
@@ -421,7 +397,6 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
   const [lost, setLost] = useState(false);
-  const street = ENVIRONMENT_THEME !== 'beach';
   const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
   const detected = useMemo(() => detectTier(device), [device]);
   const forced = useMemo(() => forcedTier(), []);
@@ -439,15 +414,11 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
   if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
 
   const profile = profileFor(tier);
-  if (street && profile.shadowFilter === 'pcss') installPcss();
+  if (profile.shadowFilter === 'pcss') installPcss();
   else restorePcss();
-  const dpr = street ? profile.dpr : (tier === 'low' ? [1, 1] : tier === 'medium' ? [1, 1.25] : [1, 1.5]) as [number, number];
-  const shadowsOn = street ? profile.shadows !== 'none' : tier !== 'low';
-  const shadowType = !shadowsOn
-    ? false
-    : street
-      ? (profile.shadowFilter === 'pcss' ? 'basic' : 'variance')
-      : 'percentage';
+  const dpr = profile.dpr;
+  const shadowsOn = profile.shadows !== 'none';
+  const shadowType = !shadowsOn ? false : profile.shadowFilter === 'pcss' ? 'basic' : 'variance';
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}
@@ -457,10 +428,10 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
         shadows={shadowType}
         dpr={dpr}
         gl={{
-          antialias: street ? profile.aa === 'none' : tier !== 'low',
+          antialias: profile.aa === 'none',
           powerPreference: 'high-performance',
           toneMapping: AgXToneMapping,
-          toneMappingExposure: street ? STREET_EXPOSURE : 1,
+          toneMappingExposure: STREET_EXPOSURE,
         }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >

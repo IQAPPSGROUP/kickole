@@ -8,13 +8,13 @@ export const STREET_HEMI = { sky: '#fff1d4', ground: '#c8966a', intensity: 0.85 
 export const STREET_FILL = { color: '#ffe3bf', intensity: 1.25 };
 export const STREET_ENV_INTENSITY = 0.62;
 /**
- * Court white balance. The sky HDR is blue, and that irradiance tints an
- * upward floor lavender. These tints keep the concrete warm grey, and the
- * env intensities keep that sky reflection off the ground.
+ * Court white balance. Beige-gold, not clay orange: red still leads so the
+ * floor stays warm, and the lines stay lighter than the asphalt. Env
+ * intensity stays low so the sky reflection does not lift the ground.
  */
-export const STREET_COURT_TINT = '#f4e7d4';
-export const STREET_COURT_ENV = 0.2;
-export const STREET_APRON_TINT = '#f6ead8';
+export const STREET_COURT_TINT = '#c09a62';
+export const STREET_COURT_ENV = 0.16;
+export const STREET_APRON_TINT = '#d2b48a';
 export const STREET_APRON_ENV = 0.18;
 export const STREET_CONCRETE_TINT = '#efe2d0';
 export const STREET_CONCRETE_ENV = 0.2;

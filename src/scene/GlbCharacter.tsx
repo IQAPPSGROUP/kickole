@@ -26,6 +26,11 @@ import { measureKickContactAnchors } from './measureFootContact';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
+/** The street key is already hot. Keep the photograph under white so cheeks do not clip. */
+const FACE_ALBEDO = '#efe6df';
+const FACE_ROUGHNESS = 0.88;
+const FACE_ENV = 0.16;
+
 /** glTF images on this skinned head sample as one averaged colour. A canvas copy of the same pixels does not. */
 function photographTexture(source: Texture): CanvasTexture | null {
   const image = source.image as (CanvasImageSource & { width?: number; height?: number }) | undefined;
@@ -40,17 +45,14 @@ function photographTexture(source: Texture): CanvasTexture | null {
   } catch {
     return null;
   }
-  // The photograph's midtones sit well below the kit skin. Open them so the
-  // cheeks read under the same key, fill and IBL as the shirt.
+  // A short lift opens crushed midtones. The old power curve pushed cheeks to white.
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
   const px = pixels.data;
   for (let i = 0; i < px.length; i += 4) {
     if (px[i + 3] < 16) continue;
     for (let channel = 0; channel < 3; channel += 1) {
       const u = px[i + channel] / 255;
-      // Open the photograph enough to take the street key light, and leave
-      // headroom so the cheeks do not clip into the sclera.
-      const lifted = Math.min(1, Math.pow(u, 0.62) * 0.82 + 0.14);
+      const lifted = Math.min(0.9, Math.pow(u, 0.7) * 0.8 + 0.1);
       px[i + channel] = Math.round(lifted * 255);
     }
   }
@@ -692,9 +694,10 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
               const lit = new MeshStandardMaterial({
                 map: photo,
                 normalMap: source.normalMap ?? null,
-                color: '#ffffff',
-                roughness: 0.55,
+                color: FACE_ALBEDO,
+                roughness: FACE_ROUGHNESS,
                 metalness: 0,
+                envMapIntensity: FACE_ENV,
               });
               lit.name = m.name;
               lit.userData.facePhoto = true;
@@ -776,7 +779,11 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       // Every Skin instance gets the wardrobe colour. The head photograph is already
       // the finished face, so multiplying it by the skin swatch flattens the cheeks.
       if (m.userData.facePhoto) {
-        m.color.set('#ffffff');
+        m.color.set(FACE_ALBEDO);
+        if (m instanceof MeshStandardMaterial) {
+          m.roughness = FACE_ROUGHNESS;
+          m.envMapIntensity = FACE_ENV;
+        }
         continue;
       }
       if (colors[name]) m.color.set(colors[name]);

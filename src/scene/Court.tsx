@@ -8,7 +8,7 @@ import { ENVIRONMENT_THEME } from './environment';
 import { Crowd } from './Crowd';
 import { profileFor } from './qualityTier';
 import { prefersReducedMotion, sceneLifeBudget } from './juice';
-import { STREET_CONCRETE_ENV, STREET_CONCRETE_TINT } from './daylight';
+import { STREET_APRON_ENV, STREET_APRON_TINT, STREET_CONCRETE_ENV, STREET_CONCRETE_TINT, STREET_COURT_ENV, STREET_COURT_TINT } from './daylight';
 import { createPennantGeometry, placeRope } from './pennant';
 import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, LAMP_SPOTS, STREET_FILES, streetUrl, wallMapSet, type FenceSlot, type LampSpot } from './streetLayout';
 import { useStreetMaps, useStreetNodes, type StreetMaps } from './streetMaterials';
@@ -514,10 +514,10 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         <planeGeometry args={[40.5, 40.5]} />
         <meshStandardMaterial
           map={apron.color ?? undefined}
-          color={apron.color ? '#b18452' : '#8d7048'}
+          color={apron.color ? STREET_APRON_TINT : '#8d7048'}
           roughness={0.9}
           metalness={0.02}
-          envMapIntensity={0.18}
+          envMapIntensity={STREET_APRON_ENV}
         />
       </mesh>
       <mesh position={[0, -0.08, 0]} receiveShadow={shadows}>
@@ -530,10 +530,10 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
           map={court.color ?? undefined}
           normalMap={court.normal ?? undefined}
           roughnessMap={court.rough ?? undefined}
-          color={court.color ? '#a56d3c' : '#6d6a66'}
+          color={court.color ? STREET_COURT_TINT : '#6d6a66'}
           roughness={court.rough ? 0.94 : 0.78}
           metalness={0.02}
-          envMapIntensity={0.16}
+          envMapIntensity={STREET_COURT_ENV}
         />
       </mesh>
       <CourtLines />

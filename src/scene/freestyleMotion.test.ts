@@ -180,6 +180,9 @@ describe('fab foot contact', () => {
       planted.push(bone(gltf.scene, supportName).getWorldPosition(new Vector3()));
     }
     const contact = playingKick('right', 0.04);
+    contact.ball.x = rig.anchors.right.ball.x;
+    contact.ball.y = rig.anchors.right.ball.y;
+    contact.ball.z = rig.anchors.right.ball.z;
     action.time = animationSampleTime(contact, 'KickRight', clip.duration);
     mixer.update(1 / 60);
     rig.apply(contact, 'KickRight', computePose(contact), 1 / 60);
@@ -200,6 +203,15 @@ describe('fab foot contact', () => {
     expect(corrected.slide).toBeLessThan(0.01);
     expect(corrected.bob).toBeLessThan(0.012);
     expect(Math.abs(bootGap), `boot gap ${bootGap.toFixed(3)} foot ${strikeFoot.toArray().map((n) => n.toFixed(3)).join(',')}`).toBeLessThan(0.02);
+    const kickHip = bone(gltf.scene, 'UpperLeg_R').getWorldPosition(new Vector3());
+    const kickKnee = bone(gltf.scene, 'LowerLeg_R').getWorldPosition(new Vector3());
+    const kickToe = bone(gltf.scene, 'Toe_R').getWorldPosition(new Vector3());
+    expect(kickKnee.y, 'the knee stays below the hip').toBeLessThan(kickHip.y - 0.06);
+    expect(kickKnee.z, 'the knee lifts forward').toBeGreaterThan(kickHip.z + 0.08);
+    const footDir = kickToe.clone().sub(strikeFoot).normalize();
+    expect(footDir.z, 'the laces point forward').toBeGreaterThan(0.75);
+    expect(footDir.y, 'the toes sit slightly up').toBeGreaterThan(-0.05);
+    expect(footDir.y, 'the toes are not pulled up to the shin').toBeLessThan(0.45);
 
     const idleSamples: Array<{ x: number; y: number; z: number }> = [];
     const idle = gltf.animations.find((entry) => entry.name === 'Idle');
@@ -254,6 +266,9 @@ describe('fab foot contact', () => {
     };
 
     const leftKick = playingKick('left', 0.04);
+    leftKick.ball.x = rig.anchors.left.ball.x;
+    leftKick.ball.y = rig.anchors.left.ball.y;
+    leftKick.ball.z = rig.anchors.left.ball.z;
     const leftClip = gltf.animations.find((entry) => entry.name === 'KickLeft');
     if (!leftClip) throw new Error('missing KickLeft');
     const leftMixer = new AnimationMixer(gltf.scene);

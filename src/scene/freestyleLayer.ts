@@ -1,13 +1,12 @@
 import {
   AnimationMixer,
   Euler,
-  Matrix4,
   Quaternion,
   Vector3,
   type AnimationClip,
   type Object3D,
 } from 'three';
-import type { Side } from '../engine/config';
+import { DEFAULT_CONFIG, type Side } from '../engine/config';
 import type { GameEngine } from '../engine/engine';
 import type { TrickKind } from '../engine/tricks';
 import { atwFootOffset } from './atwOrbit';
@@ -17,6 +16,7 @@ import {
   BOOT_MATERIALS,
   THIGH_MATERIALS,
   UPPER_MATERIALS,
+  ballCenterOnInstep,
   closestSkinnedVertex,
   instepLocalPoint,
   surfaceGap,
@@ -141,6 +141,7 @@ function chain(scene: Object3D, side: Side): LegChain | null {
 const footWorld = new Vector3();
 const NAPE = new Vector3(0, 0.06, -0.1);
 const hipRest = new Vector3();
+const hipRestQ = new Quaternion();
 const segB = new Vector3();
 const ball = new Vector3();
 const hipDelta = new Vector3();
@@ -149,19 +150,12 @@ const pole = new Vector3();
 const hipWorld = new Vector3();
 const euler = new Euler();
 const swing = new Quaternion();
-const aimWorld = new Vector3();
-const aimFrom = new Vector3();
-const aimTo = new Vector3();
-const aimInv = new Matrix4();
-const forearmL = new Vector3();
-const forearmR = new Vector3();
+const armRest: Record<Side, Quaternion> = { left: new Quaternion(), right: new Quaternion() };
+const elbowRest: Record<Side, Quaternion> = { left: new Quaternion(), right: new Quaternion() };
 const headPosed = new Quaternion();
 const clipThigh = new Quaternion();
 const clipShin = new Quaternion();
 const clipFoot = new Quaternion();
-const solvedThigh = new Quaternion();
-const solvedShin = new Quaternion();
-const solvedFoot = new Quaternion();
 const orientQ = new Quaternion();
 const localScratch = new Vector3();
 const restScratch = new Vector3();
@@ -382,14 +376,61 @@ export function createFreestyleRig() {
   function solveStrike(side: Side, ankle: Vector3, towardBall: Vector3, wideKnee = false) {
     const limb = leg(side);
     limb.thigh.getWorldPosition(hipWorld);
+    const outward = side === 'left' ? -1 : 1;
     if (wideKnee) {
-      const outward = side === 'left' ? -1 : 1;
       pole.set(hipWorld.x + outward * 0.55, hipWorld.y + 0.05, hipWorld.z + 0.5);
     } else {
-      forwardPole(hipWorld, pole);
+      // Knee breaks forward and a little out. A clip that has already lifted the knee is ignored.
+      pole.set(hipWorld.x + outward * 0.16, hipWorld.y - 0.12, hipWorld.z + 0.7);
     }
-    solveTwoBone(limb.thigh, limb.shin, limb.foot, ankle, pole);
+    solveTwoBone(limb.thigh, limb.shin, limb.foot, ankle, pole, true);
     orientInstep(side, towardBall);
+  }
+
+  /**
+   * Instep kick-up from the Fab bind axes. Negative X on the thigh swings the
+   * knee forward; the same X on the shin bends it. The ankle stays locked with
+   * the toes a little up. `lift` 0 hovers, 1 is the touch, above 1 follows through.
+   * Chasing a waist-high ball folds this rig's knee into the hip, so the ball
+   * is measured onto this foot instead.
+   */
+  function poseKickUp(side: Side, lift: number) {
+    if (!bones) return;
+    bones.hips.quaternion.copy(hipRestQ);
+    bones.hips.position.copy(hipRest);
+    const u = Math.min(1, Math.max(0, lift));
+    bones.hips.quaternion.multiply(swing.setFromEuler(euler.set(-0.05 * u, 0, 0)));
+    bones.hips.updateMatrix();
+    bones.hips.updateWorldMatrix(true, true);
+    const follow = Math.max(0, lift - 1);
+    poseKickLeg(side, 0.28 + 0.30 * u + follow * 0.12, 0.20 + 0.18 * u, 0.46);
+  }
+
+  /** Hip flexion, a slight knee bend, ankle locked, toes slightly up. */
+  function poseKickLeg(side: Side, hipFlex: number, kneeFlex: number, toeUp: number) {
+    const limb = leg(side);
+    const outward = side === 'left' ? -1 : 1;
+    limb.thigh.quaternion.setFromEuler(euler.set(-hipFlex, 0, -outward * 0.06));
+    limb.thigh.updateMatrix();
+    limb.shin.quaternion.setFromEuler(euler.set(kneeFlex, 0, 0));
+    limb.shin.updateMatrix();
+    limb.foot.quaternion.setFromEuler(euler.set(hipFlex - kneeFlex - toeUp, 0, 0));
+    limb.foot.updateMatrix();
+    limb.foot.updateWorldMatrix(true, true);
+  }
+
+  /** Pose the touch and remember the ball centre that sits on the laces. */
+  function measureKickBall(scene: Object3D, side: Side) {
+    poseKickUp(side, 1);
+    pin(other(side), anchors[other(side)].plant);
+    const centre = ballCenterOnInstep(scene, side, DEFAULT_CONFIG.ballRadius);
+    if (centre) anchors[side].ball.copy(centre);
+    else {
+      const limb = leg(side);
+      limb.foot.getWorldPosition(footWorld);
+      const outward = side === 'left' ? -1 : 1;
+      anchors[side].ball.set(footWorld.x + outward * 0.02, footWorld.y + 0.16, footWorld.z + 0.1);
+    }
   }
 
   /**
@@ -521,56 +562,26 @@ export function createFreestyleRig() {
     return closest;
   }
 
-  function captureForearm(elbow: Object3D | undefined, handName: string, out: Vector3) {
-    if (!elbow) return;
-    const hand = elbow.getObjectByName(handName);
-    if (!hand) {
-      out.set(0, 0.22, 0);
-      return;
-    }
-    if (hand.parent === elbow) {
-      out.copy(hand.position);
-      return;
-    }
-    elbow.updateWorldMatrix(true, true);
-    hand.getWorldPosition(out);
-    elbow.worldToLocal(out);
-  }
-
   /**
-   * Point a limb at `worldDir`. The bone's rest quaternion already holds a T-pose,
-   * so writing a local Euler leaves the arm out to the side. This aims the child offset.
+   * Hang the arms from the Fab rest pose. The bind already points the elbows down
+   * and a little out; a full re-aim twists the mesh into the chest.
+   * `abduct` opens them, `pitch` swings a hand forward, `elbowBend` stays soft.
    */
-  function aimLimb(bone: Object3D, localOffset: Vector3, worldDir: Vector3) {
-    const parent = bone.parent;
-    if (!parent || localOffset.lengthSq() < 1e-8 || worldDir.lengthSq() < 1e-8) return;
-    parent.updateWorldMatrix(true, false);
-    aimInv.copy(parent.matrixWorld).invert();
-    aimTo.copy(worldDir).transformDirection(aimInv).normalize();
-    aimFrom.copy(localOffset).normalize();
-    if (aimFrom.dot(aimTo) < -0.999) aimTo.x += 0.02;
-    bone.quaternion.setFromUnitVectors(aimFrom, aimTo);
-    bone.updateMatrix();
-  }
-
-  /** Arms hang slightly out, elbows bent. `pitch` swings the hand forward (+Z). */
   function poseArm(side: Side, abduct: number, pitch: number, elbowBend: number) {
     if (!bones) return;
     const arm = side === 'left' ? bones.armLeft : bones.armRight;
     const elbow = side === 'left' ? bones.elbowLeft : bones.elbowRight;
     if (!arm || !elbow) return;
     const outward = side === 'left' ? 1 : -1;
-    const spread = Math.sin(Math.min(1.15, Math.abs(abduct)));
-    aimWorld.set(outward * spread * 0.38, -0.78, Math.sin(pitch) * 1.15);
-    aimLimb(arm, elbow.position, aimWorld);
-    const forearm = side === 'left' ? forearmL : forearmR;
-    const bend = Math.max(0.2, elbowBend);
-    aimWorld.set(outward * 0.1, -0.62, 0.12 + Math.sin(bend) * 0.9 + Math.sin(pitch) * 0.55);
-    if (forearm.lengthSq() > 1e-6) aimLimb(elbow, forearm, aimWorld);
-    else {
-      elbow.rotation.set(bend, 0, 0);
-      elbow.updateMatrix();
-    }
+    const spread = Math.min(0.5, Math.max(0.16, abduct * 0.72));
+    const forward = Math.max(-0.34, Math.min(0.34, pitch * 0.55));
+    const bend = Math.min(0.38, Math.max(0.08, elbowBend * 0.28));
+    arm.quaternion.copy(armRest[side]);
+    arm.quaternion.multiply(swing.setFromEuler(euler.set(-forward, 0, -outward * spread)));
+    arm.updateMatrix();
+    elbow.quaternion.copy(elbowRest[side]);
+    elbow.quaternion.multiply(swing.setFromEuler(euler.set(bend, 0, outward * 0.06)));
+    elbow.updateMatrix();
     hold(arm);
     hold(elbow);
   }
@@ -601,39 +612,20 @@ export function createFreestyleRig() {
   }
 
   function applyStrike(engine: GameEngine, side: Side, since: number) {
-    const limb = leg(side);
     const held = engine.contact?.side === side;
-    const weight = held
+    // The kick clip chambers the knee above the hip. Replace it for the whole swing.
+    const lift = held
       ? 1
       : since <= 0
-        ? 0
+        ? 0.2
         : since < CONTACT_DELAY
-          ? smooth(since / CONTACT_DELAY)
+          ? 0.2 + 0.8 * smooth(since / CONTACT_DELAY)
           : since < FOLLOW_TIME
-            ? 1 - smooth((since - CONTACT_DELAY) / (FOLLOW_TIME - CONTACT_DELAY))
-            : 0;
-    if (weight > 0.001) {
-      clipThigh.copy(limb.thigh.quaternion);
-      clipShin.copy(limb.shin.quaternion);
-      clipFoot.copy(limb.foot.quaternion);
-      ballNow(engine, ball);
-      limb.thigh.getWorldPosition(hipWorld);
-      approach.copy(hipWorld).sub(ball);
-      seatFoot(side, ball, engine.config.ballRadius, approach);
-      // Full contact stays on the leather. Earlier frames keep some of the clip so the swing does not pop.
-      if (weight < 0.999) {
-        solvedThigh.copy(limb.thigh.quaternion);
-        solvedShin.copy(limb.shin.quaternion);
-        solvedFoot.copy(limb.foot.quaternion);
-        limb.thigh.quaternion.copy(clipThigh).slerp(solvedThigh, weight);
-        limb.shin.quaternion.copy(clipShin).slerp(solvedShin, weight);
-        limb.foot.quaternion.copy(clipFoot).slerp(solvedFoot, weight);
-        limb.thigh.updateMatrix();
-        limb.shin.updateMatrix();
-        limb.foot.updateMatrix();
-        limb.shin.updateWorldMatrix(true, true);
-      }
-    }
+            ? 1 + 0.18 * Math.sin(((since - CONTACT_DELAY) / (FOLLOW_TIME - CONTACT_DELAY)) * Math.PI)
+            : since < RECOVER_TIME
+              ? 1 - smooth((since - FOLLOW_TIME) / (RECOVER_TIME - FOLLOW_TIME))
+              : 0.15;
+    poseKickUp(side, lift);
     pin(other(side), anchors[other(side)].plant);
     const env = since < CONTACT_DELAY ? easeIn(since / CONTACT_DELAY) : since < RECOVER_TIME ? 1 - smooth((since - FOLLOW_TIME) / (RECOVER_TIME - FOLLOW_TIME)) : 0;
     const counter = Math.min(1, Math.max(0, env));
@@ -1063,8 +1055,10 @@ export function createFreestyleRig() {
         elbowRight: bone(scene, 'LowerArm_R'),
         left, right,
       };
-      captureForearm(bones.elbowLeft, 'Hand_L', forearmL);
-      captureForearm(bones.elbowRight, 'Hand_R', forearmR);
+      if (bones.armLeft) armRest.left.copy(bones.armLeft.quaternion);
+      if (bones.armRight) armRest.right.copy(bones.armRight.quaternion);
+      if (bones.elbowLeft) elbowRest.left.copy(bones.elbowLeft.quaternion);
+      if (bones.elbowRight) elbowRest.right.copy(bones.elbowRight.quaternion);
       const idle = clipNamed(clips, 'Idle');
       if (idle) {
         const mixer = poseClip(scene, idle, 0);
@@ -1083,8 +1077,6 @@ export function createFreestyleRig() {
       capture(scene, clips, 'right', 'KickRight', KICK_CLIP_CONTACT_TIME, 'contact');
       capture(scene, clips, 'left', 'KickLeft', 0.42, 'follow');
       capture(scene, clips, 'right', 'KickRight', 0.42, 'follow');
-      anchors.left.ball.set(-0.17 * 0.6, 0.72, 0.62);
-      anchors.right.ball.set(0.17 * 0.6, 0.72, 0.62);
       if (idle) {
         const mixer = poseClip(scene, idle, 0);
         mixer.stopAllAction();
@@ -1092,6 +1084,14 @@ export function createFreestyleRig() {
       }
       captureBodyLandmarks();
       hipRest.copy(bones.hips.position);
+      hipRestQ.copy(bones.hips.quaternion);
+      measureKickBall(scene, 'right');
+      measureKickBall(scene, 'left');
+      if (idle) {
+        const mixer = poseClip(scene, idle, 0);
+        mixer.stopAllAction();
+        mixer.uncacheRoot(scene);
+      }
       if (chest) chestRest.copy(chest.quaternion);
       headLagReady = false;
       ready = true;

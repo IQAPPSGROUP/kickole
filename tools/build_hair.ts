@@ -32,7 +32,7 @@ import {
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outFile = join(root, 'public/models/hair/kickole_hair.glb');
 const BODIES: HairBody[] = ['male', 'female', 'primitive'];
-const ATLASES: HairAtlas[] = ['strand', 'braid', 'curl', 'spike', 'stubble'];
+const ATLASES: HairAtlas[] = ['strand', 'braid', 'curl', 'spike', 'stubble', 'crest'];
 
 interface Geo {
   pos: number[];
@@ -132,17 +132,16 @@ function braidMaps(): Maps {
     for (let x = 0; x < width; x++) {
       let a = 0;
       for (let s = 0; s < 3; s++) {
-        const cx = width * 0.5 + Math.sin((y / height) * Math.PI * 10 + s * 2.094) * width * 0.22;
+        const cx = width * 0.5 + Math.sin((y / height) * Math.PI * 8 + s * 2.094) * width * 0.16;
         const d = Math.abs(x - cx);
-        const fiber = Math.max(0, 1 - d / (width * 0.085));
-        const cross = 0.75 + 0.25 * Math.sin((y / height) * Math.PI * 10 + s);
-        a = Math.max(a, fiber * fiber * cross);
+        const fiber = smooth(1 - d / (width * 0.2));
+        a = Math.max(a, fiber);
       }
-      const edge = smooth((x / width) * 5) * smooth(((width - x) / width) * 5);
+      const edge = smooth(x / 6) * smooth((width - 1 - x) / 6);
       alpha[y * width + x] = a * edge;
     }
   }
-  return finish(width, height, alpha, (a) => Math.round(198 + a * 40));
+  return finish(width, height, alpha, (a) => Math.round(188 + a * 50));
 }
 
 function curlMaps(): Maps {
@@ -206,19 +205,39 @@ function stubbleMaps(): Maps {
   const alpha = new Float32Array(size * size);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const cell = 7;
+      const cell = 6;
       const gx = Math.floor(x / cell);
       const gy = Math.floor(y / cell);
-      if (hash(gx, gy) < 0.62) continue;
+      if (hash(gx, gy) < 0.38) continue;
       const lx = x - gx * cell - cell / 2;
       const ly = y - gy * cell;
-      if (ly > cell * 0.7) continue;
-      const d = Math.abs(lx);
-      const tick = Math.max(0, 1 - d / 0.8);
-      alpha[y * size + x] = tick * tick * 0.85;
+      if (ly > 4) continue;
+      const tick = Math.max(0, 1 - Math.abs(lx) / 1.2);
+      alpha[y * size + x] = tick > 0.4 ? 0.95 : 0;
     }
   }
-  return finish(size, size, alpha, () => 196);
+  return finish(size, size, alpha, () => 210);
+}
+
+/** Dense strip used by the mohawk so the crest reads as hair from the front and the side. */
+function crestMaps(): Maps {
+  const width = 128;
+  const height = 256;
+  const alpha = new Float32Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let a = 0;
+      for (let s = 0; s < 16; s++) {
+        const wobble = Math.sin(y * 0.04 + s * 1.3) * 1.1;
+        const cx = ((s + 0.5) / 16) * width + wobble;
+        const fiber = Math.max(0, 1 - Math.abs(x - cx) / 3.4);
+        a = Math.max(a, fiber);
+      }
+      const edge = smooth(x / 8) * smooth((width - 1 - x) / 8) * smooth(y / 10);
+      alpha[y * width + x] = a * edge;
+    }
+  }
+  return finish(width, height, alpha, (a) => Math.round(200 + a * 40));
 }
 
 async function toPng(raw: Buffer, width: number, height: number) {
@@ -304,6 +323,7 @@ async function main() {
     curl: curlMaps(),
     spike: spikeMaps(),
     stubble: stubbleMaps(),
+    crest: crestMaps(),
   };
   const materials = {} as Record<HairAtlas, Material>;
   for (const atlas of ATLASES) {

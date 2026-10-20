@@ -74,7 +74,7 @@ export const HAIR_SKULLS: Record<HairBody, Skull> = {
   },
 };
 
-export type HairAtlas = 'strand' | 'braid' | 'curl' | 'spike' | 'stubble';
+export type HairAtlas = 'strand' | 'braid' | 'curl' | 'spike' | 'stubble' | 'crest';
 
 /** One alpha card. Local +Y runs root to tip, local +Z is the card normal. */
 export interface HairCard {
@@ -148,7 +148,7 @@ export function scalpSpec(body: HairBody): ScalpSpec {
     phiStart: Math.PI / 2 + open,
     phiLength: Math.PI * 2 - open * 2,
     thetaStart: 0,
-    thetaLength: 2.05,
+    thetaLength: 2.2,
     color,
   };
 }
@@ -395,22 +395,34 @@ function mohawk(skull: Skull): HairCard[] {
   const outward = new Vector3();
   const growth = new Vector3();
   const root = new Vector3();
-  const steps = 9;
+  const front = new Vector3(0, 0.15, 1);
+  const side = new Vector3(1, 0, 0);
+  const steps = 10;
   let n = 0;
   for (let i = 0; i < steps; i++) {
     const t = i / (steps - 1);
-    spherical(0.18 + t * 1.25, Math.PI * 1.5, outward);
-    growth.copy(UP).lerp(outward, 0.35).normalize();
+    spherical(0.22 + t * 1.15, Math.PI * 1.5, outward);
     seatRoot(skull, outward, root);
-    const height = skull.radius * (1.2 - t * 0.35);
-    for (const twist of [0, 0.7, 1.25, Math.PI / 2]) {
+    const height = skull.radius * (1.35 - t * 0.4);
+    growth.copy(UP).lerp(outward, 0.2).normalize();
+    // A narrow strip facing the front, plus layers facing the side.
+    add(cards, skull, {
+      id: `mohawk-front-${n++}`,
+      atlas: 'crest',
+      root,
+      growth,
+      align: front,
+      width: 0.028,
+      height,
+    });
+    for (const twist of [-0.45, 0, 0.45]) {
       add(cards, skull, {
-        id: `mohawk-${n++}`,
-        atlas: 'strand',
+        id: `mohawk-side-${n++}`,
+        atlas: 'crest',
         root,
         growth,
-        align: outward,
-        width: 0.016,
+        align: side,
+        width: 0.02,
         height,
         twist,
       });
@@ -551,23 +563,40 @@ function braids(skull: Skull): HairCard[] {
         root,
         growth,
         align: outward,
-        width: 0.012,
-        height: skull.radius * 0.32,
+        width: 0.016,
+        height: skull.radius * 0.34,
+        twist: i % 2 === 0 ? 0.4 : 0,
       });
       prev.copy(root);
       hasPrev = true;
     }
-    outward.set(lateral, Math.cos(1.55), -Math.sin(1.55)).normalize();
+    outward.set(lateral, Math.cos(1.5), -Math.sin(1.5)).normalize();
     seatRoot(skull, outward, root);
     add(cards, skull, {
       id: `braid-hang-${n++}`,
       atlas: 'braid',
       root,
-      growth: growth.set(lateral * 0.12, -1, -0.22).normalize(),
-      align: outward,
-      width: 0.013,
-      height: 0.15,
+      growth: growth.set(lateral * 0.35, -1, -0.15).normalize(),
+      align: new Vector3(lateral, 0, 1),
+      width: 0.018,
+      height: 0.2,
     });
+  }
+  // Box braids beside the cheeks, facing the camera, outside the face volume.
+  for (const side of [-1, 1]) {
+    for (const [yBias, zBias] of [[0.72, -0.25], [0.35, -0.55]] as const) {
+      outward.set(side * 0.95, yBias, zBias).normalize();
+      seatRoot(skull, outward, root);
+      add(cards, skull, {
+        id: `braid-side-${n++}`,
+        atlas: 'braid',
+        root,
+        growth: growth.set(side * 0.12, -1, 0.02).normalize(),
+        align: new Vector3(0, 0, 1),
+        width: 0.02,
+        height: 0.2,
+      });
+    }
   }
   return cards;
 }

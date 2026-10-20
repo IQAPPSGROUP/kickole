@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { AgXToneMapping, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
+import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
@@ -189,7 +189,49 @@ function StreetTone() {
   return null;
 }
 
-/** Shared sunny HDR. Crisp sky on every theme. Image lighting follows the profile. */
+const SKY_VERTEX = /* glsl */ `
+  varying vec3 vDir;
+  void main() {
+    vDir = position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const SKY_FRAGMENT = /* glsl */ `
+  varying vec3 vDir;
+  void main() {
+    vec3 dir = normalize(vDir);
+    float up = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
+    vec3 horizon = vec3(0.10, 0.38, 0.86);
+    vec3 zenith = vec3(0.02, 0.16, 0.62);
+    vec3 color = mix(horizon, zenith, pow(up, 0.65));
+    vec3 sunDir = normalize(vec3(0.55, 0.78, 0.28));
+    float sun = pow(max(dot(dir, sunDir), 0.0), 360.0);
+    float glow = pow(max(dot(dir, sunDir), 0.0), 8.0);
+    color += vec3(1.0, 0.62, 0.28) * sun * 1.6;
+    color += vec3(1.0, 0.78, 0.45) * glow * 0.18;
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+/** Deep blue sky with a warm sun. The gameplay camera looks at the horizon, so an equirect horizon would read grey. */
+function CarnivalSky() {
+  return (
+    <mesh frustumCulled={false} renderOrder={-1}>
+      <sphereGeometry args={[48, 28, 16]} />
+      <shaderMaterial
+        side={BackSide}
+        depthWrite={false}
+        fog={false}
+        toneMapped={false}
+        vertexShader={SKY_VERTEX}
+        fragmentShader={SKY_FRAGMENT}
+      />
+    </mesh>
+  );
+}
+
+/** Shared sunny HDR for reflections only. The visible sky is CarnivalSky. */
 function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
   useEffect(() => {
@@ -208,9 +250,6 @@ function SunnyIbl({ ibl }: { ibl: boolean }) {
         if (!alive) { loaded.dispose(); disposePm(); return; }
         hdr = loaded;
         loaded.mapping = EquirectangularReflectionMapping;
-        scene.background = loaded;
-        scene.backgroundBlurriness = 0;
-        scene.backgroundIntensity = 1;
         if (ibl) {
           env = pm.fromEquirectangular(loaded).texture;
           scene.environment = env;
@@ -296,7 +335,8 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   return (
     <>
       <StreetTone />
-      <color attach="background" args={[ENVIRONMENT_THEME === 'beach' ? '#1f78e0' : '#3d8fe8']} />
+      <color attach="background" args={['#1a6fd0']} />
+      <CarnivalSky />
       <CameraRig shake={quality !== 'low'} quality={quality} />
       <SunnyIbl ibl={profile.ibl} />
       <Simulation controller={controller} />

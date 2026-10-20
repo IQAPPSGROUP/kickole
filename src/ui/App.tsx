@@ -13,13 +13,13 @@ import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
-import { Home, GameOver, SettingsScreen } from './Screens';
+import { Home, GameOver, Scoreboard, SettingsScreen } from './Screens';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
-type Overlay = 'none' | 'settings' | 'customise' | 'shop';
+type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'scoreboard';
 
 export function App() {
   const controller = useMemo(() => new GameController(), []);
@@ -162,7 +162,12 @@ export function App() {
         />
       )}
       {phase !== 'menu' && (
-        <Hud hud={snap.hud} controller={controller} onSkipCelebration={() => controller.skipCelebration()} />
+        <Hud
+          hud={snap.hud}
+          controller={controller}
+          onSkipCelebration={() => controller.skipCelebration()}
+          onScoreboard={() => setOverlay('scoreboard')}
+        />
       )}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
       {phase === 'over' && snap.result && overlay === 'none' && (
@@ -177,6 +182,13 @@ export function App() {
         />
       )}
       {InspectorPanel && <Suspense fallback={null}><InspectorPanel controller={controller} /></Suspense>}
+      {overlay === 'scoreboard' && (
+        <Scoreboard
+          best={snap.save.best}
+          leaderboard={snap.save.leaderboard}
+          onClose={closeOverlay}
+        />
+      )}
       {overlay === 'settings' && (
         <SettingsScreen
           settings={snap.settings}

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { ALLEY_BUNTING, ALLEY_FILES, ALLEY_MURAL, ALLEY_OFFSET } from './alleyLayout';
 import { resolveEnvironmentTheme } from './environment';
-import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
+import { gameplayFov, gameplayLookAt, gameplayCameraPosition } from './gameplayCamera';
 import { inPlayVolume } from './streetLayout';
 
 function glb(file: string) {
@@ -99,49 +99,36 @@ describe('alley environment', () => {
     }
   });
 
-  it('shows the full wordmark between the phone HUD and the player', () => {
-    const [x, y, z] = ALLEY_MURAL.position;
-    const [width, height] = ALLEY_MURAL.size;
+  it('drops the portrait player toward the buttons and keeps the ball on screen', () => {
     const point = new Vector3();
     for (const aspect of [390 / 844, 430 / 932]) {
-      const cam = new PerspectiveCamera(GAMEPLAY_FOV, aspect, 0.1, 200);
+      const cam = new PerspectiveCamera(gameplayFov(aspect), aspect, 0.1, 200);
       gameplayCameraPosition(aspect, cam.position);
-      cam.lookAt(GAMEPLAY_TARGET);
+      cam.lookAt(gameplayLookAt(aspect));
       cam.updateMatrixWorld();
       cam.updateProjectionMatrix();
-      expect(cam.position.y).toBeGreaterThan(1.5);
-      expect(cam.position.y).toBeLessThan(1.7);
-      const screen = (px: number, py: number, pz: number) => {
+      expect(cam.position.z).toBeGreaterThan(6);
+      expect(cam.position.z).toBeLessThan(8);
+      expect(cam.position.y).toBeGreaterThan(0.9);
+      expect(cam.position.y).toBeLessThan(1.3);
+      const screenY = (px: number, py: number, pz: number) => {
         point.set(px, py, pz).project(cam);
-        return { x: point.x * 0.5 + 0.5, y: 1 - (point.y * 0.5 + 0.5) };
+        return 1 - (point.y * 0.5 + 0.5);
       };
-      const corners = [
-        screen(x - width / 2, y + height / 2, z),
-        screen(x + width / 2, y + height / 2, z),
-        screen(x - width / 2, y - height / 2, z),
-        screen(x + width / 2, y - height / 2, z),
-      ];
-      for (const corner of corners) {
-        expect(corner.x).toBeGreaterThan(0.03);
-        expect(corner.x).toBeLessThan(0.97);
-        // Below the score card and the challenge prompt, above the player's crown.
-        expect(corner.y).toBeGreaterThan(0.22);
-        expect(corner.y).toBeLessThan(0.42);
-      }
-      const crown = screen(0, 1.75, 0.04);
-      const feet = screen(0, 0, 0.04);
-      const wallBase = screen(0, 0.02, -7.04);
-      expect(crown.y).toBeGreaterThan(corners[2].y + 0.04);
-      expect(feet.y).toBeGreaterThan(0.9);
-      expect(feet.y).toBeLessThan(1);
-      expect(1 - wallBase.y).toBeGreaterThan(0.26);
-      expect(1 - wallBase.y).toBeLessThan(0.36);
-      for (const row of ALLEY_BUNTING) {
-        const rope = screen(0, row.y, row.z);
-        const tip = screen(0, row.y - row.sag - 0.36, row.z);
-        expect(rope.y).toBeGreaterThan(corners[2].y);
-        expect(tip.y).toBeGreaterThan(rope.y);
-      }
+      const head = screenY(0, 1.72, 0.16);
+      const ball = screenY(0, 0.11, 0.62);
+      const ballBottom = screenY(0, 0, 0.62);
+      const kick = screenY(0, 2.2, 0.5);
+      // Body drops into the lower half; the head stays above the ball.
+      expect(head).toBeGreaterThan(0.38);
+      expect(head).toBeLessThan(0.46);
+      expect(ball).toBeGreaterThan(head + 0.25);
+      // Whole ball sits above the portrait trick fan (~0.79) and the ready line.
+      expect(ball).toBeGreaterThan(0.68);
+      expect(ball).toBeLessThan(0.75);
+      expect(ballBottom).toBeLessThan(0.76);
+      expect(kick).toBeGreaterThan(0.05);
+      expect(kick).toBeLessThan(head);
     }
   });
 

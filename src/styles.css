@@ -91,7 +91,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .btn.ghost { background: rgba(247,245,237,.12); color: var(--white); }
 
 .screen { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; pointer-events: none; padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom); }
-.screen.over, .screen.settings { pointer-events: auto; justify-content: center; align-items: center; background: rgba(20,45,53,.78); backdrop-filter: blur(4px); }
+.screen.over, .screen.settings, .screen.scoreboard { pointer-events: auto; justify-content: center; align-items: center; background: rgba(20,45,53,.78); backdrop-filter: blur(4px); }
+.board-empty { margin: 8px 0; letter-spacing: 2px; font-weight: 800; color: #f5c94d; }
 .screen.settings { z-index: 20; overflow-y: auto; }
 .home { justify-content: space-between; align-items: center; }
 .home-top { text-align: center; padding-top: 24px; }
@@ -818,3 +819,46 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .shop-action { min-width: 78px; font-size: 9px; }
   .home-actions { flex-direction: column; }
 }
+
+/* Play chrome: score and scoreboard sit top-left; trick chips are a name only. */
+.hud-bar {
+  position: absolute;
+  top: 0;
+  left: max(10px, env(safe-area-inset-left));
+  z-index: 6;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-bar .hud-top {
+  position: static;
+  left: auto;
+  top: auto;
+  margin: 8px 0 0;
+}
+.scoreboard-btn {
+  pointer-events: auto;
+  margin-top: 8px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid #f5c94d66;
+  background: linear-gradient(#17353d, #102830);
+  box-shadow: 0 6px 0 #0a1b20, 0 12px 22px #0006;
+  color: #f5c94d;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.scoreboard-btn svg { width: 22px; height: 22px; }
+.scoreboard-btn:active { transform: scale(.96); }
+.tap-start {
+  bottom: calc(max(8px, env(safe-area-inset-bottom)) + var(--control-lift) + 6px);
+  font-size: clamp(15px, 4.2vw, 22px);
+  letter-spacing: 1px;
+}
+.trick-label { font-size: 11px; letter-spacing: .3px; }
+.foot-btn-label { font-size: 11px; letter-spacing: .4px; }
+.prompt-tip { display: none; }

@@ -32,14 +32,12 @@ import {
   stepFpsGuard,
   subscribeDevice,
 } from './qualityTier';
-import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
+import { gameplayFov, gameplayLookAt, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
 import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
 
-const FOV = GAMEPLAY_FOV;
-const TARGET = GAMEPLAY_TARGET;
-
 const BASE = new Vector3();
+const AIM = new Vector3();
 const LOOK = new Vector3();
 const INTRO_POS = new Vector3();
 const INTRO_TARGET = new Vector3();
@@ -63,10 +61,12 @@ function devKickcam(): Kickcam | null {
 }
 
 function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
-  cam.fov = FOV;
+  const fov = gameplayFov(aspect);
+  cam.fov = fov;
   gameplayCameraPosition(aspect, BASE);
+  gameplayLookAt(aspect, AIM);
   cam.position.copy(BASE);
-  cam.lookAt(TARGET);
+  cam.lookAt(AIM);
   cam.updateProjectionMatrix();
 }
 
@@ -116,8 +116,11 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
       fx.shake = 0;
       return;
     }
-    if (cam.fov !== FOV) {
-      cam.fov = FOV;
+    const fov = gameplayFov(aspect);
+    gameplayCameraPosition(aspect, BASE);
+    gameplayLookAt(aspect, AIM);
+    if (cam.fov !== fov) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
     fx.push = Math.max(0, fx.push - dt * 3);
@@ -125,21 +128,20 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
     const reduced = prefersReducedMotion();
     if (reduced) fx.swoop = 0;
     fx.swoop = Math.max(0, fx.swoop - dt * 0.72);
-    if (BASE.lengthSq() === 0) gameplayCameraPosition(aspect, BASE);
     const swoop = fx.swoop;
     const swayStill = cameraSway(state.clock.elapsedTime, quality, reduced);
     if (!shake && swoop <= 0 && swayStill.x === 0 && swayStill.y === 0) {
-      if (cam.fov !== FOV) {
-        cam.fov = FOV;
+      if (cam.fov !== fov) {
+        cam.fov = fov;
         cam.updateProjectionMatrix();
       }
       cam.position.copy(BASE);
-      cam.lookAt(TARGET);
+      cam.lookAt(AIM);
       return;
     }
     const t = state.clock.elapsedTime;
     const sway = cameraSway(t, quality, reduced);
-    LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
+    LOOK.copy(AIM).sub(BASE).multiplyScalar(fx.push * 0.03);
     camera.position.copy(BASE).add(LOOK);
     camera.position.x += sway.x;
     camera.position.y += sway.y;
@@ -151,16 +153,16 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
       camera.position.x += Math.sin(swoop * 1.15) * 0.62;
       camera.position.y += swoop * 0.32;
       camera.position.z -= swoop * 0.38;
-      const nextFov = FOV - swoop * 5.5;
+      const nextFov = fov - swoop * 5.5;
       if (Math.abs(cam.fov - nextFov) > 0.05) {
         cam.fov = nextFov;
         cam.updateProjectionMatrix();
       }
-    } else if (cam.fov !== FOV) {
-      cam.fov = FOV;
+    } else if (cam.fov !== fov) {
+      cam.fov = fov;
       cam.updateProjectionMatrix();
     }
-    camera.lookAt(TARGET);
+    camera.lookAt(AIM);
   });
   return null;
 }
@@ -443,7 +445,7 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
           toneMapping: AgXToneMapping,
           toneMappingExposure: STREET_EXPOSURE,
         }}
-        camera={{ fov: FOV, near: 0.1, far: 60 }}
+        camera={{ fov: 35, near: 0.1, far: 80 }}
       >
         <ContextLossGuard onLost={markLost} />
         <GpuProbe />

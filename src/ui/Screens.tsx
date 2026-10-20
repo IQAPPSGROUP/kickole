@@ -70,6 +70,35 @@ export function Home({
   );
 }
 
+export function Scoreboard({
+  best, leaderboard, onClose,
+}: {
+  best: number;
+  leaderboard: RunRecord[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="screen scoreboard">
+      <div className="card">
+        <h2>SCORES</h2>
+        <p className="coin-earn">BEST {best}</p>
+        {leaderboard.length === 0 ? (
+          <p className="board-empty">NONE YET</p>
+        ) : (
+          <ol className="board">
+            {leaderboard.map((r, i) => (
+              <li key={r.date + '-' + i}>
+                <span>{i + 1}</span><b>{r.score}</b><em>{r.kickUps}</em>
+              </li>
+            ))}
+          </ol>
+        )}
+        <button className="btn primary" onClick={onClose} autoFocus>BACK</button>
+      </div>
+    </div>
+  );
+}
+
 export function GameOver({
   result, best, coins, leaderboard, onAgain, onHome, onShop,
 }: {

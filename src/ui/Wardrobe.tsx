@@ -60,8 +60,7 @@ export function BodySelect({ onChoose }: { onChoose: (body: PlayerBody) => void 
   return (
     <div className="screen settings body-select">
       <div className="card">
-        <h2>YOUR FOOTBALLER</h2>
-        <p className="shop-lead">Pick a male or female player. Both are free, and you can change this later in Customise.</p>
+        <h2>PLAYER</h2>
         <button type="button" className="btn primary big" onClick={() => onChoose('male')}>MALE</button>
         <button type="button" className="btn ghost" onClick={() => onChoose('female')}>FEMALE</button>
       </div>

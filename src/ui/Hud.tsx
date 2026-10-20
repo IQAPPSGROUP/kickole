@@ -12,25 +12,37 @@ export function Hud({
   hud,
   controller,
   onSkipCelebration,
+  onScoreboard,
 }: {
   hud: HudState;
   controller?: GameController;
   onSkipCelebration?: () => void;
+  onScoreboard?: () => void;
 }) {
   const f = hud.feedback;
   const combo = streakMultiplier(hud.streak);
+  const showBoard = onScoreboard && (hud.phase === 'ready' || hud.phase === 'playing');
   return (
     <div className="hud">
-      <div className="hud-top">
-        <span className="score-label">YOUR RUN</span>
-        <div className="score" key={hud.score}>{hud.score}</div>
-        <div className="hud-sub">
-          <span>KICK-UPS <b>{hud.kickUps}</b></span>
-          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
+      <div className="hud-bar">
+        <div className="hud-top">
+          <div className="score" key={hud.score}>{hud.score}</div>
+          <div className="hud-sub">
+            <span>KICK-UPS <b>{hud.kickUps}</b></span>
+            {combo > 1 && <span className="combo" key={combo}>x{combo}</span>}
+          </div>
         </div>
-      </div>
-      <div className="hud-coaching">
-        {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
+        {showBoard && (
+          <button
+            type="button"
+            className="scoreboard-btn"
+            aria-label="Scoreboard"
+            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+            onClick={(e) => { e.stopPropagation(); onScoreboard?.(); }}
+          >
+            <TrophyIcon />
+          </button>
+        )}
       </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
       {f && hud.phase !== 'over' && (
@@ -40,14 +52,12 @@ export function Hud({
         </div>
       )}
       {hud.phase === 'ready' && (
-        <div className="tap-start">FIND YOUR RHYTHM<small>Tap either side to start · Tricks unlock in play</small></div>
+        <div className="tap-start">FIND YOUR RHYTHM</div>
       )}
-      {hud.stalling && <div className="stall-hint">HOLD… RELEASE TO FLICK!</div>}
-      {hud.neckHolding && <div className="stall-hint">NECK STALL · RELEASE TO FLICK</div>}
+      {hud.stalling && <div className="stall-hint">RELEASE</div>}
+      {hud.neckHolding && <div className="stall-hint">RELEASE</div>}
       {hud.armedTrick && hud.phase === 'playing' && (
-        <div className="trick-armed">
-          {armedLabel(hud.armedTrick)} {hud.trickQueued ? 'LINING UP' : 'ARMED'}
-        </div>
+        <div className="trick-armed">{armedLabel(hud.armedTrick)}</div>
       )}
       {hud.celebrating && (
         <button
@@ -55,7 +65,7 @@ export function Hud({
           className="celebrate-skip"
           onClick={(e) => { e.stopPropagation(); onSkipCelebration?.(); }}
         >
-          {hud.celebrationLabel} · TAP TO SKIP
+          SKIP
         </button>
       )}
     </div>
@@ -98,7 +108,6 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
       </svg>
       <div className="prompt-bounce">
         <GraffitiText text={call} className={call.length > 16 ? 'graffiti prompt-call is-long' : 'graffiti prompt-call'} />
-        <GraffitiText text={prompt.tip} className="graffiti prompt-tip" />
         <svg className="prompt-ring" viewBox="0 0 36 36" aria-hidden>
           <circle cx="18" cy="18" r="14" />
           <circle ref={ring} cx="18" cy="18" r="14" pathLength={100} />
@@ -134,12 +143,24 @@ function GraffitiText({ text, className }: { text: string; className: string }) 
 }
 
 export function ClueMark({ gesture }: { gesture: PromptGesture }) {
-  const label = gesture === 'hold' ? 'Hold' : gesture === 'swipe' ? 'Swipe' : 'Tap';
   return (
     <span className={`ghost-hand ghost-${gesture}`} aria-hidden>
       <i />
-      <em>{label}</em>
     </span>
+  );
+}
+
+function TrophyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M7 4h10v2.2a4.2 4.2 0 0 1-3.1 4 4.2 4.2 0 0 1-3.8 0A4.2 4.2 0 0 1 7 6.2V4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path d="M7 6H4.8A2.8 2.8 0 0 0 7.2 9.2M17 6h2.2A2.8 2.8 0 0 1 16.8 9.2M12 10.4V14M9 20h6M8.5 17.5h7l-.6-3.5h-5.8l-.6 3.5z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -184,56 +205,6 @@ function BeatRing({ active }: { active: boolean }) {
 }
 
 type TrickButtonKind = 'head' | 'neck' | ArmedTrick;
-
-function TrickIcon({ kind }: { kind: TrickButtonKind }) {
-  const common = { viewBox: '0 0 24 24', 'aria-hidden': true as const, className: 'trick-icon' };
-  switch (kind) {
-    case 'head':
-      return (
-        <svg {...common}>
-          <circle cx="12" cy="8" r="3.2" fill="currentColor" />
-          <path d="M8 20c.4-3 2-4.6 4-4.6s3.6 1.6 4 4.6" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      );
-    case 'aroundTheWorld':
-      return (
-        <svg {...common}>
-          <path d="M12 5a7 7 0 1 0 6.2 3.8" fill="none" stroke="currentColor" strokeWidth="2" />
-          <path d="M15 4.5h4.2V9" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      );
-    case 'neck':
-      return (
-        <svg {...common}>
-          <path d="M8 5h8M9 5v6.5c0 2.8 1.3 4.5 3 4.5s3-1.7 3-4.5V5" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      );
-    case 'highFlick':
-      return (
-        <svg {...common}>
-          <path d="M12 19V7M7.5 11 12 6.5 16.5 11" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      );
-    case 'groove':
-      return (
-        <svg {...common}>
-          <path d="M9 18V8l8-2v10" fill="none" stroke="currentColor" strokeWidth="2" />
-          <circle cx="7.2" cy="18" r="1.8" fill="currentColor" />
-          <circle cx="15.2" cy="16" r="1.8" fill="currentColor" />
-        </svg>
-      );
-    case 'thigh':
-      return (
-        <svg {...common}>
-          <path d="M9 4v8l-2 8M15 4v7l3 9" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-      );
-    default: {
-      const exhaustive: never = kind;
-      return exhaustive;
-    }
-  }
-}
 
 function trickName(kind: TrickButtonKind): string {
   switch (kind) {
@@ -459,15 +430,7 @@ export function TouchZones({ controller }: { controller: GameController }) {
       >
         {trick.kind === 'groove' && <BeatRing active={playing || Boolean(clue?.beat)} />}
         {clueOn(trick.control) && clue && <ClueMark gesture={clue.gesture} />}
-        {!playing && (
-          <svg className="trick-lock" viewBox="0 0 12 12" aria-hidden>
-            <rect x="2.2" y="5.2" width="7.6" height="5.4" rx="1" fill="currentColor" />
-            <path d="M3.6 5.2V3.7a2.4 2.4 0 0 1 4.8 0v1.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-          </svg>
-        )}
-        <TrickIcon kind={trick.kind} />
         <span className="trick-label">{trickName(trick.kind)}</span>
-        {trick.kind === 'neck' && playing && <small className="trick-sub">HOLD</small>}
       </button>
     );
   };
@@ -479,7 +442,6 @@ export function TouchZones({ controller }: { controller: GameController }) {
         {LEFT_FAN.map(trickButton)}
         <button type="button" className={`foot-btn left${clueOn('feet') ? ' clue' : ''}`} aria-label="Left foot" {...bindFoot(controller, 'left')}>
           <PowerRing controller={controller} side="left" />
-          <span className="foot-btn-mark">L</span>
           <span className="foot-btn-label">LEFT</span>
         </button>
       </div>
@@ -488,7 +450,6 @@ export function TouchZones({ controller }: { controller: GameController }) {
         <button type="button" className={`foot-btn right${clueOn('feet') ? ' clue' : ''}`} aria-label="Right foot" {...bindFoot(controller, 'right')}>
           <PowerRing controller={controller} side="right" />
           {clueOn('feet') && clue && <ClueMark gesture={clue.gesture} />}
-          <span className="foot-btn-mark">R</span>
           <span className="foot-btn-label">RIGHT</span>
         </button>
       </div>

@@ -2,9 +2,10 @@ import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { BufferGeometry, CanvasTexture, Color, DoubleSide, InstancedMesh, MeshStandardMaterial, Object3D, RepeatWrapping, SRGBColorSpace } from 'three';
 import type { Quality } from '../game/storage';
-import { EnvironmentBackdrop } from './EnvironmentBackdrop';
 import { BeachCourt } from './BeachCourt';
 import { ENVIRONMENT_THEME } from './environment';
+import { SportsCourt } from './SportsCourt';
+import { StreetProps } from './StreetProps';
 import { Crowd } from './Crowd';
 import { profileFor } from './qualityTier';
 import { prefersReducedMotion, sceneLifeBudget } from './juice';
@@ -14,15 +15,10 @@ import { concreteMapSet, courtMapSet, fenceModel, fencePosts, fenceSlots, LAMP_S
 import { useStreetMaps, useStreetNodes, type StreetMaps } from './streetMaterials';
 
 const NAVY = '#1E2A5A';
-const TEAL = '#00B8A9';
 const LIME = '#FFD93D';
 const CORAL = '#FF4F9A';
 const WHITE = '#F8F9FB';
 
-// Stable paint wear: reloading or changing quality must not rearrange the court.
-function seededRandom(seed: number) {
-  return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-}
 
 function makeCanvas(size: number, draw: (g: CanvasRenderingContext2D, n: number) => void) {
   const c = document.createElement('canvas');
@@ -87,65 +83,12 @@ function useBlobTexture() {
   );
 }
 
-function Bin({ x, z, color }: { x: number; z: number; color: string }) {
-  const blob = useBlobTexture();
-  return (
-    <group position={[x, 0, z]}>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-        <planeGeometry args={[0.9, 0.9]} />
-        <meshBasicMaterial map={blob} transparent depthWrite={false} />
-      </mesh>
-      <mesh position={[0, 0.3, 0]} castShadow>
-        <cylinderGeometry args={[0.2, 0.17, 0.6, 14]} />
-        <meshStandardMaterial color={color} roughness={0.72} metalness={0.04} />
-      </mesh>
-      <mesh position={[0, 0.62, 0]}>
-        <cylinderGeometry args={[0.22, 0.22, 0.04, 14]} />
-        <meshStandardMaterial color="#2c3136" roughness={0.62} metalness={0.25} />
-      </mesh>
-    </group>
-  );
-}
-
-function Poster({ x, y, color, w = 0.7, h = 0.95 }: { x: number; y: number; color: string; w?: number; h?: number }) {
-  return (
-    <group position={[x, y, -3.47]}>
-      <mesh>
-        <boxGeometry args={[w, h, 0.02]} />
-        <meshStandardMaterial color={WHITE} roughness={0.6} />
-      </mesh>
-      <mesh position={[0, 0.08, 0.012]}>
-        <boxGeometry args={[w * 0.8, h * 0.55, 0.01]} />
-        <meshStandardMaterial color={color} roughness={0.72} metalness={0.04} />
-      </mesh>
-      <mesh position={[0, -h * 0.34, 0.012]}>
-        <boxGeometry args={[w * 0.6, 0.06, 0.01]} />
-        <meshStandardMaterial color="#2c3136" roughness={0.62} metalness={0.25} />
-      </mesh>
-    </group>
-  );
-}
-
-function Floodlight({ x, z }: { x: number; z: number }) {
-  return (
-    <group position={[x, 0, z]}>
-      <mesh position={[0, 1.8, 0]}>
-        <cylinderGeometry args={[0.05, 0.07, 3.6, 8]} />
-        <meshStandardMaterial color="#2c3136" roughness={0.62} metalness={0.25} />
-      </mesh>
-      <mesh position={[0, 3.65, 0]}>
-        <boxGeometry args={[0.55, 0.16, 0.22]} />
-        <meshBasicMaterial color="#ffc98a" toneMapped={false} />
-      </mesh>
-    </group>
-  );
-}
 
 const FESTA = ['#ff4f9a', '#ffd93d', '#2ee6d6', '#7c6bff', '#ff8a3d', '#ffffff', '#5ee08a'];
 const FLAG_X = [-4.15, -3.25, -2.35, -1.45, -0.55, 0.35];
 
 /** Bunting, flags and streamers. Four instanced draws, all outside the play box. */
-function CarnivalDressing({ sway }: { sway: boolean }) {
+export function CarnivalDressing({ sway }: { sway: boolean }) {
   const buntingRef = useRef<InstancedMesh>(null);
   const ropeRef = useRef<InstancedMesh>(null);
   const wallRef = useRef<InstancedMesh>(null);
@@ -281,96 +224,6 @@ function CarnivalDressing({ sway }: { sway: boolean }) {
   );
 }
 
-/** Low-poly hillside neighbourhood: original geometry, no downloaded models or textures.
- * Placed behind the back wall so the ball and player remain unobstructed.
- * Static buildings are intentionally unlit to minimise mobile GPU cost. */
-function HillsideNeighbourhood() {
-  const buildings = useMemo(() => {
-    const random = seededRandom(1969);
-    const palette = ['#f6d7b0', '#f7b7c4', '#ffe08a', '#b7ebe4', '#f7f1e4', '#f0c48a'];
-    return Array.from({ length: 22 }, (_, i) => {
-      const row = i < 12 ? 0 : 1;
-      const index = row === 0 ? i : i - 12;
-      const x = (index - (row === 0 ? 5.5 : 4.5)) * (row === 0 ? 0.93 : 1.24);
-      const z = row === 0 ? -5.5 - random() * 0.5 : -7.3 - random() * 0.9;
-      const width = 0.74 + random() * 0.48;
-      const height = (row === 0 ? 2.0 : 3.0) + random() * 2.0;
-      const depth = 0.7 + random() * 0.55;
-      return { x, z, width, height, depth, color: palette[i % palette.length], roof: i % 3 === 0, balcony: i % 4 === 0 };
-    });
-  }, []);
-  return (
-    <group>
-      {/* Distant skyline blocks: flat shaded and intentionally low-poly. */}
-      {buildings.map((b, i) => (
-        <group key={i} position={[b.x, 0, b.z]}>
-          <mesh position={[0, b.height / 2, 0]}>
-            <boxGeometry args={[b.width, b.height, b.depth]} />
-            <meshLambertMaterial color={b.color} />
-          </mesh>
-          <mesh position={[0, b.height + 0.055, 0]}>
-            <boxGeometry args={[b.width + 0.13, 0.11, b.depth + 0.13]} />
-            <meshLambertMaterial color="#D8C6AA" />
-          </mesh>
-          {/* Dark windows face the camera. */}
-          {[-0.22, 0.22].map((u, k) => (
-            <mesh key={k} position={[u * b.width, b.height * 0.68, b.depth / 2 + 0.008]}>
-              <planeGeometry args={[0.14, 0.22]} />
-              <meshBasicMaterial color="#294854" />
-            </mesh>
-          ))}
-          {b.roof && (
-            <mesh position={[b.width * 0.23, b.height + 0.24, 0]}>
-              <boxGeometry args={[0.09, 0.37, 0.09]} />
-              <meshLambertMaterial color="#56616A" />
-            </mesh>
-          )}
-          {b.balcony && (
-            <mesh position={[0, b.height * 0.46, b.depth / 2 + 0.12]}>
-              <boxGeometry args={[b.width * 0.72, 0.06, 0.23]} />
-              <meshLambertMaterial color="#E3D4BB" />
-            </mesh>
-          )}
-          {/* Rooftop water tanks and solar panels break up the boxy skyline. */}
-          {i % 5 === 0 && (
-            <group position={[-b.width * 0.2, b.height + 0.3, 0]}>
-              <mesh>
-                <cylinderGeometry args={[0.17, 0.19, 0.44, 8]} />
-                <meshLambertMaterial color="#283C43" />
-              </mesh>
-              <mesh position={[0, 0.24, 0]}>
-                <cylinderGeometry args={[0.19, 0.19, 0.035, 8]} />
-                <meshLambertMaterial color="#17262D" />
-              </mesh>
-            </group>
-          )}
-          {i % 6 === 2 && (
-            <mesh position={[0, b.height + 0.21, 0]} rotation={[-0.35, 0, 0]}>
-              <boxGeometry args={[b.width * 0.55, 0.035, 0.37]} />
-              <meshLambertMaterial color="#274A61" />
-            </mesh>
-          )}
-          {/* Sunshades and colourful laundry give the houses lived-in detail. */}
-          {i % 3 === 1 && (
-            <group position={[0, b.height * 0.46 + 0.22, b.depth / 2 + 0.15]}>
-              <mesh rotation={[0.2, 0, 0]}>
-                <boxGeometry args={[b.width * 0.85, 0.035, 0.36]} />
-                <meshLambertMaterial color={i % 2 ? "#E5BD71" : "#D16F56"} />
-              </mesh>
-              {[-0.22, 0, 0.22].map((u, j) => (
-                <mesh key={j} position={[u * b.width, -0.17 - j * 0.02, 0.15]}>
-                  <planeGeometry args={[0.15, 0.28 + j * 0.035]} />
-                  <meshBasicMaterial color={['#F5E9C9', '#5E9FBC', '#D65E62'][j]} side={DoubleSide} />
-                </mesh>
-              ))}
-            </group>
-          )}
-        </group>
-      ))}
-    </group>
-  );
-}
-
 const slotDummy = new Object3D();
 const LINE_W = 0.14;
 
@@ -390,7 +243,7 @@ function useLineMaterial() {
 }
 
 /** Painted markings as geometry. A 9 cm texture line disappears in the grazing mip. */
-function CourtLines() {
+export function CourtLines() {
   const material = useLineMaterial();
   const boxZ = (z0: number, z1: number) => ({ z: (z0 + z1) / 2, d: Math.abs(z1 - z0) });
   const near = boxZ(1.8, 2.95);
@@ -496,7 +349,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
   const stencil = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalStencil) : null, null, null, 1, 1);
   const tag = useStreetMaps(profile.decals ? streetUrl(STREET_FILES.decalTag) : null, null, null, 1, 1);
   const fenceNodes = useStreetNodes(fenceModel(profile.fence));
-  const lampNodes = useStreetNodes(profile.lamp === 'simple' ? null : streetUrl(STREET_FILES.lamp));
+  const lampNodes = useStreetNodes(streetUrl(STREET_FILES.lamp));
   const panel = fenceNodes.find((node) => node.name === 'Panel');
   const post = fenceNodes.find((node) => node.name === 'Post');
   const slots = useMemo(() => fenceSlots(profile.fence), [profile.fence]);
@@ -509,7 +362,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
   }, [sign, fence, blob]);
   return (
     <group>
-      <EnvironmentBackdrop quality={quality} fallback={<HillsideNeighbourhood />} />
+      <StreetProps quality={quality} />
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow={shadows}>
         <planeGeometry args={[40.5, 40.5]} />
         <meshStandardMaterial
@@ -573,8 +426,6 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         <planeGeometry args={[3.2, 0.8]} />
         <meshBasicMaterial map={sign} transparent toneMapped={false} />
       </mesh>
-      <Poster x={2.15} y={1.35} color={CORAL} />
-      <Poster x={3.15} y={1.5} color={TEAL} w={0.9} h={0.7} />
       {tag.color && [-1, 1].map((side) => (
         <mesh key={side} position={[side * 4.28, 0.5, -0.4]} rotation={[0, side > 0 ? -Math.PI / 2 : Math.PI / 2, 0]}>
           <planeGeometry args={[0.72, 0.72]} />
@@ -602,24 +453,7 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
         </mesh>
       ))}
       <Crowd count={profile.crowd} lod={profile.crowdLod} idle={profile.crowdIdle} />
-      <Bin x={-3.7} z={-3} color={TEAL} />
-      <Bin x={-3.15} z={-3.05} color={CORAL} />
-      <mesh position={[3.05, 0.32, -2.85]} castShadow>
-        <boxGeometry args={[1.15, 0.07, 0.34]} />
-        <meshStandardMaterial color="#b9a06a" roughness={0.72} />
-      </mesh>
-      <mesh position={[3.05, 0.16, -2.85]}>
-        <boxGeometry args={[1.05, 0.28, 0.28]} />
-        <meshStandardMaterial color="#2c3136" roughness={0.55} metalness={0.35} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[3.05, 0.016, -2.85]}>
-        <planeGeometry args={[1.6, 0.8]} />
-        <meshBasicMaterial map={blob} transparent depthWrite={false} />
-      </mesh>
       <CarnivalDressing sway={sceneLifeBudget(quality, prefersReducedMotion()).buntingSway} />
-      {profile.lamp === 'simple' && LAMP_SPOTS.map((spot) => (
-        <Floodlight key={`flood-${spot.x}`} x={spot.x} z={spot.z} />
-      ))}
       {lampNodes.map((node) => (
         LAMP_SPOTS.map((spot) => (
           <group key={`${node.name}-${spot.x}`} position={[spot.x, 0, spot.z]} rotation={[0, spot.ry, 0]}>
@@ -654,5 +488,13 @@ function StreetCourt({ shadows, quality }: { shadows: boolean; quality: Quality 
 }
 
 export function Court(props: { shadows: boolean; quality: Quality }) {
-  return ENVIRONMENT_THEME === 'beach' ? <BeachCourt {...props} /> : <StreetCourt {...props} />;
+  switch (ENVIRONMENT_THEME) {
+    case 'beach': return <BeachCourt {...props} />;
+    case 'court': return <SportsCourt {...props} />;
+    case 'street': return <StreetCourt {...props} />;
+    default: {
+      const neverTheme: never = ENVIRONMENT_THEME;
+      return neverTheme;
+    }
+  }
 }

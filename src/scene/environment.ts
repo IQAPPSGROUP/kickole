@@ -7,14 +7,27 @@ export const ENVIRONMENT_OFFSET_X = -1.6;
 export const ENVIRONMENT_OFFSET_Y = -0.7;
 export const ENVIRONMENT_OFFSET_Z = -1.8;
 
-export type EnvironmentTheme = 'street' | 'beach';
-export function resolveEnvironmentTheme(build?: string, preview?: string | null): EnvironmentTheme {
-  return (preview ?? build) === 'beach' ? 'beach' : 'street';
+export type EnvironmentTheme = 'street' | 'court' | 'beach';
+
+export function resolveEnvironmentTheme(build?: string | null, preview?: string | null): EnvironmentTheme {
+  const value = preview ?? build;
+  switch (value) {
+    case 'street':
+    case 'court':
+    case 'beach':
+      return value;
+    default:
+      return 'street';
+  }
 }
 
-/** Production uses a build setting. Only the dev viewer accepts a URL override. */
+function previewTheme(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('environment');
+}
+
+/** Build setting is the default. `?environment=street|court|beach` overrides it so one preview can show every location. */
 export const ENVIRONMENT_THEME = resolveEnvironmentTheme(
   import.meta.env.VITE_ENVIRONMENT_THEME,
-  import.meta.env.DEV && typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('environment') : undefined,
+  previewTheme(),
 );

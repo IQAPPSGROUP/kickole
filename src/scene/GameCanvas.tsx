@@ -1,8 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
-import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { AgXToneMapping, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
 import type { GraphicsChoice, Quality } from '../game/storage';
@@ -17,7 +16,9 @@ import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
-import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
+import { STREET_EXPOSURE, STREET_FILL } from './daylight';
+import { locationHemi } from './locations';
+import { PhotoSky } from './PhotoSky';
 import { installPcss, restorePcss } from './pcss';
 import {
   createFpsGuard,
@@ -189,88 +190,6 @@ function StreetTone({ exposure }: { exposure: number }) {
   return null;
 }
 
-const SKY_VERTEX = /* glsl */ `
-  varying vec3 vDir;
-  void main() {
-    vDir = position;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const SKY_FRAGMENT = /* glsl */ `
-  varying vec3 vDir;
-  void main() {
-    vec3 dir = normalize(vDir);
-    float up = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 horizon = vec3(0.10, 0.38, 0.86);
-    vec3 zenith = vec3(0.02, 0.16, 0.62);
-    vec3 color = mix(horizon, zenith, pow(up, 0.65));
-    vec3 sunDir = normalize(vec3(0.55, 0.78, 0.28));
-    float sun = pow(max(dot(dir, sunDir), 0.0), 360.0);
-    float glow = pow(max(dot(dir, sunDir), 0.0), 8.0);
-    color += vec3(1.0, 0.62, 0.28) * sun * 1.6;
-    color += vec3(1.0, 0.78, 0.45) * glow * 0.18;
-    gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
-/** Deep blue sky with a warm sun. The gameplay camera looks at the horizon, so an equirect horizon would read grey. */
-function CarnivalSky() {
-  return (
-    <mesh frustumCulled={false} renderOrder={-1}>
-      <sphereGeometry args={[48, 28, 16]} />
-      <shaderMaterial
-        side={BackSide}
-        depthWrite={false}
-        fog={false}
-        toneMapped={false}
-        vertexShader={SKY_VERTEX}
-        fragmentShader={SKY_FRAGMENT}
-      />
-    </mesh>
-  );
-}
-
-/** Shared sunny HDR for reflections. CarnivalSky is the visible sky. */
-function SunnyIbl({ ibl }: { ibl: boolean }) {
-  const { gl, scene } = useThree();
-  useEffect(() => {
-    let alive = true;
-    let pmDisposed = false;
-    let env: ReturnType<PMREMGenerator['fromEquirectangular']>['texture'] | null = null;
-    let hdr: { dispose: () => void } | null = null;
-    const pm = new PMREMGenerator(gl);
-    const disposePm = () => {
-      if (pmDisposed) return;
-      pmDisposed = true;
-      pm.dispose();
-    };
-    const timer = window.setTimeout(() => {
-      new HDRLoader().load(`${import.meta.env.BASE_URL}${STREET_HDR_URL}`, (loaded) => {
-        if (!alive) { loaded.dispose(); disposePm(); return; }
-        hdr = loaded;
-        loaded.mapping = EquirectangularReflectionMapping;
-        if (ibl) {
-          env = pm.fromEquirectangular(loaded).texture;
-          scene.environment = env;
-          scene.environmentIntensity = STREET_ENV_INTENSITY;
-        }
-        disposePm();
-      });
-    }, 400);
-    return () => {
-      alive = false;
-      window.clearTimeout(timer);
-      scene.environment = null;
-      scene.background = null;
-      env?.dispose();
-      hdr?.dispose();
-      disposePm();
-    };
-  }, [gl, scene, ibl]);
-  return null;
-}
-
 function FpsWatch({ tier, onTier }: { tier: Quality; onTier: (next: Quality) => void }) {
   const guard = useMemo(() => createFpsGuard(), []);
   const samples = useMemo(() => [] as number[], []);
@@ -329,21 +248,21 @@ function forcedTier(): Quality | null {
 }
 
 function World({ controller, skin, quality, onReady }: SceneProps) {
-  const street = ENVIRONMENT_THEME !== 'beach';
+  const theme = ENVIRONMENT_THEME;
   const profile = profileFor(quality);
   const shadows = profile.shadows !== 'none';
+  const hemi = locationHemi(theme);
   useEffect(() => { onReady(); }, [onReady]);
-  const postProfile = street ? profile : { ...profile, bloom: false, dof: false };
+  const postProfile = theme === 'beach' ? { ...profile, bloom: false, dof: false } : profile;
   return (
     <>
       <StreetTone exposure={STREET_EXPOSURE} />
-      <color attach="background" args={['#1a6fd0']} />
-      <CarnivalSky />
+      <color attach="background" args={['#7ec8ff']} />
+      <PhotoSky theme={theme} quality={quality} />
       <CameraRig shake={quality !== 'low'} quality={quality} />
-      {(street || profile.sky !== 'flat') && <SunnyIbl ibl={profile.ibl} />}
       <Simulation controller={controller} />
       <PerfProbe />
-      <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
+      <hemisphereLight args={[hemi.sky, hemi.ground, hemi.intensity]} />
       <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
       <KeyLight quality={quality} engine={controller.engine} />
       <Court shadows={shadows} quality={quality} />

@@ -6,7 +6,7 @@ import { sampleOpeningCamera } from './openingCamera';
 const aspects = [375 / 667, 390 / 844, 430 / 932, 844 / 390];
 
 describe('opening camera endpoint', () => {
-  for (const theme of ['beach', 'street'] as const) {
+  for (const theme of ['beach', 'court', 'street'] as const) {
     for (const aspect of aspects) {
       it(`${theme} u=1 matches gameplay camera at aspect ${aspect.toFixed(3)}`, () => {
         const pos = new Vector3();

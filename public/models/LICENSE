@@ -67,6 +67,45 @@ public/models/environment/street/*.glb
   Original fence, lamp and spectator meshes, EXT_meshopt_compression.
   No downloaded character models. Rebuild with npm run build:street.
 
+Location skies, grounds and street props
+----------------------------------------
+CC0 1.0. Poly Haven. Optimised for the game (1K HDR, tone-mapped JPEG,
+KTX2, meshopt GLB). Rebuild with npm run build:locations.
+The raw downloads are not stored in this repository.
+
+  public/textures/locations/street_docklands_1k.hdr
+  public/textures/locations/street_sky.jpg
+    Poly Haven docklands_02, 1K. https://polyhaven.com/a/docklands_02
+
+  public/textures/locations/court_green_point_1k.hdr
+  public/textures/locations/court_sky.jpg
+    Poly Haven green_point_park, 1K. https://polyhaven.com/a/green_point_park
+
+  public/textures/locations/beach_mondello_1k.hdr
+  public/textures/locations/beach_sky.jpg
+    Poly Haven spiaggia_di_mondello, 1K. https://polyhaven.com/a/spiaggia_di_mondello
+
+  public/textures/locations/sand_*.ktx2
+    Poly Haven sand_03, 1K. https://polyhaven.com/a/sand_03
+
+  public/textures/locations/track_*.ktx2
+    Poly Haven rubberized_track, 1K. https://polyhaven.com/a/rubberized_track
+
+  public/textures/locations/grass_*.ktx2
+    Poly Haven grass_ground, 1K. https://polyhaven.com/a/grass_ground
+
+  public/models/environment/locations/anthurium.glb
+    Poly Haven anthurium_botany_01. https://polyhaven.com/a/anthurium_botany_01
+
+  public/models/environment/locations/barrel.glb
+    Poly Haven barrel_03. https://polyhaven.com/a/barrel_03
+
+  public/models/environment/locations/trash-can.glb
+    Poly Haven metal_trash_can. https://polyhaven.com/a/metal_trash_can
+
+  public/models/environment/locations/gazania.glb
+    Poly Haven flower_gazania. https://polyhaven.com/a/flower_gazania
+
 Quaternius sources still in this folder
 ---------------------------------------
 kickole_player_v2.glb and kickole_player_v3.glb are derived from the

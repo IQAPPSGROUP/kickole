@@ -16,12 +16,14 @@ describe('beach visual theme',()=>{
   it('keeps carnival cloth behind the rope and in front of the goal',()=>{
     expect(beachCarnivalClearOfPlay()).toBe(true);
   });
-  it('preserves street by default and only accepts the explicit beach theme',()=>{
+  it('preserves street by default and accepts street, court, and beach',()=>{
     expect(resolveEnvironmentTheme()).toBe('street');
     expect(resolveEnvironmentTheme('anything')).toBe('street');
     expect(resolveEnvironmentTheme('beach')).toBe('beach');
+    expect(resolveEnvironmentTheme('court')).toBe('court');
     expect(resolveEnvironmentTheme('street','beach')).toBe('beach');
     expect(resolveEnvironmentTheme('beach','street')).toBe('street');
+    expect(resolveEnvironmentTheme('beach','court')).toBe('court');
   });
   it('keeps all backdrop geometry behind play and within descending mobile budgets',()=>{
     let lastTriangles=Infinity,lastBytes=Infinity;

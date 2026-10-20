@@ -28,10 +28,10 @@ import { measureKickContactAnchors } from './measureFootContact';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
-/** The street key is already hot. Keep the photograph under white so cheeks do not clip. */
-const FACE_ALBEDO = '#efe6df';
-const FACE_ROUGHNESS = 0.88;
-const FACE_ENV = 0.16;
+/** The street key is already hot. A light multiply clips the cheeks to white. */
+const FACE_ALBEDO = '#b09080';
+const FACE_ROUGHNESS = 0.92;
+const FACE_ENV = 0.1;
 
 /** glTF images on this skinned head sample as one averaged colour. A canvas copy of the same pixels does not. */
 function photographTexture(source: Texture): CanvasTexture | null {
@@ -47,14 +47,14 @@ function photographTexture(source: Texture): CanvasTexture | null {
   } catch {
     return null;
   }
-  // A short lift opens crushed midtones. The old power curve pushed cheeks to white.
+  // Keep the photograph's own range. A small shadow open, then a hard cap under the key.
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
   const px = pixels.data;
   for (let i = 0; i < px.length; i += 4) {
     if (px[i + 3] < 16) continue;
     for (let channel = 0; channel < 3; channel += 1) {
       const u = px[i + channel] / 255;
-      const lifted = Math.min(0.9, Math.pow(u, 0.7) * 0.8 + 0.1);
+      const lifted = Math.min(0.78, Math.pow(u, 0.85) * 0.9 + 0.04);
       px[i + channel] = Math.round(lifted * 255);
     }
   }
@@ -241,8 +241,9 @@ function attachFaceEyes(root: Object3D, head: Bone | undefined): void {
   const material = new MeshStandardMaterial({
     map,
     color: '#ffffff',
-    roughness: 0.4,
+    roughness: 0.72,
     metalness: 0,
+    envMapIntensity: 0.2,
     side: DoubleSide,
     // A small lift keeps the sclera out of the socket shadow. Stronger than this
     // trips the street bloom and turns the eye into a white plate.

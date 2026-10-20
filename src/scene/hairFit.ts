@@ -177,8 +177,12 @@ function mohawk(skull: Skull): HairPart[] {
 }
 
 function highTop(skull: Skull): HairPart[] {
-  const height = skull.radius * 1.2;
-  const radius = skull.radius * 0.96;
+  const height = skull.radius * 1.15;
+  const radius = skull.radius * 0.94;
+  const eyeZ = Math.min(skull.landmarks.leftEye.z, skull.landmarks.rightEye.z);
+  // Wide enough to cover the crown, with the front rim behind the eyes so it
+  // does not read as a visor from the front.
+  const frontZ = eyeZ - skull.radius * 0.28;
   const bottom = skull.crownY - skull.radius * 0.22;
   return [{
     id: 'high-top',
@@ -186,9 +190,9 @@ function highTop(skull: Skull): HairPart[] {
     position: [
       skull.center.x,
       bottom + height / 2,
-      skull.center.z - skull.radius * 0.04,
+      frontZ - radius,
     ],
-    radiusTop: radius * 0.92,
+    radiusTop: radius * 0.9,
     radiusBottom: radius,
     height,
   }];

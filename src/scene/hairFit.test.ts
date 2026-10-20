@@ -128,6 +128,13 @@ describe('hair fit', () => {
     for (const body of ['male', 'female', 'primitive'] as const) {
       expect(uncoveredScalp('afro', body, [0.12, 0.7]), `afro ${body}`).toEqual([]);
       expect(uncoveredScalp('highTop', body, [0.12, 0.38]), `high-top ${body}`).toEqual([]);
+      const part = hairParts('highTop', body)[0];
+      expect(part.shape).toBe('cylinder');
+      if (part.shape !== 'cylinder') continue;
+      const eyeZ = Math.min(HAIR_SKULLS[body].landmarks.leftEye.z, HAIR_SKULLS[body].landmarks.rightEye.z);
+      const front = part.position[2] + part.radiusBottom;
+      expect(front, `${body} visor`).toBeLessThan(eyeZ - 0.01);
+      expect(part.position[1] + part.height / 2, `${body} height`).toBeGreaterThan(HAIR_SKULLS[body].crownY + HAIR_SKULLS[body].radius * 0.45);
     }
   });
 

@@ -250,7 +250,7 @@ export function profileFor(tier: Quality): TierProfile {
     case 'low':
       return {
         lod: 1, shadows: 'none', shadowMap: 0, shadowFilter: 'off', shadowExtent: 0, shadowRadius: 0,
-        contactShadows: true, ssao: false, bloom: false, dof: false, aa: 'none', ibl: true,
+        contactShadows: false, ssao: false, bloom: false, dof: false, aa: 'none', ibl: true,
         dpr: [1, 1], crowd: 8,
         courtMaps: 'color', fence: 'plane', decals: false, crowdLod: 2, crowdIdle: false,
         sky: 'flat', lamp: 'simple',
@@ -258,7 +258,7 @@ export function profileFor(tier: Quality): TierProfile {
     case 'medium':
       return {
         lod: 0, shadows: 'tight', shadowMap: 512, shadowFilter: 'vsm', shadowExtent: 4.8, shadowRadius: 8,
-        contactShadows: true, ssao: false, bloom: false, dof: false, aa: 'fxaa', ibl: true,
+        contactShadows: false, ssao: false, bloom: false, dof: false, aa: 'fxaa', ibl: true,
         dpr: [1, 1.25], crowd: 16,
         courtMaps: 'rough', fence: 'sparse', decals: true, crowdLod: 1, crowdIdle: true,
         sky: 'reflect', lamp: 'emissive',
@@ -266,7 +266,7 @@ export function profileFor(tier: Quality): TierProfile {
     case 'high':
       return {
         lod: 0, shadows: 'tight', shadowMap: 1024, shadowFilter: 'pcss', shadowExtent: 3.2, shadowRadius: 42,
-        contactShadows: true, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
+        contactShadows: false, ssao: true, bloom: true, dof: true, aa: 'smaa', ibl: true,
         dpr: [1, 1.5], crowd: 28,
         courtMaps: 'full', fence: 'link', decals: true, crowdLod: 0, crowdIdle: true,
         sky: 'hdri', lamp: 'lit',

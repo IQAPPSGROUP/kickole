@@ -1,6 +1,5 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows } from '@react-three/drei';
 import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import type { GameController } from '../game/controller';
@@ -358,17 +357,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <KeyLight quality={quality} engine={controller.engine} />
       <Court shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
-      {profile.contactShadows && (
-        <ContactShadows
-          position={[0, 0.006, 0.15]}
-          opacity={0.42}
-          scale={3.1}
-          blur={2.1}
-          far={1.5}
-          resolution={quality === 'low' ? 128 : 256}
-          color="#3d2a22"
-        />
-      )}
+      {/* drei ContactShadows paints a flat blue disc on this court, so it stays off. */}
       <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />

@@ -102,9 +102,9 @@ describe('quality tiers', () => {
     expect(profileFor('low').aa).toBe('none');
     expect(profileFor('high').shadows).toBe('tight');
     expect(profileFor('high').shadowFilter).toBe('pcss');
-    expect(profileFor('high').contactShadows).toBe(true);
-    expect(profileFor('low').contactShadows).toBe(true);
-    expect(profileFor('medium').contactShadows).toBe(true);
+    expect(profileFor('high').contactShadows).toBe(false);
+    expect(profileFor('low').contactShadows).toBe(false);
+    expect(profileFor('medium').contactShadows).toBe(false);
     expect(profileFor('medium').shadowFilter).toBe('vsm');
     expect(profileFor('medium').ibl).toBe(true);
     expect(profileFor('medium').bloom).toBe(false);

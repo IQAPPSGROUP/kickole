@@ -9,7 +9,7 @@ import type {
   RunSubmit,
 } from './leaderboard';
 import { readBlockedNames, writeBlockedNames } from './leaderboard';
-import { composeNickname, parseNickname } from './nickname';
+import { composeNickname, parseNickname, type FreePair } from './nickname';
 import { loadDeviceId } from './nicknameStore';
 import { liveRpc, type LeaderboardRpc } from './supabaseClient';
 
@@ -178,6 +178,33 @@ export async function registerPlayer(input: {
   }
   const reason = typeof body.reason === 'string' ? body.reason : 'not_in_list';
   return { ok: false, reason };
+}
+
+/** Untaken word pairs for Shuffle and Pick one for me. Empty when the board cannot be reached. */
+export async function suggestFreeNames(input: {
+  deviceId: string;
+  count?: number;
+  adjective?: string | null;
+  noun?: string | null;
+  rpc?: LeaderboardRpc;
+}): Promise<FreePair[]> {
+  const rpc = input.rpc ?? liveRpc();
+  const suggested = await callRpc(rpc, 'suggest_free_names', {
+    n: input.count ?? 8,
+    device_id: input.deviceId,
+    adjective: input.adjective ?? null,
+    noun: input.noun ?? null,
+  });
+  if (suggested.error) return [];
+  const body = asRecord(suggested.data);
+  if (body.ok !== true || !Array.isArray(body.names)) return [];
+  const names: FreePair[] = [];
+  for (const item of body.names) {
+    const row = asRecord(item);
+    if (typeof row.adjective !== 'string' || typeof row.noun !== 'string') continue;
+    names.push({ adjective: row.adjective, noun: row.noun });
+  }
+  return names;
 }
 
 /** Ask which tag this pair would get, including a Roman numeral when the pair is taken. */

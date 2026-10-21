@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { countryByCode, countryFlag, searchCountries, suggestedCountry } from '../game/countries';
 import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
-import { composeNickname, parseNickname, wordIndex } from '../game/nickname';
+import { composeNickname, parseNickname, pickFreePair, wordIndex, type FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import { GraffitiText } from './Hud';
 
@@ -34,12 +34,14 @@ export function NicknameForm({
   submitLabel,
   onSubmit,
   onPeek,
+  onSuggest,
 }: {
   initial?: string;
   initialCountry?: string | null;
   submitLabel: string;
   onSubmit: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
+  onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
 }) {
   const parsed = parseNickname(initial);
   const [adj, setAdj] = useState(() => wordIndex(ADJECTIVES, parsed?.adjective ?? ADJECTIVES[0] ?? 'Turbo'));
@@ -83,6 +85,23 @@ export function NicknameForm({
     return false;
   };
 
+  const showFree = (name: FreePair): boolean => {
+    const nextAdj = wordIndex(ADJECTIVES, name.adjective);
+    const nextNoun = wordIndex(NOUNS, name.noun);
+    const left = ADJECTIVES[nextAdj];
+    const right = NOUNS[nextNoun];
+    if (!left || !right || left.toLowerCase() !== name.adjective.toLowerCase() || right.toLowerCase() !== name.noun.toLowerCase()) {
+      return false;
+    }
+    setAdj(nextAdj);
+    setNoun(nextNoun);
+    setPreview(composeNickname(left, right) ?? `${left} ${right}`);
+    setTaken(null);
+    setAcked(true);
+    setServerIssue(null);
+    return true;
+  };
+
   const applyPair = (nextAdj: number, nextNoun: number) => {
     setAdj(nextAdj);
     setNoun(nextNoun);
@@ -95,24 +114,46 @@ export function NicknameForm({
     let changeNoun = false;
     switch (side) {
       case 'first':
-        changeAdj = true;
+        changeAdj = !lockAdj;
         break;
       case 'second':
-        changeNoun = true;
+        changeNoun = !lockNoun;
         break;
       case 'both':
-        changeAdj = true;
-        changeNoun = true;
+        changeAdj = !lockAdj;
+        changeNoun = !lockNoun;
         break;
       default: {
         const neverSide: never = side;
         return neverSide;
       }
     }
-    const nextAdj = changeAdj && !lockAdj ? otherIndex(ADJECTIVES.length, adj) : adj;
-    const nextNoun = changeNoun && !lockNoun ? otherIndex(NOUNS.length, noun) : noun;
-    if (nextAdj === adj && nextNoun === noun) return;
-    applyPair(nextAdj, nextNoun);
+    if (!changeAdj && !changeNoun) return;
+    void (async () => {
+      if (onSuggest) {
+        try {
+          const names = await onSuggest({
+            count: 8,
+            adjective: changeAdj ? null : adjective,
+            noun: changeNoun ? null : nounWord,
+          });
+          const choice = pickFreePair(names.filter((name) => (
+            (changeAdj || name.adjective.toLowerCase() === adjective.toLowerCase())
+            && (changeNoun || name.noun.toLowerCase() === nounWord.toLowerCase())
+          )), { adjective, noun: nounWord });
+          const unchanged = choice
+            && choice.adjective.toLowerCase() === adjective.toLowerCase()
+            && choice.noun.toLowerCase() === nounWord.toLowerCase();
+          if (choice && !unchanged && showFree(choice)) return;
+        } catch {
+          /* a local roll still moves the wheels */
+        }
+      }
+      const nextAdj = changeAdj ? otherIndex(ADJECTIVES.length, adj) : adj;
+      const nextNoun = changeNoun ? otherIndex(NOUNS.length, noun) : noun;
+      if (nextAdj === adj && nextNoun === noun) return;
+      applyPair(nextAdj, nextNoun);
+    })();
   };
 
   return (
@@ -335,9 +376,11 @@ function CountryPicker({
 export function NicknameScreen({
   onSave,
   onPeek,
+  onSuggest,
 }: {
   onSave: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
+  onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
 }) {
   const [suggestion] = useState(() => suggestedCountry());
   return (
@@ -346,7 +389,7 @@ export function NicknameScreen({
         <p className="court-label">WORLD BOARD</p>
         <h2 className="nick-title">YOUR TAG</h2>
         <p className="shop-lead">Pick two words from the lists. That nickname goes on the board. Country is your choice, not your location. Prefer not to say and you stay off country boards.</p>
-        <NicknameForm initialCountry={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} />
+        <NicknameForm initialCountry={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} onSuggest={onSuggest} />
       </div>
     </div>
   );

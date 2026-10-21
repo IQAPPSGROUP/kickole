@@ -121,3 +121,22 @@ export function wordIndex(words: readonly string[], word: string): number {
   const found = words.findIndex((item) => item.toLowerCase() === word.trim().toLowerCase());
   return found >= 0 ? found : 0;
 }
+
+export interface FreePair {
+  adjective: string;
+  noun: string;
+}
+
+/** Prefer a suggested pair that is not the one already on screen. */
+export function pickFreePair(
+  names: readonly FreePair[],
+  current: FreePair,
+  random: () => number = Math.random,
+): FreePair | null {
+  const same = (name: FreePair) => name.adjective.toLowerCase() === current.adjective.toLowerCase()
+    && name.noun.toLowerCase() === current.noun.toLowerCase();
+  const others = names.filter((name) => !same(name));
+  const pool = others.length > 0 ? others : names;
+  if (pool.length === 0) return null;
+  return pool[Math.floor(random() * pool.length)] ?? null;
+}

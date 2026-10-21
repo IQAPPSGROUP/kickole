@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ADJECTIVES, NOUNS } from './nicknameWords';
-import { checkNickname, composeNickname, parseNickname, romanNumeral, romanValue, suggestNickname } from './nickname';
+import { checkNickname, composeNickname, parseNickname, pickFreePair, romanNumeral, romanValue, suggestNickname } from './nickname';
 
 describe('nickname', () => {
   it('accepts a two-word list tag and a Roman suffix from II', () => {
@@ -40,5 +40,16 @@ describe('nickname', () => {
     }
     expect(seen.size).toBeGreaterThan(1);
     expect(suggestNickname(() => 0)).toBe(`${ADJECTIVES[0]} ${NOUNS[0]}`);
+  });
+
+  it('prefers a free pair that is not already on screen', () => {
+    const current = { adjective: 'Turbo', noun: 'Striker' };
+    expect(pickFreePair([
+      current,
+      { adjective: 'Neon', noun: 'Falcon' },
+      { adjective: 'Golden', noun: 'Wolf' },
+    ], current, () => 0)).toEqual({ adjective: 'Neon', noun: 'Falcon' });
+    expect(pickFreePair([], current)).toBeNull();
+    expect(pickFreePair([current], current, () => 0)).toEqual(current);
   });
 });

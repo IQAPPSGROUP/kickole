@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatRank } from './leaderboard';
 import type { LeaderboardRpc } from './supabaseClient';
-import { createSupabaseLeaderboard, peekNickname, registerPlayer, serverNicknameMessage } from './supabaseLeaderboard';
+import { createSupabaseLeaderboard, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames } from './supabaseLeaderboard';
 
 const DEVICE = '11111111-1111-4111-8111-111111111111';
 
@@ -98,6 +98,39 @@ describe('supabase leaderboard', () => {
     expect(serverNicknameMessage('rename_limit')).toBe('You can change your nickname once every 7 days.');
     expect(calls.map((call) => call.fn)).toEqual(['register_or_update_player']);
     expect(calls[0]?.args).toMatchObject({ adjective: 'Turbo', noun: 'Striker' });
+  });
+
+  it('asks for untaken pairs and skips a bad payload', async () => {
+    const { calls, rpc } = scripted({
+      suggest_free_names: (args) => ({
+        data: {
+          ok: true,
+          names: [
+            { adjective: 'Neon', noun: 'Falcon' },
+            { adjective: 1, noun: 'Wolf' },
+            { adjective: 'Golden', noun: 'Wolf' },
+          ],
+        },
+        echo: args,
+      }),
+    });
+    const names = await suggestFreeNames({
+      deviceId: DEVICE,
+      count: 8,
+      adjective: 'Neon',
+      noun: null,
+      rpc,
+    });
+    expect(names).toEqual([
+      { adjective: 'Neon', noun: 'Falcon' },
+      { adjective: 'Golden', noun: 'Wolf' },
+    ]);
+    expect(calls[0]?.args).toMatchObject({ n: 8, device_id: DEVICE, adjective: 'Neon', noun: null });
+    const offline = await suggestFreeNames({
+      deviceId: DEVICE,
+      rpc: scripted({ suggest_free_names: () => ({ error: 'offline' }) }).rpc,
+    });
+    expect(offline).toEqual([]);
   });
 
   it('offers the Roman suffix when the pair is taken', async () => {

@@ -3,7 +3,7 @@ import { installAudioLifecycle } from '../game/audio';
 import { GameController } from '../game/controller';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
-import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
+import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
 import {
   cancelOpeningIntroForGameplay,
@@ -219,6 +219,16 @@ export function App() {
     return peekNickname({ deviceId: deviceId || loadDeviceId(), adjective, noun });
   };
 
+  const suggestTags = async (request: { count: number; adjective: string | null; noun: string | null }) => {
+    const deviceId = await hydrateDeviceId();
+    return suggestFreeNames({
+      deviceId: deviceId || loadDeviceId(),
+      count: request.count,
+      adjective: request.adjective,
+      noun: request.noun,
+    });
+  };
+
   const joinBoard = () => {
     saveBoardOptIn('in');
     setOptIn('in');
@@ -259,7 +269,7 @@ export function App() {
         <OptInCard onJoin={joinBoard} onNotNow={leaveBoardPrompt} onData={() => setOverlay('data')} />
       )}
       {!needsBody && !needsOpt && needsNick && phase === 'menu' && overlay === 'none' && (
-        <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} />
+        <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} onSuggest={mockBoard ? undefined : suggestTags} />
       )}
       {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && (
         <Home
@@ -306,6 +316,7 @@ export function App() {
           onDelete={deleteBoardData}
           onData={() => setOverlay('data')}
           onPeek={mockBoard ? undefined : peekTag}
+          onSuggest={mockBoard ? undefined : suggestTags}
           board={board}
           onChange={(p) => controller.updateSettings(p)}
           onClose={closeOverlay}

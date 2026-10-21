@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
 import { countryByCode } from '../game/countries';
 import { readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
+import type { FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
 import { NicknameForm } from './NicknameScreen';
@@ -269,7 +270,7 @@ function graphicsLabel(choice: GraphicsChoice): string {
 }
 
 export function SettingsScreen({
-  settings, nickname, country, leaderboardOn, blockedTick, onNickname, onLeaderboard, onUnblock, onDelete, onData, onPeek, board, onChange, onClose,
+  settings, nickname, country, leaderboardOn, blockedTick,   onNickname, onLeaderboard, onUnblock, onDelete, onData, onPeek, onSuggest, board, onChange, onClose,
 }: {
   settings: Settings;
   nickname: string;
@@ -282,6 +283,7 @@ export function SettingsScreen({
   onDelete: () => Promise<string | void>;
   onData: () => void;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
+  onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
   board: LeaderboardService | null;
   onChange: (p: Partial<Settings>) => void;
   onClose: () => void;
@@ -303,7 +305,7 @@ export function SettingsScreen({
         {leaderboardOn && (
           <div className="group">
             <label>Change nickname and country</label>
-            <NicknameForm initial={nickname} initialCountry={country} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} />
+            <NicknameForm initial={nickname} initialCountry={country} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
             <p className="shop-note">Your nickname is picked from our word lists. You can change it once every 7 days. Country is your choice, not your location. Prefer not to say keeps you off country boards.</p>
           </div>
         )}

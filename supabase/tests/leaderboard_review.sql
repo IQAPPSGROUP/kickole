@@ -31,6 +31,39 @@ begin
     raise exception 'second tag should be II: %', result;
   end if;
 
+  if not has_function_privilege('anon', 'public.suggest_free_names(integer, uuid, text, text)', 'execute') then
+    raise exception 'anon cannot suggest free names';
+  end if;
+  result := public.suggest_free_names(8, a);
+  if result->>'ok' <> 'true' or jsonb_array_length(result->'names') < 1 then
+    raise exception 'suggest_free_names failed: %', result;
+  end if;
+  result := public.suggest_free_names(4, b, 'Turbo', 'Striker');
+  if result->>'ok' <> 'true' or jsonb_array_length(result->'names') <> 0 then
+    raise exception 'a taken bare pair must not be suggested: %', result;
+  end if;
+  result := public.suggest_free_names(4, a, 'Turbo', 'Striker');
+  if result->>'ok' <> 'true'
+     or jsonb_array_length(result->'names') <> 1
+     or result->'names'->0->>'adjective' <> 'Turbo'
+     or result->'names'->0->>'noun' <> 'Striker' then
+    raise exception 'own bare name stays available: %', result;
+  end if;
+  result := public.suggest_free_names(4, a, 'Neon', null);
+  if result->>'ok' <> 'true' or jsonb_array_length(result->'names') < 1 then
+    raise exception 'locked first word returned nothing: %', result;
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(result->'names') elem
+    where elem->>'adjective' <> 'Neon'
+  ) then
+    raise exception 'a locked first word must stay: %', result;
+  end if;
+  result := public.suggest_free_names(1, a, 'NotAWord', null);
+  if result->>'ok' <> 'false' or result->>'reason' <> 'not_in_list' then
+    raise exception 'unknown word should be rejected: %', result;
+  end if;
+
   result := public.peek_nickname(a, 'Neon', 'Falcon');
   if result->>'ok' <> 'true' or result->>'nickname' <> 'Neon Falcon' then
     raise exception 'peek failed: %', result;

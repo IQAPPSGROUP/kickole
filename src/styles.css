@@ -997,7 +997,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   right: max(8px, var(--sat-r));
   z-index: 6;
   width: min(30vw, 112px);
-  padding: 4px 7px 5px;
+  padding: 3px 7px 2px;
   border-radius: 3px;
   background: rgba(8, 12, 22, .5);
   border: 1px solid rgba(255, 225, 74, .78);
@@ -1016,6 +1016,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .14em;
+  line-height: 1;
 }
 .world-rank-line {
   display: block;
@@ -1028,11 +1029,11 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .world-rank-country {
   display: block;
-  margin-top: 2px;
+  margin-top: 1px;
   color: #fffdf8;
   font-size: 13px;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1;
   white-space: nowrap;
 }
 .world-rank-delta {
@@ -1046,7 +1047,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   animation: rank-climb .35s ease-out;
 }
 .world-rank-name {
-  margin-top: 2px;
+  margin-top: 0;
   color: #fffdf8;
   font-size: 11px;
   font-weight: 700;

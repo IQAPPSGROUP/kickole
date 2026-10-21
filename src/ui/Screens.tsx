@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
-import { countryByCode } from '../game/countries';
+import { countryByCode, countryFlag } from '../game/countries';
 import { readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
@@ -153,8 +153,11 @@ export function GameOver({
             {!optedOut && page.hidden && <p className="shop-note">Not enough players in your country yet</p>}
             {!optedOut && !page.hidden && <ol className="board">
               {rows.map((row) => (
-                <li key={`${period}:${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''} aria-label={entryLabel(row)}>
+                <li key={`${period}:${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''} aria-label={entryLabel(row, scope)}>
                   <span>{row.rank > 0 ? row.rank.toLocaleString('en-US') : '—'}</span>
+                  {scope === 'country' && row.country && (
+                    <span className="country-flag" aria-hidden="true">{countryFlag(row.country)}</span>
+                  )}
                   <b>{row.nickname}</b>
                   <em>{row.score}</em>
                   {!row.mine && (
@@ -243,8 +246,8 @@ function flattenAround(board: LeaderboardService, score: number, scope: BoardSco
   return [...around.above, around.me, ...around.below];
 }
 
-function entryLabel(row: BoardEntry): string {
-  const country = row.country ? countryByCode(row.country)?.name : null;
+function entryLabel(row: BoardEntry, scope: BoardScope): string {
+  const country = scope === 'country' && row.country ? countryByCode(row.country)?.name : null;
   return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
 }
 

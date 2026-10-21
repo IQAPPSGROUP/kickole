@@ -1205,7 +1205,15 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .data-panel .data-contact { margin: 0; font-size: 14px; font-weight: 800; }
 .data-panel a { color: #ffe14a; }
-.world-board .country-flag { font-size: 14px; }
+.world-board .board li .country-flag {
+  width: auto;
+  min-width: 1em;
+  flex: none;
+  opacity: 1;
+  font-size: 16px;
+  line-height: 1;
+  font-variant-numeric: normal;
+}
 .world-board { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .world-board .board li { padding: 4px 8px; font-size: 13px; }
 .world-board .board li span { width: auto; min-width: 2.4em; font-variant-numeric: tabular-nums; }

@@ -125,9 +125,14 @@ begin
   end if;
   if exists (
     select 1 from jsonb_array_elements(result->'rows') elem
-    where elem->>'nickname' = 'Turbo Striker' and elem->>'country' is not null
+    where elem->>'country' is not null
   ) then
-    raise exception 'world row must hide a country under 20 players: %', result;
+    raise exception 'world rows must not include a country: %', result;
+  end if;
+  if exists (
+    select 1 from public.get_around(a, 'all', 'world', 3) g where g.country is not null
+  ) then
+    raise exception 'world around must not include a country';
   end if;
 
   update private.players set created_at = now() - interval '2 days' where id = b;

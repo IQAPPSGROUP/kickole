@@ -18,7 +18,7 @@ export interface BoardEntry {
   rank: number;
   nickname: string;
   score: number;
-  /** ISO alpha-2, or null when this player chose not to say. */
+  /** ISO alpha-2 on a country board. Null on every world row, and when the player chose not to say. */
   country: string | null;
   mine: boolean;
 }
@@ -300,21 +300,12 @@ export function createMockLeaderboard(options: {
       });
     }
     combined.sort(byStanding);
-    const countryCounts = new Map<string, number>();
-    if (scope === 'world') {
-      for (const row of combined) {
-        if (!row.country) continue;
-        countryCounts.set(row.country, (countryCounts.get(row.country) ?? 0) + 1);
-      }
-    }
     return combined.map((row, index) => ({
       rank: index + 1,
       nickname: row.nickname,
       score: row.score,
       mine: row.mine,
-      country: scope === 'world' && row.country && (countryCounts.get(row.country) ?? 0) < COUNTRY_BOARD_MIN
-        ? null
-        : row.country,
+      country: scope === 'world' ? null : row.country,
     }));
   };
 

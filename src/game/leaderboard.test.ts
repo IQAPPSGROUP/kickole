@@ -94,8 +94,10 @@ describe('mock leaderboard', () => {
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
     const world = board.top('world', 23, 50, 'all', NOW);
-    expect(world.some((row) => row.country === 'GB')).toBe(true);
-    expect(world.some((row) => row.country == null)).toBe(true);
+    expect(world.length).toBeGreaterThan(0);
+    expect(world.every((row) => row.country == null)).toBe(true);
+    const worldAround = board.around(23, 'world', 'all', NOW);
+    expect([...worldAround.above, worldAround.me, ...worldAround.below].every((row) => row.country == null)).toBe(true);
   });
 
   it('hides a country board with fewer than 20 players', () => {

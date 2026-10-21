@@ -627,7 +627,11 @@ export function createSupabaseLeaderboard(options: {
       });
       if (token !== generation || stopped) return;
       const body = asRecord(result.data);
-      if (!result.error && body.ok === true) pendingUnblocks.delete(name);
+      if (!result.error && (body.ok === true || body.reason === 'not_found')) pendingUnblocks.delete(name);
+      else if (!result.error && body.reason === 'unknown_player') {
+        registered = false;
+        await ensureRegistered(token);
+      }
     }
     persistModeration();
   };

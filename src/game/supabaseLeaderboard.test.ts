@@ -291,6 +291,62 @@ describe('supabase leaderboard', () => {
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'block_player' && call.args.blocked_nickname === 'MidKick')).toBe(true));
   });
 
+  it('keeps a refused unblock queued and registers an unknown device', async () => {
+    const storage = memory();
+    const { calls, rpc } = scripted(liveHandlers({
+      unblock_player: () => ({ data: { ok: false, reason: 'unknown_player' } }),
+    }));
+    const board = createSupabaseLeaderboard({
+      nickname: NICK,
+      country: 'GB',
+      storage,
+      rpc,
+      deviceId: DEVICE,
+      now: () => 9_000_000,
+    });
+    open.push(board);
+    board.start();
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'get_rank')).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const registersBefore = calls.filter((call) => call.fn === 'register_or_update_player').length;
+    board.unblock('MidKick');
+    await vi.waitFor(() => expect(calls.some((call) => (
+      call.fn === 'unblock_player'
+      && call.args.device_id === DEVICE
+      && call.args.blocked_nickname === 'MidKick'
+    ))).toBe(true));
+    await vi.waitFor(() => (
+      expect(calls.filter((call) => call.fn === 'register_or_update_player').length).toBeGreaterThan(registersBefore)
+    ));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(storage.getItem('kicky.board.pending-moderation.v1')).toContain('MidKick');
+  });
+
+  it('keeps a rate-limited unblock queued', async () => {
+    const storage = memory();
+    const { calls, rpc } = scripted(liveHandlers({
+      unblock_player: () => ({ data: { ok: false, reason: 'rate_limited' } }),
+    }));
+    const board = createSupabaseLeaderboard({
+      nickname: NICK,
+      country: 'GB',
+      storage,
+      rpc,
+      deviceId: DEVICE,
+      now: () => 9_000_000,
+    });
+    open.push(board);
+    board.start();
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'get_rank')).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const registersBefore = calls.filter((call) => call.fn === 'register_or_update_player').length;
+    board.unblock('MidKick');
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'unblock_player' && call.args.blocked_nickname === 'MidKick')).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(storage.getItem('kicky.board.pending-moderation.v1')).toContain('MidKick');
+    expect(calls.filter((call) => call.fn === 'register_or_update_player').length).toBe(registersBefore);
+  });
+
   it('drops an implausible score instead of retrying it', async () => {
     const storage = memory();
     const { calls, rpc } = scripted(liveHandlers({

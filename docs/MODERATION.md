@@ -9,6 +9,7 @@ Player nicknames come from the word lists in `private.nickname_words`. Players d
 - A report counts toward the public queue only when the reporter's row is at least 24 hours old, they have at least one accepted score, and they are under the daily cap (5 counted reports per UTC day, plus the hashed-IP limit). The client is not told whether a report counted.
 - Three distinct pending reporters hide the nickname automatically.
 - Settings lists blocked nicknames and can unblock them.
+- `block_player` and `unblock_player` both require a live device id. A missing or deleted device returns `unknown_player`. Each allows 40 calls per device per 10 minutes and 80 calls per hashed IP per 10 minutes. Over that budget the call returns `rate_limited` and does not change blocks. A missing nickname still returns a generic `{ok:true}`.
 - **Delete my leaderboard data** calls `delete_player`. That removes the nickname, scores, bests, and reports or blocks this player filed. If a report or moderation record exists against them, the player row stays as a tombstone with the nickname cleared. `private.purge_leaderboard()` drops settled reports and moderation log rows after 90 days, then removes the tombstone.
 
 ## Moderator functions

@@ -153,6 +153,85 @@ begin
   if result->>'ok' <> 'true' or result->>'reason' is not null then
     raise exception 'a missing block target must be a generic ok: %', result;
   end if;
+
+  -- 20261021150700: unblock matches block. 40/device/10min and 80/IP/10min.
+  result := public.block_player(null, 'Turbo Striker');
+  if result->>'reason' <> 'unknown_player' then
+    raise exception 'block without a device must fail: %', result;
+  end if;
+  result := public.unblock_player(null, 'Turbo Striker');
+  if result->>'reason' <> 'unknown_player' then
+    raise exception 'unblock without a device must fail: %', result;
+  end if;
+  result := public.unblock_player('00000000-0000-4000-8000-000000000099', 'Turbo Striker');
+  if result->>'reason' <> 'unknown_player' then
+    raise exception 'unblock from an unknown device must fail: %', result;
+  end if;
+
+  result := public.block_player(b, 'Turbo Striker');
+  if result->>'ok' <> 'true' or result->>'reason' is not null then
+    raise exception 'block should succeed: %', result;
+  end if;
+  if not exists (
+    select 1 from private.blocks bl where bl.player_id = b and bl.blocked_player_id = a
+  ) then
+    raise exception 'block row missing';
+  end if;
+  result := public.unblock_player(b, 'Turbo Striker');
+  if result->>'ok' <> 'true' or result->>'reason' is not null then
+    raise exception 'unblock should succeed: %', result;
+  end if;
+  if exists (
+    select 1 from private.blocks bl where bl.player_id = b and bl.blocked_player_id = a
+  ) then
+    raise exception 'unblock should remove the row';
+  end if;
+
+  update private.players set deleted_at = now() where id = b;
+  result := public.unblock_player(b, 'Turbo Striker');
+  if result->>'reason' <> 'unknown_player' then
+    raise exception 'a deleted device must not unblock: %', result;
+  end if;
+  result := public.block_player(b, 'Turbo Striker');
+  if result->>'reason' <> 'unknown_player' then
+    raise exception 'a deleted device must not block: %', result;
+  end if;
+  update private.players set deleted_at = null where id = b;
+
+  insert into private.rate_limits (device_id, action)
+  select b, 'unblock' from generate_series(1, 40);
+  update private.players set deleted_at = now() where id = b;
+  result := public.unblock_player(b, 'Turbo Striker');
+  if result->>'reason' <> 'unknown_player' then
+    raise exception 'a deleted device must fail before the rate limit: %', result;
+  end if;
+  update private.players set deleted_at = null where id = b;
+  result := public.block_player(b, 'Turbo Striker');
+  if result->>'ok' <> 'true' or result->>'reason' is not null then
+    raise exception 'the block budget is separate from unblock: %', result;
+  end if;
+  result := public.unblock_player(b, 'Turbo Striker');
+  if result->>'reason' <> 'rate_limited' then
+    raise exception 'unblock over the device budget must fail: %', result;
+  end if;
+  if not exists (
+    select 1 from private.blocks bl where bl.player_id = b and bl.blocked_player_id = a
+  ) then
+    raise exception 'a rate-limited unblock must keep the block row';
+  end if;
+  delete from private.rate_limits where device_id = b and action = 'unblock';
+
+  if private.ip_hash() is null then
+    raise exception 'ip hash salt missing';
+  end if;
+  insert into private.rate_limits (ip_hash, action)
+  select private.ip_hash(), 'block-ip' from generate_series(1, 80);
+  result := public.block_player(b, 'Neon Falcon');
+  if result->>'reason' <> 'rate_limited' then
+    raise exception 'block over the ip budget must fail: %', result;
+  end if;
+  delete from private.rate_limits where action = 'block-ip';
+  delete from private.blocks where player_id = b;
   result := public.report_player(b, 'No Such Player', null);
   if result->>'ok' <> 'true' or result->>'reason' is not null then
     raise exception 'a missing report target must be a generic ok: %', result;

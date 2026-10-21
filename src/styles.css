@@ -181,8 +181,10 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .prompt-banner {
   position: absolute;
+  /* Rises with the halfway camera so the tag stays beside the torso. */
+  --prompt-lift: 13vh;
   left: max(28px, var(--sat-l));
-  bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 6px);
+  bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 6px + var(--prompt-lift));
   z-index: 7;
   width: min(30vw, 118px);
   text-align: left;
@@ -675,7 +677,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .home-help { font-size: 9px; text-align: center; }
   .hud-top { position: absolute; left: max(16px, env(safe-area-inset-left)); top: 0; min-width: 120px; }
   .hud-coaching { position: absolute; left: 50%; top: 4px; width: min(46vw, 360px); margin: 0; transform: translateX(-50%); }
-  .prompt-banner { width: min(26vw, 160px); bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 4px); }
+  .prompt-banner { width: min(26vw, 160px); bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 4px + var(--prompt-lift)); }
   .prompt-call { font-size: 22px; }
   .prompt-call.is-long { font-size: 16px; }
   .prompt-tip { font-size: 11px; }

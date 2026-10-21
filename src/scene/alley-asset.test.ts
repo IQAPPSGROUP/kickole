@@ -113,8 +113,14 @@ describe('alley environment', () => {
       cam.updateProjectionMatrix();
       const horiz = Math.hypot(GAMEPLAY_TARGET.x - cam.position.x, GAMEPLAY_TARGET.z - cam.position.z);
       const pitch = Math.atan2(cam.position.y - GAMEPLAY_TARGET.y, horiz) * 180 / Math.PI;
-      expect(cam.position.y).toBeGreaterThan(2.2);
-      expect(cam.position.y).toBeLessThan(2.55);
+      expect(cam.position.y).toBeGreaterThan(2.02);
+      expect(cam.position.y).toBeLessThan(2.14);
+      expect(cam.position.z).toBeGreaterThan(6.4);
+      expect(cam.position.z).toBeLessThan(6.7);
+      expect(GAMEPLAY_TARGET.y).toBeGreaterThan(0.8);
+      expect(GAMEPLAY_TARGET.y).toBeLessThan(0.92);
+      expect(GAMEPLAY_TARGET.z).toBeGreaterThan(0);
+      expect(GAMEPLAY_TARGET.z).toBeLessThan(0.2);
       expect(pitch).toBeGreaterThan(6);
       expect(pitch).toBeLessThan(14);
       const screen = (px: number, py: number, pz: number) => {
@@ -147,9 +153,9 @@ describe('alley environment', () => {
       const body = feet.y - crown.y;
       expect(body).toBeGreaterThan(0.34);
       expect(body).toBeLessThan(0.46);
-      // Feet sit low, just above the corner buttons, with the whole body still in frame.
-      expect(feet.y).toBeGreaterThan(0.78);
-      expect(feet.y).toBeLessThan(0.86);
+      // Feet sit between the old high frame and the low frame, still above the buttons.
+      expect(feet.y).toBeGreaterThan(0.64);
+      expect(feet.y).toBeLessThan(0.72);
       expect(feet.x).toBeGreaterThan(0.46);
       expect(feet.x).toBeLessThan(0.54);
       expect(crown.y).toBeGreaterThan(letters[2].y + 0.1);

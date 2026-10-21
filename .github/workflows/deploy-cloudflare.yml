@@ -2,14 +2,15 @@ name: Deploy Kickolé to Cloudflare Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - '**'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: cloudflare-pages-production
+  group: cloudflare-pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -30,13 +31,25 @@ jobs:
         run: |
           npm run typecheck
           npm test
+      # Preview branches only. main leaves this unset, and the Capacitor
+      # release scripts (ios:sync, cap:sync) never set it, so ?mockBoard=1
+      # stays off store builds and production Pages.
+      - name: Allow the review mock
+        if: github.ref_name != 'main'
+        run: echo "VITE_ALLOW_MOCK=1" >> "$GITHUB_ENV"
       - name: Build production assets
         env:
           VITE_ENVIRONMENT_THEME: beach
+          # Publishable client key. Not a service-role secret.
+          VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
         run: npm run build
+      # main stays the production branch. Any other branch is a Pages preview
+      # at https://<branch-alias>.<project>.pages.dev. A slash in the branch
+      # name becomes a hyphen in that alias.
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=${{ github.ref_name }}

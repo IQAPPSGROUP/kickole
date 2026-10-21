@@ -40,7 +40,7 @@ export function launchStoreNote(platform: BillingPlatform, hasPrice: boolean): s
 
 /** In-app description of what the one-time purchase actually unlocks. */
 export function launchCollectionBlurb(itemCount: number): string {
-  return `One permanent unlock for this launch collection only — all ${itemCount} launch boots and kits, including Street, Freestyle and Legend items that otherwise need challenge progress. Future collections are sold separately. Free skin tones, hair and basic styling stay free. The purchase unlocks those cosmetics. It does not complete the challenges.`;
+  return `One permanent unlock for this launch collection only — all ${itemCount} launch boots and kits, including Street, Freestyle and Legend items that otherwise need challenge progress. Future collections are sold separately. Skin tones, hair and basic styling stay included. The purchase unlocks those cosmetics. It does not complete the challenges.`;
 }
 
 export function shouldRefreshEntitlementsOnResume(platform: BillingPlatform, visibilityState: string): boolean {

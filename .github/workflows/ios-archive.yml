@@ -25,8 +25,13 @@ jobs:
       - name: Show Xcode
         run: xcodebuild -version
       - run: npm ci
-      - run: npm run build
-      - run: npx cap sync ios
+      - name: Build web assets and sync iOS
+        run: |
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
+          npm run ios:sync
       - name: Check signing secrets
         env:
           ASC_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}

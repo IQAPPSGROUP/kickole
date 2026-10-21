@@ -20,6 +20,9 @@ workflows:
         - app_store
       vars:
         BUNDLE_ID: com.iqappsgroup.kickole
+        # Publishable client key. Not a service-role secret.
+        VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
     scripts:
       - name: Require the Kickolé App Store Apple ID
         script: |
@@ -54,6 +57,10 @@ workflows:
       - name: Build web assets and sync iOS
         script: |
           set -euo pipefail
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
           npm run ios:sync
       - name: Set up code signing on the Xcode project
         script: |
@@ -101,6 +108,9 @@ workflows:
     environment:
       node: "22"
       xcode: latest
+      vars:
+        VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
     scripts:
       - name: Require Xcode 26 or newer
         script: |
@@ -119,6 +129,10 @@ workflows:
       - name: Build web assets and sync iOS
         script: |
           set -euo pipefail
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
           npm run ios:sync
       - name: Compile for the iOS Simulator without signing
         script: |

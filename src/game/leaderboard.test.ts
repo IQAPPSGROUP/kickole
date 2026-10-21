@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockLeaderboard, formatRank } from './leaderboard';
+import { createMockLeaderboard, formatRank, isoWeekStartUtc } from './leaderboard';
 import { DEVICE_ID_KEY } from './nicknameStore';
+import { ADJECTIVES, NOUNS } from './nicknameWords';
 
 const NOW = 1_700_000_000_000;
 
@@ -25,8 +26,11 @@ describe('mock leaderboard', () => {
     const low = board.rankFor(0, NOW);
     const mid = board.rankFor(23, NOW);
     const high = board.rankFor(2000, NOW);
-    expect(low.rank).toBeGreaterThan(mid.rank);
-    expect(mid.rank).toBeGreaterThan(high.rank);
+    expect(low.rank).not.toBeNull();
+    expect(mid.rank).not.toBeNull();
+    expect(high.rank).not.toBeNull();
+    expect(low.rank!).toBeGreaterThan(mid.rank!);
+    expect(mid.rank!).toBeGreaterThan(high.rank!);
     expect(low.total).toBe(mid.total);
     expect(formatRank(mid.rank)).toMatch(/^#[\d,]+$/);
     expect(mid.country).toBeNull();
@@ -37,7 +41,7 @@ describe('mock leaderboard', () => {
 
   it('shows three neighbours and a different weekly board', () => {
     const board = createMockLeaderboard({ nickname: 'StreetKick42', storage: memory(), now: NOW });
-    const around = board.around(23, 'world', NOW);
+    const around = board.around(23, 'world', 'all', NOW);
     expect(around.above).toHaveLength(3);
     expect(around.below).toHaveLength(3);
     expect(around.me.mine).toBe(true);
@@ -45,9 +49,9 @@ describe('mock leaderboard', () => {
     expect(around.me.score).toBe(23);
     expect(around.above.every((row) => row.rank < around.me.rank && row.score >= around.me.score)).toBe(true);
     expect(around.below.every((row) => row.rank > around.me.rank)).toBe(true);
-    const week = board.around(23, 'week', NOW);
+    const week = board.around(23, 'world', 'week', NOW);
     expect(week.me.rank).not.toBe(around.me.rank);
-    const top = board.top('world', 23, 10, NOW);
+    const top = board.top('world', 23, 10, 'all', NOW);
     expect(top).toHaveLength(10);
     expect(top[0]?.rank).toBe(1);
     expect(top.some((row) => row.mine)).toBe(false);
@@ -59,37 +63,80 @@ describe('mock leaderboard', () => {
     expect(board.submit(23, NOW).accepted).toBe(true);
     expect(board.submit(10, NOW + 1)).toEqual({ accepted: false, best: 23 });
     expect(board.submit(40, NOW + 2)).toEqual({ accepted: true, best: 40 });
-    const before = board.rankFor(23, NOW).rank;
-    const target = board.around(23, 'world', NOW).above[0]?.nickname ?? '';
-    board.report(target);
-    board.report('StreetKick42');
+    const before = board.rankFor(23, NOW).rank ?? 0;
+    const around = board.around(23, 'world', 'all', NOW);
+    const target = around.above[0]?.nickname ?? '';
+    const spared = around.above[1]?.nickname ?? '';
+    board.report(spared, 'nope' as 'rude');
+    expect(board.around(23, 'world', 'all', NOW).above.some((row) => row.nickname === spared)).toBe(true);
+    board.report(target, 'rude');
+    board.report('StreetKick42', 'rude');
     expect(board.rankFor(23, NOW).rank).toBe(before - 1);
-    expect(board.around(23, 'world', NOW).above.some((row) => row.nickname === target)).toBe(false);
+    expect(board.around(23, 'world', 'all', NOW).above.some((row) => row.nickname === target)).toBe(false);
     const again = createMockLeaderboard({ nickname: 'StreetKick42', storage, now: NOW });
     expect(again.submit(40, NOW)).toEqual({ accepted: false, best: 40 });
     expect(again.deviceId).toBe(board.deviceId);
     expect(storage.getItem(DEVICE_ID_KEY)).toBe(board.deviceId);
-    const entry = again.top('world', 23, 1, NOW)[0];
+    const entry = again.top('world', 23, 1, 'all', NOW)[0];
     expect(entry && 'deviceId' in entry).toBe(false);
   });
 
   it('ranks a chosen country separately and leaves prefer-not-to-say off that board', () => {
     const hidden = createMockLeaderboard({ nickname: 'StreetKick42', country: null, storage: memory(), now: NOW });
     expect(hidden.rankFor(23, NOW).countryRank).toBeNull();
-    expect(hidden.top('country', 23, 10, NOW)).toEqual([]);
-    expect(hidden.around(23, 'country', NOW).me.rank).toBe(0);
+    expect(hidden.top('country', 23, 10, 'all', NOW)).toEqual([]);
+    expect(hidden.around(23, 'country', 'all', NOW).me.rank).toBe(0);
 
     const board = createMockLeaderboard({ nickname: 'StreetKick42', country: 'gb', storage: memory(), now: NOW });
     const snap = board.rankFor(23, NOW);
     expect(board.country).toBe('GB');
     expect(snap.country).toBe('GB');
     expect(snap.countryRank).not.toBeNull();
-    expect(snap.countryRank!).toBeLessThan(snap.rank);
-    const around = board.around(23, 'country', NOW);
+    expect(snap.countryRank!).toBeLessThan(snap.rank!);
+    const around = board.around(23, 'country', 'all', NOW);
     const rows = [...around.above, around.me, ...around.below];
     expect(around.me.mine).toBe(true);
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
-    expect(board.top('world', 23, 10, NOW).every((row) => row.country)).toBe(true);
+    const world = board.top('world', 23, 50, 'all', NOW);
+    expect(world.length).toBeGreaterThan(0);
+    expect(world.every((row) => row.country == null)).toBe(true);
+    const worldAround = board.around(23, 'world', 'all', NOW);
+    expect([...worldAround.above, worldAround.me, ...worldAround.below].every((row) => row.country == null)).toBe(true);
+  });
+
+  it('shows a country review board of more than 20 word-list names', () => {
+    const allowed = new Set(ADJECTIVES.flatMap((adjective) => NOUNS.map((noun) => `${adjective} ${noun}`)));
+    const board = createMockLeaderboard({ nickname: 'Turbo Striker', country: 'GB', storage: memory(), now: NOW });
+    const country = board.board('all', 'country', 420, 25, NOW);
+    expect(country.hidden).toBe(false);
+    expect(country.rows.length).toBeGreaterThanOrEqual(20);
+    expect(country.rows.every((row) => row.country === 'GB')).toBe(true);
+    const today = board.board('day', 'country', 420, 25, NOW);
+    expect(today.hidden).toBe(false);
+    expect(today.rows.length).toBeGreaterThanOrEqual(20);
+    const world = board.board('all', 'world', 420, 25, NOW);
+    expect(world.rows.length).toBeGreaterThanOrEqual(10);
+    expect(world.rows.filter((row) => !row.mine).length).toBeGreaterThanOrEqual(5);
+    expect(world.rows.every((row) => row.country == null)).toBe(true);
+    expect(world.rows.every((row) => allowed.has(row.nickname))).toBe(true);
+  });
+
+  it('hides a country board with fewer than 20 players', () => {
+    const board = createMockLeaderboard({ nickname: 'Turbo Striker', country: 'AD', storage: memory(), now: NOW });
+    expect(board.rankFor(23, NOW).countryHidden).toBe(true);
+    expect(board.rankFor(23, NOW).countryRank).toBeNull();
+    expect(board.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
+    expect(board.board('day', 'world', 23, 10, NOW).hidden).toBe(false);
+    expect(board.around(23, 'world', 'all', NOW).me.country).toBeNull();
+  });
+
+  it('treats a week as Monday 00:00 UTC through the following Sunday', () => {
+    const wednesday = Date.UTC(2026, 9, 21, 15, 0, 0);
+    expect(isoWeekStartUtc(wednesday)).toBe(Date.UTC(2026, 9, 19));
+    expect(new Date(isoWeekStartUtc(wednesday)).getUTCDay()).toBe(1);
+    const sundayEvening = Date.UTC(2026, 9, 18, 23, 0, 0);
+    expect(isoWeekStartUtc(sundayEvening)).toBe(Date.UTC(2026, 9, 12));
+    expect(formatRank(null)).toBe('—');
   });
 });

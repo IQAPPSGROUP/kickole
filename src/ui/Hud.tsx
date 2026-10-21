@@ -149,7 +149,7 @@ function graffitiGlyphs(text: string) {
   return glyphs;
 }
 
-function GraffitiText({ text, className }: { text: string; className: string }) {
+export function GraffitiText({ text, className }: { text: string; className: string }) {
   return (
     <span className={className}>
       <span className="prompt-shine" aria-hidden="true">{graffitiGlyphs(text)}</span>

@@ -1,6 +1,10 @@
 # World leaderboard backend plan
 
-The app already has the client: a nickname and an optional self-chosen country on the device, a live rank tag, and the game-over board. Scores are **not** uploaded. `createMockLeaderboard` in `src/game/leaderboard.ts` implements `LeaderboardService`. A later Supabase client should implement that same interface and leave the UI alone.
+The live client is `createSupabaseLeaderboard`. The review migrations (`20261021120000` through `20261021120002`, plus `20261021130000_suggest_free_names.sql`) replace free-text nicknames. Players pick two words from the lists. Shuffle and Pick one for me call `suggest_free_names` so the wheels land on a pair nobody else has yet. The client also calls `peek_nickname`, `register_or_update_player`, `start_run`, `submit_score`, `get_rank`, `get_around`, `get_board`, `report_player`, `block_player`, `unblock_player`, and `delete_player`. `moderator_queue` and `resolve_report` stay off the client. See `docs/MODERATION.md`. Tables stay in the private schema. `?mockBoard=1` keeps `createMockLeaderboard` for tests, local development, and preview-branch builds that set `VITE_ALLOW_MOCK=1`. Production web builds ignore it. Capacitor and store builds fail if `VITE_ALLOW_MOCK` is set. The mock does not call `suggest_free_names`.
+
+Week is the ISO week starting Monday 00:00 UTC. Submit limits are one score per 10 seconds per device, 200 per UTC day per device and per real IP hash, at most 25 points per second of server time since `start_run`, and combo at most 3 per second plus one. A run token expires 10 minutes after `start_run`.
+
+The notes below are the earlier sketch. Where they disagree with the migrations, the migrations win.
 
 Checked against Supabase’s current API security docs: grants and row level security are separate layers, new `public` tables can be auto-granted to `anon`, views need `security_invoker = true` on Postgres 15+, and secret keys bypass RLS. Edge Functions still verify only the legacy JWT `anon` / `service_role` keys, so a publishable key needs `--no-verify-jwt` plus an in-function check.
 
@@ -122,10 +126,10 @@ User-generated nicknames are UGC. Before the backend is turned on, the build nee
 
 The local mock already filters, and Report hides the name on this device. It does not contact a server.
 
-## Privacy notice to add before upload
+## Privacy notice
 
-The Settings copy currently says scores stay on the device. That sentence has to change in the app, in `docs/STORE_DATA_SAFETY.md`, and in the App Store / Play Data safety forms **before** `submit-score` is called from a release build. Proposed wording:
+Settings and `docs/STORE_DATA_SAFETY.md` describe the live board. Use the same wording in the App Store / Play Data safety forms. Proposed wording:
 
-> Kickolé stores a nickname you choose and a random device id on this device. You can also choose a country, or prefer not to say. If you play online, we send that nickname, your score, the device id, and the country you chose (if any) to our scoreboard so other players can see your tag, flag and score. We do not ask for your real name, email, phone number, contacts, or precise location. We do not use GPS, your IP address, or a network lookup to pick your country. A suggestion may come from your device language region, and you can change it or leave it off. Choosing “Prefer not to say” keeps you off country boards. The device id is not your Apple or Google account. You can change the nickname and country in Settings. Uninstalling the app removes them from this device; ask the support address on the leaderboard to remove a score from the public board. We do not use the board for advertising.
+> The leaderboard is off until you tap Join leaderboard. If you join, Kickolé stores a nickname picked from our word lists and a random device id on this device. You can also choose a country, or prefer not to say. We send that nickname, your score, the device id, and the country you chose (if any) to our scoreboard so other players can see your tag, flag and score. We do not use GPS or a network lookup to pick your country. A hashed IP address may be kept for 30 days to limit cheating. Choosing “Prefer not to say” keeps you off country boards. You can change the nickname once every 7 days. Delete my leaderboard data removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days. We do not use the board for advertising.
 
 Also declare, when it ships: gameplay scores transmitted for app functionality, not tracking; no account; nickname is user-generated content.

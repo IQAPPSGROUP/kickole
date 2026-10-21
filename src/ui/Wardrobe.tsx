@@ -61,7 +61,7 @@ export function BodySelect({ onChoose }: { onChoose: (body: PlayerBody) => void 
     <div className="screen settings body-select">
       <div className="card">
         <h2>YOUR FOOTBALLER</h2>
-        <p className="shop-lead">Pick a male or female player. Both are free, and you can change this later in Customise.</p>
+        <p className="shop-lead">Pick a male or female player. You can change this later in Customise.</p>
         <button type="button" className="btn primary big" onClick={() => onChoose('male')}>MALE</button>
         <button type="button" className="btn ghost" onClick={() => onChoose('female')}>FEMALE</button>
       </div>
@@ -98,7 +98,7 @@ export function CustomiseScreen({
     <div className="screen settings wardrobe">
       <div className="card wardrobe-card">
         <h2>CUSTOMISE</h2>
-        <p className="shop-lead">Free looks — footballer, skin, hair and basic colours. Shop kits never change your face or hair.</p>
+        <p className="shop-lead">Pick a footballer, then skin, hair and basic colours. Shop kits never change your face or hair.</p>
         <PlayerPreview skin={skin} closeUp label="Customise preview" />
         <div className="group">
           <label>Footballer</label>
@@ -115,13 +115,13 @@ export function CustomiseScreen({
               </button>
             ))}
           </div>
-          <p className="shop-note">Both footballers are free. Kit colours, numbers and hair colours work on either.</p>
+          <p className="shop-note">Kit colours, numbers and hair colours work on either player.</p>
         </div>
         <SwatchRow label="Skin tone" colours={SKIN_TONES} value={a.skinTone} onPick={(skinTone) => patch({ skinTone })} />
         <SwatchRow label="Hair colour" colours={HAIR_COLORS} value={a.hairColor} onPick={(hairColor) => patch({ hairColor })} />
         <SwatchRow label="Shirt" colours={CLOTHING_SWATCHES} value={a.clothing.shirt} onPick={(shirt) => patch({ clothing: { ...a.clothing, shirt } })} />
         <SwatchRow label="Shorts" colours={CLOTHING_SWATCHES} value={a.clothing.shorts} onPick={(shorts) => patch({ clothing: { ...a.clothing, shorts } })} />
-        <p className="shop-note">Clothing swatches apply when you want a free look. Equipped shop kits override shirt/shorts/socks colours in play.</p>
+        <p className="shop-note">Clothing swatches colour the basic kit. Equipped shop kits override shirt, shorts and socks colours in play.</p>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

@@ -105,7 +105,7 @@ export const BOOTS: readonly BootDesign[] = [
     lace: '#F8F9FB',
     trim: '#1E2A5A',
     pattern: 'panels',
-    note: 'Starter pair. Free forever.',
+    note: 'Starter pair. Included from the first run.',
   },
   {
     id: 'boot-beach-wave',
@@ -201,7 +201,7 @@ export const KITS: readonly KitDesign[] = [
     unlock: { tier: 'starter', price: 0, challenge: 'none', challengeTarget: 0 },
     clothing: { shirt: '#FFD93D', shirtTrim: '#1E2A5A', shorts: '#1E2A5A', socks: '#F8F9FB' },
     pattern: 'plain',
-    note: 'Starter kit. Free forever.',
+    note: 'Starter kit. Included from the first run.',
   },
   {
     id: 'kit-beach-wave',

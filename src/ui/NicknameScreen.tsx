@@ -1,74 +1,337 @@
 import { useEffect, useRef, useState } from 'react';
 import { countryByCode, countryFlag, searchCountries, suggestedCountry } from '../game/countries';
-import { checkNickname, nicknameMessage, suggestNickname, type NicknameIssue } from '../game/nickname';
+import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
+import { composeNickname, isBlockedPair, parseNickname, pickFreePair, unblockIndex, wordIndex, type FreePair } from '../game/nickname';
+import type { PeekOutcome } from '../game/supabaseLeaderboard';
+import { GraffitiText } from './Hud';
+
+export function OptInCard({
+  onJoin,
+  onNotNow,
+  onData,
+}: {
+  onJoin: () => void;
+  onNotNow: () => void;
+  onData: () => void;
+}) {
+  return (
+    <div className="screen settings nick-screen">
+      <div className="card nick-card">
+        <p className="court-label">LEADERBOARD</p>
+        <h2 className="nick-title">JOIN IN?</h2>
+        <p className="shop-lead">The leaderboard is off until you join. Other players would see a nickname picked from our word lists, your score, and a country if you choose one. The game works either way.</p>
+        <button type="button" className="btn primary" onClick={onJoin}>Join leaderboard</button>
+        <button type="button" className="btn ghost" onClick={onNotNow}>Not now</button>
+        <button type="button" className="btn ghost" onClick={onData}>How it works</button>
+      </div>
+    </div>
+  );
+}
 
 export function NicknameForm({
   initial = '',
   initialCountry = null,
+  suggestion = null,
   submitLabel,
   onSubmit,
+  onPeek,
+  onSuggest,
 }: {
   initial?: string;
   initialCountry?: string | null;
+  /** Locale hint. Shown as a one-tap chip only while no country is selected. */
+  suggestion?: string | null;
   submitLabel: string;
-  onSubmit: (nickname: string, country: string | null) => void;
+  onSubmit: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
+  onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
+  onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
 }) {
-  const [value, setValue] = useState(initial);
+  const parsed = parseNickname(initial);
+  const [adj, setAdj] = useState(() => wordIndex(ADJECTIVES, parsed?.adjective ?? ADJECTIVES[0] ?? 'Turbo'));
+  const [noun, setNoun] = useState(() => wordIndex(NOUNS, parsed?.noun ?? NOUNS[0] ?? 'Striker'));
   const [country, setCountry] = useState<string | null>(() => countryByCode(initialCountry)?.code ?? null);
-  const [tried, setTried] = useState(false);
-  const check = checkNickname(value);
-  const issue: NicknameIssue | null = !check.ok && (tried || value.trim().length > 0) ? check.issue : null;
+  const [preview, setPreview] = useState(() => parsed?.nickname ?? composeNickname(ADJECTIVES[0] ?? 'Turbo', NOUNS[0] ?? 'Striker') ?? '');
+  const [taken, setTaken] = useState<string | null>(null);
+  const [acked, setAcked] = useState(false);
+  const [serverIssue, setServerIssue] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [lockAdj, setLockAdj] = useState(false);
+  const [lockNoun, setLockNoun] = useState(false);
+  const adjective = ADJECTIVES[adj] ?? 'Turbo';
+  const nounWord = NOUNS[noun] ?? 'Striker';
+
+  const showPair = (left: string, right: string) => {
+    setPreview(composeNickname(left, right) ?? `${left} ${right}`);
+    setTaken(null);
+    setAcked(false);
+    setServerIssue(null);
+  };
+
+  const peekPair = async (left: string, right: string): Promise<boolean> => {
+    if (!onPeek) {
+      setPreview(composeNickname(left, right) ?? `${left} ${right}`);
+      setTaken(null);
+      setAcked(true);
+      return false;
+    }
+    const result = await onPeek(left, right);
+    const base = composeNickname(left, right) ?? `${left} ${right}`;
+    if (result.taken && result.nickname) {
+      setPreview(result.nickname);
+      setTaken(`${base} is taken. You'll be ${result.nickname}.`);
+      setAcked(true);
+      return true;
+    }
+    setPreview(result.nickname || base);
+    setTaken(null);
+    setAcked(true);
+    return false;
+  };
+
+  const showFree = (name: FreePair): boolean => {
+    const nextAdj = wordIndex(ADJECTIVES, name.adjective);
+    const nextNoun = wordIndex(NOUNS, name.noun);
+    const left = ADJECTIVES[nextAdj];
+    const right = NOUNS[nextNoun];
+    if (!left || !right || left.toLowerCase() !== name.adjective.toLowerCase() || right.toLowerCase() !== name.noun.toLowerCase()) {
+      return false;
+    }
+    if (isBlockedPair(left, right)) return false;
+    setAdj(nextAdj);
+    setNoun(nextNoun);
+    setPreview(composeNickname(left, right) ?? `${left} ${right}`);
+    setTaken(null);
+    setAcked(true);
+    setServerIssue(null);
+    return true;
+  };
+
+  const applyPair = (nextAdj: number, nextNoun: number) => {
+    setAdj(nextAdj);
+    setNoun(nextNoun);
+    setServerIssue(null);
+    void peekPair(ADJECTIVES[nextAdj] ?? adjective, NOUNS[nextNoun] ?? nounWord);
+  };
+
+  const roll = (side: 'first' | 'second' | 'both') => {
+    let changeAdj = false;
+    let changeNoun = false;
+    switch (side) {
+      case 'first':
+        changeAdj = !lockAdj;
+        break;
+      case 'second':
+        changeNoun = !lockNoun;
+        break;
+      case 'both':
+        changeAdj = !lockAdj;
+        changeNoun = !lockNoun;
+        break;
+      default: {
+        const neverSide: never = side;
+        return neverSide;
+      }
+    }
+    if (!changeAdj && !changeNoun) return;
+    void (async () => {
+      if (onSuggest) {
+        try {
+          const names = await onSuggest({
+            count: 8,
+            adjective: changeAdj ? null : adjective,
+            noun: changeNoun ? null : nounWord,
+          });
+          const choice = pickFreePair(names.filter((name) => (
+            !isBlockedPair(name.adjective, name.noun)
+            && (changeAdj || name.adjective.toLowerCase() === adjective.toLowerCase())
+            && (changeNoun || name.noun.toLowerCase() === nounWord.toLowerCase())
+          )), { adjective, noun: nounWord });
+          const unchanged = choice
+            && choice.adjective.toLowerCase() === adjective.toLowerCase()
+            && choice.noun.toLowerCase() === nounWord.toLowerCase();
+          if (choice && !unchanged && showFree(choice)) return;
+        } catch {
+          /* a local roll still moves the wheels */
+        }
+      }
+      let nextAdj = changeAdj ? otherIndex(ADJECTIVES.length, adj) : adj;
+      let nextNoun = changeNoun ? otherIndex(NOUNS.length, noun) : noun;
+      let guard = 0;
+      while (isBlockedPair(ADJECTIVES[nextAdj] ?? '', NOUNS[nextNoun] ?? '') && guard < 40) {
+        guard += 1;
+        if (changeAdj) nextAdj = otherIndex(ADJECTIVES.length, nextAdj);
+        if (changeNoun) nextNoun = otherIndex(NOUNS.length, nextNoun);
+      }
+      if (nextAdj === adj && nextNoun === noun) return;
+      if (isBlockedPair(ADJECTIVES[nextAdj] ?? '', NOUNS[nextNoun] ?? '')) return;
+      applyPair(nextAdj, nextNoun);
+    })();
+  };
+
   return (
     <form
       className="nick-form"
       onSubmit={(event) => {
         event.preventDefault();
-        setTried(true);
-        if (!check.ok) return;
-        onSubmit(check.nickname, country);
+        if (busy) return;
+        setBusy(true);
+        setServerIssue(null);
+        void (async () => {
+          const initialPair = parsed?.adjective === adjective && parsed?.noun === nounWord;
+          if (!initialPair && isBlockedPair(adjective, nounWord)) {
+            setServerIssue('Those two words can\'t go together.');
+            setBusy(false);
+            return;
+          }
+          if (!acked) {
+            const wasTaken = await peekPair(adjective, nounWord);
+            if (wasTaken) {
+              setBusy(false);
+              return;
+            }
+          }
+          const message = await onSubmit(adjective, nounWord, country);
+          if (message) setServerIssue(message);
+          setBusy(false);
+        })();
       }}
     >
-      <input
-        className="nick-input"
-        value={value}
-        maxLength={16}
-        autoCapitalize="none"
-        autoCorrect="off"
-        autoComplete="off"
-        spellCheck={false}
-        enterKeyHint="done"
-        aria-label="Nickname"
-        placeholder="StreetKick42"
-        onChange={(event) => setValue(event.target.value)}
-      />
-      {issue && <p className="nick-error" role="alert">{nicknameMessage(issue)}</p>}
-      <CountryPicker country={country} onChange={setCountry} />
+      <div className="nick-preview" aria-live="polite">
+        <svg className="prompt-filters" aria-hidden width="0" height="0">
+          <filter id="prompt-spray" x="-8%" y="-20%" width="116%" height="150%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="noise" />
+            <feColorMatrix in="noise" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.4 -0.55" result="speck" />
+            <feComposite in="speck" in2="SourceAlpha" operator="in" />
+          </filter>
+        </svg>
+        <GraffitiText text={preview} className="graffiti nick-preview-tag" />
+      </div>
+      {taken && <p className="nick-error" role="alert">{taken}</p>}
+      {serverIssue && <p className="nick-error" role="alert">{serverIssue}</p>}
+      <div className="nick-wheels">
+        <WordWheel
+          label="First word"
+          words={ADJECTIVES}
+          index={adj}
+          locked={lockAdj}
+          onToggleLock={() => setLockAdj((value) => !value)}
+          onShuffle={() => roll('first')}
+          onChange={(index) => {
+            const next = unblockIndex('adjective', index, noun);
+            setAdj(next);
+            showPair(ADJECTIVES[next] ?? adjective, nounWord);
+          }}
+        />
+        <WordWheel
+          label="Second word"
+          words={NOUNS}
+          index={noun}
+          locked={lockNoun}
+          onToggleLock={() => setLockNoun((value) => !value)}
+          onShuffle={() => roll('second')}
+          onChange={(index) => {
+            const next = unblockIndex('noun', adj, index);
+            setNoun(next);
+            showPair(adjective, NOUNS[next] ?? nounWord);
+          }}
+        />
+      </div>
+      <p className="nick-real-name">Don&apos;t use your real name</p>
       <button
         type="button"
-        className="btn ghost"
-        onClick={() => {
-          setValue(suggestNickname());
-          setTried(false);
-        }}
+        className="btn primary nick-shuffle"
+        disabled={lockAdj && lockNoun}
+        onClick={() => roll('both')}
       >
-        SUGGEST
+        <span aria-hidden="true">🎲</span> Pick one for me
       </button>
-      <button type="submit" className="btn primary" disabled={!check.ok}>{submitLabel}</button>
+      <CountryPicker country={country} suggestion={suggestion} onChange={setCountry} />
+      <button type="submit" className="btn primary" disabled={busy}>{busy ? 'SAVING' : submitLabel}</button>
     </form>
+  );
+}
+
+function otherIndex(length: number, current: number): number {
+  if (length <= 1) return current;
+  const offset = 1 + Math.floor(Math.random() * (length - 1));
+  return (current + offset) % length;
+}
+
+function WordWheel({
+  label,
+  words,
+  index,
+  locked,
+  onChange,
+  onToggleLock,
+  onShuffle,
+}: {
+  label: string;
+  words: readonly string[];
+  index: number;
+  locked: boolean;
+  onChange: (index: number) => void;
+  onToggleLock: () => void;
+  onShuffle: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const current = ref.current?.querySelector('[aria-selected="true"]');
+    current?.scrollIntoView({ block: 'center' });
+  }, [index]);
+  return (
+    <div className="nick-wheel-col">
+      <span className="country-label">{label}</span>
+      <div className="nick-word-tools">
+        <button
+          type="button"
+          aria-pressed={locked}
+          aria-label={locked ? `Unlock ${label}` : `Lock ${label}`}
+          onClick={onToggleLock}
+        >
+          {locked ? 'Locked' : 'Lock'}
+        </button>
+        <button
+          type="button"
+          aria-label={`Shuffle ${label}`}
+          disabled={locked}
+          onClick={onShuffle}
+        >
+          Shuffle
+        </button>
+      </div>
+      <div ref={ref} className={`nick-wheel${locked ? ' is-locked' : ''}`} role="listbox" aria-label={label}>
+        {words.map((word, wordIndex) => (
+          <button
+            key={word}
+            type="button"
+            role="option"
+            aria-selected={wordIndex === index}
+            className={wordIndex === index ? 'on' : ''}
+            onClick={() => onChange(wordIndex)}
+          >
+            {word}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
 function CountryPicker({
   country,
+  suggestion = null,
   onChange,
 }: {
   country: string | null;
+  suggestion?: string | null;
   onChange: (country: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const listRef = useRef<HTMLUListElement>(null);
   const selected = countryByCode(country);
+  const hinted = country == null ? countryByCode(suggestion) : null;
   const matches = searchCountries(query);
   useEffect(() => {
     if (!open) return;
@@ -94,6 +357,13 @@ function CountryPicker({
         {selected && <span className="country-flag" aria-hidden="true">{countryFlag(selected.code)}</span>}
         <span id="country-value">{selected ? selected.name : 'Prefer not to say'}</span>
       </button>
+      {hinted && (
+        <button type="button" className="country-suggest" onClick={() => onChange(hinted.code)}>
+          Suggested: <span className="country-flag" aria-hidden="true">{countryFlag(hinted.code)}</span>
+          {' '}
+          {hinted.name}
+        </button>
+      )}
       {open && (
         <div className="country-panel">
           <input
@@ -140,15 +410,23 @@ function CountryPicker({
   );
 }
 
-export function NicknameScreen({ onSave }: { onSave: (nickname: string, country: string | null) => void }) {
+export function NicknameScreen({
+  onSave,
+  onPeek,
+  onSuggest,
+}: {
+  onSave: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
+  onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
+  onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
+}) {
   const [suggestion] = useState(() => suggestedCountry());
   return (
     <div className="screen settings nick-screen">
       <div className="card nick-card">
         <p className="court-label">WORLD BOARD</p>
         <h2 className="nick-title">YOUR TAG</h2>
-        <p className="shop-lead">Pick a nickname for the world board. Letters, numbers and underscore. No real name, email or phone. Country is your choice, not your location. Prefer not to say and you stay off country boards.</p>
-        <NicknameForm initialCountry={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} />
+        <p className="shop-lead">Pick two words from the lists. That nickname goes on the board. Country is your choice, not your location. Prefer not to say and you stay off country boards.</p>
+        <NicknameForm initialCountry={null} suggestion={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} onSuggest={onSuggest} />
       </div>
     </div>
   );

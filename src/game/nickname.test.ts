@@ -1,37 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { checkNickname, suggestNickname } from './nickname';
+import { ADJECTIVES, NOUNS } from './nicknameWords';
+import { checkNickname, composeNickname, isBlockedPair, parseNickname, pickFreePair, romanNumeral, romanValue, suggestNickname, unblockIndex } from './nickname';
 
 describe('nickname', () => {
-  it('accepts a street tag', () => {
-    expect(checkNickname('StreetKick42')).toEqual({ ok: true, nickname: 'StreetKick42' });
-    expect(checkNickname('  alley_tap7 ')).toEqual({ ok: true, nickname: 'alley_tap7' });
+  it('accepts a two-word list tag and a Roman suffix from II', () => {
+    expect(checkNickname('Turbo Striker')).toEqual({ ok: true, nickname: 'Turbo Striker' });
+    expect(checkNickname('  golden falcon ')).toEqual({ ok: true, nickname: 'Golden Falcon' });
+    expect(checkNickname('Turbo Striker II')).toEqual({ ok: true, nickname: 'Turbo Striker II' });
+    expect(parseNickname('Neon Cobra XL')).toMatchObject({ adjective: 'Neon', noun: 'Cobra', suffix: 40 });
   });
 
-  it('rejects length, symbols, email, phone and links', () => {
+  it('rejects free typing, a bare word, and the numeral I', () => {
     expect(checkNickname('')).toMatchObject({ ok: false, issue: 'empty' });
-    expect(checkNickname('ab')).toMatchObject({ issue: 'length' });
-    expect(checkNickname('a'.repeat(17))).toMatchObject({ issue: 'length' });
-    expect(checkNickname('cool name')).toMatchObject({ issue: 'charset' });
-    expect(checkNickname('rob@iqapps.com')).toMatchObject({ issue: 'email' });
-    expect(checkNickname('gmailkid')).toMatchObject({ issue: 'email' });
-    expect(checkNickname('5551234567')).toMatchObject({ issue: 'phone' });
-    expect(checkNickname('+44 7700 900123')).toMatchObject({ issue: 'phone' });
-    expect(checkNickname('https://kick.test')).toMatchObject({ issue: 'url' });
-    expect(checkNickname('www.kick.test')).toMatchObject({ issue: 'url' });
-    expect(checkNickname('kickdotcom')).toMatchObject({ issue: 'url' });
+    expect(checkNickname('StreetKick42')).toMatchObject({ issue: 'not_in_list' });
+    expect(checkNickname('Turbo')).toMatchObject({ issue: 'not_in_list' });
+    expect(checkNickname('Turbo Striker I')).toMatchObject({ issue: 'not_in_list' });
+    expect(checkNickname('Turbo Striker 2')).toMatchObject({ issue: 'not_in_list' });
+    expect(composeNickname('NotAWord', 'Striker')).toBeNull();
   });
 
-  it('rejects profanity, leetspeak, and a plain real name', () => {
-    expect(checkNickname('ohshit')).toMatchObject({ issue: 'profanity' });
-    expect(checkNickname('sh1t')).toMatchObject({ issue: 'profanity' });
-    expect(checkNickname('Maria')).toMatchObject({ issue: 'real_name' });
-    expect(checkNickname('JohnSmith')).toMatchObject({ issue: 'real_name' });
-    expect(checkNickname('maria_garcia')).toMatchObject({ issue: 'real_name' });
-    expect(checkNickname('John42')).toMatchObject({ issue: 'real_name' });
-    expect(checkNickname('StreetKick42').ok).toBe(true);
+  it('writes Roman numerals from 1 through 40 and back', () => {
+    expect(romanNumeral(1)).toBe('I');
+    expect(romanNumeral(2)).toBe('II');
+    expect(romanNumeral(4)).toBe('IV');
+    expect(romanNumeral(9)).toBe('IX');
+    expect(romanNumeral(40)).toBe('XL');
+    expect(romanNumeral(41)).toBe('');
+    expect(romanValue('III')).toBe(3);
+    expect(romanValue('I')).toBe(1);
+    expect(romanValue('IL')).toBeNull();
   });
 
-  it('suggests a tag that passes the filter', () => {
+  it('suggests a pair from the lists', () => {
     const seen = new Set<string>();
     for (let i = 0; i < 40; i += 1) {
       const name = suggestNickname();
@@ -39,6 +39,31 @@ describe('nickname', () => {
       seen.add(name);
     }
     expect(seen.size).toBeGreaterThan(1);
-    expect(suggestNickname(() => 0)).toBe('StreetKick10');
+    expect(suggestNickname(() => 0)).toBe(`${ADJECTIVES[0]} ${NOUNS[0]}`);
+  });
+
+  it('prefers a free pair that is not already on screen', () => {
+    const current = { adjective: 'Turbo', noun: 'Striker' };
+    expect(pickFreePair([
+      current,
+      { adjective: 'Neon', noun: 'Falcon' },
+      { adjective: 'Golden', noun: 'Wolf' },
+    ], current, () => 0)).toEqual({ adjective: 'Neon', noun: 'Falcon' });
+    expect(pickFreePair([], current)).toBeNull();
+    expect(pickFreePair([current], current, () => 0)).toEqual(current);
+  });
+
+  it('refuses trademark pairs and steps the changed word off them', () => {
+    expect(isBlockedPair('Ghost', 'Rider')).toBe(true);
+    expect(isBlockedPair('ghost', 'rider')).toBe(true);
+    expect(isBlockedPair('Silver', 'Fox')).toBe(true);
+    expect(isBlockedPair('Power', 'Ranger')).toBe(true);
+    expect(isBlockedPair('Ninja', 'Turtle')).toBe(true);
+    expect(isBlockedPair('Desert', 'Eagle')).toBe(true);
+    expect(isBlockedPair('Ghost', 'Striker')).toBe(false);
+    const ghost = ADJECTIVES.findIndex((word) => word === 'Ghost');
+    const rider = NOUNS.findIndex((word) => word === 'Rider');
+    expect(unblockIndex('noun', ghost, rider)).not.toBe(rider);
+    expect(isBlockedPair(ADJECTIVES[ghost] ?? '', NOUNS[unblockIndex('noun', ghost, rider)] ?? '')).toBe(false);
   });
 });

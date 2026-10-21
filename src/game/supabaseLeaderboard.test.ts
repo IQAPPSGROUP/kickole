@@ -283,11 +283,11 @@ describe('supabase leaderboard', () => {
     expect(board.top('world', 10, 10).every((row) => row.country == null)).toBe(true);
     expect(board.around(10, 'country').me.country).toBe('GB');
 
-    board.report('HighKick');
+    board.report('HighKick', 'rude');
     expect(board.around(10, 'world').above.some((row) => row.nickname === 'HighKick')).toBe(false);
     board.block('MidKick');
     expect(board.around(10, 'world').above.some((row) => row.nickname === 'MidKick')).toBe(false);
-    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'report_player' && call.args.reported_nickname === 'HighKick')).toBe(true));
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'report_player' && call.args.reported_nickname === 'HighKick' && call.args.reason === 'rude')).toBe(true));
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'block_player' && call.args.blocked_nickname === 'MidKick')).toBe(true));
   });
 
@@ -379,5 +379,44 @@ describe('supabase leaderboard', () => {
       }),
     });
     await vi.waitFor(() => expect(storage.getItem('kicky.board.outbox.v1')).toBeNull());
+  });
+
+  it('sends a reason code, drops a rejected report, and ignores a legacy queue entry', async () => {
+    const storage = memory();
+    storage.setItem('kicky.board.pending-moderation.v1', JSON.stringify({
+      reports: ['OldKick', { nickname: 'KeptKick', reason: 'other' }, { nickname: 'BadKick', reason: 'player_report' }],
+      blocks: [],
+      unblocks: [],
+    }));
+    const { calls, rpc } = scripted(liveHandlers({
+      report_player: (args) => (
+        args.reported_nickname === 'KeptKick'
+          ? { data: { ok: false, reason: 'invalid_reason' } }
+          : { data: { ok: false, reason: 'rate_limited' } }
+      ),
+    }));
+    const board = createSupabaseLeaderboard({
+      nickname: NICK,
+      country: 'GB',
+      storage,
+      rpc,
+      deviceId: DEVICE,
+      now: () => 9_000_000,
+    });
+    open.push(board);
+    board.start();
+    await vi.waitFor(() => expect(calls.some((call) => (
+      call.fn === 'report_player' && call.args.reported_nickname === 'KeptKick' && call.args.reason === 'other'
+    ))).toBe(true));
+    expect(calls.some((call) => call.args.reported_nickname === 'OldKick' || call.args.reason === 'player_report')).toBe(false);
+    await vi.waitFor(() => expect(storage.getItem('kicky.board.pending-moderation.v1')).not.toContain('KeptKick'));
+    board.report('HighKick', 'impersonation');
+    expect(board.around(10, 'world').above.some((row) => row.nickname === 'HighKick')).toBe(false);
+    await vi.waitFor(() => expect(calls.some((call) => (
+      call.fn === 'report_player' && call.args.reported_nickname === 'HighKick' && call.args.reason === 'impersonation'
+    ))).toBe(true));
+    const queued = storage.getItem('kicky.board.pending-moderation.v1') ?? '';
+    expect(queued).toContain('HighKick');
+    expect(queued).toContain('impersonation');
   });
 });

@@ -12,6 +12,7 @@ import { readBlockedNames, writeBlockedNames } from './leaderboard';
 import { composeNickname, isBlockedPair, parseNickname, type FreePair } from './nickname';
 import { kickTimesText, runChecksum } from './runProof';
 import { loadDeviceId } from './nicknameStore';
+import { isReportReason, type ReportReason } from './reportReasons';
 import { liveRpc, type LeaderboardRpc } from './supabaseClient';
 
 const REFRESH_MS = 10_000;
@@ -56,8 +57,13 @@ interface OutboxScore {
   kickTimesMs?: number[];
 }
 
+interface PendingReport {
+  nickname: string;
+  reason: ReportReason;
+}
+
 interface PendingModeration {
-  reports: string[];
+  reports: PendingReport[];
   blocks: string[];
   unblocks: string[];
 }
@@ -286,12 +292,24 @@ function readOutbox(storage: Storage): OutboxScore | null {
   }
 }
 
+function readReport(item: unknown): PendingReport | null {
+  const row = asRecord(item);
+  const nickname = typeof row.nickname === 'string' ? row.nickname.trim() : '';
+  if (!nickname || !isReportReason(row.reason)) return null;
+  return { nickname, reason: row.reason };
+}
+
 function readModeration(storage: Storage): PendingModeration {
   try {
     const raw = storage.getItem(MODERATION_KEY);
     if (!raw) return { reports: [], blocks: [], unblocks: [] };
     const parsed = asRecord(JSON.parse(raw) as unknown);
-    const reports = Array.isArray(parsed.reports) ? parsed.reports.filter((item): item is string => typeof item === 'string') : [];
+    const reports = Array.isArray(parsed.reports)
+      ? parsed.reports.flatMap((item) => {
+        const report = readReport(item);
+        return report ? [report] : [];
+      })
+      : [];
     const blocks = Array.isArray(parsed.blocks) ? parsed.blocks.filter((item): item is string => typeof item === 'string') : [];
     const unblocks = Array.isArray(parsed.unblocks) ? parsed.unblocks.filter((item): item is string => typeof item === 'string') : [];
     return { reports, blocks, unblocks };
@@ -338,7 +356,7 @@ export function createSupabaseLeaderboard(options: {
   const deviceId = options.deviceId ?? loadDeviceId(storage);
   let blocked = readBlockedNames(storage);
   const pending = readModeration(storage);
-  const pendingReports = new Set(pending.reports);
+  const pendingReports = new Map(pending.reports.map((item) => [item.nickname.toLowerCase(), item]));
   const pendingBlocks = new Set(pending.blocks);
   const pendingUnblocks = new Set(pending.unblocks);
   let outbox = readOutbox(storage);
@@ -382,7 +400,7 @@ export function createSupabaseLeaderboard(options: {
   const persistModeration = () => {
     try {
       const payload: PendingModeration = {
-        reports: [...pendingReports],
+        reports: [...pendingReports.values()],
         blocks: [...pendingBlocks],
         unblocks: [...pendingUnblocks],
       };
@@ -593,16 +611,18 @@ export function createSupabaseLeaderboard(options: {
   };
 
   const flushModeration = async (token: number): Promise<void> => {
-    for (const name of [...pendingReports]) {
+    for (const item of [...pendingReports.values()]) {
+      const key = item.nickname.toLowerCase();
       const result = await callRpc(rpc, 'report_player', {
         reporter_device_id: deviceId,
-        reported_nickname: name,
-        reason: 'player_report',
+        reported_nickname: item.nickname,
+        reason: item.reason,
       });
       if (token !== generation || stopped) return;
       const body = asRecord(result.data);
-      if (!result.error && (body.ok === true || body.reason === 'not_found')) pendingReports.delete(name);
-      else if (!result.error && body.reason === 'unknown_player') {
+      if (!result.error && (body.ok === true || body.reason === 'not_found' || body.reason === 'invalid_reason')) {
+        pendingReports.delete(key);
+      } else if (!result.error && body.reason === 'unknown_player') {
         registered = false;
         await ensureRegistered(token);
       }
@@ -821,12 +841,12 @@ export function createSupabaseLeaderboard(options: {
       const accepted = rounded > known;
       return { accepted, best: accepted ? rounded : known };
     },
-    report(name) {
+    report(name, reason) {
       const trimmed = name.trim();
       const key = trimmed.toLowerCase();
-      if (!key || key === nickname.toLowerCase()) return;
+      if (!isReportReason(reason) || !key || key === nickname.toLowerCase()) return;
       if (!isHidden(trimmed)) blocked = [...blocked, trimmed];
-      pendingReports.add(trimmed);
+      pendingReports.set(key, { nickname: trimmed, reason });
       persistHidden();
       persistModeration();
       publish();

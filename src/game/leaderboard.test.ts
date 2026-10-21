@@ -64,9 +64,13 @@ describe('mock leaderboard', () => {
     expect(board.submit(10, NOW + 1)).toEqual({ accepted: false, best: 23 });
     expect(board.submit(40, NOW + 2)).toEqual({ accepted: true, best: 40 });
     const before = board.rankFor(23, NOW).rank ?? 0;
-    const target = board.around(23, 'world', 'all', NOW).above[0]?.nickname ?? '';
-    board.report(target);
-    board.report('StreetKick42');
+    const around = board.around(23, 'world', 'all', NOW);
+    const target = around.above[0]?.nickname ?? '';
+    const spared = around.above[1]?.nickname ?? '';
+    board.report(spared, 'nope' as 'rude');
+    expect(board.around(23, 'world', 'all', NOW).above.some((row) => row.nickname === spared)).toBe(true);
+    board.report(target, 'rude');
+    board.report('StreetKick42', 'rude');
     expect(board.rankFor(23, NOW).rank).toBe(before - 1);
     expect(board.around(23, 'world', 'all', NOW).above.some((row) => row.nickname === target)).toBe(false);
     const again = createMockLeaderboard({ nickname: 'StreetKick42', storage, now: NOW });

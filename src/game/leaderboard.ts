@@ -2,6 +2,7 @@ import { COUNTRIES, countryByCode } from './countries';
 import { isBlockedPair } from './nickname';
 import { ADJECTIVES, NOUNS } from './nicknameWords';
 import { loadDeviceId } from './nicknameStore';
+import { isReportReason, type ReportReason } from './reportReasons';
 
 /** Day, ISO week (Monday 00:00 UTC), calendar month, calendar year, or all-time. */
 export type BoardPeriod = 'day' | 'week' | 'month' | 'year' | 'all';
@@ -86,7 +87,7 @@ export interface LeaderboardService {
   top(scope: BoardScope, score: number, limit: number, period?: BoardPeriod, now?: number): BoardEntry[];
   board(period: BoardPeriod, scope: BoardScope, score: number, limit?: number, now?: number): BoardPage;
   submit(score: number, at?: number, run?: RunSubmit): SubmitResult;
-  report(nickname: string): void;
+  report(nickname: string, reason: ReportReason): void;
   block(nickname: string): void;
   unblock(nickname: string): void;
   blockedNames(): string[];
@@ -380,10 +381,10 @@ export function createMockLeaderboard(options: {
       }
       return { accepted: true, best: rounded };
     },
-    report(name) {
+    report(name, reason) {
       const trimmed = name.trim();
       const key = trimmed.toLowerCase();
-      if (!key || key === nickname.toLowerCase()) return;
+      if (!isReportReason(reason) || !key || key === nickname.toLowerCase()) return;
       reports.add(key);
       if (!hidden(trimmed)) blocked = [...blocked, trimmed];
       persistSets();

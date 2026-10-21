@@ -139,15 +139,36 @@ begin
   update private.players set created_at = now() - interval '2 days' where id = b;
   insert into private.scores (player_id, score, combo, run_duration_ms) values (b, 10, 1, 1000);
   update private.scores set created_at = now() - interval '1 hour' where player_id = b;
-  result := public.report_player(b, 'Turbo Striker', null);
+  result := public.report_player(b, 'Turbo Striker', 'rude');
   if result->>'ok' <> 'true' then
     raise exception 'eligible report should succeed: %', result;
   end if;
   if not exists (
-    select 1 from private.reports r where r.reporter_player_id = b and r.reported_player_id = a and r.status = 'pending'
+    select 1 from private.reports r
+    where r.reporter_player_id = b and r.reported_player_id = a and r.status = 'pending' and r.reason = 'rude'
   ) then
-    raise exception 'eligible report was not stored';
+    raise exception 'eligible report did not store the reason code';
   end if;
+  result := public.report_player(b, 'Turbo Striker', null);
+  if result->>'reason' <> 'invalid_reason' then
+    raise exception 'a missing reason must be rejected: %', result;
+  end if;
+  result := public.report_player(b, 'No Such Name', 'made-up');
+  if result->>'reason' <> 'invalid_reason' then
+    raise exception 'a bad reason must be rejected before the name lookup: %', result;
+  end if;
+  result := public.report_player(b, 'Turbo Striker', 'player_report');
+  if result->>'reason' <> 'invalid_reason' then
+    raise exception 'free text must not be stored: %', result;
+  end if;
+  begin
+    insert into private.reports (reporter_player_id, reported_player_id, reported_nickname, reason)
+    values (b, a, 'Turbo Striker', 'player_report');
+    raise exception 'reason check should reject free text';
+  exception
+    when check_violation then
+      null;
+  end;
 
   result := public.block_player(b, 'No Such Player');
   if result->>'ok' <> 'true' or result->>'reason' is not null then
@@ -232,12 +253,12 @@ begin
   end if;
   delete from private.rate_limits where action = 'block-ip';
   delete from private.blocks where player_id = b;
-  result := public.report_player(b, 'No Such Player', null);
+  result := public.report_player(b, 'No Such Player', 'other');
   if result->>'ok' <> 'true' or result->>'reason' is not null then
     raise exception 'a missing report target must be a generic ok: %', result;
   end if;
 
-  result := public.report_player(a, 'Neon Falcon', null);
+  result := public.report_player(a, 'Neon Falcon', 'other');
   if exists (
     select 1 from private.reports r where r.reporter_player_id = a and r.status = 'pending'
   ) then

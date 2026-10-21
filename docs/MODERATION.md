@@ -4,8 +4,8 @@ Player nicknames come from the word lists in `private.nickname_words`. Players d
 
 ## What players can do
 
-- **Report** and **Block** sit behind the `⋯` button on a board row. Report asks for confirmation. Block hides that nickname on this device immediately.
-- A report also blocks the nickname for the reporter.
+- **Report** and **Block** sit behind the `⋯` button on a board row. The menu is a sheet fixed on the screen. Report asks for one reason: `rude` (Rude or mean name), `impersonation` (Pretending to be someone), or `other` (Something else). The reported player is not told who filed it. Block hides that nickname on this device immediately.
+- A report also blocks the nickname for the reporter. `report_player` stores the reason code. A missing or unknown code returns `invalid_reason` before the nickname lookup, so that answer does not reveal whether the name exists. A known device reporting a missing name still returns a generic `{ok:true}`.
 - A report counts toward the public queue only when the reporter's row is at least 24 hours old, they have at least one accepted score, and they are under the daily cap (5 counted reports per UTC day, plus the hashed-IP limit). The client is not told whether a report counted.
 - Three distinct pending reporters hide the nickname automatically.
 - Settings lists blocked nicknames and can unblock them.

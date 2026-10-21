@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMockLeaderboard, formatRank, isoWeekStartUtc } from './leaderboard';
 import { DEVICE_ID_KEY } from './nicknameStore';
+import { ADJECTIVES, NOUNS } from './nicknameWords';
 
 const NOW = 1_700_000_000_000;
 
@@ -98,6 +99,23 @@ describe('mock leaderboard', () => {
     expect(world.every((row) => row.country == null)).toBe(true);
     const worldAround = board.around(23, 'world', 'all', NOW);
     expect([...worldAround.above, worldAround.me, ...worldAround.below].every((row) => row.country == null)).toBe(true);
+  });
+
+  it('shows a country review board of more than 20 word-list names', () => {
+    const allowed = new Set(ADJECTIVES.flatMap((adjective) => NOUNS.map((noun) => `${adjective} ${noun}`)));
+    const board = createMockLeaderboard({ nickname: 'Turbo Striker', country: 'GB', storage: memory(), now: NOW });
+    const country = board.board('all', 'country', 420, 25, NOW);
+    expect(country.hidden).toBe(false);
+    expect(country.rows.length).toBeGreaterThanOrEqual(20);
+    expect(country.rows.every((row) => row.country === 'GB')).toBe(true);
+    const today = board.board('day', 'country', 420, 25, NOW);
+    expect(today.hidden).toBe(false);
+    expect(today.rows.length).toBeGreaterThanOrEqual(20);
+    const world = board.board('all', 'world', 420, 25, NOW);
+    expect(world.rows.length).toBeGreaterThanOrEqual(10);
+    expect(world.rows.filter((row) => !row.mine).length).toBeGreaterThanOrEqual(5);
+    expect(world.rows.every((row) => row.country == null)).toBe(true);
+    expect(world.rows.every((row) => allowed.has(row.nickname))).toBe(true);
   });
 
   it('hides a country board with fewer than 20 players', () => {

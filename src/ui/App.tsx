@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { installAudioLifecycle } from '../game/audio';
-import { GameController } from '../game/controller';
+import { GameController, type Result } from '../game/controller';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
@@ -25,6 +25,20 @@ const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) 
 
 type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'data';
 
+const REVIEW_NICKNAME = 'Turbo Striker';
+const REVIEW_COUNTRY = 'GB';
+const REVIEW_RESULT: Result = {
+  score: 420,
+  kickUps: 24,
+  bestStreak: 8,
+  combos: 3,
+  durationMs: 24000,
+  kickTimesMs: [800, 1600, 2400],
+  newBest: false,
+  rank: 40,
+  coinsEarned: 4,
+};
+
 export function App() {
   const controller = useMemo(() => new GameController(), []);
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
@@ -33,20 +47,31 @@ export function App() {
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
-  const [deviceReady, setDeviceReady] = useState(false);
-  const [blockedTick, setBlockedTick] = useState(0);
   const mockBoard = useMemo(() => new URLSearchParams(window.location.search).get('mockBoard') === '1', []);
-  const leaderboardOn = optIn === 'in';
+  const [deviceReady, setDeviceReady] = useState(mockBoard);
+  const [blockedTick, setBlockedTick] = useState(0);
+  const [reviewOpen, setReviewOpen] = useState(mockBoard);
+  const reviewing = mockBoard && optIn !== 'out';
+  const boardName = nickname ?? (reviewing ? REVIEW_NICKNAME : null);
+  const boardCountry = countryChoice.chosen ? countryChoice.country : (reviewing ? REVIEW_COUNTRY : null);
+  const leaderboardOn = optIn === 'in' || (reviewing && optIn === 'unknown');
   const board = useMemo((): LeaderboardService | null => {
-    if (!leaderboardOn || !nickname || !deviceReady) return null;
-    const options = { nickname, country: countryChoice.country };
+    if (!leaderboardOn || !boardName || !deviceReady) return null;
+    const options = { nickname: boardName, country: boardCountry };
     return mockBoard ? createMockLeaderboard(options) : createSupabaseLeaderboard(options);
-  }, [leaderboardOn, nickname, countryChoice.country, deviceReady, mockBoard]);
+  }, [leaderboardOn, boardName, boardCountry, deviceReady, mockBoard]);
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
-  useEffect(() => { initOpeningIntro(); }, []);
+  useEffect(() => {
+    if (mockBoard) {
+      skipOpeningIntro();
+      if (!controller.getSnapshot().save.bodyChosen) controller.chooseBody('male');
+      return;
+    }
+    initOpeningIntro();
+  }, [controller, mockBoard]);
 
   useEffect(() => {
     let live = true;
@@ -118,9 +143,9 @@ export function App() {
     };
   }, [controller]);
 
-  const needsBody = !snap.save.bodyChosen;
-  const needsOpt = optIn === 'unknown';
-  const needsNick = leaderboardOn && nickname == null;
+  const needsBody = !snap.save.bodyChosen && !mockBoard;
+  const needsOpt = optIn === 'unknown' && !mockBoard;
+  const needsNick = leaderboardOn && nickname == null && !mockBoard;
   const blocking = overlay !== 'none' || needsBody || needsOpt || needsNick;
 
   useEffect(() => {
@@ -262,7 +287,7 @@ export function App() {
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
-      {intro.active && !needsBody && !needsOpt && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
+      {intro.active && !mockBoard && !needsBody && !needsOpt && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
@@ -272,7 +297,7 @@ export function App() {
       {!needsBody && !needsOpt && needsNick && phase === 'menu' && overlay === 'none' && (
         <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} onSuggest={mockBoard ? undefined : suggestTags} />
       )}
-      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && (
+      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !(reviewOpen && board) && (
         <Home
           best={snap.save.best}
           coins={snap.save.coins}
@@ -292,6 +317,19 @@ export function App() {
         />
       )}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
+      {reviewOpen && phase === 'menu' && overlay === 'none' && board && (
+        <GameOver
+          result={REVIEW_RESULT}
+          best={Math.max(snap.save.best, REVIEW_RESULT.score)}
+          coins={snap.save.coins}
+          board={board}
+          onAgain={startGame}
+          onHome={() => setReviewOpen(false)}
+          onShop={() => setOverlay('shop')}
+          rowLimit={25}
+          initialView="top"
+        />
+      )}
       {phase === 'over' && snap.result && overlay === 'none' && (
         <GameOver
           result={snap.result}
@@ -301,13 +339,14 @@ export function App() {
           onAgain={startGame}
           onHome={() => controller.home()}
           onShop={() => setOverlay('shop')}
+          rowLimit={mockBoard ? 25 : 10}
         />
       )}
       {InspectorPanel && <Suspense fallback={null}><InspectorPanel controller={controller} /></Suspense>}
       {overlay === 'settings' && (
         <SettingsScreen
           settings={snap.settings}
-          nickname={nickname ?? ''}
+          nickname={nickname ?? (reviewing ? boardName ?? '' : '')}
           country={countryChoice.country}
           leaderboardOn={leaderboardOn}
           blockedTick={blockedTick}

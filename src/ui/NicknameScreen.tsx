@@ -31,6 +31,7 @@ export function OptInCard({
 export function NicknameForm({
   initial = '',
   initialCountry = null,
+  suggestion = null,
   submitLabel,
   onSubmit,
   onPeek,
@@ -38,6 +39,8 @@ export function NicknameForm({
 }: {
   initial?: string;
   initialCountry?: string | null;
+  /** Locale hint. Shown as a one-tap chip only while no country is selected. */
+  suggestion?: string | null;
   submitLabel: string;
   onSubmit: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
@@ -235,7 +238,7 @@ export function NicknameForm({
       >
         <span aria-hidden="true">🎲</span> Pick one for me
       </button>
-      <CountryPicker country={country} onChange={setCountry} />
+      <CountryPicker country={country} suggestion={suggestion} onChange={setCountry} />
       <button type="submit" className="btn primary" disabled={busy}>{busy ? 'SAVING' : submitLabel}</button>
     </form>
   );
@@ -310,15 +313,18 @@ function WordWheel({
 
 function CountryPicker({
   country,
+  suggestion = null,
   onChange,
 }: {
   country: string | null;
+  suggestion?: string | null;
   onChange: (country: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const listRef = useRef<HTMLUListElement>(null);
   const selected = countryByCode(country);
+  const hinted = country == null ? countryByCode(suggestion) : null;
   const matches = searchCountries(query);
   useEffect(() => {
     if (!open) return;
@@ -344,6 +350,12 @@ function CountryPicker({
         {selected && <span className="country-flag" aria-hidden="true">{countryFlag(selected.code)}</span>}
         <span id="country-value">{selected ? selected.name : 'Prefer not to say'}</span>
       </button>
+      {hinted && (
+        <button type="button" className="country-suggest" onClick={() => onChange(hinted.code)}>
+          Suggested: <span className="country-flag" aria-hidden="true">{countryFlag(hinted.code)}</span>
+          {hinted.name}
+        </button>
+      )}
       {open && (
         <div className="country-panel">
           <input
@@ -406,7 +418,7 @@ export function NicknameScreen({
         <p className="court-label">WORLD BOARD</p>
         <h2 className="nick-title">YOUR TAG</h2>
         <p className="shop-lead">Pick two words from the lists. That nickname goes on the board. Country is your choice, not your location. Prefer not to say and you stay off country boards.</p>
-        <NicknameForm initialCountry={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} onSuggest={onSuggest} />
+        <NicknameForm initialCountry={null} suggestion={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} onSuggest={onSuggest} />
       </div>
     </div>
   );

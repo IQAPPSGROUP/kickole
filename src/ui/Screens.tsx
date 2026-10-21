@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
-import { countryByCode, countryFlag } from '../game/countries';
+import { countryByCode, countryFlag, suggestedCountry } from '../game/countries';
 import { readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
@@ -76,7 +76,7 @@ export function Home({
 }
 
 export function GameOver({
-  result, best, coins, board, onAgain, onHome, onShop,
+  result, best, coins, board, onAgain, onHome, onShop, rowLimit = 10, initialView = 'around',
 }: {
   result: Result;
   best: number;
@@ -85,10 +85,13 @@ export function GameOver({
   onAgain: () => void;
   onHome: () => void;
   onShop: () => void;
+  /** How many rows the top list keeps. Country review boards need more than 10. */
+  rowLimit?: number;
+  initialView?: 'around' | 'top';
 }) {
   const [period, setPeriod] = useState<BoardPeriod>('all');
   const [scope, setScope] = useState<BoardScope>('world');
-  const [view, setView] = useState<'around' | 'top'>('around');
+  const [view, setView] = useState<'around' | 'top'>(initialView);
   const [note, setNote] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string | null>(null);
   const [confirmReport, setConfirmReport] = useState(false);
@@ -97,7 +100,7 @@ export function GameOver({
     board ? board.subscribe : idleSubscribe,
     () => board?.revision ?? 0,
   );
-  const page = board ? board.board(period, scope, result.score, 10) : { hidden: false, rows: [] as BoardEntry[] };
+  const page = board ? board.board(period, scope, result.score, rowLimit) : { hidden: false, rows: [] as BoardEntry[] };
   const optedOut = scope === 'country' && !board?.country;
   const rows = board && !optedOut && !page.hidden
     ? view === 'top'
@@ -146,7 +149,7 @@ export function GameOver({
             {!optedOut && (
               <div className="seg board-tabs" role="tablist" aria-label="Board view">
                 <button type="button" className={view === 'around' ? 'on' : ''} onClick={() => setView('around')}>AROUND YOU</button>
-                <button type="button" className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>TOP 10</button>
+                <button type="button" className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>TOP {rowLimit}</button>
               </div>
             )}
             {optedOut && <p className="shop-note">You chose not to appear on a country board.</p>}
@@ -234,7 +237,7 @@ function idleSubscribe(): () => void {
 }
 
 const PERIODS: readonly { id: BoardPeriod; label: string; title?: string }[] = [
-  { id: 'day', label: 'Day' },
+  { id: 'day', label: 'Today' },
   { id: 'week', label: 'Week', title: 'Monday to Sunday UTC' },
   { id: 'month', label: 'Month' },
   { id: 'year', label: 'Year' },
@@ -291,6 +294,7 @@ export function SettingsScreen({
   onChange: (p: Partial<Settings>) => void;
   onClose: () => void;
 }) {
+  const [countrySuggestion] = useState(() => suggestedCountry());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
   const blocked = readBlockedNames(localStorage);
@@ -308,7 +312,7 @@ export function SettingsScreen({
         {leaderboardOn && (
           <div className="group">
             <label>Change nickname and country</label>
-            <NicknameForm initial={nickname} initialCountry={country} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
+            <NicknameForm initial={nickname} initialCountry={country} suggestion={countrySuggestion} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
             <p className="shop-note">Your nickname is picked from our word lists. You can change it once every 7 days. Country is your choice, not your location. Prefer not to say keeps you off country boards.</p>
           </div>
         )}
@@ -444,7 +448,7 @@ export function DataScreen({ onClose }: { onClose: () => void }) {
           <li>Build a nickname from our word lists, or tap Pick one for me. You can&apos;t type your own, so your real name stays private.</li>
           <li>Boards: Today, Week, Month, Year and All time, for the world and for your country. A country board only shows once it has 20 players.</li>
           <li>Your best scores stay until 2 years after you last play. Other runs go after 12 months.</li>
-          <li>Tap &apos;Delete my leaderboard data&apos; any time to remove everything straight away.</li>
+          <li>Tap &apos;Delete my leaderboard data&apos; any time to remove your nickname and scores straight away. If someone has reported you, we keep that report for up to 90 days so we can check it.</li>
           <li>We keep a scrambled version of your internet address for up to 30 days to stop cheating.</li>
           <li>Report or Block a name from the ⋯ button. Blocking only changes what you see, and the other player isn&apos;t told. If something upsets you, tell an adult you trust.</li>
         </ul>

@@ -22,7 +22,7 @@ export function OptInCard({
         <p className="shop-lead">The leaderboard is off until you join. Other players would see a nickname picked from our word lists, your score, and a country if you choose one. The game works either way.</p>
         <button type="button" className="btn primary" onClick={onJoin}>Join leaderboard</button>
         <button type="button" className="btn ghost" onClick={onNotNow}>Not now</button>
-        <button type="button" className="btn ghost" onClick={onData}>Leaderboard &amp; your data</button>
+        <button type="button" className="btn ghost" onClick={onData}>How it works</button>
       </div>
     </div>
   );

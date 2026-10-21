@@ -431,13 +431,19 @@ export function SettingsScreen({
 
 export function DataScreen({ onClose }: { onClose: () => void }) {
   return (
-    <div className="overlay">
-      <div className="panel wide data-panel">
-        <h2>Leaderboard &amp; your data</h2>
-        <p>The leaderboard is off until you tap Join leaderboard.</p>
-        <p>If you join, we save a nickname you pick from our word lists, a random device id, your scores, and a country only if you choose one. We do not use GPS. We may keep a hashed IP address for 30 days to limit cheating.</p>
-        <p>You can change your nickname once every 7 days. You can turn the leaderboard off, and you can block or report other nicknames.</p>
-        <p>This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
+    <div className="screen settings">
+      <div className="card data-panel">
+        <h2>Leaderboard: how it works</h2>
+        <ul>
+          <li>It&apos;s off unless you turn it on.</li>
+          <li>Others see only your nickname, your country (if you pick one) and your score. No real names, photos or chat.</li>
+          <li>Boards: Today, Week, Month, Year and All time, for the world and for your country. A country board only shows once it has 20 players.</li>
+          <li>Your best scores stay until 2 years after you last play. Other runs go after 12 months.</li>
+          <li>Tap &apos;Delete my leaderboard data&apos; any time to remove everything straight away.</li>
+          <li>We keep a scrambled version of your internet address for up to 30 days to stop cheating.</li>
+          <li>Report or Block a name from the ⋯ button. Blocking only changes what you see, and the other player isn&apos;t told. If something upsets you, tell an adult you trust.</li>
+        </ul>
+        <p className="data-contact">Questions? <a href="mailto:hello@iqcoaching.co.uk">hello@iqcoaching.co.uk</a></p>
         <button className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

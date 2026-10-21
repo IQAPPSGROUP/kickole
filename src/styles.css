@@ -1172,7 +1172,20 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   border-radius: 12px;
   cursor: pointer;
 }
-.data-panel p { text-align: left; }
+.data-panel { text-align: left; }
+.data-panel h2 { letter-spacing: 0; font-size: 20px; line-height: 1.25; text-align: left; }
+.data-panel ul {
+  margin: 0;
+  padding: 0 0 0 1.15em;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+.data-panel .data-contact { margin: 0; font-size: 14px; font-weight: 800; }
+.data-panel a { color: #ffe14a; }
 .world-board .country-flag { font-size: 14px; }
 .world-board { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .world-board .board li { padding: 4px 8px; font-size: 13px; }

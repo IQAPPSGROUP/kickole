@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatRank } from './leaderboard';
+import { runChecksum } from './runProof';
 import type { LeaderboardRpc } from './supabaseClient';
 import { createSupabaseLeaderboard, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames } from './supabaseLeaderboard';
 
@@ -222,7 +223,7 @@ describe('supabase leaderboard', () => {
 
     board.startRun();
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'start_run')).toBe(true));
-    expect(board.submit(30, clock, { combo: 2, durationMs: 8_000 })).toEqual({ accepted: true, best: 30 });
+    expect(board.submit(30, clock, { combo: 2, durationMs: 8_000, kickTimesMs: [120, 480] })).toEqual({ accepted: true, best: 30 });
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'submit_score')).toBe(true));
     const sent = calls.filter((call) => call.fn === 'submit_score');
     expect(sent).toHaveLength(1);
@@ -232,6 +233,16 @@ describe('supabase leaderboard', () => {
       combo: 2,
       run_duration_ms: 8_000,
       run_token: '22222222-2222-4222-8222-222222222222',
+      kick_count: 2,
+      kick_times: '120,480',
+      kick_checksum: runChecksum({
+        deviceId: DEVICE,
+        token: '22222222-2222-4222-8222-222222222222',
+        score: 30,
+        kickCount: 2,
+        durationMs: 8_000,
+        kickTimes: '120,480',
+      }),
     });
     expect(storage.getItem('kicky.board.outbox.v1')).toContain('"score":30');
 
@@ -299,6 +310,18 @@ describe('supabase leaderboard', () => {
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'start_run')).toBe(true));
     board.submit(20, 4_000_000, { combo: 1, durationMs: 100 });
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'submit_score')).toBe(true));
+    expect(calls.find((call) => call.fn === 'submit_score')?.args).toMatchObject({
+      kick_count: 0,
+      kick_times: '',
+      kick_checksum: runChecksum({
+        deviceId: DEVICE,
+        token: '22222222-2222-4222-8222-222222222222',
+        score: 20,
+        kickCount: 0,
+        durationMs: 100,
+        kickTimes: '',
+      }),
+    });
     await vi.waitFor(() => expect(storage.getItem('kicky.board.outbox.v1')).toBeNull());
   });
 });

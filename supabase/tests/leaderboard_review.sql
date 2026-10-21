@@ -9,6 +9,7 @@ declare
   b uuid := '00000000-0000-4000-8000-0000000000b2';
   result jsonb;
   token uuid;
+  proof text;
   v_report bigint;
 begin
   if has_function_privilege('anon', 'public.moderator_queue()', 'execute') then
@@ -181,23 +182,44 @@ begin
     raise exception 'start_run failed: %', result;
   end if;
   result := public.submit_score(b, 1, 0, 1000, token);
+  if result->>'reason' <> 'implausible' then
+    raise exception 'a score without kick proof must fail: %', result;
+  end if;
+  result := public.submit_score(b, 1, 0, 1000, token, 1, '100', '00000000');
+  if result->>'reason' <> 'invalid_token' then
+    raise exception 'a missing kick proof must burn the token: %', result;
+  end if;
+
+  result := public.start_run(b);
+  token := (result->>'token')::uuid;
+  result := public.submit_score(b, 1, 0, 1000, token, 1, '100', 'deadbeef');
+  if result->>'reason' <> 'implausible' then
+    raise exception 'a bad kick checksum must fail: %', result;
+  end if;
+
+  result := public.start_run(b);
+  token := (result->>'token')::uuid;
+  proof := private.run_checksum(b, token, 1, 1, 1000, '100');
+  result := public.submit_score(b, 1, 0, 1000, token, 1, '100', proof);
   if result->>'accepted' <> 'true' then
-    raise exception 'token submit should be accepted: %', result;
+    raise exception 'token submit with kick proof should be accepted: %', result;
   end if;
   result := public.start_run(b);
   token := (result->>'token')::uuid;
-  result := public.submit_score(b, 500, 1, 1000, token);
+  proof := private.run_checksum(b, token, 500, 1, 1000, '100');
+  result := public.submit_score(b, 500, 1, 1000, token, 1, '100', proof);
   if result->>'reason' <> 'implausible' then
     raise exception 'score above 25 per server second must fail: %', result;
   end if;
-  result := public.submit_score(b, 12, 1, 1000, token);
+  result := public.submit_score(b, 12, 1, 1000, token, 1, '100', proof);
   if result->>'reason' <> 'invalid_token' then
     raise exception 'a token is single-use: %', result;
   end if;
 
   result := public.start_run(b);
   token := (result->>'token')::uuid;
-  result := public.submit_score(b, 20, 1, 600000, token);
+  proof := private.run_checksum(b, token, 20, 1, 600000, '100');
+  result := public.submit_score(b, 20, 1, 600000, token, 1, '100', proof);
   if result->>'reason' <> 'implausible' then
     raise exception 'duration past the token age should fail: %', result;
   end if;

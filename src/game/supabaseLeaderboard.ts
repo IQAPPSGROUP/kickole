@@ -535,26 +535,24 @@ export function createSupabaseLeaderboard(options: {
   const flushOutbox = async (token: number): Promise<void> => {
     if (!outbox || outbox.deviceId !== deviceId || now() < outbox.holdUntil) return;
     const pendingScore = outbox;
-    const kickTimesMs = pendingScore.kickTimesMs;
-    const kickTimes = kickTimesMs ? kickTimesText(kickTimesMs) : null;
+    const kickTimesMs = pendingScore.kickTimesMs ?? [];
+    const kickTimes = kickTimesText(kickTimesMs);
     const sent = await callRpc(rpc, 'submit_score', {
       device_id: deviceId,
       score: pendingScore.score,
       combo: pendingScore.combo,
       run_duration_ms: pendingScore.durationMs,
       run_token: pendingScore.token,
-      ...(kickTimesMs ? {
-        kick_count: kickTimesMs.length,
-        kick_times: kickTimes,
-        kick_checksum: runChecksum({
-          deviceId,
-          token: pendingScore.token,
-          score: pendingScore.score,
-          kickCount: kickTimesMs.length,
-          durationMs: pendingScore.durationMs,
-          kickTimes: kickTimes ?? '',
-        }),
-      } : {}),
+      kick_count: kickTimesMs.length,
+      kick_times: kickTimes,
+      kick_checksum: runChecksum({
+        deviceId,
+        token: pendingScore.token,
+        score: pendingScore.score,
+        kickCount: kickTimesMs.length,
+        durationMs: pendingScore.durationMs,
+        kickTimes,
+      }),
     });
     if (token !== generation || stopped) return;
     if (sent.error) {

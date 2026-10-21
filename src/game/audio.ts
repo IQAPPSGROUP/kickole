@@ -27,6 +27,7 @@ import {
   type MusicGraph,
 } from './musicBed';
 import { RobPlayer } from './robMusic';
+import { normalizeSongChoice, SHUFFLE_SONG, type SongChoice } from './tracks';
 
 /**
  * Kicks, misses and cheers are synthesised here.
@@ -60,6 +61,9 @@ let musicGraph: MusicGraph | null = null;
 let rob: RobPlayer | null = null;
 let robMenu: 'idle' | 'ready' | 'missing' = 'idle';
 let robPlay: 'idle' | 'ready' | 'missing' = 'idle';
+let songChoice: SongChoice = SHUFFLE_SONG;
+let nowPlaying: string | null = null;
+const trackListeners = new Set<(name: string | null) => void>();
 let interruptWatch = false;
 let resumeAttempt = 0;
 let droppedByInterrupt = false;
@@ -332,9 +336,36 @@ function noteRob(which: 'menu' | 'play', ok: boolean) {
   }
 }
 
+function noteTrack(name: string | null) {
+  nowPlaying = name;
+  trackListeners.forEach((listener) => listener(name));
+}
+
+/** The gameplay song to save: shuffle, or one track from tracks.ts. */
+export function setSongChoice(choice: SongChoice) {
+  songChoice = normalizeSongChoice(choice);
+  rob?.setSongChoice(songChoice);
+}
+
+/** Crossfade to the next gameplay track. Returns the choice to persist. */
+export function skipTrack(): SongChoice {
+  const c = ctx;
+  if (c) ensureRob(c);
+  const next = rob?.skip() ?? songChoice;
+  songChoice = normalizeSongChoice(next);
+  return songChoice;
+}
+
+export function subscribeNowPlaying(listener: (name: string | null) => void): () => void {
+  trackListeners.add(listener);
+  listener(nowPlaying);
+  return () => { trackListeners.delete(listener); };
+}
+
 function ensureRob(c: AudioContext) {
   if (rob || !musicMix) return;
-  rob = new RobPlayer(c, musicMix, noteRob);
+  rob = new RobPlayer(c, musicMix, noteRob, undefined, noteTrack);
+  rob.setSongChoice(songChoice);
 }
 
 function recoverPlayback() {

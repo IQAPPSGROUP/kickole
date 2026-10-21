@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { normalizeSongChoice, SHUFFLE_SONG, type SongChoice } from './tracks';
 import type { Appearance, PlayerBody } from './appearance';
 import { normalizeAppearance } from './appearance';
 import { normalizeLearned, type LessonId } from './prompts';
@@ -33,6 +34,8 @@ export interface Settings {
   musicVolume: number;
   /** 0..1 effects level. The on/off switch is `sfx`. */
   sfxVolume: number;
+  /** Shuffle the gameplay playlist, or keep one track. */
+  song: SongChoice;
   vibration: boolean;
   /** On-screen trick prompts, glowing controls and tutorial tips. */
   hints: boolean;
@@ -60,6 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sfx: true,
   musicVolume: 1,
   sfxVolume: 1,
+  song: SHUFFLE_SONG,
   vibration: true,
   hints: true,
   graphics: 'auto',
@@ -189,6 +193,7 @@ export function loadSettings(): Settings {
     sfx: typeof d.sfx === 'boolean' ? d.sfx : DEFAULT_SETTINGS.sfx,
     musicVolume: unitVolume(d.musicVolume),
     sfxVolume: unitVolume(d.sfxVolume),
+    song: normalizeSongChoice(d.song),
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
     hints: typeof d.hints === 'boolean' ? d.hints : DEFAULT_SETTINGS.hints,
     graphics,

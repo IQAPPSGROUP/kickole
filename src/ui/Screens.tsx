@@ -14,6 +14,7 @@ import {
 } from '../game/reportReasons';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
+import { GAME_TRACKS, SHUFFLE_SONG } from '../game/tracks';
 import { NicknameForm } from './NicknameScreen';
 import {
   detectTier,
@@ -444,6 +445,28 @@ export function SettingsScreen({
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
         <VolumeSlider label="Music volume" value={settings.musicVolume} onChange={(musicVolume) => onChange({ musicVolume })} />
+        <div className="group">
+          <label id="song-choice-label">Song</label>
+          <div className="song-list" role="group" aria-labelledby="song-choice-label">
+            <button
+              type="button"
+              aria-pressed={settings.song === SHUFFLE_SONG}
+              onClick={() => onChange({ song: SHUFFLE_SONG })}
+            >
+              Shuffle
+            </button>
+            {GAME_TRACKS.map((track) => (
+              <button
+                key={track.id}
+                type="button"
+                aria-pressed={settings.song === track.id}
+                onClick={() => onChange({ song: track.id })}
+              >
+                {track.title}
+              </button>
+            ))}
+          </div>
+        </div>
         <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />
         <VolumeSlider label="Sound effects volume" value={settings.sfxVolume} onChange={(sfxVolume) => onChange({ sfxVolume })} />
         <Toggle label="Vibration" value={settings.vibration} onChange={(vibration) => onChange({ vibration })} />

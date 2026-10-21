@@ -15,4 +15,6 @@ Each playlist track starts about 0.6s in, so the lead-in is trimmed. The next tr
 
 The menu still loops `menu-song` from 0.6s to 146.0s with a 1.5–2s crossfade. The first pass can include the opening. Switching between the menu and play crossfades as well.
 
+Display titles live in `src/game/tracks.ts` (placeholders Track 1–4). Settings can keep the shuffle or pin one track. That choice is saved on the device. Change song crossfades to the next track in the rotation.
+
 These are Rob's own songs for Kickolé. The generated bed in `src/game/musicBed.ts` plays only when a mode has no usable file.

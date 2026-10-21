@@ -12,7 +12,7 @@ import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
-import { beatClock, cheer, setBed, sfx, unlockAudio } from './audio';
+import { beatClock, cheer, setBed, setSongChoice, sfx, skipTrack, unlockAudio } from './audio';
 import {
   applyPromptAction,
   beginRun,
@@ -145,6 +145,7 @@ export class GameController {
     this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
     this.engine.on((e) => this.onEvent(e));
     this.billing.setEntitlementListener((snapshot) => this.applyBillingSnapshot(snapshot));
+    setSongChoice(this.settings.song);
     this.snapshot = this.build();
     this.billingReady = this.initBilling();
     if (this.billing.platform !== 'web' && typeof document !== 'undefined') {
@@ -633,6 +634,16 @@ export class GameController {
     this.settings = applyGraphicsPatch(this.settings, patch);
     if (patch.hints === false) this.prompts = freshClock(this.save.learnedTricks, false);
     if (patch.hints === true) this.prompts = beginRun(this.save.learnedTricks, true);
+    if (patch.song !== undefined) setSongChoice(this.settings.song);
+    saveSettings(this.settings);
+    this.publish();
+  }
+
+  /** Crossfade to the next gameplay song. A pinned song moves to the next title. */
+  changeSong() {
+    const next = skipTrack();
+    if (next === this.settings.song) return;
+    this.settings = { ...this.settings, song: next };
     saveSettings(this.settings);
     this.publish();
   }

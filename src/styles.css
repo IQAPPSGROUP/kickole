@@ -1429,6 +1429,73 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .board-report { color: #ff4f9a; }
 .board-block { color: #f7e9c5; }
+/* Change song sits in the top gap: score tile on the left, world rank on the right, mural below y≈110. */
+.song-skip {
+  position: absolute;
+  z-index: 8;
+  top: max(12px, var(--sat-t));
+  left: 184px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 12px;
+  border: 2px solid #f7e9c5;
+  background: rgba(16, 10, 14, .78);
+  color: #fffdf8;
+  font-size: 16px;
+  line-height: 1;
+  letter-spacing: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.song-skip:active { transform: scale(.96); }
+.now-playing {
+  position: absolute;
+  z-index: 7;
+  top: 104px;
+  right: max(6px, var(--sat-r));
+  width: max-content;
+  max-width: min(54vw, 210px);
+  margin: 0;
+  text-align: right;
+  pointer-events: none;
+  animation: now-playing-fade 3s ease forwards;
+}
+.now-playing-title { font-size: 15px; line-height: .95; }
+.now-playing .prompt-face .prompt-ch {
+  color: #fffdf8;
+  -webkit-text-fill-color: #fffdf8;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
+}
+.now-playing .prompt-ink .prompt-ch { -webkit-text-stroke: 0.12em #140814; }
+@keyframes now-playing-fade {
+  0% { opacity: 0; transform: translateY(-4px); }
+  14% { opacity: 1; transform: none; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.song-list { display: flex; flex-direction: column; gap: 6px; }
+.song-list button {
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: .04em;
+  color: #fffdf8;
+  background: rgba(247, 245, 237, .08);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  min-height: 44px;
+  padding: 8px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.song-list button[aria-pressed="true"] {
+  border-color: #f7e9c5;
+  background: rgba(247, 233, 197, .16);
+}
 @media (orientation: landscape) and (max-height: 600px) {
   .world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }
 }

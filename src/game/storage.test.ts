@@ -171,6 +171,11 @@ describe('storage', () => {
     const legacy = await load({ 'kicky.settings.v1': JSON.stringify({ sound: true }) });
     expect(legacy.loadSettings().musicVolume).toBe(DEFAULT_SETTINGS.musicVolume);
     expect(legacy.loadSettings().sfxVolume).toBe(1);
+    expect(legacy.loadSettings().song).toBe('shuffle');
+    saveSettings({ ...loaded, song: 'game-song-2' });
+    expect(loadSettings().song).toBe('game-song-2');
+    const junk = await load({ 'kicky.settings.v1': JSON.stringify({ song: 'not-a-track' }) });
+    expect(junk.loadSettings().song).toBe('shuffle');
   });
 
   it('validates settings and round-trips them', async () => {

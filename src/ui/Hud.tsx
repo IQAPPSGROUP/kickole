@@ -3,7 +3,8 @@ import type { GameController, Hud as HudState, ArmedTrick } from '../game/contro
 import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
 import { streakMultiplier } from '../engine/scoring';
-import { beatClock } from '../game/audio';
+import { beatClock, subscribeNowPlaying } from '../game/audio';
+import { trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
 import type { LeaderboardService } from '../game/leaderboard';
 import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
@@ -167,6 +168,46 @@ export function ClueMark({ gesture }: { gesture: PromptGesture }) {
       <i />
       <em>{label}</em>
     </span>
+  );
+}
+
+function SongChrome({ controller, playing }: { controller: GameController; playing: boolean }) {
+  const [notice, setNotice] = useState<{ id: number; name: string } | null>(null);
+  useEffect(() => subscribeNowPlaying((name) => {
+    if (!name) {
+      setNotice(null);
+      return;
+    }
+    setNotice({ id: Date.now(), name });
+  }), []);
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => {
+      setNotice((current) => (current?.id === notice.id ? null : current));
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  const title = notice ? trackTitle(notice.name) : '';
+  return (
+    <>
+      {playing && notice && (
+        <p key={notice.id} className="now-playing" role="status">
+          <GraffitiText text={`Now playing: ${title}`} className="graffiti now-playing-title" />
+        </p>
+      )}
+      <button
+        type="button"
+        className="song-skip"
+        aria-label="Change song"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          controller.changeSong();
+        }}
+      >
+        <span aria-hidden="true">♫⏭</span>
+      </button>
+    </>
   );
 }
 
@@ -513,6 +554,7 @@ export function TouchZones({ controller }: { controller: GameController }) {
 
   return (
     <div className="zones" style={fanStyle}>
+      <SongChrome controller={controller} playing={playing} />
       <p className="trick-help">H header · N neck · T thigh · F flick · W atw · G groove · Esc cancel</p>
       <div className="fan fan-left" role="group" aria-label="Left foot and tricks">
         {LEFT_FAN.map(trickButton)}

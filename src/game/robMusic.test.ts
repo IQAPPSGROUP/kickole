@@ -10,6 +10,7 @@ import {
   TRACK_LEAD_IN_SEC,
   loadTrack,
   nextLoopAt,
+  choiceAfterSkip,
   pickTrack,
   resumePlan,
   shuffleNames,
@@ -87,6 +88,21 @@ describe('gameplay playlist', () => {
     expect(pickTrack(GAMEPLAY_TRACKS, 1, failed, 'gameplay-instrumental')).toEqual({ name: 'menu-song', index: 1 });
     expect(pickTrack(GAMEPLAY_TRACKS, 2, failed, 'menu-song')).toEqual({ name: 'gameplay-instrumental', index: 0 });
     expect(pickTrack(['only'], 0, new Set(), 'only')).toEqual({ name: 'only', index: 0 });
+  });
+
+  it('advances a chosen song to the next title and leaves shuffle on the shuffled order', () => {
+    expect(choiceAfterSkip('gameplay-instrumental', ['game-song-3', 'menu-song'], 'gameplay-instrumental', new Set())).toEqual({
+      choice: 'menu-song',
+      track: { name: 'menu-song', index: 1 },
+    });
+    expect(choiceAfterSkip('shuffle', ['game-song-3', 'menu-song', 'gameplay-instrumental'], 'game-song-3', new Set())).toEqual({
+      choice: 'shuffle',
+      track: { name: 'menu-song', index: 1 },
+    });
+    expect(choiceAfterSkip('shuffle', GAMEPLAY_TRACKS, 'menu-song', new Set(['game-song-2', 'game-song-3']))).toEqual({
+      choice: 'shuffle',
+      track: { name: 'gameplay-instrumental', index: 0 },
+    });
   });
 });
 

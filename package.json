@@ -12,8 +12,9 @@
     "nickname-words": "tsx tools/syncNicknameWords.ts",
     "build:player": "tsx tools/build_fab_player.ts",
     "build:street": "tsx tools/build_street_court.ts",
-    "ios:sync": "npm run build && npx cap sync ios",
-    "cap:sync": "npm run build && npx cap sync",
+    "build:store": "KICKOLE_STORE_BUILD=1 npm run build",
+    "ios:sync": "npm run build:store && npx cap sync ios",
+    "cap:sync": "npm run build:store && npx cap sync",
     "cap:android": "npm run cap:sync && npx cap open android",
     "cap:ios": "npm run cap:sync && npx cap open ios"
   },

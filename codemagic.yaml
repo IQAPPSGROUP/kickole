@@ -57,6 +57,10 @@ workflows:
       - name: Build web assets and sync iOS
         script: |
           set -euo pipefail
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
           npm run ios:sync
       - name: Set up code signing on the Xcode project
         script: |
@@ -125,6 +129,10 @@ workflows:
       - name: Build web assets and sync iOS
         script: |
           set -euo pipefail
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
           npm run ios:sync
       - name: Compile for the iOS Simulator without signing
         script: |

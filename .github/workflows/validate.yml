@@ -47,7 +47,13 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-36'
       - run: npm ci
-      - run: npm run build
+      - name: Build web assets for Capacitor
+        run: |
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a Capacitor build."
+            exit 1
+          fi
+          npm run build:store
       - run: npx cap sync android
       - name: Assemble debug APK
         working-directory: android

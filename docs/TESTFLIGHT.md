@@ -28,4 +28,4 @@ The signed workflow is `ios-testflight`. `ios-simulator` is an unsigned compile 
 
 The launch images in `ios/App/App/Assets.xcassets/Splash.imageset` are still the Capacitor placeholder (white field, Capacitor logo in the centre). Replace them before an external TestFlight looks finished. The app icon is not a placeholder.
 
-`?simPurchase=1` / `dev_sim` can grant the Launch Collection only in a Vite development serve. `npm run ios:sync` uses the production web build, and that build ignores the query and any saved `dev_sim` locker.
+`?simPurchase=1` / `dev_sim` can grant the Launch Collection only in a Vite development serve. `npm run ios:sync` uses the production web build, and that build ignores the query and any saved `dev_sim` locker. The same store build fails if `VITE_ALLOW_MOCK` is set, so `?mockBoard=1` stays off TestFlight.

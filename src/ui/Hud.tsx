@@ -5,17 +5,23 @@ import type { Side } from '../engine/config';
 import { streakMultiplier } from '../engine/scoring';
 import { beatClock } from '../game/audio';
 import { prefersReducedMotion } from '../scene/juice';
-import { fanLayout } from './fanLayout';
+import type { LeaderboardService } from '../game/leaderboard';
+import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
 import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
+import { WorldRank } from './WorldRank';
 
 export function Hud({
   hud,
   controller,
   onSkipCelebration,
+  nickname,
+  board,
 }: {
   hud: HudState;
   controller?: GameController;
   onSkipCelebration?: () => void;
+  nickname?: string | null;
+  board?: LeaderboardService | null;
 }) {
   const f = hud.feedback;
   const combo = streakMultiplier(hud.streak);
@@ -42,6 +48,9 @@ export function Hud({
         {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
       </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
+      {nickname && board && (hud.phase === 'playing' || hud.phase === 'ready') && (
+        <WorldRank score={hud.score} nickname={nickname} service={board} />
+      )}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}
@@ -339,7 +348,19 @@ function useFanStyle(): CSSProperties {
         const value = parseFloat(getComputedStyle(app).getPropertyValue(name));
         return Number.isFinite(value) ? value : 0;
       };
-      setLayout(fanLayout(window.innerWidth, read('--sat-l'), read('--sat-r'), read('--sat-b')));
+      const next = fanLayout(window.innerWidth, read('--sat-l'), read('--sat-r'), read('--sat-b'));
+      setLayout(next);
+      if (app instanceof HTMLElement) {
+        app.style.setProperty('--btn', `${next.button}px`);
+        app.style.setProperty('--trick-size', `${FAN_BUTTON}px`);
+        app.style.setProperty('--foot', `${FOOT_BUTTON}px`);
+        app.style.setProperty('--fan-d', `${next.d}px`);
+        app.style.setProperty('--fan-dx', `${next.dx}px`);
+        app.style.setProperty('--fan-dy', `${next.dy}px`);
+        app.style.setProperty('--fan-inset-l', `${next.insetLeft}px`);
+        app.style.setProperty('--fan-inset-r', `${next.insetRight}px`);
+        app.style.setProperty('--fan-inset-b', `${next.insetBottom}px`);
+      }
     };
     apply();
     window.addEventListener('resize', apply);

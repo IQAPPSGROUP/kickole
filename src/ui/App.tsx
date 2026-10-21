@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { installAudioLifecycle } from '../game/audio';
 import { GameController } from '../game/controller';
+import { createMockLeaderboard } from '../game/leaderboard';
+import { hydrateCountry, hydrateNickname, loadNickname, loadStoredCountry, saveCountry, saveNickname } from '../game/nicknameStore';
 import { GameCanvas } from '../scene/GameCanvas';
 import {
   cancelOpeningIntroForGameplay,
@@ -13,6 +15,7 @@ import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
+import { NicknameScreen } from './NicknameScreen';
 import { Home, GameOver, SettingsScreen } from './Screens';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
@@ -26,11 +29,35 @@ export function App() {
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
   const [overlay, setOverlay] = useState<Overlay>('none');
+  const [nickname, setNickname] = useState<string | null>(() => loadNickname());
+  const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
+  const board = useMemo(
+    () => (nickname ? createMockLeaderboard({ nickname, country: countryChoice.country }) : null),
+    [nickname, countryChoice.country],
+  );
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
   useEffect(() => { initOpeningIntro(); }, []);
+
+  useEffect(() => {
+    let live = true;
+    void hydrateNickname().then((name) => {
+      if (!live || !name) return;
+      setNickname((current) => current ?? name);
+    });
+    void hydrateCountry().then((stored) => {
+      if (!live) return;
+      setCountryChoice(stored);
+    });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'over' || !snap.result || !board) return;
+    board.submit(snap.result.score);
+  }, [phase, snap.result, board]);
 
   useEffect(() => {
     const readInset = (name: string) => {
@@ -71,7 +98,8 @@ export function App() {
   }, [controller]);
 
   const needsBody = !snap.save.bodyChosen;
-  const blocking = overlay !== 'none' || needsBody;
+  const needsNick = nickname == null;
+  const blocking = overlay !== 'none' || needsBody || needsNick;
 
   useEffect(() => {
     let spaceDown = false;
@@ -147,11 +175,19 @@ export function App() {
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
-      {intro.active && <OpeningSkip onSkip={skipOpeningIntro} />}
+      {intro.active && !needsBody && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
-      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && (
+      {!needsBody && needsNick && phase === 'menu' && (
+        <NicknameScreen onSave={(name, country) => {
+          saveNickname(name);
+          saveCountry(country);
+          setNickname(name);
+          setCountryChoice({ chosen: true, country });
+        }} />
+      )}
+      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsNick && (
         <Home
           best={snap.save.best}
           coins={snap.save.coins}
@@ -162,7 +198,13 @@ export function App() {
         />
       )}
       {phase !== 'menu' && (
-        <Hud hud={snap.hud} controller={controller} onSkipCelebration={() => controller.skipCelebration()} />
+        <Hud
+          hud={snap.hud}
+          controller={controller}
+          nickname={nickname}
+          board={board}
+          onSkipCelebration={() => controller.skipCelebration()}
+        />
       )}
       {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
       {phase === 'over' && snap.result && overlay === 'none' && (
@@ -170,7 +212,7 @@ export function App() {
           result={snap.result}
           best={snap.save.best}
           coins={snap.save.coins}
-          leaderboard={snap.save.leaderboard}
+          board={board}
           onAgain={startGame}
           onHome={() => controller.home()}
           onShop={() => setOverlay('shop')}
@@ -180,6 +222,14 @@ export function App() {
       {overlay === 'settings' && (
         <SettingsScreen
           settings={snap.settings}
+          nickname={nickname ?? ''}
+          country={countryChoice.country}
+          onNickname={(name, country) => {
+            saveNickname(name);
+            saveCountry(country);
+            setNickname(name);
+            setCountryChoice({ chosen: true, country });
+          }}
           onChange={(p) => controller.updateSettings(p)}
           onClose={closeOverlay}
         />

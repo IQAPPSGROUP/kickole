@@ -26,6 +26,7 @@ import {
   alleyModelUrl,
   alleyUrl,
 } from './alleyLayout';
+import { PITCH_PLANE, fillPitch, pitchPlaneGeometry, pitchTextureSize } from './alleyPitch';
 
 const FESTA = ['#d64545', '#e6b325', '#3aa6a0', '#f4f0e6', '#e07a3d', '#3d6ea8'];
 
@@ -252,6 +253,49 @@ function Bunting({ sway }: { sway: boolean }) {
   );
 }
 
+/** One baked decal. The concrete shows through the chips, and the sun lights the paint. */
+function AlleyPitch({ quality }: { quality: Quality }) {
+  const texture = useMemo(() => {
+    const size = pitchTextureSize(quality);
+    const spanX = PITCH_PLANE.x1 - PITCH_PLANE.x0;
+    const spanZ = PITCH_PLANE.z1 - PITCH_PLANE.z0;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = Math.round(size * (spanZ / spanX));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('pitch');
+    const pixels = fillPitch(canvas.width, canvas.height);
+    const image = ctx.createImageData(canvas.width, canvas.height);
+    image.data.set(pixels);
+    ctx.putImageData(image, 0, 0);
+    const map = new CanvasTexture(canvas);
+    map.colorSpace = SRGBColorSpace;
+    map.anisotropy = quality === 'high' ? 8 : 4;
+    map.needsUpdate = true;
+    return map;
+  }, [quality]);
+  const geometry = useMemo(() => pitchPlaneGeometry(), []);
+  useEffect(() => () => {
+    texture.dispose();
+    geometry.dispose();
+  }, [texture, geometry]);
+  return (
+    <mesh geometry={geometry} receiveShadow renderOrder={2}>
+      <meshStandardMaterial
+        map={texture}
+        roughness={0.94}
+        metalness={0}
+        envMapIntensity={0.16}
+        transparent
+        depthWrite={false}
+        polygonOffset
+        polygonOffsetFactor={-4}
+        polygonOffsetUnits={-8}
+      />
+    </mesh>
+  );
+}
+
 export function AlleyCourt({ shadows, quality }: { shadows: boolean; quality: Quality }) {
   const sway = sceneLifeBudget(quality, prefersReducedMotion()).buntingSway;
   const url = alleyModelUrl(quality);
@@ -269,6 +313,7 @@ export function AlleyCourt({ shadows, quality }: { shadows: boolean; quality: Qu
           <AlleyModel quality={quality} shadows={shadows} />
         </Suspense>
       </AlleyBoundary>
+      <AlleyPitch quality={quality} />
     </group>
   );
 }

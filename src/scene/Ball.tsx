@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CanvasTexture, Color, Euler, MeshPhysicalMaterial, RepeatWrapping, Vector2, type Group, type Mesh } from 'three';
+import { CanvasTexture, Color, Euler, MeshPhysicalMaterial, RepeatWrapping, Vector2, type Group } from 'three';
 import type { Quality } from '../game/storage';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
@@ -57,7 +57,6 @@ function leatherMaps(size: number): { normal: CanvasTexture; rough: CanvasTextur
 export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin; quality: Quality }) {
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
-  const shadow = useRef<Mesh>(null);
   const r = engine.config.ballRadius;
   const euler = useMemo(() => new Euler(0, 0, 0, 'XYZ'), []);
   const panel = useMemo(() => new Color(skin.football.panels), [skin.football.panels]);
@@ -107,13 +106,6 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       : 0;
     // Flatten only. Growing the ball, or wrapping it in a transparent shell, leaves a gap and a glassy ball.
     if (group.current) group.current.scale.set(1, 1 - 0.035 * squash, 1);
-    if (shadow.current) {
-      const h = Math.max(0, b.y - r);
-      const s = 1 / (1 + h * 0.9);
-      shadow.current.position.set(b.x, 0.012, b.z);
-      shadow.current.scale.set(s, s, s);
-      (shadow.current.material as unknown as { opacity: number }).opacity = 0.4 * s;
-    }
   });
 
   return (
@@ -125,10 +117,6 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
           </mesh>
         </group>
       </group>
-      <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[r * 1.25, 24]} />
-        <meshBasicMaterial color="#1E2A5A" transparent opacity={0.4} depthWrite={false} />
-      </mesh>
     </>
   );
 }

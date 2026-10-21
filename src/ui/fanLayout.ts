@@ -1,26 +1,28 @@
 /**
  * Quarter-circle fan around each corner kick button.
- * The three tricks sit on one radius: beside (0°), 35° up-and-inward, and straight up (90°).
- * The radius is the chord that keeps the 0° and 35° faces `gap` apart, capped so the two
- * inner tricks still clear each other on a phone.
+ * Tricks sit beside the foot (0°), 35° up-and-inward, and straight up (90°).
+ * The 0° and 90° radius stops where ATW and GROOVE still clear each other.
+ * On a narrow phone the 35° trick steps further out along that ray so its
+ * face stays `gap` from the neighbours.
  */
 
 const FAN_RAD = (35 * Math.PI) / 180;
 const COS_35 = Math.cos(FAN_RAD);
 const SIN_35 = Math.sin(FAN_RAD);
-const CHORD_35 = 2 * Math.sin(FAN_RAD / 2);
 
-export const FAN_BUTTON = 52;
-/** Corner kick faces, about 1.35× the trick chips. */
-export const FOOT_BUTTON = 70;
-export const FAN_GAP = 6;
+/** Trick chips (HEAD, FLICK, NECK, THIGH, ATW, GROOVE). */
+export const FAN_BUTTON = 65;
+/** Corner kick faces. Larger than the trick chips, about 84–88px. */
+export const FOOT_BUTTON = 86;
+/** Face gap. The painted ring sits 3px outside the face, so 8px keeps those rings apart. */
+export const FAN_GAP = 8;
 const MIN_INSET_X = 4;
 const BOTTOM_LIFT = 16;
-/** Phones in this width keep a side safe inset and a centre gap so the inner chips and the R label stay on screen. */
+/** Phones in this width keep a side inset and a centre gap so the inner chips stay apart. */
 const PHONE_MIN_W = 360;
 const PHONE_MAX_W = 430;
-const PHONE_INSET_X = 16;
-const PHONE_MIDDLE = 28;
+const PHONE_INSET_X = 8;
+const PHONE_MIDDLE = 8;
 
 export interface FanLayout {
   button: number;
@@ -47,15 +49,32 @@ export function fanLayout(
   const insetLeft = Math.max(phone ? PHONE_INSET_X : MIN_INSET_X, safeLeft);
   const insetRight = Math.max(phone ? PHONE_INSET_X : MIN_INSET_X, safeRight);
   const insetBottom = safeBottom + BOTTOM_LIFT;
-  const dClear = (button + gap) / CHORD_35;
   const middle = phone ? PHONE_MIDDLE : gap;
   const dMax = (width - insetLeft - insetRight - button * 2 - middle) / 2;
-  // Largest radius that still keeps the two inner tricks apart. The minimum
-  // chord packs the 35° trick against the top button, so the fan reads as two rows.
-  const d = dMax >= dClear ? dMax : Math.max(dClear, button + gap);
-  const dx = d * COS_35;
-  const dy = d * SIN_35;
+  // Open the fan until ATW and GROOVE keep `middle` between them. On a narrow
+  // phone that radius is shorter than the 35° chord, so the diagonal trick
+  // steps out along the same ray until it clears its two neighbours.
+  const d = Math.max(0, dMax);
+  const maxDx = (width - insetLeft - insetRight - button * 2 - gap) / 2;
+  const diag = diagonalRadius(d, button, gap, Math.max(d, maxDx / COS_35));
+  const dx = diag * COS_35;
+  const dy = diag * SIN_35;
   return { button, insetLeft, insetRight, insetBottom, d, dx, dy };
+}
+
+/** Radius along the 35° ray. Grows past `d` until the chord gap is `gap`, and stops before the two diagonals meet. */
+function diagonalRadius(d: number, button: number, gap: number, limit: number): number {
+  const faceGap = (radius: number) => Math.hypot(radius * COS_35 - d, radius * SIN_35) - button;
+  const cap = Math.max(d, limit);
+  if (faceGap(d) >= gap || cap <= d) return d;
+  let lo = d;
+  let hi = cap;
+  for (let i = 0; i < 24; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (faceGap(mid) >= gap) hi = mid;
+    else lo = mid;
+  }
+  return hi;
 }
 
 export interface FanRect {
@@ -68,7 +87,7 @@ export interface FanRect {
 
 /**
  * Screen rects, origin at the top-left, for overlap checks.
- * Trick chips stay on the 52px fan. L and R grow from the same corner
+ * Trick chips stay on the fan radius. L and R grow from the same corner
  * (left/bottom or right/bottom), so they stay inside the safe inset.
  */
 export function fanRects(width: number, height: number, layout: FanLayout): FanRect[] {

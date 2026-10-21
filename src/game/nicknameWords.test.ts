@@ -67,6 +67,22 @@ describe('nickname words', () => {
     expect(documented.adjective).toEqual([...ADJECTIVES]);
     expect(documented.noun).toEqual([...NOUNS]);
     expect(ADJECTIVES.length * NOUNS.length).toBeGreaterThan(14_000);
+    expect(ADJECTIVES).not.toContain('Jumbo');
+    expect(ADJECTIVES).not.toContain('Colossal');
+    expect(ADJECTIVES).not.toContain('Massive');
+    expect(ADJECTIVES).toEqual(expect.arrayContaining(['Jazzy', 'Zippy', 'Snazzy']));
+    expect(NOUNS).not.toContain('Roulette');
+    expect(NOUNS).toContain('Stepover');
+  });
+
+  it('updates a live word list without re-seeding the whole table', () => {
+    const sql = readFileSync('supabase/migrations/20261021140000_nickname_words_safeguarding.sql', 'utf8');
+    expect(sql).toMatch(/lower\(word\) in \('jumbo', 'colossal', 'massive'\)/);
+    expect(sql).toMatch(/lower\(word\) = 'roulette'/);
+    expect(sql).toContain("('adjective', 'Jazzy')");
+    expect(sql).toContain("('adjective', 'Zippy')");
+    expect(sql).toContain("('adjective', 'Snazzy')");
+    expect(sql).toContain("('noun', 'Stepover')");
   });
 
   it('scans every combo, including Roman suffixes through XL, against the blocked words', () => {

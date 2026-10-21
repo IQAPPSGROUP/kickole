@@ -93,9 +93,9 @@ Titan
 Giant
 Tiny
 Mini
-Jumbo
-Colossal
-Massive
+Jazzy
+Zippy
+Snazzy
 Bright
 Radiant
 Glowing
@@ -280,7 +280,7 @@ Corner
 Penalty
 Touchline
 Elastico
-Roulette
+Stepover
 Bicycle
 Acrobat
 Magician

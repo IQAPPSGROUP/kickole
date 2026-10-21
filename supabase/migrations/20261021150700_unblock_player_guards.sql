@@ -1,12 +1,12 @@
 -- Commit only. Apply on the kickole project by hand after 20261021150600.
 -- unblock_player used to delete a block for any device id, with no limit.
 -- A missing or deleted device now returns unknown_player, matching block_player.
--- block_player previously had no rate limit. Both RPCs now share one budget
--- so unblock is not a weaker write:
+-- block_player previously had no rate limit. The two RPCs use separate
+-- counters, with the same limits, so unblock is not a weaker write:
 --   40 calls per device per 10 minutes
 --   80 calls per hashed IP per 10 minutes
 -- Header-less callers share the 'unknown' bucket. A missing hash fails closed.
--- Over the budget the RPC returns rate_limited and does not change blocks.
+-- Over its own budget the RPC returns rate_limited and does not change blocks.
 
 create or replace function public.block_player(device_id uuid, blocked_nickname text)
 returns jsonb language plpgsql volatile security definer set search_path = '' as $$

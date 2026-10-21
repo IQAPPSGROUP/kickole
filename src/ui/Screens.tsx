@@ -1,8 +1,17 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Result } from '../game/controller';
 import { countryByCode, countryFlag, suggestedCountry } from '../game/countries';
 import { readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
+import {
+  BLOCK_CONFIRMATION,
+  DONE_CONFIRMATION,
+  REPORT_PRIVACY_LINE,
+  REPORT_REASONS,
+  REPORT_THANKS,
+  type ReportReason,
+} from '../game/reportReasons';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
 import { NicknameForm } from './NicknameScreen';
@@ -92,9 +101,9 @@ export function GameOver({
   const [period, setPeriod] = useState<BoardPeriod>('all');
   const [scope, setScope] = useState<BoardScope>('world');
   const [view, setView] = useState<'around' | 'top'>(initialView);
-  const [note, setNote] = useState<string | null>(null);
   const [sheet, setSheet] = useState<string | null>(null);
-  const [confirmReport, setConfirmReport] = useState(false);
+  const [sheetStep, setSheetStep] = useState<SheetStep>('actions');
+  const [notice, setNotice] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
   const periodRow = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -112,7 +121,26 @@ export function GameOver({
       : flattenAround(board, result.score, scope, period)
     : [];
   void revision;
+  const closeSheet = () => {
+    setSheet(null);
+    setSheetStep('actions');
+  };
+  const reportName = (reason: ReportReason) => {
+    if (!sheet || !board) return;
+    board.report(sheet, reason);
+    setNotice(REPORT_THANKS);
+    closeSheet();
+    setRevision((value) => value + 1);
+  };
+  const blockName = () => {
+    if (!sheet || !board) return;
+    board.block(sheet);
+    setNotice(BLOCK_CONFIRMATION);
+    closeSheet();
+    setRevision((value) => value + 1);
+  };
   return (
+    <>
     <div className="screen over">
       <div className="card over-card">
         <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
@@ -174,7 +202,7 @@ export function GameOver({
                       aria-label={`More actions for ${row.nickname}`}
                       onClick={() => {
                         setSheet(row.nickname);
-                        setConfirmReport(false);
+                        setSheetStep('actions');
                       }}
                     >
                       ⋯
@@ -183,47 +211,6 @@ export function GameOver({
                 </li>
               ))}
             </ol>}
-            {sheet && board && (
-              <div className="board-sheet" role="dialog" aria-label={`Actions for ${sheet}`}>
-                <p>{sheet}</p>
-                {confirmReport ? (
-                  <>
-                    <p>Report this nickname?</p>
-                    <button type="button" onClick={() => setConfirmReport(false)}>Cancel</button>
-                    <button
-                      type="button"
-                      className="sheet-report"
-                      onClick={() => {
-                        board.report(sheet);
-                        setNote('Reported. Hidden on this device.');
-                        setSheet(null);
-                        setRevision((value) => value + 1);
-                      }}
-                    >
-                      Report
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button type="button" className="sheet-report" onClick={() => setConfirmReport(true)}>Report</button>
-                    <button
-                      type="button"
-                      className="sheet-block"
-                      onClick={() => {
-                        board.block(sheet);
-                        setNote('Blocked. Hidden on this device.');
-                        setSheet(null);
-                        setRevision((value) => value + 1);
-                      }}
-                    >
-                      Block
-                    </button>
-                    <button type="button" onClick={() => setSheet(null)}>Close</button>
-                  </>
-                )}
-              </div>
-            )}
-            {note && <p className="shop-note">{note}</p>}
           </div>
         )}
         <button className="btn primary big" onClick={onAgain} autoFocus>PLAY AGAIN</button>
@@ -233,6 +220,90 @@ export function GameOver({
         </div>
       </div>
     </div>
+    {sheet && board && (
+      <ScreenModal label={`Actions for ${sheet}`} onBackdrop={closeSheet}>
+        <div className="board-sheet">
+          <p className="sheet-name">{sheet}</p>
+          {rowSheetStep(sheetStep, {
+            onReasons: () => setSheetStep('reasons'),
+            onReport: reportName,
+            onBlock: blockName,
+            onBack: () => setSheetStep('actions'),
+            onClose: closeSheet,
+          })}
+        </div>
+      </ScreenModal>
+    )}
+    {notice && (
+      <ScreenModal label="Confirmation">
+        <div className="centre-notice">
+          <p>{notice}</p>
+          <button type="button" className="btn primary" onClick={() => setNotice(null)}>OK</button>
+        </div>
+      </ScreenModal>
+    )}
+    </>
+  );
+}
+
+type SheetStep = 'actions' | 'reasons';
+
+function rowSheetStep(step: SheetStep, actions: {
+  onReasons: () => void;
+  onReport: (reason: ReportReason) => void;
+  onBlock: () => void;
+  onBack: () => void;
+  onClose: () => void;
+}): ReactNode {
+  switch (step) {
+    case 'actions':
+      return (
+        <>
+          <button type="button" className="sheet-report" onClick={actions.onReasons}>Report</button>
+          <button type="button" className="sheet-block" onClick={actions.onBlock}>Block</button>
+          <button type="button" onClick={actions.onClose}>Close</button>
+        </>
+      );
+    case 'reasons':
+      return (
+        <>
+          <p className="sheet-privacy">{REPORT_PRIVACY_LINE}</p>
+          {REPORT_REASONS.map((item) => (
+            <button key={item.code} type="button" className="sheet-reason" onClick={() => actions.onReport(item.code)}>
+              {item.label}
+            </button>
+          ))}
+          <button type="button" onClick={actions.onBack}>Back</button>
+        </>
+      );
+    default: {
+      const neverStep: never = step;
+      return neverStep;
+    }
+  }
+}
+
+function ScreenModal({
+  label,
+  onBackdrop,
+  children,
+}: {
+  label: string;
+  onBackdrop?: () => void;
+  children: ReactNode;
+}) {
+  return createPortal(
+    <div className="screen-modal" onClick={onBackdrop}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -301,6 +372,7 @@ export function SettingsScreen({
   const [countrySuggestion] = useState(() => suggestedCountry());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
+  const [doneNotice, setDoneNotice] = useState(false);
   const blocked = readBlockedNames(localStorage);
   void blockedTick;
   const choices: GraphicsChoice[] = ['auto', 'low', 'medium', 'high'];
@@ -309,6 +381,7 @@ export function SettingsScreen({
   const detected = detectTier(device);
   const requested = resolveTier(settings.graphics, detected);
   return (
+    <>
     <div className="screen settings">
       <div className="card settings-card">
         <div className="settings-body">
@@ -327,6 +400,7 @@ export function SettingsScreen({
                       if (board) board.unblock(name);
                       else writeBlockedNames(localStorage, blocked.filter((item) => item.toLowerCase() !== name.toLowerCase()));
                       onUnblock();
+                      setDoneNotice(true);
                     }}
                   >
                     Unblock
@@ -429,7 +503,11 @@ export function SettingsScreen({
                 onClick={() => {
                   void onDelete().then((message) => {
                     if (message) setDeleteNote(message);
-                    else setConfirmDelete(false);
+                    else {
+                      setConfirmDelete(false);
+                      setDeleteNote(null);
+                      setDoneNotice(true);
+                    }
                   });
                 }}
               >
@@ -443,6 +521,15 @@ export function SettingsScreen({
         </div>
       </div>
     </div>
+    {doneNotice && (
+      <ScreenModal label="Done">
+        <div className="centre-notice">
+          <p>{DONE_CONFIRMATION}</p>
+          <button type="button" className="btn primary" onClick={() => setDoneNotice(false)}>OK</button>
+        </div>
+      </ScreenModal>
+    )}
+    </>
   );
 }
 
@@ -458,7 +545,7 @@ export function DataScreen({ onClose }: { onClose: () => void }) {
           <li>Your best scores stay until 2 years after you last play. Other runs go after 12 months.</li>
           <li>Tap &apos;Delete my leaderboard data&apos; any time to remove your nickname and scores straight away. If someone has reported you, we keep that report for up to 90 days so we can check it.</li>
           <li>We keep a scrambled version of your internet address for up to 30 days to stop cheating.</li>
-          <li>Report or Block a name from the ⋯ button. Blocking only changes what you see, and the other player isn&apos;t told. If something upsets you, tell an adult you trust.</li>
+          <li>Report or Block a name from the ⋯ button. A report asks you to pick a reason. They won&apos;t be told you reported them. Blocking only changes what you see, and the other player isn&apos;t told. If something upsets you, tell an adult you trust.</li>
         </ul>
         <p className="data-contact">Questions? <a href="mailto:hello@iqcoaching.co.uk">hello@iqcoaching.co.uk</a></p>
         <button className="btn primary" onClick={onClose}>DONE</button>

@@ -979,13 +979,18 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .country-toggle { border-color: #ff4f9a; }
 .country-suggest {
   font: inherit;
-  font-weight: 800;
-  color: #140814;
-  background: #ff4f9a;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: #f7e9c5;
+  background: transparent;
   border: 0;
-  border-radius: 14px;
+  border-radius: 12px;
   min-height: 44px;
-  padding: 8px 12px;
+  padding: 8px 4px;
   text-align: left;
   cursor: pointer;
   width: 100%;
@@ -1158,20 +1163,30 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   border-radius: 12px;
   cursor: pointer;
 }
+.screen-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgba(8, 6, 16, .78);
+}
 .board-sheet {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 100%;
-  padding: 12px;
-  border-radius: 14px;
-  background:
-    linear-gradient(rgba(16, 10, 12, .78), rgba(16, 10, 12, .78)),
-    url('./ui/wall-tile.jpg') center / cover;
-  border: 0;
+  width: min(100%, 340px);
+  padding: 16px;
+  border-radius: 18px;
+  background: #140814;
+  border: 3px solid #f7e9c5;
   text-align: left;
 }
 .board-sheet p { margin: 0; color: #fffdf8; font-weight: 800; }
+.sheet-name { font-size: 22px; line-height: 1.2; text-align: center; }
+.sheet-privacy { font-size: 16px; line-height: 1.35; font-weight: 700; text-align: center; }
 .board-sheet button {
   min-height: 44px;
   min-width: 44px;
@@ -1184,7 +1199,27 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   background: #f7e9c5;
 }
 .sheet-report { background: #ffd0e4; color: #3b1024; }
-.sheet-block { background: #f7e9c5; color: #24180c; }
+.sheet-block,
+.sheet-reason { background: #f7e9c5; color: #24180c; }
+.centre-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(100%, 340px);
+  padding: 24px 18px;
+  border-radius: 20px;
+  background: #1E2A5A;
+  border: 3px solid #f7e9c5;
+  text-align: center;
+}
+.centre-notice p {
+  margin: 0;
+  color: #fffdf8;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+.centre-notice .btn { min-height: 44px; width: 100%; }
 .nick-wheels { display: flex; gap: 8px; }
 .nick-wheel-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .nick-word-tools { display: flex; gap: 4px; }

@@ -1158,6 +1158,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .nick-wheel button.on { background: rgba(255, 79, 154, .28); border-color: #ff4f9a; }
 .nick-shuffle { min-height: 52px; }
+.nick-real-name { margin: 0; text-align: center; font-size: 14px; font-weight: 800; color: #fffdf8; }
 .nick-preview { display: flex; justify-content: center; min-height: 48px; }
 .unblock-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .unblock-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

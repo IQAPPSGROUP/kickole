@@ -128,6 +128,7 @@ export function NicknameForm({
           }}
         />
       </div>
+      <p className="nick-real-name">Don&apos;t use your real name</p>
       <button
         type="button"
         className="btn primary nick-shuffle"

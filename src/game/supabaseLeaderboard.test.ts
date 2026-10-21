@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { formatRank } from './leaderboard';
 import type { LeaderboardRpc } from './supabaseClient';
-import { createSupabaseLeaderboard, registerPlayer, serverNicknameMessage } from './supabaseLeaderboard';
+import { createSupabaseLeaderboard, peekNickname, registerPlayer, serverNicknameMessage } from './supabaseLeaderboard';
 
 const DEVICE = '11111111-1111-4111-8111-111111111111';
 
@@ -40,30 +40,34 @@ function scripted(handlers: Record<string, Handler>) {
   return { calls, rpc };
 }
 
+const NICK = 'Turbo Striker';
+
 const rankRow = {
   rank: 4,
   total: 20,
-  nickname: 'zz_test_me',
+  nickname: NICK,
   score: 10,
   country: 'GB',
   country_rank: 2,
   country_total: 5,
+  country_hidden: false,
 };
 
 const aroundRows = [
   { rank: 2, nickname: 'HighKick', country: 'FR', score: 100, mine: false },
   { rank: 3, nickname: 'MidKick', country: 'GB', score: 50, mine: false },
-  { rank: 4, nickname: 'zz_test_me', country: 'GB', score: 10, mine: true },
+  { rank: 4, nickname: NICK, country: 'GB', score: 10, mine: true },
   { rank: 5, nickname: 'LowKick', country: 'DE', score: 5, mine: false },
 ];
 
 function liveHandlers(extra: Record<string, Handler> = {}): Record<string, Handler> {
   return {
-    check_nickname: () => ({ data: { ok: true, reason: null } }),
-    register_or_update_player: () => ({ data: { ok: true, nickname: 'zz_test_me', country: 'GB' } }),
+    peek_nickname: () => ({ data: { ok: true, nickname: NICK, taken: false } }),
+    register_or_update_player: () => ({ data: { ok: true, nickname: NICK, country: 'GB' } }),
+    start_run: () => ({ data: { ok: true, token: '22222222-2222-4222-8222-222222222222' } }),
     get_rank: () => ({ data: [rankRow] }),
     get_around: (args) => ({ data: args.period === 'week' ? aroundRows.map((row) => ({ ...row, rank: row.rank + 1 })) : aroundRows }),
-    get_top: () => ({ data: aroundRows.slice(0, 3).map((row) => ({ ...row, mine: false })) }),
+    get_board: () => ({ data: { hidden: false, rows: aroundRows.slice(0, 3).map((row) => ({ ...row, mine: false })) } }),
     submit_score: () => ({ data: { accepted: true, best: 30, week_best: 30, new_best: true, new_week_best: true } }),
     report_player: () => ({ data: { ok: true } }),
     block_player: () => ({ data: { ok: true } }),
@@ -80,38 +84,54 @@ describe('supabase leaderboard', () => {
 
   it('shows a server reason when the nickname is taken', async () => {
     const { calls, rpc } = scripted({
-      check_nickname: () => ({ data: { ok: false, reason: 'taken' } }),
-      register_or_update_player: () => ({ data: { ok: true } }),
+      register_or_update_player: () => ({ data: { ok: false, reason: 'taken' } }),
     });
     const result = await registerPlayer({
       deviceId: DEVICE,
-      nickname: 'zz_test_taken',
+      adjective: 'Turbo',
+      noun: 'Striker',
       country: 'GB',
       rpc,
     });
     expect(result).toEqual({ ok: false, reason: 'taken' });
     expect(serverNicknameMessage('taken')).toBe('That nickname is taken.');
-    expect(calls.map((call) => call.fn)).toEqual(['check_nickname']);
+    expect(serverNicknameMessage('rename_limit')).toBe('You can change your nickname once every 7 days.');
+    expect(calls.map((call) => call.fn)).toEqual(['register_or_update_player']);
+    expect(calls[0]?.args).toMatchObject({ adjective: 'Turbo', noun: 'Striker' });
+  });
+
+  it('offers the Roman suffix when the pair is taken', async () => {
+    const { rpc } = scripted({
+      peek_nickname: () => ({ data: { ok: true, nickname: 'Turbo Striker II', taken: true } }),
+    });
+    const result = await peekNickname({
+      deviceId: DEVICE,
+      adjective: 'Turbo',
+      noun: 'Striker',
+      rpc,
+    });
+    expect(result).toMatchObject({ ok: true, nickname: 'Turbo Striker II', taken: true });
   });
 
   it('keeps the nickname locally when the board cannot be reached', async () => {
     const { rpc } = scripted({
-      check_nickname: () => ({ error: 'offline' }),
+      register_or_update_player: () => ({ error: 'offline' }),
     });
     const result = await registerPlayer({
       deviceId: DEVICE,
-      nickname: 'zz_test_me',
+      adjective: 'Turbo',
+      noun: 'Striker',
       country: null,
       rpc,
     });
-    expect(result).toEqual({ ok: true, offline: true });
+    expect(result).toEqual({ ok: true, offline: true, nickname: 'Turbo Striker' });
   });
 
   it('climbs past cached neighbours and waits 10s before asking again', async () => {
     let clock = 1_000_000;
     const { calls, rpc } = scripted(liveHandlers());
     const board = createSupabaseLeaderboard({
-      nickname: 'zz_test_me',
+      nickname: NICK,
       country: 'GB',
       storage: memory(),
       rpc,
@@ -152,7 +172,7 @@ describe('supabase leaderboard', () => {
       submit_score: () => (submitFails ? { error: 'offline' } : { data: { accepted: true, best: 30, week_best: 30, new_best: true, new_week_best: true } }),
     }));
     const board = createSupabaseLeaderboard({
-      nickname: 'zz_test_me',
+      nickname: NICK,
       country: 'GB',
       storage,
       rpc,
@@ -165,6 +185,8 @@ describe('supabase leaderboard', () => {
     expect(board.rankFor(12).rank).toBeNull();
     expect(formatRank(board.rankFor(12).rank)).toBe('—');
 
+    board.startRun();
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'start_run')).toBe(true));
     expect(board.submit(30, clock, { combo: 2, durationMs: 8_000 })).toEqual({ accepted: true, best: 30 });
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'submit_score')).toBe(true));
     const sent = calls.filter((call) => call.fn === 'submit_score');
@@ -174,6 +196,7 @@ describe('supabase leaderboard', () => {
       score: 30,
       combo: 2,
       run_duration_ms: 8_000,
+      run_token: '22222222-2222-4222-8222-222222222222',
     });
     expect(storage.getItem('kicky.board.outbox.v1')).toContain('"score":30');
 
@@ -191,7 +214,7 @@ describe('supabase leaderboard', () => {
   it('asks for the ISO week and hides a reported or blocked nickname', async () => {
     const { calls, rpc } = scripted(liveHandlers());
     const board = createSupabaseLeaderboard({
-      nickname: 'zz_test_me',
+      nickname: NICK,
       country: 'GB',
       storage: memory(),
       rpc,
@@ -201,12 +224,12 @@ describe('supabase leaderboard', () => {
     open.push(board);
     board.start();
     await vi.waitFor(() => expect(board.rankFor(0).rank).toBe(4));
-    board.around(10, 'week');
+    board.around(10, 'world', 'week');
     board.top('country', 10, 10);
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'get_around' && call.args.period === 'week' && call.args.scope === 'world')).toBe(true));
     await vi.waitFor(() => {
-      const top = calls.find((call) => call.fn === 'get_top' && call.args.scope === 'country');
-      expect(top?.args.country_code).toBe('GB');
+      const top = calls.find((call) => call.fn === 'get_board' && call.args.scope === 'country');
+      expect(top?.args.country).toBe('GB');
       expect(top?.args.period).toBe('all');
     });
 
@@ -220,11 +243,11 @@ describe('supabase leaderboard', () => {
 
   it('drops an implausible score instead of retrying it', async () => {
     const storage = memory();
-    const { rpc } = scripted(liveHandlers({
+    const { calls, rpc } = scripted(liveHandlers({
       submit_score: () => ({ data: { accepted: false, reason: 'implausible' } }),
     }));
     const board = createSupabaseLeaderboard({
-      nickname: 'zz_test_me',
+      nickname: NICK,
       country: null,
       storage,
       rpc,
@@ -233,8 +256,10 @@ describe('supabase leaderboard', () => {
     });
     open.push(board);
     board.start();
-    await vi.waitFor(() => expect(board.revision).toBeGreaterThan(0));
+    board.startRun();
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'start_run')).toBe(true));
     board.submit(20, 4_000_000, { combo: 1, durationMs: 100 });
+    await vi.waitFor(() => expect(calls.some((call) => call.fn === 'submit_score')).toBe(true));
     await vi.waitFor(() => expect(storage.getItem('kicky.board.outbox.v1')).toBeNull());
   });
 });

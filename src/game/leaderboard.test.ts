@@ -40,7 +40,7 @@ describe('mock leaderboard', () => {
 
   it('shows three neighbours and a different weekly board', () => {
     const board = createMockLeaderboard({ nickname: 'StreetKick42', storage: memory(), now: NOW });
-    const around = board.around(23, 'world', NOW);
+    const around = board.around(23, 'world', 'all', NOW);
     expect(around.above).toHaveLength(3);
     expect(around.below).toHaveLength(3);
     expect(around.me.mine).toBe(true);
@@ -48,9 +48,9 @@ describe('mock leaderboard', () => {
     expect(around.me.score).toBe(23);
     expect(around.above.every((row) => row.rank < around.me.rank && row.score >= around.me.score)).toBe(true);
     expect(around.below.every((row) => row.rank > around.me.rank)).toBe(true);
-    const week = board.around(23, 'week', NOW);
+    const week = board.around(23, 'world', 'week', NOW);
     expect(week.me.rank).not.toBe(around.me.rank);
-    const top = board.top('world', 23, 10, NOW);
+    const top = board.top('world', 23, 10, 'all', NOW);
     expect(top).toHaveLength(10);
     expect(top[0]?.rank).toBe(1);
     expect(top.some((row) => row.mine)).toBe(false);
@@ -63,24 +63,24 @@ describe('mock leaderboard', () => {
     expect(board.submit(10, NOW + 1)).toEqual({ accepted: false, best: 23 });
     expect(board.submit(40, NOW + 2)).toEqual({ accepted: true, best: 40 });
     const before = board.rankFor(23, NOW).rank ?? 0;
-    const target = board.around(23, 'world', NOW).above[0]?.nickname ?? '';
+    const target = board.around(23, 'world', 'all', NOW).above[0]?.nickname ?? '';
     board.report(target);
     board.report('StreetKick42');
     expect(board.rankFor(23, NOW).rank).toBe(before - 1);
-    expect(board.around(23, 'world', NOW).above.some((row) => row.nickname === target)).toBe(false);
+    expect(board.around(23, 'world', 'all', NOW).above.some((row) => row.nickname === target)).toBe(false);
     const again = createMockLeaderboard({ nickname: 'StreetKick42', storage, now: NOW });
     expect(again.submit(40, NOW)).toEqual({ accepted: false, best: 40 });
     expect(again.deviceId).toBe(board.deviceId);
     expect(storage.getItem(DEVICE_ID_KEY)).toBe(board.deviceId);
-    const entry = again.top('world', 23, 1, NOW)[0];
+    const entry = again.top('world', 23, 1, 'all', NOW)[0];
     expect(entry && 'deviceId' in entry).toBe(false);
   });
 
   it('ranks a chosen country separately and leaves prefer-not-to-say off that board', () => {
     const hidden = createMockLeaderboard({ nickname: 'StreetKick42', country: null, storage: memory(), now: NOW });
     expect(hidden.rankFor(23, NOW).countryRank).toBeNull();
-    expect(hidden.top('country', 23, 10, NOW)).toEqual([]);
-    expect(hidden.around(23, 'country', NOW).me.rank).toBe(0);
+    expect(hidden.top('country', 23, 10, 'all', NOW)).toEqual([]);
+    expect(hidden.around(23, 'country', 'all', NOW).me.rank).toBe(0);
 
     const board = createMockLeaderboard({ nickname: 'StreetKick42', country: 'gb', storage: memory(), now: NOW });
     const snap = board.rankFor(23, NOW);
@@ -88,12 +88,20 @@ describe('mock leaderboard', () => {
     expect(snap.country).toBe('GB');
     expect(snap.countryRank).not.toBeNull();
     expect(snap.countryRank!).toBeLessThan(snap.rank!);
-    const around = board.around(23, 'country', NOW);
+    const around = board.around(23, 'country', 'all', NOW);
     const rows = [...around.above, around.me, ...around.below];
     expect(around.me.mine).toBe(true);
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
-    expect(board.top('world', 23, 10, NOW).every((row) => row.country)).toBe(true);
+    expect(board.top('world', 23, 10, 'all', NOW).every((row) => row.country)).toBe(true);
+  });
+
+  it('hides a country board with fewer than 20 players', () => {
+    const board = createMockLeaderboard({ nickname: 'Turbo Striker', country: 'AD', storage: memory(), now: NOW });
+    expect(board.rankFor(23, NOW).countryHidden).toBe(true);
+    expect(board.rankFor(23, NOW).countryRank).toBeNull();
+    expect(board.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
+    expect(board.board('day', 'world', 23, 10, NOW).hidden).toBe(false);
   });
 
   it('treats a week as Monday 00:00 UTC through the following Sunday', () => {

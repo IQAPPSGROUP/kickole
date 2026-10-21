@@ -1,7 +1,8 @@
 import { useState, useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
-import { countryByCode, countryFlag } from '../game/countries';
-import type { BoardEntry, BoardScope, LeaderboardService } from '../game/leaderboard';
+import { countryByCode } from '../game/countries';
+import { readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
+import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
 import { NicknameForm } from './NicknameScreen';
 import {
@@ -84,19 +85,23 @@ export function GameOver({
   onHome: () => void;
   onShop: () => void;
 }) {
+  const [period, setPeriod] = useState<BoardPeriod>('all');
   const [scope, setScope] = useState<BoardScope>('world');
   const [view, setView] = useState<'around' | 'top'>('around');
   const [note, setNote] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<string | null>(null);
+  const [confirmReport, setConfirmReport] = useState(false);
   const [revision, setRevision] = useState(0);
   void useSyncExternalStore(
     board ? board.subscribe : idleSubscribe,
     () => board?.revision ?? 0,
   );
+  const page = board ? board.board(period, scope, result.score, 10) : { hidden: false, rows: [] as BoardEntry[] };
   const optedOut = scope === 'country' && !board?.country;
-  const rows = board && !optedOut
+  const rows = board && !optedOut && !page.hidden
     ? view === 'top'
-      ? board.top(scope, result.score, 10)
-      : flattenAround(board, result.score, scope)
+      ? page.rows
+      : flattenAround(board, result.score, scope, period)
     : [];
   void revision;
   return (
@@ -112,16 +117,28 @@ export function GameOver({
         </div>
         {board && (
           <div className="world-board">
-            <div className="seg board-tabs" role="tablist" aria-label="Board scope">
-              {(['world', 'week', 'country'] as const).map((id) => (
+            <div className="period-scroller" role="tablist" aria-label="Board period">
+              {PERIODS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={period === item.id ? 'on' : ''}
+                  title={item.title}
+                  onClick={() => setPeriod(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="seg board-tabs" role="tablist" aria-label="World or country">
+              {(['world', 'country'] as const).map((id) => (
                 <button
                   key={id}
                   type="button"
                   className={scope === id ? 'on' : ''}
-                  title={id === 'week' ? 'ISO week, Monday to Sunday UTC' : undefined}
                   onClick={() => setScope(id)}
                 >
-                  {scopeLabel(id)}
+                  {id === 'world' ? 'World' : 'Country'}
                 </button>
               ))}
             </div>
@@ -132,44 +149,69 @@ export function GameOver({
               </div>
             )}
             {optedOut && <p className="shop-note">You chose not to appear on a country board.</p>}
-            {!optedOut && <ol className="board">
+            {!optedOut && page.hidden && <p className="shop-note">Not enough players in your country yet</p>}
+            {!optedOut && !page.hidden && <ol className="board">
               {rows.map((row) => (
-                <li key={`${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''} aria-label={entryLabel(row)}>
+                <li key={`${period}:${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''} aria-label={entryLabel(row)}>
                   <span>{row.rank > 0 ? row.rank.toLocaleString('en-US') : '—'}</span>
-                  <b>
-                    {row.country && <span className="country-flag" aria-hidden="true">{countryFlag(row.country)}</span>}
-                    {row.nickname}
-                  </b>
+                  <b>{row.nickname}</b>
                   <em>{row.score}</em>
                   {!row.mine && (
-                    <span className="board-actions">
-                      <button
-                        type="button"
-                        className="board-report"
-                        onClick={() => {
-                          board.report(row.nickname);
-                          setNote('Reported. Hidden on this device.');
-                          setRevision((value) => value + 1);
-                        }}
-                      >
-                        Report
-                      </button>
-                      <button
-                        type="button"
-                        className="board-block"
-                        onClick={() => {
-                          board.block(row.nickname);
-                          setNote('Blocked. Hidden on this device.');
-                          setRevision((value) => value + 1);
-                        }}
-                      >
-                        Block
-                      </button>
-                    </span>
+                    <button
+                      type="button"
+                      className="board-more"
+                      aria-label={`More actions for ${row.nickname}`}
+                      onClick={() => {
+                        setSheet(row.nickname);
+                        setConfirmReport(false);
+                      }}
+                    >
+                      ⋯
+                    </button>
                   )}
                 </li>
               ))}
             </ol>}
+            {sheet && board && (
+              <div className="board-sheet" role="dialog" aria-label={`Actions for ${sheet}`}>
+                <p>{sheet}</p>
+                {confirmReport ? (
+                  <>
+                    <p>Report this nickname?</p>
+                    <button type="button" onClick={() => setConfirmReport(false)}>Cancel</button>
+                    <button
+                      type="button"
+                      className="sheet-report"
+                      onClick={() => {
+                        board.report(sheet);
+                        setNote('Reported. Hidden on this device.');
+                        setSheet(null);
+                        setRevision((value) => value + 1);
+                      }}
+                    >
+                      Report
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button type="button" className="sheet-report" onClick={() => setConfirmReport(true)}>Report</button>
+                    <button
+                      type="button"
+                      className="sheet-block"
+                      onClick={() => {
+                        board.block(sheet);
+                        setNote('Blocked. Hidden on this device.');
+                        setSheet(null);
+                        setRevision((value) => value + 1);
+                      }}
+                    >
+                      Block
+                    </button>
+                    <button type="button" onClick={() => setSheet(null)}>Close</button>
+                  </>
+                )}
+              </div>
+            )}
             {note && <p className="shop-note">{note}</p>}
           </div>
         )}
@@ -187,20 +229,16 @@ function idleSubscribe(): () => void {
   return () => {};
 }
 
-function scopeLabel(scope: BoardScope): string {
-  switch (scope) {
-    case 'world': return 'WORLD';
-    case 'week': return 'WEEK';
-    case 'country': return 'COUNTRY';
-    default: {
-      const neverScope: never = scope;
-      return neverScope;
-    }
-  }
-}
+const PERIODS: readonly { id: BoardPeriod; label: string; title?: string }[] = [
+  { id: 'day', label: 'Day' },
+  { id: 'week', label: 'Week', title: 'Monday to Sunday UTC' },
+  { id: 'month', label: 'Month' },
+  { id: 'year', label: 'Year' },
+  { id: 'all', label: 'All time' },
+];
 
-function flattenAround(board: LeaderboardService, score: number, scope: BoardScope) {
-  const around = board.around(score, scope);
+function flattenAround(board: LeaderboardService, score: number, scope: BoardScope, period: BoardPeriod) {
+  const around = board.around(score, scope, period);
   return [...around.above, around.me, ...around.below];
 }
 
@@ -231,15 +269,27 @@ function graphicsLabel(choice: GraphicsChoice): string {
 }
 
 export function SettingsScreen({
-  settings, nickname, country, onNickname, onChange, onClose,
+  settings, nickname, country, leaderboardOn, blockedTick, onNickname, onLeaderboard, onUnblock, onDelete, onData, onPeek, board, onChange, onClose,
 }: {
   settings: Settings;
   nickname: string;
   country: string | null;
-  onNickname: (nickname: string, country: string | null) => void | string | Promise<void | string | undefined>;
+  leaderboardOn: boolean;
+  blockedTick: number;
+  onNickname: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
+  onLeaderboard: (on: boolean) => void;
+  onUnblock: () => void;
+  onDelete: () => Promise<string | void>;
+  onData: () => void;
+  onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
+  board: LeaderboardService | null;
   onChange: (p: Partial<Settings>) => void;
   onClose: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteNote, setDeleteNote] = useState<string | null>(null);
+  const blocked = readBlockedNames(localStorage);
+  void blockedTick;
   const choices: GraphicsChoice[] = ['auto', 'low', 'medium', 'high'];
   const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
   const running = useSyncExternalStore(subscribeRunningTier, getRunningTier);
@@ -249,10 +299,62 @@ export function SettingsScreen({
     <div className="screen settings">
       <div className="card">
         <h2>SETTINGS</h2>
+        <Toggle label="Leaderboard" value={leaderboardOn} onChange={onLeaderboard} />
+        {leaderboardOn && (
+          <div className="group">
+            <label>Change nickname and country</label>
+            <NicknameForm initial={nickname} initialCountry={country} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} />
+            <p className="shop-note">Your nickname is picked from our word lists. You can change it once every 7 days. Country is your choice, not your location. Prefer not to say keeps you off country boards.</p>
+          </div>
+        )}
+        {blocked.length > 0 && (
+          <div className="group">
+            <label>Blocked nicknames</label>
+            <ul className="unblock-list">
+              {blocked.map((name) => (
+                <li key={name}>
+                  <span>{name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (board) board.unblock(name);
+                      else writeBlockedNames(localStorage, blocked.filter((item) => item.toLowerCase() !== name.toLowerCase()));
+                      onUnblock();
+                    }}
+                  >
+                    Unblock
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="group">
-          <label>Change nickname and country</label>
-          <NicknameForm initial={nickname} initialCountry={country} submitLabel="SAVE" onSubmit={onNickname} />
-          <p className="shop-note">Change the nickname and country saved on this device. Online play sends that nickname, a random device id, your score, and the country you pick to the world board. Prefer not to say keeps you off country boards. We do not use GPS or your IP address to choose a country.</p>
+          <button type="button" className="btn ghost" onClick={onData}>Leaderboard &amp; your data</button>
+          {!confirmDelete && (
+            <button type="button" className="btn ghost" onClick={() => { setConfirmDelete(true); setDeleteNote(null); }}>
+              Delete my leaderboard data
+            </button>
+          )}
+          {confirmDelete && (
+            <>
+              <p className="shop-note">This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  void onDelete().then((message) => {
+                    if (message) setDeleteNote(message);
+                    else setConfirmDelete(false);
+                  });
+                }}
+              >
+                Delete my leaderboard data
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
+            </>
+          )}
+          {deleteNote && <p className="nick-error" role="alert">{deleteNote}</p>}
         </div>
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
@@ -301,10 +403,10 @@ export function SettingsScreen({
             without deleting items you earned with coins.
           </p>
           <p>
-            Coins, appearance and purchases stay on this device. A nickname, a random device id, your score and the country you choose are sent only for the world board.
-            We do not collect advertising identifiers for tracking. We do not use GPS, your IP address or a network lookup to pick your country.
+            Coins, appearance and purchases stay on this device. The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and the country you choose are sent for the board.
+            We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A hashed IP address may be kept for 30 days to limit cheating.
             Purchases are verified with Apple or Google on the device; we do not log purchase tokens, receipts or credentials.
-            To remove a public score, contact IQ Apps Group. Store privacy / Data Safety declarations for listings are documented for release builds.
+            Tap Delete my leaderboard data to remove your nickname and scores. Store privacy declarations are documented for release builds.
           </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>Music is a synthesised boom-bap beat. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
@@ -321,6 +423,21 @@ export function SettingsScreen({
             </a>
           </p>
         </div>
+        <button className="btn primary" onClick={onClose}>DONE</button>
+      </div>
+    </div>
+  );
+}
+
+export function DataScreen({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="overlay">
+      <div className="panel wide data-panel">
+        <h2>Leaderboard &amp; your data</h2>
+        <p>The leaderboard is off until you tap Join leaderboard.</p>
+        <p>If you join, we save a nickname you pick from our word lists, a random device id, your scores, and a country only if you choose one. We do not use GPS. We may keep a hashed IP address for 30 days to limit cheating.</p>
+        <p>You can change your nickname once every 7 days. You can turn the leaderboard off, and you can block or report other nicknames.</p>
+        <p>This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
         <button className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

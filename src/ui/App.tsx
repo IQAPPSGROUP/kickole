@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } fr
 import { installAudioLifecycle } from '../game/audio';
 import { GameController } from '../game/controller';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
-import { hydrateCountry, hydrateDeviceId, hydrateNickname, loadDeviceId, loadNickname, loadStoredCountry, saveCountry, saveNickname } from '../game/nicknameStore';
-import { registerPlayer, serverNicknameMessage, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
+import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
+import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
 import {
   cancelOpeningIntroForGameplay,
@@ -16,14 +16,14 @@ import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
-import { NicknameScreen } from './NicknameScreen';
-import { Home, GameOver, SettingsScreen } from './Screens';
+import { NicknameScreen, OptInCard } from './NicknameScreen';
+import { DataScreen, Home, GameOver, SettingsScreen } from './Screens';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
-type Overlay = 'none' | 'settings' | 'customise' | 'shop';
+type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'data';
 
 export function App() {
   const controller = useMemo(() => new GameController(), []);
@@ -32,13 +32,16 @@ export function App() {
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
+  const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
   const [deviceReady, setDeviceReady] = useState(false);
+  const [blockedTick, setBlockedTick] = useState(0);
   const mockBoard = useMemo(() => new URLSearchParams(window.location.search).get('mockBoard') === '1', []);
+  const leaderboardOn = optIn === 'in';
   const board = useMemo((): LeaderboardService | null => {
-    if (!nickname || !deviceReady) return null;
+    if (!leaderboardOn || !nickname || !deviceReady) return null;
     const options = { nickname, country: countryChoice.country };
     return mockBoard ? createMockLeaderboard(options) : createSupabaseLeaderboard(options);
-  }, [nickname, countryChoice.country, deviceReady, mockBoard]);
+  }, [leaderboardOn, nickname, countryChoice.country, deviceReady, mockBoard]);
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
@@ -51,9 +54,11 @@ export function App() {
       await hydrateDeviceId();
       const name = await hydrateNickname();
       const stored = await hydrateCountry();
+      const choice = await hydrateBoardOptIn();
       if (!live) return;
       if (name) setNickname((current) => current ?? name);
       setCountryChoice(stored);
+      setOptIn(choice);
       setDeviceReady(true);
     })();
     return () => { live = false; };
@@ -113,8 +118,9 @@ export function App() {
   }, [controller]);
 
   const needsBody = !snap.save.bodyChosen;
-  const needsNick = nickname == null;
-  const blocking = overlay !== 'none' || needsBody || needsNick;
+  const needsOpt = optIn === 'unknown';
+  const needsNick = leaderboardOn && nickname == null;
+  const blocking = overlay !== 'none' || needsBody || needsOpt || needsNick;
 
   useEffect(() => {
     let spaceDown = false;
@@ -179,6 +185,7 @@ export function App() {
   const startGame = () => {
     cancelOpeningIntroForGameplay();
     setOverlay('none');
+    board?.startRun();
     controller.play();
   };
 
@@ -187,34 +194,74 @@ export function App() {
     setOverlay('none');
   };
 
-  const lockNickname = async (name: string, country: string | null): Promise<string | void> => {
+  const lockNickname = async (adjective: string, noun: string, country: string | null): Promise<string | void> => {
     const deviceId = await hydrateDeviceId();
+    let finalName = `${adjective} ${noun}`;
     if (!mockBoard) {
       const result = await registerPlayer({
         deviceId: deviceId || loadDeviceId(),
-        nickname: name,
+        adjective,
+        noun,
         country,
       });
       if (!result.ok) return serverNicknameMessage(result.reason);
+      if (result.nickname) finalName = result.nickname;
     }
-    saveNickname(name);
+    saveNickname(finalName);
     saveCountry(country);
-    setNickname(name);
+    setNickname(finalName);
     setCountryChoice({ chosen: true, country });
+    setDeviceReady(true);
+  };
+
+  const peekTag = async (adjective: string, noun: string) => {
+    const deviceId = await hydrateDeviceId();
+    return peekNickname({ deviceId: deviceId || loadDeviceId(), adjective, noun });
+  };
+
+  const joinBoard = () => {
+    saveBoardOptIn('in');
+    setOptIn('in');
+  };
+
+  const leaveBoardPrompt = () => {
+    saveBoardOptIn('out');
+    setOptIn('out');
+  };
+
+  const setLeaderboard = (on: boolean) => {
+    if (on) joinBoard();
+    else leaveBoardPrompt();
+    if (on && !nickname) setOverlay('none');
+  };
+
+  const deleteBoardData = async (): Promise<string | void> => {
+    if (!mockBoard) {
+      const deviceId = await hydrateDeviceId();
+      const removed = await deletePlayerAccount({ deviceId: deviceId || loadDeviceId() });
+      if (!removed.ok) return 'Could not reach the board. Try again when you are online.';
+    }
+    await resetLeaderboardIdentity();
+    setNickname(null);
+    setCountryChoice({ chosen: false, country: null });
+    setBlockedTick((value) => value + 1);
     setDeviceReady(true);
   };
 
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
-      {intro.active && !needsBody && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
+      {intro.active && !needsBody && !needsOpt && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
-      {!needsBody && needsNick && phase === 'menu' && (
-        <NicknameScreen onSave={(name, country) => lockNickname(name, country)} />
+      {!needsBody && needsOpt && phase === 'menu' && overlay === 'none' && (
+        <OptInCard onJoin={joinBoard} onNotNow={leaveBoardPrompt} onData={() => setOverlay('data')} />
       )}
-      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsNick && (
+      {!needsBody && !needsOpt && needsNick && phase === 'menu' && overlay === 'none' && (
+        <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} />
+      )}
+      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && (
         <Home
           best={snap.save.best}
           coins={snap.save.coins}
@@ -251,10 +298,21 @@ export function App() {
           settings={snap.settings}
           nickname={nickname ?? ''}
           country={countryChoice.country}
-          onNickname={(name, country) => lockNickname(name, country)}
+          leaderboardOn={leaderboardOn}
+          blockedTick={blockedTick}
+          onNickname={lockNickname}
+          onLeaderboard={setLeaderboard}
+          onUnblock={() => setBlockedTick((value) => value + 1)}
+          onDelete={deleteBoardData}
+          onData={() => setOverlay('data')}
+          onPeek={mockBoard ? undefined : peekTag}
+          board={board}
           onChange={(p) => controller.updateSettings(p)}
           onClose={closeOverlay}
         />
+      )}
+      {overlay === 'data' && (
+        <DataScreen onClose={() => setOverlay(leaderboardOn || optIn === 'out' ? 'settings' : 'none')} />
       )}
       {overlay === 'customise' && (
         <CustomiseScreen

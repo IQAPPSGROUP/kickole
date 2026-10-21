@@ -4,6 +4,9 @@ import { checkNickname } from './nickname';
 export const NICKNAME_KEY = 'kicky.nickname.v1';
 export const DEVICE_ID_KEY = 'kicky.device.v1';
 export const COUNTRY_KEY = 'kicky.country.v1';
+export const OPT_IN_KEY = 'kicky.board.optin.v1';
+
+export type BoardOptIn = 'unknown' | 'in' | 'out';
 
 /** Stored when the player chooses "Prefer not to say". Missing key means they have not chosen yet. */
 const COUNTRY_NONE = 'none';
@@ -13,6 +16,71 @@ export interface StoredCountry {
   chosen: boolean;
   /** ISO alpha-2, or null when unset or prefer-not-to-say. */
   country: string | null;
+}
+
+export function loadBoardOptIn(storage: Storage = localStorage): BoardOptIn {
+  try {
+    const raw = storage.getItem(OPT_IN_KEY);
+    if (raw === 'in' || raw === 'out') return raw;
+  } catch {
+    /* missing means they have not been asked */
+  }
+  return 'unknown';
+}
+
+export function saveBoardOptIn(value: Exclude<BoardOptIn, 'unknown'>, storage: Storage = localStorage): void {
+  try {
+    storage.setItem(OPT_IN_KEY, value);
+  } catch {
+    /* the in-memory choice still applies this session */
+  }
+  void mirrorPreference(OPT_IN_KEY, value);
+}
+
+export async function hydrateBoardOptIn(storage: Storage = localStorage): Promise<BoardOptIn> {
+  const local = loadBoardOptIn(storage);
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()) return local;
+    const { Preferences } = await import('@capacitor/preferences');
+    const stored = await Preferences.get({ key: OPT_IN_KEY });
+    if (stored.value === 'in' || stored.value === 'out') {
+      try { storage.setItem(OPT_IN_KEY, stored.value); } catch { /* ignore */ }
+      return stored.value;
+    }
+    if (local !== 'unknown') await Preferences.set({ key: OPT_IN_KEY, value: local });
+  } catch {
+    /* Preferences is absent in the browser and in tests. */
+  }
+  return loadBoardOptIn(storage);
+}
+
+/** Forget the nickname, country and install id. The next loadDeviceId mints a new id. */
+export async function resetLeaderboardIdentity(storage: Storage = localStorage): Promise<string> {
+  for (const key of [
+    NICKNAME_KEY,
+    COUNTRY_KEY,
+    DEVICE_ID_KEY,
+    'kicky.board.blocks.v1',
+    'kicky.board.reports.v1',
+    'kicky.board.best.v1',
+    'kicky.board.outbox.v1',
+    'kicky.board.pending-moderation.v1',
+  ]) {
+    try { storage.removeItem(key); } catch { /* ignore */ }
+  }
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (Capacitor.isNativePlatform()) {
+      const { Preferences } = await import('@capacitor/preferences');
+      await Preferences.remove({ key: NICKNAME_KEY });
+      await Preferences.remove({ key: COUNTRY_KEY });
+      await Preferences.remove({ key: DEVICE_ID_KEY });
+    }
+  } catch {
+    /* Web storage already dropped the keys. */
+  }
+  return loadDeviceId(storage);
 }
 
 export function loadNickname(storage: Storage = localStorage): string | null {

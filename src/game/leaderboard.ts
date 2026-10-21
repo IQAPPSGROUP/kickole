@@ -1,8 +1,17 @@
 import { COUNTRIES, countryByCode } from './countries';
+import { ADJECTIVES, NOUNS } from './nicknameWords';
 import { loadDeviceId } from './nicknameStore';
 
-/** World is all-time. Week is the ISO week starting Monday 00:00 UTC. Country is all-time for one self-chosen code. */
-export type BoardScope = 'world' | 'week' | 'country';
+/** Day, ISO week (Monday 00:00 UTC), calendar month, calendar year, or all-time. */
+export type BoardPeriod = 'day' | 'week' | 'month' | 'year' | 'all';
+
+/** World is every player. Country is one self-chosen code. */
+export type BoardScope = 'world' | 'country';
+
+/** A country board with fewer players than this stays hidden. */
+export const COUNTRY_BOARD_MIN = 20;
+
+export const BOARD_BLOCKS_KEY = 'kicky.board.blocks.v1';
 
 export interface BoardEntry {
   rank: number;
@@ -13,6 +22,11 @@ export interface BoardEntry {
   mine: boolean;
 }
 
+export interface BoardPage {
+  hidden: boolean;
+  rows: BoardEntry[];
+}
+
 export interface RankSnapshot {
   /** Null when the live board has not answered. The panel shows a dash. */
   rank: number | null;
@@ -21,8 +35,10 @@ export interface RankSnapshot {
   score: number;
   /** Null when the player prefers not to say, or has not chosen. */
   country: string | null;
-  /** Null when they are excluded from country boards. */
+  /** Null when they are excluded from country boards, or that board is hidden. */
   countryRank: number | null;
+  /** True when their country has fewer than {@link COUNTRY_BOARD_MIN} players this period. */
+  countryHidden: boolean;
 }
 
 export interface RunSubmit {
@@ -58,12 +74,19 @@ export interface LeaderboardService {
   start(): void;
   /** Ignore in-flight results. The next `start` fetches again. */
   stop(): void;
+  /** Ask the server for a single-use run token. Offline play still works. */
+  startRun(): void;
   rankFor(score: number, now?: number): RankSnapshot;
-  around(score: number, scope: BoardScope, now?: number): AroundMe;
-  top(scope: BoardScope, score: number, limit: number, now?: number): BoardEntry[];
+  around(score: number, scope: BoardScope, period?: BoardPeriod, now?: number): AroundMe;
+  top(scope: BoardScope, score: number, limit: number, period?: BoardPeriod, now?: number): BoardEntry[];
+  board(period: BoardPeriod, scope: BoardScope, score: number, limit?: number, now?: number): BoardPage;
   submit(score: number, at?: number, run?: RunSubmit): SubmitResult;
   report(nickname: string): void;
   block(nickname: string): void;
+  unblock(nickname: string): void;
+  blockedNames(): string[];
+  /** Removes this install's nickname, scores and device id after the server accepts. */
+  deleteData(): Promise<boolean>;
 }
 
 /** Monday 00:00 UTC of the ISO week that contains `now`. */
@@ -74,13 +97,32 @@ export function isoWeekStartUtc(now: number): number {
   return midnight - daysFromMonday * 86_400_000;
 }
 
+export function periodStart(period: BoardPeriod, now: number): number {
+  const date = new Date(now);
+  switch (period) {
+    case 'day':
+      return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+    case 'week':
+      return isoWeekStartUtc(now);
+    case 'month':
+      return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+    case 'year':
+      return Date.UTC(date.getUTCFullYear(), 0, 1);
+    case 'all':
+      return 0;
+    default: {
+      const neverPeriod: never = period;
+      return neverPeriod;
+    }
+  }
+}
+
 const CROWD = 1600;
 const BEST_KEY = 'kicky.board.best.v1';
-const BLOCKS_KEY = 'kicky.board.blocks.v1';
 const REPORTS_KEY = 'kicky.board.reports.v1';
-
-const LEFT = ['Street', 'Alley', 'Brick', 'Rhythm', 'Groove', 'Court', 'Beat', 'Flick'] as const;
-const RIGHT = ['Kick', 'Touch', 'Tap', 'Hop', 'Spin', 'Jam', 'Clip', 'Roll'] as const;
+const POPULAR = ['GB', 'BR', 'US', 'NG', 'FR', 'JP', 'DE', 'ES', 'IT', 'MX'] as const;
+const POPULAR_SET = new Set<string>(POPULAR);
+const TAIL = COUNTRIES.map((country) => country.code).filter((code) => !POPULAR_SET.has(code) && code !== 'AD');
 
 interface CrowdRow {
   nickname: string;
@@ -104,10 +146,9 @@ interface StoredBest {
 }
 
 function crowdNickname(index: number): string {
-  const left = LEFT[index % LEFT.length] ?? 'Street';
-  const right = RIGHT[Math.floor(index / LEFT.length) % RIGHT.length] ?? 'Kick';
-  const n = 10 + (Math.floor(index / (LEFT.length * RIGHT.length)) % 90);
-  return `${left}${right}${n}`;
+  const adjective = ADJECTIVES[index % ADJECTIVES.length] ?? 'Turbo';
+  const noun = NOUNS[Math.floor(index / ADJECTIVES.length) % NOUNS.length] ?? 'Striker';
+  return `${adjective} ${noun}`;
 }
 
 function crowdScore(index: number): number {
@@ -115,42 +156,51 @@ function crowdScore(index: number): number {
   return 1 + Math.round(t * t * 3000);
 }
 
+function crowdCountry(index: number): string {
+  if (index % 200 === 0) return 'AD';
+  if (index % 10 < 7) return POPULAR[index % POPULAR.length] ?? 'GB';
+  return TAIL[index % TAIL.length] ?? 'GB';
+}
+
 function crowdAt(index: number, now: number): number {
-  const ageDays = index % 21;
+  const code = crowdCountry(index);
+  const ageDays = POPULAR_SET.has(code) ? index % 3 : 7 + (index % 14);
   return now - ageDays * 24 * 60 * 60 * 1000 - (index % 50) * 60 * 1000;
 }
 
-function crowdCountry(index: number): string {
-  const country = COUNTRIES[index % COUNTRIES.length];
-  return country ? country.code : '';
-}
-
-function inScope(scope: BoardScope, at: number, now: number, code: string, playerCountry: string | null): boolean {
-  switch (scope) {
-    case 'world':
+function inPeriod(period: BoardPeriod, at: number, now: number): boolean {
+  if (at > now) return false;
+  switch (period) {
+    case 'all':
       return true;
+    case 'day':
     case 'week':
-      return at >= isoWeekStartUtc(now) && at <= now;
-    case 'country':
-      return playerCountry != null && code === playerCountry;
+    case 'month':
+    case 'year':
+      return at >= periodStart(period, now);
     default: {
-      const neverScope: never = scope;
-      return neverScope;
+      const neverPeriod: never = period;
+      return neverPeriod;
     }
   }
 }
 
-function playerOnBoard(scope: BoardScope, playerCountry: string | null): boolean {
-  switch (scope) {
-    case 'world':
-    case 'week':
-      return true;
-    case 'country':
-      return playerCountry != null;
-    default: {
-      const neverScope: never = scope;
-      return neverScope;
-    }
+export function readBlockedNames(storage: Storage): string[] {
+  try {
+    const raw = storage.getItem(BOARD_BLOCKS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function writeBlockedNames(storage: Storage, names: string[]): void {
+  try {
+    storage.setItem(BOARD_BLOCKS_KEY, JSON.stringify(names));
+  } catch {
+    /* the in-memory list still hides the name this session */
   }
 }
 
@@ -197,38 +247,42 @@ export function createMockLeaderboard(options: {
   const nickname = options.nickname;
   const country = countryByCode(options.country)?.code ?? null;
   const deviceId = loadDeviceId(storage);
-  const blocks = new Set(readList(storage, BLOCKS_KEY).map((name) => name.toLowerCase()));
+  let blocked = readBlockedNames(storage);
   const reports = new Set(readList(storage, REPORTS_KEY).map((name) => name.toLowerCase()));
   let best = readBest(storage);
 
+  const hidden = (name: string) => blocked.some((item) => item.toLowerCase() === name.toLowerCase());
+
   const persistSets = () => {
+    writeBlockedNames(storage, blocked);
     try {
-      storage.setItem(BLOCKS_KEY, JSON.stringify([...blocks]));
       storage.setItem(REPORTS_KEY, JSON.stringify([...reports]));
     } catch {
       /* the in-memory board still hides the name this session */
     }
   };
 
-  const crowd = (now: number, scope: BoardScope): CrowdRow[] => {
+  const crowd = (now: number, scope: BoardScope, period: BoardPeriod): CrowdRow[] => {
     const rows: CrowdRow[] = [];
     const mine = nickname.toLowerCase();
     for (let index = 0; index < CROWD; index += 1) {
       const rowName = crowdNickname(index);
       const key = rowName.toLowerCase();
-      if (key === mine || blocks.has(key)) continue;
+      if (key === mine || hidden(rowName)) continue;
       const at = crowdAt(index, now);
       const code = crowdCountry(index);
-      if (!inScope(scope, at, now, code, country)) continue;
+      if (!inPeriod(period, at, now)) continue;
+      if (scope === 'country' && (country == null || code !== country)) continue;
       rows.push({ nickname: rowName, score: crowdScore(index), at, country: code });
     }
     return rows;
   };
 
-  const placed = (score: number, scope: BoardScope, now: number): BoardEntry[] => {
+  const placed = (score: number, scope: BoardScope, period: BoardPeriod, now: number): BoardEntry[] => {
     const at = now;
-    const combined: StandingRow[] = crowd(now, scope).map((row) => ({ ...row, mine: false }));
-    if (playerOnBoard(scope, country)) {
+    const combined: StandingRow[] = crowd(now, scope, period).map((row) => ({ ...row, mine: false }));
+    const onBoard = scope === 'world' || (scope === 'country' && country != null);
+    if (onBoard) {
       combined.push({
         nickname,
         score: Math.max(0, Math.floor(score)),
@@ -247,6 +301,14 @@ export function createMockLeaderboard(options: {
     }));
   };
 
+  const pageFor = (period: BoardPeriod, scope: BoardScope, score: number, limit: number, now: number): BoardPage => {
+    if (scope === 'country' && country == null) return { hidden: false, rows: [] };
+    const rows = placed(score, scope, period, now);
+    if (scope === 'country' && rows.length < COUNTRY_BOARD_MIN) return { hidden: true, rows: [] };
+    const cap = Math.max(1, Math.min(50, Math.floor(limit)));
+    return { hidden: false, rows: rows.slice(0, cap) };
+  };
+
   return {
     nickname,
     country,
@@ -255,42 +317,44 @@ export function createMockLeaderboard(options: {
     subscribe() { return () => {}; },
     start() {},
     stop() {},
+    startRun() {},
     rankFor(score, now = Date.now()) {
-      const board = placed(score, 'world', now);
+      const board = placed(score, 'world', 'all', now);
       const me = board.find((row) => row.mine);
       const rounded = Math.max(0, Math.floor(score));
-      const countryRank = country
-        ? placed(score, 'country', now).find((row) => row.mine)?.rank ?? null
-        : null;
+      const countryRows = country ? placed(score, 'country', 'all', now) : [];
+      const countryHidden = country != null && countryRows.length < COUNTRY_BOARD_MIN;
       return {
         rank: me?.rank ?? board.length,
         total: board.length,
         nickname,
         score: rounded,
         country,
-        countryRank,
+        countryRank: countryHidden ? null : countryRows.find((row) => row.mine)?.rank ?? null,
+        countryHidden,
       };
     },
-    around(score, scope, now = Date.now()) {
-      const board = placed(score, scope, now);
-      const index = board.findIndex((row) => row.mine);
+    around(score, scope, period = 'all', now = Date.now()) {
       const rounded = Math.max(0, Math.floor(score));
-      if (index < 0) {
-        return {
-          above: [],
-          me: { rank: 0, nickname, score: rounded, mine: true, country },
-          below: [],
-        };
-      }
-      const me = board[index] ?? { rank: 1, nickname, score: rounded, mine: true, country };
+      const me = { rank: 0, nickname, score: rounded, mine: true, country };
+      if (scope === 'country' && !country) return { above: [], me, below: [] };
+      const page = pageFor(period, scope, score, 50, now);
+      if (page.hidden) return { above: [], me, below: [] };
+      const board = placed(score, scope, period, now);
+      const index = board.findIndex((row) => row.mine);
+      if (index < 0) return { above: [], me, below: [] };
+      const mine = board[index] ?? me;
       return {
         above: board.slice(Math.max(0, index - 3), index),
-        me,
+        me: mine,
         below: board.slice(index + 1, index + 4),
       };
     },
-    top(scope, score, limit, now = Date.now()) {
-      return placed(score, scope, now).slice(0, Math.max(1, limit));
+    top(scope, score, limit, period = 'all', now = Date.now()) {
+      return pageFor(period, scope, score, limit, now).rows;
+    },
+    board(period, scope, score, limit = 10, now = Date.now()) {
+      return pageFor(period, scope, score, limit, now);
     },
     submit(score, at = Date.now(), _run?: RunSubmit) {
       const rounded = Math.floor(score);
@@ -307,17 +371,40 @@ export function createMockLeaderboard(options: {
       return { accepted: true, best: rounded };
     },
     report(name) {
-      const key = name.trim().toLowerCase();
+      const trimmed = name.trim();
+      const key = trimmed.toLowerCase();
       if (!key || key === nickname.toLowerCase()) return;
       reports.add(key);
-      blocks.add(key);
+      if (!hidden(trimmed)) blocked = [...blocked, trimmed];
       persistSets();
     },
     block(name) {
-      const key = name.trim().toLowerCase();
+      const trimmed = name.trim();
+      const key = trimmed.toLowerCase();
       if (!key || key === nickname.toLowerCase()) return;
-      blocks.add(key);
+      if (!hidden(trimmed)) blocked = [...blocked, trimmed];
       persistSets();
+    },
+    unblock(name) {
+      const key = name.trim().toLowerCase();
+      blocked = blocked.filter((item) => item.toLowerCase() !== key);
+      persistSets();
+    },
+    blockedNames() {
+      return [...blocked];
+    },
+    async deleteData() {
+      try {
+        storage.removeItem(BEST_KEY);
+        storage.removeItem(REPORTS_KEY);
+        storage.removeItem(BOARD_BLOCKS_KEY);
+      } catch {
+        /* the next install id is still minted below */
+      }
+      blocked = [];
+      reports.clear();
+      best = null;
+      return true;
     },
   };
 }

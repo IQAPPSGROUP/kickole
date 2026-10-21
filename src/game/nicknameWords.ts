@@ -1,0 +1,56 @@
+/**
+ * Curated nickname halves. Players only get `adjective + noun`.
+ * Every pair is original: no people, clubs, or brands.
+ * `nicknameWords.test.ts` scans every combo against the blocked-word list.
+ */
+
+export const ADJECTIVES = [
+  'Turbo', 'Golden', 'Rocket', 'Shadow', 'Neon', 'Thunder', 'Cosmic', 'Blazing', 'Street', 'Lightning',
+  'Mega', 'Wild', 'Frosty', 'Ninja', 'Laser', 'Supersonic', 'Electric', 'Galactic', 'Silent', 'Iron',
+  'Crimson', 'Mighty', 'Rapid', 'Brave', 'Lucky', 'Sunny', 'Velvet', 'Marble', 'Silver', 'Bronze',
+  'Copper', 'Emerald', 'Sapphire', 'Diamond', 'Platinum', 'Atomic', 'Sonic', 'Hyper', 'Prime',
+  'Royal', 'Noble', 'Swift', 'Flash', 'Inferno', 'Solar', 'Lunar', 'Stellar', 'Astral', 'Polar',
+  'Arctic', 'Jungle', 'Urban', 'Midnight', 'Dawn', 'Dusk', 'Rainbow', 'Retro', 'Funky', 'Groovy',
+  'Rhythm', 'Tempo', 'Echo', 'Chill', 'Icy', 'Fiery', 'Heroic', 'Fearless', 'Daring', 'Bold',
+  'Steady', 'Clever', 'Sneaky', 'Stealth', 'Phantom', 'Ghost', 'Spirit', 'Mystic', 'Magic', 'Wonder',
+  'Epic', 'Iconic', 'Shiny', 'Glossy', 'Metal', 'Steel', 'Titan', 'Giant', 'Tiny', 'Mini',
+  'Jumbo', 'Colossal', 'Massive', 'Bright', 'Radiant', 'Glowing', 'Dazzle', 'Zoom', 'Dash', 'Nitro',
+  'Boost', 'Power', 'Energy', 'Volt', 'Pulse', 'Storm', 'Cyclone', 'Tornado', 'Breeze', 'Cloud',
+  'Nova', 'Meteor', 'Astro', 'Nebula', 'Cosmos', 'Zenith', 'Apex', 'Summit', 'Alpine', 'Canyon',
+  'Desert', 'Oasis', 'Ocean', 'River', 'Frost', 'Glacier', 'Frozen', 'Molten', 'Ember', 'Flame',
+  'Scorch', 'Zephyr', 'Aero', 'Kinetic', 'Quantum', 'Photon', 'Plasma', 'Circuit', 'Arcade', 'Fiesta',
+  'Samba', 'Bravo', 'Vivid', 'Blizzard', 'Prism', 'Quartz', 'Onyx', 'Cobalt', 'Indigo',
+  'Magenta', 'Cyan', 'Coral', 'Blitz', 'Fleet', 'Zippy', 'Snappy', 'Bouncy', 'Lofty', 'Soaring',
+  'Hidden', 'Grand', 'Super', 'Giga', 'Nano', 'Orbital', 'Starlit', 'Moonlit', 'Sunlit', 'Fresh',
+  'Crisp', 'Cool', 'Snowy', 'Stormy', 'Misty', 'Polished', 'Tropical', 'Alley', 'Rooftop', 'Sunrise',
+  'Cyber', 'Carnival', 'Mellow', 'Silky', 'Granite', 'Encore', 'Magnetic', 'Binary', 'Planetary', 'Timeless',
+  'Ancient', 'Vintage', 'Classic', 'Windy', 'Foggy', 'Sandy', 'Rocky', 'Mossy', 'Maple', 'Mint',
+  'Mango', 'Coconut', 'Zesty', 'Tangy', 'Juicy', 'Fluffy', 'Fuzzy', 'Lively', 'Jolly', 'Cheerful',
+] as const;
+
+export const NOUNS = [
+  'Striker', 'Keeper', 'Volley', 'Nutmeg', 'Rabona', 'Panenka', 'Maestro', 'Wizard', 'Panther', 'Falcon',
+  'Cobra', 'Tiger', 'Wolf', 'Dragon', 'Phoenix', 'Rhino', 'Shark', 'Comet', 'Legend', 'Juggler',
+  'Bandit', 'Pirate', 'Samurai', 'Goalie', 'Sweeper', 'Winger', 'Captain', 'Playmaker', 'Finisher', 'Dribbler',
+  'Scorer', 'Header', 'Curler', 'Chipper', 'Spinner', 'Hopper', 'Kicker', 'Jumper', 'Dancer', 'Groover',
+  'Ranger', 'Rider', 'Racer', 'Sprinter', 'Flyer', 'Glider', 'Climber', 'Rover', 'Nomad', 'Voyager',
+  'Scout', 'Knight', 'Guardian', 'Champion', 'Artist', 'Dreamer', 'Builder', 'Lion', 'Leopard', 'Cheetah',
+  'Lynx', 'Ocelot', 'Bobcat', 'Cougar', 'Bear', 'Panda', 'Koala', 'Otter', 'Beaver', 'Fox',
+  'Coyote', 'Hyena', 'Eagle', 'Hawk', 'Owl', 'Raven', 'Parrot', 'Toucan', 'Flamingo', 'Penguin',
+  'Pelican', 'Heron', 'Crane', 'Dove', 'Dolphin', 'Whale', 'Orca', 'Marlin', 'Turtle', 'Gecko',
+  'Iguana', 'Viper', 'Python', 'Mamba', 'Frog', 'Toad', 'Zebra', 'Giraffe', 'Elephant', 'Hippo',
+  'Buffalo', 'Bison', 'Gazelle', 'Impala', 'Kangaroo', 'Wombat', 'Hornet', 'Beetle', 'Mantis',
+  'Octopus', 'Squid', 'Camel', 'Llama', 'Lemur', 'Unicorn', 'Griffin', 'Kraken', 'Yeti',
+  'Scorpion', 'Corner', 'Penalty', 'Touchline', 'Elastico', 'Roulette', 'Bicycle', 'Acrobat', 'Magician', 'Drummer',
+  'Pioneer', 'Paladin', 'Warden', 'Flicker', 'Balancer', 'Poet', 'Skipper', 'Midfielder', 'Defender',
+  'Forward', 'Condor', 'Macaw', 'Ibex', 'Okapi', 'Tapir', 'Bongo', 'Badger', 'Rabbit',
+  'Walrus', 'Narwhal', 'Starling', 'Sparrow', 'Puffin', 'Axolotl', 'Gibbon', 'Meerkat', 'Warthog',
+  'Aardvark', 'Platypus', 'Quokka', 'Dugong', 'Manatee', 'Starfish', 'Jellyfish', 'Angelfish', 'Swordfish',
+  'Piranha', 'Stingray', 'Hammerhead', 'Sailfish', 'Lobster', 'Nautilus', 'Firefly', 'Dragonfly', 'Ladybug', 'Cricket',
+  'Reindeer', 'Sloth', 'Armadillo', 'Porcupine', 'Hedgehog', 'Squirrel', 'Chipmunk', 'Raccoon', 'Wallaby',
+  'Ostrich', 'Kestrel', 'Osprey', 'Buzzard', 'Magpie', 'Jackal', 'Dingo', 'Grizzly',
+  'Newt', 'Salamander', 'Chameleon', 'Tarantula', 'Pegasus', 'Sphinx', 'Outlaw', 'Prodigy',
+] as const;
+
+export type NicknameAdjective = (typeof ADJECTIVES)[number];
+export type NicknameNoun = (typeof NOUNS)[number];

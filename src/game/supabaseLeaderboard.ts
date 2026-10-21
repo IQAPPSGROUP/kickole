@@ -1,35 +1,48 @@
 import { countryByCode } from './countries';
 import type {
   BoardEntry,
+  BoardPage,
+  BoardPeriod,
   BoardScope,
   LeaderboardService,
   RankSnapshot,
   RunSubmit,
 } from './leaderboard';
+import { readBlockedNames, writeBlockedNames } from './leaderboard';
+import { composeNickname, parseNickname } from './nickname';
 import { loadDeviceId } from './nicknameStore';
 import { liveRpc, type LeaderboardRpc } from './supabaseClient';
 
 const REFRESH_MS = 10_000;
-const BLOCKS_KEY = 'kicky.board.blocks.v1';
 const OUTBOX_KEY = 'kicky.board.outbox.v1';
 const MODERATION_KEY = 'kicky.board.pending-moderation.v1';
 
 export type RegisterOutcome =
-  | { ok: true; offline?: boolean }
+  | { ok: true; nickname: string; offline?: boolean }
   | { ok: false; reason: string };
+
+export interface PeekOutcome {
+  ok: boolean;
+  nickname: string;
+  taken: boolean;
+  offline?: boolean;
+  reason?: string;
+}
 
 interface RankCache {
   rank: number | null;
   total: number;
   score: number;
   countryRank: number | null;
+  countryHidden: boolean;
   neighbours: BoardEntry[];
   countryNeighbours: BoardEntry[];
 }
 
 interface StoredBoard {
   around: BoardEntry[];
-  top: BoardEntry[];
+  page: BoardPage;
+  at: number;
 }
 
 interface OutboxScore {
@@ -38,34 +51,17 @@ interface OutboxScore {
   combo: number;
   durationMs: number;
   holdUntil: number;
+  token: string;
 }
 
 interface PendingModeration {
   reports: string[];
   blocks: string[];
+  unblocks: string[];
 }
 
-type ServerScope = 'world' | 'country';
-type ServerPeriod = 'all' | 'week';
-
-function queryFor(scope: BoardScope): { scope: ServerScope; period: ServerPeriod } {
-  switch (scope) {
-    case 'world':
-      return { scope: 'world', period: 'all' };
-    case 'week':
-      return { scope: 'world', period: 'week' };
-    case 'country':
-      return { scope: 'country', period: 'all' };
-    default: {
-      const neverScope: never = scope;
-      return neverScope;
-    }
-  }
-}
-
-function boardKey(scope: BoardScope): string {
-  const query = queryFor(scope);
-  return `${query.scope}:${query.period}`;
+function sliceKey(scope: BoardScope, period: BoardPeriod): string {
+  return `${scope}:${period}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -83,6 +79,12 @@ function numberOrNull(value: unknown): number | null {
 function countryCode(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   return countryByCode(value.trim())?.code ?? null;
+}
+
+function readBoardPage(data: unknown): BoardPage {
+  const body = asRecord(data);
+  if (body.hidden === true) return { hidden: true, rows: [] };
+  return { hidden: false, rows: Array.isArray(body.rows) ? readRows(body.rows) : [] };
 }
 
 function readRows(data: unknown): BoardEntry[] {
@@ -120,18 +122,18 @@ async function callRpc(
 
 export function serverNicknameMessage(reason: string): string {
   switch (reason) {
-    case 'length':
-      return 'Use 3 to 16 characters.';
-    case 'charset':
-      return 'Letters, numbers and underscore only.';
-    case 'looks_like_phone':
-      return 'That looks like a phone number.';
-    case 'blocked_word':
-      return 'Pick a different nickname.';
+    case 'not_in_list':
+      return 'Pick two words from the lists.';
+    case 'rename_limit':
+      return 'You can change your nickname once every 7 days.';
     case 'taken':
       return 'That nickname is taken.';
     case 'invalid_country':
       return 'Pick a country from the list.';
+    case 'banned':
+      return 'This device cannot join the board.';
+    case 'rate_limited':
+      return 'Try again in a little while.';
     default:
       return 'Pick a different nickname.';
   }
@@ -139,57 +141,86 @@ export function serverNicknameMessage(reason: string): string {
 
 function permanentNicknameReason(reason: string): boolean {
   switch (reason) {
-    case 'length':
-    case 'charset':
-    case 'looks_like_phone':
-    case 'blocked_word':
-    case 'taken':
+    case 'not_in_list':
     case 'invalid_country':
+    case 'banned':
+    case 'taken':
       return true;
+    case 'rename_limit':
+    case 'rate_limited':
+      return false;
     default:
       return false;
   }
 }
 
-/** Lock in a nickname. A network failure still counts as saved locally (`offline`). */
+/** Lock in two list words. A network failure still counts as saved locally (`offline`). */
 export async function registerPlayer(input: {
   deviceId: string;
-  nickname: string;
+  adjective: string;
+  noun: string;
   country: string | null;
   rpc?: LeaderboardRpc;
 }): Promise<RegisterOutcome> {
   const rpc = input.rpc ?? liveRpc();
-  const checked = await callRpc(rpc, 'check_nickname', {
-    nickname: input.nickname,
-    device_id: input.deviceId,
-  });
-  if (checked.error) return { ok: true, offline: true };
-  const checkBody = asRecord(checked.data);
-  if (checkBody.ok !== true) {
-    const reason = typeof checkBody.reason === 'string' ? checkBody.reason : 'blocked_word';
-    return { ok: false, reason };
-  }
+  const local = composeNickname(input.adjective, input.noun) ?? '';
   const saved = await callRpc(rpc, 'register_or_update_player', {
     device_id: input.deviceId,
-    nickname: input.nickname,
+    adjective: input.adjective,
+    noun: input.noun,
     country: input.country,
   });
-  if (saved.error) return { ok: true, offline: true };
+  if (saved.error) return { ok: true, offline: true, nickname: local };
   const body = asRecord(saved.data);
-  if (body.ok === true) return { ok: true };
-  const reason = typeof body.reason === 'string' ? body.reason : 'blocked_word';
+  if (body.ok === true) {
+    const nickname = typeof body.nickname === 'string' ? body.nickname : local;
+    return { ok: true, nickname };
+  }
+  const reason = typeof body.reason === 'string' ? body.reason : 'not_in_list';
   return { ok: false, reason };
 }
 
-function readList(storage: Storage, key: string): string[] {
-  try {
-    const raw = storage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
-  } catch {
-    return [];
+/** Ask which tag this pair would get, including a Roman numeral when the pair is taken. */
+export async function peekNickname(input: {
+  deviceId: string;
+  adjective: string;
+  noun: string;
+  rpc?: LeaderboardRpc;
+}): Promise<PeekOutcome> {
+  const rpc = input.rpc ?? liveRpc();
+  const local = composeNickname(input.adjective, input.noun) ?? '';
+  const peeked = await callRpc(rpc, 'peek_nickname', {
+    device_id: input.deviceId,
+    adjective: input.adjective,
+    noun: input.noun,
+  });
+  if (peeked.error) return { ok: true, nickname: local, taken: false, offline: true };
+  const body = asRecord(peeked.data);
+  if (body.ok !== true) {
+    return {
+      ok: false,
+      nickname: local,
+      taken: false,
+      reason: typeof body.reason === 'string' ? body.reason : 'not_in_list',
+    };
   }
+  return {
+    ok: true,
+    nickname: typeof body.nickname === 'string' ? body.nickname : local,
+    taken: body.taken === true,
+  };
+}
+
+export async function deletePlayerAccount(input: {
+  deviceId: string;
+  rpc?: LeaderboardRpc;
+}): Promise<{ ok: true } | { ok: false; offline: true }> {
+  const rpc = input.rpc ?? liveRpc();
+  const removed = await callRpc(rpc, 'delete_player', { device_id: input.deviceId });
+  if (removed.error) return { ok: false, offline: true };
+  const body = asRecord(removed.data);
+  if (body.ok === true) return { ok: true };
+  return { ok: false, offline: true };
 }
 
 function readOutbox(storage: Storage): OutboxScore | null {
@@ -198,13 +229,14 @@ function readOutbox(storage: Storage): OutboxScore | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<OutboxScore>;
     if (!parsed || typeof parsed.deviceId !== 'string' || typeof parsed.score !== 'number') return null;
-    if (typeof parsed.combo !== 'number' || typeof parsed.durationMs !== 'number') return null;
+    if (typeof parsed.combo !== 'number' || typeof parsed.durationMs !== 'number' || typeof parsed.token !== 'string') return null;
     return {
       deviceId: parsed.deviceId,
       score: parsed.score,
       combo: parsed.combo,
       durationMs: parsed.durationMs,
       holdUntil: typeof parsed.holdUntil === 'number' ? parsed.holdUntil : 0,
+      token: parsed.token,
     };
   } catch {
     return null;
@@ -214,13 +246,14 @@ function readOutbox(storage: Storage): OutboxScore | null {
 function readModeration(storage: Storage): PendingModeration {
   try {
     const raw = storage.getItem(MODERATION_KEY);
-    if (!raw) return { reports: [], blocks: [] };
+    if (!raw) return { reports: [], blocks: [], unblocks: [] };
     const parsed = asRecord(JSON.parse(raw) as unknown);
     const reports = Array.isArray(parsed.reports) ? parsed.reports.filter((item): item is string => typeof item === 'string') : [];
     const blocks = Array.isArray(parsed.blocks) ? parsed.blocks.filter((item): item is string => typeof item === 'string') : [];
-    return { reports, blocks };
+    const unblocks = Array.isArray(parsed.unblocks) ? parsed.unblocks.filter((item): item is string => typeof item === 'string') : [];
+    return { reports, blocks, unblocks };
   } catch {
-    return { reports: [], blocks: [] };
+    return { reports: [], blocks: [], unblocks: [] };
   }
 }
 
@@ -260,12 +293,14 @@ export function createSupabaseLeaderboard(options: {
   const nickname = options.nickname;
   const country = countryByCode(options.country)?.code ?? null;
   const deviceId = options.deviceId ?? loadDeviceId(storage);
-  const hidden = new Set(readList(storage, BLOCKS_KEY).map((name) => name.toLowerCase()));
+  let blocked = readBlockedNames(storage);
   const pending = readModeration(storage);
   const pendingReports = new Set(pending.reports);
   const pendingBlocks = new Set(pending.blocks);
+  const pendingUnblocks = new Set(pending.unblocks);
   let outbox = readOutbox(storage);
   if (outbox && outbox.deviceId !== deviceId) outbox = null;
+  let runToken: string | null = null;
 
   let revision = 0;
   let generation = 0;
@@ -275,7 +310,6 @@ export function createSupabaseLeaderboard(options: {
   let offline = false;
   let syncedBest = 0;
   let widgetAt = 0;
-  let boardAt = 0;
   let lastLive = 0;
   let lastSubmitKey = '';
   let lastSubmitAt = 0;
@@ -292,7 +326,7 @@ export function createSupabaseLeaderboard(options: {
   };
 
   const persistHidden = () => {
-    try { storage.setItem(BLOCKS_KEY, JSON.stringify([...hidden])); } catch { /* session memory still hides the name */ }
+    writeBlockedNames(storage, blocked);
   };
 
   const persistOutbox = () => {
@@ -304,7 +338,11 @@ export function createSupabaseLeaderboard(options: {
 
   const persistModeration = () => {
     try {
-      const payload: PendingModeration = { reports: [...pendingReports], blocks: [...pendingBlocks] };
+      const payload: PendingModeration = {
+        reports: [...pendingReports],
+        blocks: [...pendingBlocks],
+        unblocks: [...pendingUnblocks],
+      };
       storage.setItem(MODERATION_KEY, JSON.stringify(payload));
     } catch { /* retry stays in memory */ }
   };
@@ -321,15 +359,23 @@ export function createSupabaseLeaderboard(options: {
     }, Math.max(0, wait));
   };
 
-  const rememberOutbox = (score: number, combo: number, durationMs: number, holdUntil: number) => {
+  const rememberOutbox = (score: number, combo: number, durationMs: number, holdUntil: number, token: string) => {
     if (outbox && outbox.deviceId === deviceId && score < outbox.score) return;
-    outbox = { deviceId, score, combo, durationMs, holdUntil };
+    outbox = { deviceId, score, combo, durationMs, holdUntil, token };
     persistOutbox();
   };
 
   const ensureRegistered = async (token: number): Promise<boolean> => {
     if (registered || registrationBlocked) return registered;
-    const result = await registerPlayer({ deviceId, nickname, country, rpc });
+    const parsed = parseNickname(nickname);
+    if (!parsed) return false;
+    const result = await registerPlayer({
+      deviceId,
+      adjective: parsed.adjective,
+      noun: parsed.noun,
+      country,
+      rpc,
+    });
     if (token !== generation || stopped) return false;
     if (result.ok) {
       registered = !result.offline;
@@ -347,10 +393,10 @@ export function createSupabaseLeaderboard(options: {
   const pullWidget = async (token: number, force: boolean): Promise<void> => {
     if (!force && widgetAt && now() - widgetAt < REFRESH_MS) return;
     widgetAt = now();
-    const rankCall = callRpc(rpc, 'get_rank', { device_id: deviceId, scope: 'world', period: 'all' });
-    const aroundCall = callRpc(rpc, 'get_around', { device_id: deviceId, scope: 'world', period: 'all', n: 3 });
+    const rankCall = callRpc(rpc, 'get_rank', { device_id: deviceId, period: 'all' });
+    const aroundCall = callRpc(rpc, 'get_around', { device_id: deviceId, period: 'all', scope: 'world', n: 3 });
     const countryCall = country
-      ? callRpc(rpc, 'get_around', { device_id: deviceId, scope: 'country', period: 'all', n: 3 })
+      ? callRpc(rpc, 'get_around', { device_id: deviceId, period: 'all', scope: 'country', n: 3 })
       : null;
     const [rankRes, aroundRes, countryRes] = await Promise.all([rankCall, aroundCall, countryCall]);
     if (token !== generation || stopped) return;
@@ -367,67 +413,68 @@ export function createSupabaseLeaderboard(options: {
       ? (rankCache?.countryNeighbours ?? [])
       : readRows(countryRes.data);
     const score = numberOrNull(row.score) ?? 0;
+    const countryHidden = row.country_hidden === true;
     rankCache = {
       rank: hasRow ? numberOrNull(row.rank) : null,
       total: numberOrNull(row.total) ?? rankCache?.total ?? 0,
       score,
-      countryRank: country ? numberOrNull(row.country_rank) : null,
+      countryRank: country && !countryHidden ? numberOrNull(row.country_rank) : null,
+      countryHidden,
       neighbours,
-      countryNeighbours,
+      countryNeighbours: countryHidden ? [] : countryNeighbours,
     };
     syncedBest = Math.max(syncedBest, score);
     const world = boards.get('world:all');
-    boards.set('world:all', { around: neighbours, top: world?.top ?? [] });
+    boards.set('world:all', {
+      around: neighbours,
+      page: world?.page ?? { hidden: false, rows: [] },
+      at: world?.at ?? 0,
+    });
     if (country) {
       const countryBoard = boards.get('country:all');
-      boards.set('country:all', { around: countryNeighbours, top: countryBoard?.top ?? [] });
+      boards.set('country:all', {
+        around: countryNeighbours,
+        page: countryHidden
+          ? { hidden: true, rows: [] }
+          : (countryBoard?.page ?? { hidden: false, rows: [] }),
+        at: countryBoard?.at ?? 0,
+      });
     }
   };
 
-  const pullScope = async (scope: ServerScope, period: ServerPeriod, token: number): Promise<boolean> => {
-    const [aroundRes, topRes] = await Promise.all([
-      callRpc(rpc, 'get_around', { device_id: deviceId, scope, period, n: 3 }),
-      callRpc(rpc, 'get_top', {
-        scope,
-        country_code: scope === 'country' ? country : null,
+  const pullSlice = async (scope: BoardScope, period: BoardPeriod, token: number): Promise<boolean> => {
+    const [aroundRes, boardRes] = await Promise.all([
+      callRpc(rpc, 'get_around', { device_id: deviceId, period, scope, n: 3 }),
+      callRpc(rpc, 'get_board', {
         period,
+        scope,
+        country: scope === 'country' ? country : null,
         lim: 10,
         device_id: deviceId,
       }),
     ]);
     if (token !== generation || stopped) return false;
-    if (aroundRes.error && topRes.error) return false;
-    const key = `${scope}:${period}`;
+    if (aroundRes.error && boardRes.error) return false;
+    const key = sliceKey(scope, period);
     const previous = boards.get(key);
+    const page = boardRes.error ? (previous?.page ?? { hidden: false, rows: [] }) : readBoardPage(boardRes.data);
     boards.set(key, {
-      around: aroundRes.error ? (previous?.around ?? []) : readRows(aroundRes.data),
-      top: topRes.error ? (previous?.top ?? []) : readRows(topRes.data),
+      around: aroundRes.error || page.hidden ? (page.hidden ? [] : (previous?.around ?? [])) : readRows(aroundRes.data),
+      page,
+      at: now(),
     });
-    if (scope === 'world' && period === 'all' && !aroundRes.error && rankCache) {
+    if (scope === 'world' && period === 'all' && !aroundRes.error && !page.hidden && rankCache) {
       rankCache = { ...rankCache, neighbours: readRows(aroundRes.data) };
     }
     if (scope === 'country' && period === 'all' && !aroundRes.error && rankCache) {
-      rankCache = { ...rankCache, countryNeighbours: readRows(aroundRes.data) };
+      rankCache = {
+        ...rankCache,
+        countryHidden: page.hidden,
+        countryNeighbours: page.hidden ? [] : readRows(aroundRes.data),
+        countryRank: page.hidden ? null : rankCache.countryRank,
+      };
     }
     return true;
-  };
-
-  const pullBoard = async (token: number, force: boolean): Promise<void> => {
-    if (!force && boardAt && now() - boardAt < REFRESH_MS) return;
-    boardAt = now();
-    const jobs = [
-      pullScope('world', 'all', token),
-      pullScope('world', 'week', token),
-    ];
-    if (country) jobs.push(pullScope('country', 'all', token));
-    const results = await Promise.all(jobs);
-    if (token !== generation || stopped) return;
-    if (results.every((ok) => !ok)) {
-      offline = true;
-      scheduleRetry();
-      return;
-    }
-    offline = false;
   };
 
   const flushOutbox = async (token: number): Promise<void> => {
@@ -438,6 +485,7 @@ export function createSupabaseLeaderboard(options: {
       score: pendingScore.score,
       combo: pendingScore.combo,
       run_duration_ms: pendingScore.durationMs,
+      run_token: pendingScore.token,
     });
     if (token !== generation || stopped) return;
     if (sent.error) {
@@ -458,7 +506,7 @@ export function createSupabaseLeaderboard(options: {
       return;
     }
     const reason = typeof body.reason === 'string' ? body.reason : '';
-    if (reason === 'implausible' || reason === 'invalid') {
+    if (reason === 'implausible' || reason === 'invalid' || reason === 'invalid_token' || reason === 'banned') {
       if (outbox && outbox.score === pendingScore.score) outbox = null;
       persistOutbox();
       return;
@@ -505,7 +553,22 @@ export function createSupabaseLeaderboard(options: {
         await ensureRegistered(token);
       }
     }
+    for (const name of [...pendingUnblocks]) {
+      const result = await callRpc(rpc, 'unblock_player', {
+        device_id: deviceId,
+        blocked_nickname: name,
+      });
+      if (token !== generation || stopped) return;
+      const body = asRecord(result.data);
+      if (!result.error && body.ok === true) pendingUnblocks.delete(name);
+    }
     persistModeration();
+  };
+
+  const refreshOpenBoards = async (token: number) => {
+    await pullWidget(token, true);
+    await pullSlice('world', 'all', token);
+    if (country) await pullSlice('country', 'all', token);
   };
 
   const requestCycle = () => {
@@ -542,14 +605,20 @@ export function createSupabaseLeaderboard(options: {
     });
   };
 
-  const requestBoard = (force: boolean) => {
+  const requestSlice = (scope: BoardScope, period: BoardPeriod, force: boolean) => {
     if (stopped) return;
-    if (!force && boardAt && now() - boardAt < REFRESH_MS) return;
+    const key = sliceKey(scope, period);
+    const cached = boards.get(key);
+    if (!force && cached && cached.at > 0 && now() - cached.at < REFRESH_MS) return;
     const token = generation;
     enqueue(async () => {
       if (token !== generation || stopped) return;
-      await pullBoard(token, force);
+      const ok = await pullSlice(scope, period, token);
       if (token !== generation || stopped) return;
+      if (!ok) {
+        offline = true;
+        scheduleRetry();
+      }
       publish();
     });
   };
@@ -561,7 +630,10 @@ export function createSupabaseLeaderboard(options: {
     score,
     country,
     countryRank: null,
+    countryHidden: false,
   });
+
+  const isHidden = (name: string) => blocked.some((item) => item.toLowerCase() === name.toLowerCase());
 
   const service: LeaderboardService = {
     nickname,
@@ -583,6 +655,16 @@ export function createSupabaseLeaderboard(options: {
       if (timer) clearTimeout(timer);
       timer = null;
     },
+    startRun() {
+      const token = generation;
+      enqueue(async () => {
+        if (token !== generation || stopped) return;
+        const res = await callRpc(rpc, 'start_run', { device_id: deviceId });
+        if (token !== generation || stopped) return;
+        const body = asRecord(res.data);
+        runToken = !res.error && body.ok === true && typeof body.token === 'string' ? body.token : null;
+      });
+    },
     rankFor(score) {
       const live = Math.max(0, Math.floor(score));
       lastLive = live;
@@ -594,7 +676,8 @@ export function createSupabaseLeaderboard(options: {
         nickname,
         score: live,
         country,
-        countryRank: country
+        countryHidden: rankCache.countryHidden,
+        countryRank: country && !rankCache.countryHidden
           ? climbed(
             rankCache.countryRank,
             rankCache.countryNeighbours.find((row) => row.mine)?.score ?? rankCache.score,
@@ -604,16 +687,16 @@ export function createSupabaseLeaderboard(options: {
           : null,
       };
     },
-    around(score, scope) {
+    around(score, scope, period = 'all') {
       const rounded = Math.max(0, Math.floor(score));
       const me = { rank: 0, nickname, score: rounded, mine: true, country };
       if (scope === 'country' && !country) return { above: [], me, below: [] };
-      requestBoard(false);
-      const cached = boards.get(boardKey(scope));
-      if (!cached || cached.around.length === 0) return { above: [], me, below: [] };
-      const rows = cached.around.filter((row) => row.mine || !hidden.has(row.nickname.toLowerCase()));
+      requestSlice(scope, period, false);
+      const cached = boards.get(sliceKey(scope, period));
+      if (!cached || cached.page.hidden || cached.around.length === 0) return { above: [], me, below: [] };
+      const rows = cached.around.filter((row) => row.mine || !isHidden(row.nickname));
       const serverMe = rows.find((row) => row.mine);
-      const baseRank = serverMe?.rank ?? (scope === 'world' ? rankCache?.rank ?? null : null);
+      const baseRank = serverMe?.rank ?? (scope === 'world' && period === 'all' ? rankCache?.rank ?? null : null);
       const baseScore = serverMe?.score ?? 0;
       const myRank = climbed(baseRank, baseScore, rounded, rows) ?? 0;
       const others = rows.filter((row) => !row.mine);
@@ -623,15 +706,20 @@ export function createSupabaseLeaderboard(options: {
         below: others.filter((row) => row.rank >= myRank).sort((a, b) => a.rank - b.rank).slice(0, 3),
       };
     },
-    top(scope, _score, limit) {
-      if (scope === 'country' && !country) return [];
-      requestBoard(false);
-      const cached = boards.get(boardKey(scope));
-      if (!cached) return [];
+    top(scope, score, limit, period = 'all') {
+      return this.board(period, scope, score, limit).rows;
+    },
+    board(period, scope, _score, limit = 10) {
+      if (scope === 'country' && !country) return { hidden: false, rows: [] };
+      requestSlice(scope, period, false);
+      const cached = boards.get(sliceKey(scope, period));
+      if (!cached) return { hidden: false, rows: [] };
+      if (cached.page.hidden) return { hidden: true, rows: [] };
       const cap = Math.max(1, Math.min(50, Math.floor(limit)));
-      return cached.top
-        .filter((row) => row.mine || !hidden.has(row.nickname.toLowerCase()))
-        .slice(0, cap);
+      return {
+        hidden: false,
+        rows: cached.page.rows.filter((row) => row.mine || !isHidden(row.nickname)).slice(0, cap),
+      };
     },
     submit(score, at = now(), run?: RunSubmit) {
       const rounded = Math.floor(score);
@@ -647,15 +735,14 @@ export function createSupabaseLeaderboard(options: {
       }
       lastSubmitKey = key;
       lastSubmitAt = at;
-      rememberOutbox(rounded, combo, durationMs, 0);
       const token = generation;
       enqueue(async () => {
+        if (!runToken) return;
+        rememberOutbox(rounded, combo, durationMs, 0, runToken);
         await flushOutbox(token);
         if (token !== generation || stopped) return;
         widgetAt = 0;
-        boardAt = 0;
-        await pullWidget(token, true);
-        await pullBoard(token, true);
+        await refreshOpenBoards(token);
         if (token !== generation || stopped) return;
         publish();
       });
@@ -666,7 +753,7 @@ export function createSupabaseLeaderboard(options: {
       const trimmed = name.trim();
       const key = trimmed.toLowerCase();
       if (!key || key === nickname.toLowerCase()) return;
-      hidden.add(key);
+      if (!isHidden(trimmed)) blocked = [...blocked, trimmed];
       pendingReports.add(trimmed);
       persistHidden();
       persistModeration();
@@ -676,9 +763,7 @@ export function createSupabaseLeaderboard(options: {
         await flushModeration(token);
         if (token !== generation || stopped) return;
         widgetAt = 0;
-        boardAt = 0;
-        await pullWidget(token, true);
-        await pullBoard(token, true);
+        await refreshOpenBoards(token);
         if (token === generation && !stopped) publish();
       });
     },
@@ -686,7 +771,7 @@ export function createSupabaseLeaderboard(options: {
       const trimmed = name.trim();
       const key = trimmed.toLowerCase();
       if (!key || key === nickname.toLowerCase()) return;
-      hidden.add(key);
+      if (!isHidden(trimmed)) blocked = [...blocked, trimmed];
       pendingBlocks.add(trimmed);
       persistHidden();
       persistModeration();
@@ -696,11 +781,32 @@ export function createSupabaseLeaderboard(options: {
         await flushModeration(token);
         if (token !== generation || stopped) return;
         widgetAt = 0;
-        boardAt = 0;
-        await pullWidget(token, true);
-        await pullBoard(token, true);
+        await refreshOpenBoards(token);
         if (token === generation && !stopped) publish();
       });
+    },
+    unblock(name) {
+      const trimmed = name.trim();
+      const key = trimmed.toLowerCase();
+      if (!key) return;
+      blocked = blocked.filter((item) => item.toLowerCase() !== key);
+      pendingBlocks.delete(trimmed);
+      pendingUnblocks.add(trimmed);
+      persistHidden();
+      persistModeration();
+      publish();
+      const token = generation;
+      enqueue(async () => {
+        await flushModeration(token);
+        if (token === generation && !stopped) publish();
+      });
+    },
+    blockedNames() {
+      return [...blocked];
+    },
+    async deleteData() {
+      const removed = await deletePlayerAccount({ deviceId, rpc });
+      return removed.ok;
     },
   };
 

@@ -1000,14 +1000,12 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   margin-top: 16px;
   right: max(4px, var(--sat-r));
   z-index: 6;
-  width: 116px;
+  width: 148px;
   padding: 3px 6px 2px;
   border-radius: 3px;
-  background: rgba(8, 12, 22, .5);
-  border: 1px solid rgba(255, 225, 74, .78);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, .45);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: #0e1628;
+  border: 1px solid #2c3b59;
+  box-shadow: none;
   text-align: left;
   pointer-events: none;
   font-family: "Avenir Next Condensed", "Arial Narrow", "Nimbus Sans Narrow", "Helvetica Neue", Arial, sans-serif;
@@ -1025,13 +1023,14 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .world-rank-line {
   display: block;
-  color: #ffe14a;
+  color: #ff4f9a;
   font-size: 18px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
   text-shadow: 0 1px 0 #140814;
 }
+.world-rank-line.is-first { color: #ffe14a; }
 .world-rank-country {
   display: block;
   margin-top: 0;
@@ -1054,11 +1053,14 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .world-rank-name {
   margin-top: 0;
+  max-width: 140px;
+  overflow: hidden;
   color: #fffdf8;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .02em;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 @keyframes rank-climb {
   from { transform: translateY(6px); opacity: 0; }
@@ -1068,7 +1070,109 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .over-card .final { font-size: 56px; }
 .over-card .stats b { font-size: 20px; }
 .board-tabs { width: 100%; }
-.board-tabs button { min-height: 36px; padding: 6px 4px; font-size: 10px; letter-spacing: .2px; }
+.board-tabs button { min-height: 44px; padding: 6px 4px; font-size: 12px; letter-spacing: .2px; }
+.period-scroller {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.period-scroller button {
+  flex: none;
+  min-width: 72px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fffdf8;
+  background: #101827;
+  border: 2px solid #2c3b59;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.period-scroller button.on { border-color: #ff4f9a; background: #241018; color: #fffdf8; }
+.board-more {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fffdf8;
+  background: #101827;
+  border: 2px solid #2c3b59;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.board-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 14px;
+  background: #101827;
+  border: 1px solid #2c3b59;
+  text-align: left;
+}
+.board-sheet p { margin: 0; color: #fffdf8; font-weight: 800; }
+.board-sheet button {
+  min-height: 44px;
+  min-width: 44px;
+  font: inherit;
+  font-weight: 800;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #24180c;
+  background: #f7e9c5;
+}
+.sheet-report { background: #ffd0e4; color: #3b1024; }
+.sheet-block { background: #f7e9c5; color: #24180c; }
+.nick-wheels { display: flex; gap: 8px; }
+.nick-wheel-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nick-wheel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 168px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 2px solid #ffe14a;
+  border-radius: 14px;
+  background: rgba(14, 22, 40, .72);
+}
+.nick-wheel button {
+  min-height: 44px;
+  font: inherit;
+  font-weight: 800;
+  color: #fffdf8;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.nick-wheel button.on { background: rgba(255, 79, 154, .28); border-color: #ff4f9a; }
+.nick-shuffle { min-height: 52px; }
+.nick-preview { display: flex; justify-content: center; min-height: 48px; }
+.unblock-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.unblock-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.unblock-list button {
+  min-width: 44px;
+  min-height: 44px;
+  font: inherit;
+  font-weight: 800;
+  color: #24180c;
+  background: #f7e9c5;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.data-panel p { text-align: left; }
 .world-board .country-flag { font-size: 14px; }
 .world-board { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .world-board .board li { padding: 4px 8px; font-size: 13px; }

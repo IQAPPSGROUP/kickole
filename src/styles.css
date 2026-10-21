@@ -648,6 +648,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .credit { color: #f7f5ed; opacity: .75; font-size: 9px; }
 .score-label { display: block; margin: 0 0 1px; font-size: 20px; line-height: .95; }
 .hud-top {
+  position: relative;
   width: max-content;
   max-width: 158px;
   margin: 12px auto 0;
@@ -664,19 +665,22 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   z-index: -1;
   inset: -2px -4px 2px -3px;
   border-radius: 3px 14px 9px 5px;
-  background: rgba(247, 243, 234, .9);
-  box-shadow: 2px 3px 0 rgba(20, 8, 20, .35);
+  /* Dark wash at ~30% so the brick colour stays visible. The blur keeps the yellow number from buzzing. */
+  background: rgba(16, 10, 14, .3);
+  box-shadow: none;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
 .hud-top::after {
   content: '';
   position: absolute;
   left: 22px;
-  bottom: -6px;
-  width: 6px;
-  height: 12px;
-  border-radius: 0 0 5px 5px;
-  background: #FF4F9A;
-  box-shadow: 18px -1px 0 -1px #FFD93D, 36px 3px 0 -2px #D21B72;
+  bottom: -4px;
+  width: 4px;
+  height: 8px;
+  border-radius: 0 0 4px 4px;
+  background: rgba(255, 79, 154, .72);
+  box-shadow: 14px -1px 0 -1px rgba(255, 217, 61, .7), 26px 2px 0 -2px rgba(210, 27, 114, .65);
   pointer-events: none;
 }
 .score { font-size: clamp(68px, 20vw, 80px); }
@@ -691,10 +695,10 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .hud-top .prompt-ink .prompt-ch {
   color: #140814;
-  -webkit-text-stroke: 0.16em #140814;
+  -webkit-text-stroke: 0.11em #140814;
 }
-.score .prompt-ink { transform: translate(0.04em, 0.06em); }
-.score .prompt-ink .prompt-ch { -webkit-text-stroke: 0.2em #140814; }
+.score .prompt-ink { transform: translate(0.03em, 0.04em); }
+.score .prompt-ink .prompt-ch { -webkit-text-stroke: 0.14em #140814; }
 .hud-top .hud-sub { flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 2px; letter-spacing: 0; }
 .score-sub { font-size: 18px; line-height: 1.05; }
 .hud-sub { font-size: 10px; letter-spacing: 1px; }
@@ -945,7 +949,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   width: min(26vw, 100px);
   padding: 4px 7px 5px;
   border-radius: 3px;
-  background: rgba(8, 12, 22, .34);
+  background: rgba(8, 12, 22, .5);
   border: 1px solid rgba(255, 225, 74, .78);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .45);
   backdrop-filter: blur(3px);

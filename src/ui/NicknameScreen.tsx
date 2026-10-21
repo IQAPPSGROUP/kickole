@@ -353,6 +353,7 @@ function CountryPicker({
       {hinted && (
         <button type="button" className="country-suggest" onClick={() => onChange(hinted.code)}>
           Suggested: <span className="country-flag" aria-hidden="true">{countryFlag(hinted.code)}</span>
+          {' '}
           {hinted.name}
         </button>
       )}

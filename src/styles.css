@@ -181,7 +181,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .prompt-banner {
   position: absolute;
-  left: max(12px, var(--sat-l));
+  left: max(28px, var(--sat-l));
   bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 6px);
   z-index: 7;
   width: min(30vw, 118px);

@@ -15,8 +15,8 @@ export const INTRO_BARS = 2;
 export const LOOP_BARS = 16;
 
 /** Steady-state level after the limiter. SFX bypass this bus. */
-export const MUSIC_PLAY_LEVEL = 0.17;
-export const MUSIC_MENU_LEVEL = 0.13;
+export const MUSIC_PLAY_LEVEL = 0.28;
+export const MUSIC_MENU_LEVEL = 0.22;
 
 const PLAY_SWING = 0.62;
 const MENU_SWING = 0.55;

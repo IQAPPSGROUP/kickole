@@ -899,3 +899,124 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   .shop-action { min-width: 78px; font-size: 9px; }
   .home-actions { flex-direction: column; }
 }
+
+/* World board. The rank tag sits opposite the trick prompt, in the right margin. */
+.nick-card { overflow: visible; }
+.nick-title {
+  margin: 0;
+  font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #ffe14a;
+  -webkit-text-stroke: 1px #140814;
+  transform: rotate(-5deg);
+}
+.nick-title::after {
+  content: '';
+  display: block;
+  width: 8px;
+  height: 14px;
+  margin: -4px auto 0;
+  border-radius: 0 0 6px 6px;
+  background: #ff4f9a;
+}
+.nick-form { display: flex; flex-direction: column; gap: 8px; }
+.nick-input {
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-align: center;
+  color: #fffdf8;
+  background: rgba(247, 245, 237, .08);
+  border: 2px solid #ffe14a;
+  border-radius: 14px;
+  min-height: 52px;
+  padding: 12px;
+}
+.nick-error { margin: 0; color: #ff4f9a; font-size: 13px; font-weight: 800; }
+.nick-form .btn { width: 100%; }
+.world-rank {
+  --prompt-lift: 13vh;
+  position: absolute;
+  right: max(8px, var(--sat-r));
+  bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 6px + var(--prompt-lift));
+  z-index: 6;
+  width: min(32vw, 124px);
+  padding: 6px 8px 7px;
+  border-radius: 3px;
+  background: rgba(8, 12, 22, .34);
+  border: 1px solid rgba(255, 225, 74, .78);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  text-align: left;
+  pointer-events: none;
+  font-family: "Avenir Next Condensed", "Arial Narrow", "Nimbus Sans Narrow", "Helvetica Neue", Arial, sans-serif;
+  font-stretch: condensed;
+  letter-spacing: .04em;
+}
+.world-rank p { margin: 0; }
+.world-rank-kicker {
+  color: #fffdf8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+.world-rank-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #ffe14a;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 0 #140814;
+}
+.world-rank-delta {
+  color: #ff4f9a;
+  font-size: 12px;
+  font-weight: 800;
+  animation: rank-climb .35s ease-out;
+}
+.world-rank-name {
+  margin-top: 2px;
+  color: #fffdf8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes rank-climb {
+  from { transform: translateY(6px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.over-card { gap: 8px; padding: 14px 12px 12px; }
+.over-card .final { font-size: 56px; }
+.over-card .stats b { font-size: 20px; }
+.board-tabs { width: 100%; }
+.board-tabs button { min-height: 36px; padding: 6px; font-size: 11px; letter-spacing: .4px; }
+.world-board { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.world-board .board li { padding: 4px 8px; font-size: 13px; }
+.world-board .board li span { width: auto; min-width: 2.4em; font-variant-numeric: tabular-nums; }
+.world-board .board li b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.world-board .board li em { font-size: 12px; }
+.board-report {
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  color: #ff4f9a;
+  background: transparent;
+  border: 0;
+  padding: 4px 0 4px 4px;
+  cursor: pointer;
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .world-rank { top: 8px; bottom: auto; width: min(24vw, 140px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .world-rank-delta { animation: none; }
+}

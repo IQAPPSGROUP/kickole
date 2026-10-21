@@ -1,6 +1,8 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
-import type { GraphicsChoice, RunRecord, Settings } from '../game/storage';
+import type { BoardScope, LeaderboardService } from '../game/leaderboard';
+import type { GraphicsChoice, Settings } from '../game/storage';
+import { NicknameForm } from './NicknameScreen';
 import {
   detectTier,
   getDeviceSnapshot,
@@ -71,19 +73,29 @@ export function Home({
 }
 
 export function GameOver({
-  result, best, coins, leaderboard, onAgain, onHome, onShop,
+  result, best, coins, board, onAgain, onHome, onShop,
 }: {
   result: Result;
   best: number;
   coins: number;
-  leaderboard: RunRecord[];
+  board: LeaderboardService | null;
   onAgain: () => void;
   onHome: () => void;
   onShop: () => void;
 }) {
+  const [scope, setScope] = useState<BoardScope>('world');
+  const [view, setView] = useState<'around' | 'top'>('around');
+  const [note, setNote] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  const rows = board
+    ? view === 'top'
+      ? board.top(scope, result.score, 10)
+      : flattenAround(board, result.score, scope)
+    : [];
+  void revision;
   return (
     <div className="screen over">
-      <div className="card">
+      <div className="card over-card">
         <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
         <div className="final">{result.score}</div>
         <p className="coin-earn">+{result.coinsEarned} COINS · {coins} SAVED</p>
@@ -92,19 +104,54 @@ export function GameOver({
           <div><b>{best}</b><span>BEST</span></div>
           <div><b>{result.bestStreak}</b><span>BEST COMBO</span></div>
         </div>
-        <ol className="board">
-          {leaderboard.map((r, i) => (
-            <li key={r.date + '-' + i} className={i === result.rank ? 'me' : ''}>
-              <span>{i + 1}</span><b>{r.score}</b><em>{r.kickUps} kicks</em>
-            </li>
-          ))}
-        </ol>
+        {board && (
+          <div className="world-board">
+            <div className="seg board-tabs" role="tablist" aria-label="Board scope">
+              <button type="button" className={scope === 'world' ? 'on' : ''} onClick={() => setScope('world')}>WORLD</button>
+              <button type="button" className={scope === 'week' ? 'on' : ''} onClick={() => setScope('week')}>THIS WEEK</button>
+            </div>
+            <div className="seg board-tabs" role="tablist" aria-label="Board view">
+              <button type="button" className={view === 'around' ? 'on' : ''} onClick={() => setView('around')}>AROUND YOU</button>
+              <button type="button" className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>TOP 10</button>
+            </div>
+            <ol className="board">
+              {rows.map((row) => (
+                <li key={`${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''}>
+                  <span>{row.rank}</span>
+                  <b>{row.nickname}</b>
+                  <em>{row.score}</em>
+                  {!row.mine && (
+                    <button
+                      type="button"
+                      className="board-report"
+                      onClick={() => {
+                        board.report(row.nickname);
+                        setNote('Reported. Hidden on this device.');
+                        setRevision((value) => value + 1);
+                      }}
+                    >
+                      Report
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ol>
+            {note && <p className="shop-note">{note}</p>}
+          </div>
+        )}
         <button className="btn primary big" onClick={onAgain} autoFocus>PLAY AGAIN</button>
-        <button className="btn ghost" onClick={onShop}>SHOP</button>
-        <button className="btn ghost" onClick={onHome}>HOME</button>
+        <div className="home-actions">
+          <button className="btn ghost" onClick={onShop}>SHOP</button>
+          <button className="btn ghost" onClick={onHome}>HOME</button>
+        </div>
       </div>
     </div>
   );
+}
+
+function flattenAround(board: LeaderboardService, score: number, scope: BoardScope) {
+  const around = board.around(score, scope);
+  return [...around.above, around.me, ...around.below];
 }
 
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
@@ -129,8 +176,14 @@ function graphicsLabel(choice: GraphicsChoice): string {
 }
 
 export function SettingsScreen({
-  settings, onChange, onClose,
-}: { settings: Settings; onChange: (p: Partial<Settings>) => void; onClose: () => void }) {
+  settings, nickname, onNickname, onChange, onClose,
+}: {
+  settings: Settings;
+  nickname: string;
+  onNickname: (nickname: string) => void;
+  onChange: (p: Partial<Settings>) => void;
+  onClose: () => void;
+}) {
   const choices: GraphicsChoice[] = ['auto', 'low', 'medium', 'high'];
   const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
   const running = useSyncExternalStore(subscribeRunningTier, getRunningTier);
@@ -140,6 +193,11 @@ export function SettingsScreen({
     <div className="screen settings">
       <div className="card">
         <h2>SETTINGS</h2>
+        <div className="group">
+          <label>World nickname</label>
+          <NicknameForm initial={nickname} submitLabel="SAVE NICKNAME" onSubmit={onNickname} />
+          <p className="shop-note">Stored on this device. World scores are not uploaded yet.</p>
+        </div>
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
         <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />

@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } fr
 import { installAudioLifecycle } from '../game/audio';
 import { GameController, type Result } from '../game/controller';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
+import { mockBoardFromSearch } from '../game/mockBoard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
@@ -47,7 +48,7 @@ export function App() {
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
-  const mockBoard = useMemo(() => new URLSearchParams(window.location.search).get('mockBoard') === '1', []);
+  const mockBoard = useMemo(() => mockBoardFromSearch(window.location.search), []);
   const [deviceReady, setDeviceReady] = useState(mockBoard);
   const [blockedTick, setBlockedTick] = useState(0);
   const [reviewOpen, setReviewOpen] = useState(mockBoard);

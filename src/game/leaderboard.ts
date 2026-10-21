@@ -61,7 +61,9 @@ export interface SubmitResult {
 }
 
 /**
- * The UI talks only to this. `createMockLeaderboard` is the local stand-in (`?mockBoard=1`).
+ * The UI talks only to this. `createMockLeaderboard` is the local stand-in.
+ * `?mockBoard=1` reaches it only outside production builds, or when a preview
+ * build sets `VITE_ALLOW_MOCK=1`.
  * `createSupabaseLeaderboard` calls the private-schema RPCs.
  */
 export interface LeaderboardService {

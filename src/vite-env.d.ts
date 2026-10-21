@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_ENVIRONMENT_THEME?: string;
   readonly VITE_LEGACY_LOCATIONS?: string;
   readonly VITE_USE_GLB_CHARACTER?: string;
+  readonly VITE_ALLOW_MOCK?: string;
 }
 
 interface ImportMeta {

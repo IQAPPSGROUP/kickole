@@ -245,6 +245,23 @@ export function publishRunningTier(tier: Quality): void {
   runningListeners.forEach((listener) => listener());
 }
 
+/** Phones stay at or below this. A device pixel ratio of 3 would quadruple the framebuffer. */
+export const MAX_PIXEL_RATIO = 2;
+
+export function cappedDpr(dpr: readonly [number, number]): [number, number] {
+  const min = Math.min(dpr[0], dpr[1], MAX_PIXEL_RATIO);
+  const max = Math.min(Math.max(dpr[0], dpr[1]), MAX_PIXEL_RATIO);
+  return [min, max];
+}
+
+/**
+ * MSAA is off on every tier. Low draws the scene once. Medium and high antialias
+ * in the post stack (FXAA / SMAA) instead of allocating a second full-screen buffer.
+ */
+export function useMsaa(): boolean {
+  return false;
+}
+
 export function profileFor(tier: Quality): TierProfile {
   switch (tier) {
     case 'low':

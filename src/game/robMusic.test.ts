@@ -5,12 +5,17 @@ import {
   LOOP_END_SEC,
   LOOP_FADE_SEC,
   LOOP_START_SEC,
+  OPENER_TRACK_ID,
+  ROTATION_TRACKS,
   TRACK_CROSSFADE_SEC,
   TRACK_HANDOFF_BEFORE_END_SEC,
   TRACK_LEAD_IN_SEC,
+  RobPlayer,
+  choiceAfterSkip,
   loadTrack,
   nextLoopAt,
-  choiceAfterSkip,
+  nextRotationTrack,
+  openingPlaylist,
   pickTrack,
   resumePlan,
   shuffleNames,
@@ -207,5 +212,106 @@ describe('music duck and interruptions', () => {
     expect(clampVolume(1.5)).toBe(1);
     expect(clampVolume(-0.2)).toBe(0);
     expect(clampVolume(0.4)).toBe(0.4);
+  });
+});
+
+describe('run opener and decode budget', () => {
+  const pcmBytes = (seconds: number) => Math.round(seconds * 44100 * 2 * 4);
+
+  it('opens a shuffle on Alley Beat, then rotates the other three without a repeat', () => {
+    const playlist = openingPlaylist([...GAMEPLAY_TRACKS], () => 0);
+    expect(playlist[0]).toBe(OPENER_TRACK_ID);
+    expect(new Set(playlist).size).toBe(4);
+    expect(playlist.slice(1).every((id) => (ROTATION_TRACKS as readonly string[]).includes(id))).toBe(true);
+    expect(nextRotationTrack(playlist, OPENER_TRACK_ID, new Set())?.name).toBe(playlist[1]);
+    let current: string | null = OPENER_TRACK_ID;
+    const played: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      const next = nextRotationTrack(playlist, current, new Set());
+      expect(next).not.toBeNull();
+      expect(next?.name).not.toBe(OPENER_TRACK_ID);
+      expect(next?.name).not.toBe(current);
+      played.push(next!.name);
+      current = next!.name;
+    }
+    expect(new Set(played)).toEqual(new Set(ROTATION_TRACKS));
+    expect(openingPlaylist(ROTATION_TRACKS, () => 0)).not.toContain(OPENER_TRACK_ID);
+  });
+
+  it('keeps four decoded songs well above the two-buffer cap', () => {
+    const alley = pcmBytes(149);
+    const rise = pcmBytes(149);
+    const air = pcmBytes(158.6);
+    const drop = pcmBytes(157);
+    const all = alley + rise + air + drop;
+    expect(all).toBe(216_478_080);
+    expect(air + drop).toBeLessThan(all / 2 + alley);
+    expect(alley + air).toBeLessThan(120_000_000);
+  });
+
+  it('decodes Alley Beat alone at run start, then only the next song', async () => {
+    const clock = { currentTime: 0 };
+    const loads: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const ctx = {
+      get currentTime() { return clock.currentTime; },
+      createGain() {
+        return {
+          gain: {
+            value: 1,
+            setValueAtTime() {},
+            linearRampToValueAtTime() {},
+            cancelScheduledValues() {},
+          },
+          connect(target: unknown) { return target; },
+        };
+      },
+      createBufferSource() {
+        return {
+          buffer: null as AudioBuffer | null,
+          onended: null as null | (() => void),
+          connect(target: { connect?: (node: unknown) => unknown }) { return target; },
+          start() {},
+          stop() {},
+        };
+      },
+    };
+    const load = async (name: string) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      loads.push(name);
+      await Promise.resolve();
+      inFlight -= 1;
+      return { duration: 149 } as AudioBuffer;
+    };
+    const player = new RobPlayer(
+      ctx as unknown as AudioContext,
+      {} as AudioNode,
+      () => {},
+      load,
+      () => {},
+      () => 0,
+    );
+    const flush = async () => {
+      for (let i = 0; i < 8; i++) await Promise.resolve();
+    };
+    player.setMode('menu');
+    await flush();
+    player.setMode('play');
+    await flush();
+    expect(loads).toEqual(['menu-song', OPENER_TRACK_ID]);
+    expect(player.retainedTracks()).toEqual([OPENER_TRACK_ID]);
+    expect(maxInFlight).toBe(1);
+    const scheduled = player as unknown as { prefetchAt: number };
+    clock.currentTime = scheduled.prefetchAt + 0.3;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await flush();
+    expect(loads).toEqual(['menu-song', OPENER_TRACK_ID, 'game-song-2']);
+    expect(new Set(player.retainedTracks())).toEqual(new Set([OPENER_TRACK_ID, 'game-song-2']));
+    expect(loads).not.toContain('game-song-3');
+    player.releaseDecoded();
+    expect(player.retainedTracks()).toEqual([]);
+    player.stop();
   });
 });

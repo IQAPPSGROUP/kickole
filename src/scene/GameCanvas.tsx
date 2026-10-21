@@ -1,7 +1,8 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
+import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Texture, Vector3, type BufferGeometry, type Material, type Mesh, type Object3D, type WebGLRenderer } from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
+import { releaseDecodedMusic, restoreMusicAfterContext } from '../game/audio';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
 import type { GraphicsChoice, Quality } from '../game/storage';
@@ -20,7 +21,9 @@ import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
 import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
 import { installPcss, restorePcss } from './pcss';
+import { contextLostNeedsReload, CONTEXT_RESTORE_WAIT_MS } from './glRecovery';
 import {
+  cappedDpr,
   createFpsGuard,
   detectTier,
   getDeviceSnapshot,
@@ -30,6 +33,7 @@ import {
   resolveTier,
   stepFpsGuard,
   subscribeDevice,
+  useMsaa,
 } from './qualityTier';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { sampleOpeningCamera } from './openingCamera';
@@ -169,15 +173,55 @@ function Simulation({ controller }: { controller: GameController }) {
   return null;
 }
 
-/** Unsubscribe before a quality change disposes this canvas and releases its GL context. */
-function ContextLossGuard({ onLost }: { onLost: () => void }) {
+/** Put textures and geometries back on the GPU after the browser restores the context. */
+function refreshGpuResources(root: Object3D) {
+  root.traverse((obj) => {
+    const mesh = obj as Mesh;
+    const geometry: BufferGeometry | undefined = mesh.geometry;
+    if (geometry) {
+      for (const key of Object.keys(geometry.attributes)) {
+        const attribute = geometry.attributes[key];
+        if (attribute) attribute.needsUpdate = true;
+      }
+      if (geometry.index) geometry.index.needsUpdate = true;
+    }
+    const material = mesh.material;
+    if (!material) return;
+    const materials: Material[] = Array.isArray(material) ? material : [material];
+    for (const mat of materials) {
+      mat.needsUpdate = true;
+      for (const key of Object.keys(mat)) {
+        const value = (mat as unknown as Record<string, unknown>)[key];
+        if (value instanceof Texture) value.needsUpdate = true;
+      }
+    }
+  });
+}
+
+/**
+ * Cancel the loss so the browser fires `webglcontextrestored` on this same canvas.
+ * Unmounting here used to destroy the canvas and leave the reload screen up.
+ */
+function ContextLossGuard({ onLost, onRestored }: { onLost: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
+  const scene = useThree(state => state.scene);
   useEffect(() => {
     const canvas = gl.domElement;
-    const lost = (event: Event) => { event.preventDefault(); onLost(); };
+    const lost = (event: Event) => {
+      event.preventDefault();
+      onLost();
+    };
+    const restored = () => {
+      refreshGpuResources(scene);
+      onRestored();
+    };
     canvas.addEventListener('webglcontextlost', lost);
-    return () => canvas.removeEventListener('webglcontextlost', lost);
-  }, [gl, onLost]);
+    canvas.addEventListener('webglcontextrestored', restored);
+    return () => {
+      canvas.removeEventListener('webglcontextlost', lost);
+      canvas.removeEventListener('webglcontextrestored', restored);
+    };
+  }, [gl, scene, onLost, onRestored]);
   return null;
 }
 
@@ -395,7 +439,8 @@ function GlError({ message }: { message: string }) {
 export function GameCanvas({ controller, skin, graphics }: { controller: GameController; skin: Skin; graphics: GraphicsChoice }) {
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
-  const [lost, setLost] = useState(false);
+  const [lostAt, setLostAt] = useState<number | null>(null);
+  const [clock, setClock] = useState(() => Date.now());
   const device = useSyncExternalStore(subscribeDevice, getDeviceSnapshot);
   const detected = useMemo(() => detectTier(device), [device]);
   const forced = useMemo(() => forcedTier(), []);
@@ -407,34 +452,47 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
     (globalThis as { __KICKOLE_TIER?: Quality }).__KICKOLE_TIER = tier;
   }, [tier]);
   const markReady = useCallback(() => setReady(true), []);
-  const markLost = useCallback(() => setLost(true), []);
+  const markLost = useCallback(() => {
+    releaseDecodedMusic();
+    setLostAt((current) => current ?? Date.now());
+  }, []);
+  const markRestored = useCallback(() => {
+    setLostAt(null);
+    restoreMusicAfterContext();
+  }, []);
+  useEffect(() => {
+    if (lostAt == null) return;
+    const timer = window.setTimeout(() => setClock(Date.now()), CONTEXT_RESTORE_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [lostAt]);
 
   if (!supported) return <GlError message="Your browser or device does not support WebGL. Try updating your browser." />;
-  if (lost) return <GlError message="The graphics context was lost. Reload to continue." />;
 
+  const showLost = contextLostNeedsReload(lostAt, clock);
   const profile = profileFor(tier);
   if (profile.shadowFilter === 'pcss') installPcss();
   else restorePcss();
-  const dpr = profile.dpr;
+  const dpr = cappedDpr(profile.dpr);
   const shadowsOn = profile.shadows !== 'none';
   const shadowType = !shadowsOn ? false : profile.shadowFilter === 'pcss' ? 'basic' : 'variance';
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}
+      {showLost && <GlError message="The graphics context was lost. Reload to continue." />}
       {tier !== 'low' && <div className="vignette" />}
       <Canvas
         key={tier}
         shadows={shadowType}
         dpr={dpr}
         gl={{
-          antialias: profile.aa === 'none',
+          antialias: useMsaa(),
           powerPreference: 'high-performance',
           toneMapping: AgXToneMapping,
           toneMappingExposure: STREET_EXPOSURE,
         }}
         camera={{ fov: FOV, near: 0.1, far: 60 }}
       >
-        <ContextLossGuard onLost={markLost} />
+        <ContextLossGuard onLost={markLost} onRestored={markRestored} />
         <GpuProbe />
         {!forced && <FpsWatch tier={tier} onTier={setTier} />}
         <World controller={controller} skin={skin} quality={tier} onReady={markReady} />

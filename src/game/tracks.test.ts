@@ -2,15 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { GAME_TRACKS, normalizeEnabledTracks, normalizeSongChoice, toggleEnabled, trackTitle } from './tracks';
 
 describe('track titles', () => {
-  it('keeps a placeholder title for each gameplay file', () => {
-    expect(GAME_TRACKS.map((track) => track.title)).toEqual(['Track 1', 'Track 2', 'Track 3', 'Track 4']);
+  it('names each gameplay file', () => {
+    expect(GAME_TRACKS.map((track) => track.title)).toEqual([
+      'Alley Beat',
+      'We Rise',
+      'Keep It in the Air',
+      "Don't Let It Drop",
+    ]);
     expect(GAME_TRACKS.map((track) => track.id)).toEqual([
       'gameplay-instrumental',
       'menu-song',
       'game-song-2',
       'game-song-3',
     ]);
-    expect(trackTitle('game-song-2')).toBe('Track 3');
+    expect(trackTitle('game-song-2')).toBe('Keep It in the Air');
+    expect(trackTitle('game-song-3')).toBe("Don't Let It Drop");
     expect(trackTitle('missing')).toBe('Track');
   });
 

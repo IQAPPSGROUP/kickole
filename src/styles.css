@@ -1466,7 +1466,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   align-items: center;
   gap: 2px;
   height: 44px;
-  max-width: min(52vw, 200px);
+  max-width: min(58vw, 230px);
   margin: 0;
   padding: 0 0 0 10px;
   border-radius: 14px;
@@ -1493,7 +1493,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .now-playing-name {
   font-size: 14px;
   line-height: 1.1;
-  max-width: 108px;
+  max-width: 156px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

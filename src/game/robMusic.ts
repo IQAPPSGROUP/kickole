@@ -1,4 +1,4 @@
-import { GAME_TRACKS, MENU_TRACK_ID, SHUFFLE_SONG, type SongChoice } from './tracks';
+import { GAME_TRACKS, MENU_TRACK_ID, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 
 /** Rob's songs. The generated bed in musicBed.ts plays only when these fail to load. */
 
@@ -19,6 +19,21 @@ export const TRACK_LEAD_IN_SEC = 0.6;
 export const TRACK_CROSSFADE_SEC = 2.5;
 /** Start the next playlist track this long before the current file ends. */
 export const TRACK_HANDOFF_BEFORE_END_SEC = 3.5;
+
+/**
+ * Songs whose files do not use the shared lead-in and ending.
+ * Keep It in the Air has no fade-in and an abrupt ending.
+ * Don't Let It Drop has no fade-in; the crossfade leaves before the ending.
+ */
+const TRACK_CUE: Partial<Record<GameTrackId, { leadIn: number; handoffAt: number; fade: number }>> = {
+  'game-song-2': { leadIn: 0, handoffAt: 155.5, fade: 2 },
+  'game-song-3': { leadIn: 0, handoffAt: 152, fade: 2.5 },
+};
+
+function trackLeadIn(name: string): number {
+  const cue = TRACK_CUE[name as GameTrackId];
+  return cue ? cue.leadIn : TRACK_LEAD_IN_SEC;
+}
 
 /** Menu ↔ play. */
 export const MODE_CROSSFADE_SEC = 1.8;
@@ -61,22 +76,27 @@ export function nextLoopAt(voiceStart: number, playFor: number, fade: number): n
 
 /**
  * Playlist window. A resumed offset keeps the place in the file.
- * The next track begins 3.5s before the file ends, fading for 2.5s.
+ * Most tracks begin 0.6s in and hand off 3.5s before the end, fading for 2.5s.
+ * A named cue starts at its own lead-in and hands off at a file time.
  */
-export function trackWindow(duration: number, resumeOffset?: number): TrackWindow {
-  const lead = Math.min(TRACK_LEAD_IN_SEC, Math.max(0, duration));
+export function trackWindow(duration: number, resumeOffset?: number, name?: string): TrackWindow {
+  const cue = name ? TRACK_CUE[name as GameTrackId] : undefined;
+  const cueFits = cue != null && cue.handoffAt < duration - 0.05;
+  const lead = Math.min(cue ? cue.leadIn : TRACK_LEAD_IN_SEC, Math.max(0, duration));
   const offset = resumeOffset == null
     ? lead
     : Math.min(Math.max(0, duration), Math.max(lead, resumeOffset));
-  const handoff = Math.min(duration, Math.max(offset, duration - TRACK_HANDOFF_BEFORE_END_SEC));
+  const requested = cueFits && cue ? cue.handoffAt : duration - TRACK_HANDOFF_BEFORE_END_SEC;
+  const handoff = Math.min(duration, Math.max(offset, requested));
   const tail = Math.max(0, duration - handoff);
-  const fade = Math.min(TRACK_CROSSFADE_SEC, tail > 0 ? tail : Math.max(0, duration - offset));
+  const wanted = cueFits && cue ? cue.fade : TRACK_CROSSFADE_SEC;
+  const fade = Math.min(wanted, tail > 0 ? tail : Math.max(0, duration - offset));
   return { offset, handoff, fade };
 }
 
 /** Continue a run from the saved file position, or advance when that track is in its ending. */
-export function resumePlan(duration: number, savedOffset: number): ResumePlan {
-  const window = trackWindow(duration);
+export function resumePlan(duration: number, savedOffset: number, name?: string): ResumePlan {
+  const window = trackWindow(duration, undefined, name);
   if (!(duration > window.offset) || savedOffset >= window.handoff) return { action: 'advance' };
   return { action: 'resume', offset: Math.min(duration, Math.max(window.offset, savedOffset)) };
 }
@@ -259,7 +279,7 @@ export class RobPlayer {
     if (this.mode === 'play' && this.playhead && this.disabled.has(this.playhead.name)) {
       const plan = choiceAfterSkip(SHUFFLE_SONG, this.order ?? GAMEPLAY_TRACKS, this.playhead.name, this.unavailable());
       if (!plan.track) return;
-      this.playhead = { name: plan.track.name, offset: TRACK_LEAD_IN_SEC };
+      this.playhead = { name: plan.track.name, offset: trackLeadIn(plan.track.name) };
       const serial = ++this.skipSerial;
       void this.jumpTo(plan.track.name, this.generation, serial);
     }
@@ -277,7 +297,7 @@ export class RobPlayer {
       }
       return;
     }
-    this.playhead = { name: choice, offset: TRACK_LEAD_IN_SEC };
+    this.playhead = { name: choice, offset: trackLeadIn(choice) };
     this.ensureOrder();
     const index = this.order?.indexOf(choice) ?? -1;
     if (index >= 0) this.cursor = index;
@@ -296,7 +316,7 @@ export class RobPlayer {
     this.songChoice = plan.choice;
     const index = (this.order ?? []).indexOf(plan.track.name);
     if (index >= 0) this.cursor = index;
-    this.playhead = { name: plan.track.name, offset: TRACK_LEAD_IN_SEC };
+    this.playhead = { name: plan.track.name, offset: trackLeadIn(plan.track.name) };
     if (this.mode === 'play') {
       const serial = ++this.skipSerial;
       void this.jumpTo(plan.track.name, this.generation, serial);
@@ -372,7 +392,7 @@ export class RobPlayer {
       const buffer = await this.song(saved.name, generation);
       if (generation !== this.generation || this.mode !== 'play') return false;
       if (buffer) {
-        const plan = resumePlan(buffer.duration, saved.offset);
+        const plan = resumePlan(buffer.duration, saved.offset, saved.name);
         if (plan.action === 'resume') {
           this.cursor = Math.max(0, order.indexOf(saved.name));
           this.spawnTrack(buffer, saved.name, plan.offset, this.ctx.currentTime, MODE_CROSSFADE_SEC);
@@ -390,7 +410,7 @@ export class RobPlayer {
     const next = await this.takeNext(this.cursor, previous, generation);
     if (generation !== this.generation || this.mode !== 'play' || !next) return false;
     this.cursor = next.index;
-    this.spawnTrack(next.buffer, next.name, trackWindow(next.buffer.duration).offset, this.ctx.currentTime, MODE_CROSSFADE_SEC);
+    this.spawnTrack(next.buffer, next.name, trackWindow(next.buffer.duration, undefined, next.name).offset, this.ctx.currentTime, MODE_CROSSFADE_SEC);
     this.releaseMenu();
     return true;
   }
@@ -406,7 +426,7 @@ export class RobPlayer {
       tried.add(pick.name);
       const buffer = await this.song(pick.name, generation);
       if (generation !== this.generation) return null;
-      if (buffer && buffer.duration > TRACK_LEAD_IN_SEC + 0.05) return { ...pick, buffer };
+      if (buffer && buffer.duration > trackLeadIn(pick.name) + 0.05) return { ...pick, buffer };
       this.failed.add(pick.name);
       index = pick.index + 1;
       prior = null;
@@ -462,13 +482,13 @@ export class RobPlayer {
     if (name === SHUFFLE_SONG || this.unavailable().has(name)) return false;
     const buffer = await this.song(name, generation);
     if (generation !== this.generation || this.mode !== 'play') return false;
-    if (!buffer || !(buffer.duration > TRACK_LEAD_IN_SEC + 0.05)) {
+    if (!buffer || !(buffer.duration > trackLeadIn(name) + 0.05)) {
       this.failed.add(name);
       return false;
     }
-    const saved = this.playhead?.name === name ? this.playhead.offset : TRACK_LEAD_IN_SEC;
-    const plan = resumePlan(buffer.duration, saved);
-    const offset = plan.action === 'resume' ? plan.offset : trackWindow(buffer.duration).offset;
+    const saved = this.playhead?.name === name ? this.playhead.offset : trackLeadIn(name);
+    const plan = resumePlan(buffer.duration, saved, name);
+    const offset = plan.action === 'resume' ? plan.offset : trackWindow(buffer.duration, undefined, name).offset;
     const index = (this.order ?? []).indexOf(name);
     if (index >= 0) this.cursor = index;
     this.spawnTrack(buffer, name, offset, this.ctx.currentTime, MODE_CROSSFADE_SEC);
@@ -503,7 +523,7 @@ export class RobPlayer {
       if (serial === this.skipSerial) this.jumping = false;
       return;
     }
-    if (!buffer || !(buffer.duration > TRACK_LEAD_IN_SEC + 0.05)) {
+    if (!buffer || !(buffer.duration > trackLeadIn(target) + 0.05)) {
       this.failed.add(target);
       const taken = await this.takeNext(this.ensureOrder().indexOf(target) + 1, target, generation);
       if (generation !== this.generation || serial !== this.skipSerial || this.mode !== 'play' || !taken) {
@@ -517,7 +537,7 @@ export class RobPlayer {
     const index = this.ensureOrder().indexOf(target);
     if (index >= 0) this.cursor = index;
     this.fadeOutAll(TRACK_CROSSFADE_SEC);
-    this.spawnTrack(buffer, target, trackWindow(buffer.duration).offset, this.ctx.currentTime, TRACK_CROSSFADE_SEC);
+    this.spawnTrack(buffer, target, trackWindow(buffer.duration, undefined, target).offset, this.ctx.currentTime, TRACK_CROSSFADE_SEC);
     this.jumping = false;
   }
 
@@ -528,10 +548,10 @@ export class RobPlayer {
       const name = this.songChoice;
       const pinned = await this.song(name, generation);
       if (generation !== this.generation || this.mode !== 'play') return;
-      if (pinned && pinned.duration > TRACK_LEAD_IN_SEC + 0.05) {
+      if (pinned && pinned.duration > trackLeadIn(name) + 0.05) {
         const index = order.indexOf(name);
         if (index >= 0) this.cursor = index;
-        this.spawnTrack(pinned, name, trackWindow(pinned.duration).offset, when, fade);
+        this.spawnTrack(pinned, name, trackWindow(pinned.duration, undefined, name).offset, when, fade);
         return;
       }
       this.failed.add(name);
@@ -562,11 +582,11 @@ export class RobPlayer {
       buffer = taken.buffer;
     }
     this.cursor = pick.index;
-    this.spawnTrack(buffer, pick.name, trackWindow(buffer.duration).offset, when, fade);
+    this.spawnTrack(buffer, pick.name, trackWindow(buffer.duration, undefined, pick.name).offset, when, fade);
   }
 
   private spawnTrack(buffer: AudioBuffer, name: string, offset: number, when: number, fadeIn: number) {
-    const plan = trackWindow(buffer.duration, offset);
+    const plan = trackWindow(buffer.duration, offset, name);
     const playFor = Math.max(0.05, Math.min(buffer.duration - plan.offset, plan.handoff + plan.fade - plan.offset));
     this.loop = null;
     this.nextAt = 0;

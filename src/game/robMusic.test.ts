@@ -68,6 +68,19 @@ describe('gameplay playlist', () => {
     expect(trackWindow(149, 40)).toEqual({ offset: 40, handoff: 145.5, fade: TRACK_CROSSFADE_SEC });
   });
 
+  it('starts Keep It in the Air at the top and crossfades from 155.5s for 2s', () => {
+    expect(trackWindow(158.6, undefined, 'game-song-2')).toEqual({ offset: 0, handoff: 155.5, fade: 2 });
+    expect(trackWindow(158.6, 40, 'game-song-2')).toEqual({ offset: 40, handoff: 155.5, fade: 2 });
+    expect(resumePlan(158.6, 0, 'game-song-2')).toEqual({ action: 'resume', offset: 0 });
+    expect(resumePlan(158.6, 156, 'game-song-2')).toEqual({ action: 'advance' });
+  });
+
+  it('starts Don\'t Let It Drop at the top and crossfades from 152s for 2.5s', () => {
+    expect(trackWindow(157, undefined, 'game-song-3')).toEqual({ offset: 0, handoff: 152, fade: 2.5 });
+    expect(resumePlan(157, 12, 'game-song-3')).toEqual({ action: 'resume', offset: 12 });
+    expect(resumePlan(157, 152, 'game-song-3')).toEqual({ action: 'advance' });
+  });
+
   it('continues a later run from the saved place and advances only in the ending', () => {
     expect(resumePlan(149, 12)).toEqual({ action: 'resume', offset: 12 });
     expect(resumePlan(149, 0.2)).toEqual({ action: 'resume', offset: TRACK_LEAD_IN_SEC });

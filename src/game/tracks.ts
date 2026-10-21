@@ -1,10 +1,10 @@
-/** Gameplay songs. Replace the placeholder titles when the final names are ready. */
+/** Gameplay songs. Alley Beat and We Rise are provisional titles. */
 
 export const GAME_TRACKS = [
-  { id: 'gameplay-instrumental', title: 'Track 1' },
-  { id: 'menu-song', title: 'Track 2' },
-  { id: 'game-song-2', title: 'Track 3' },
-  { id: 'game-song-3', title: 'Track 4' },
+  { id: 'gameplay-instrumental', title: 'Alley Beat' },
+  { id: 'menu-song', title: 'We Rise' },
+  { id: 'game-song-2', title: 'Keep It in the Air' },
+  { id: 'game-song-3', title: "Don't Let It Drop" },
 ] as const;
 
 export type GameTrackId = (typeof GAME_TRACKS)[number]['id'];

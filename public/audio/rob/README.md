@@ -9,7 +9,7 @@ Playlist, in no fixed play order:
 - `game-song-2.m4a` / `.ogg`
 - `game-song-3.m4a` / `.ogg`
 
-The game requests `.m4a` first and falls back to `.ogg`. A track that is missing or cannot be decoded is skipped. `game-song-2` and `game-song-3` can be added here later.
+The game requests `.m4a` first and falls back to `.ogg`. A track that is missing or cannot be decoded is skipped for the rest of the page session.
 
 Each playlist track starts about 0.6s in, so the lead-in is trimmed. The next track starts about 3.5s before the current file ends and the two crossfade for 2.5s. The same track is not played twice in a row when another track loaded. Only the current track is decoded, and the next one is decoded just before that crossfade.
 

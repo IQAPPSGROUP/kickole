@@ -157,6 +157,41 @@ describe('storage', () => {
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 
+  it('persists music and effects volume and clamps a bad value', async () => {
+    const { loadSettings, saveSettings, DEFAULT_SETTINGS } = await load({
+      'kicky.settings.v1': JSON.stringify({ musicVolume: 1.5, sfxVolume: -2, sound: false }),
+    });
+    const loaded = loadSettings();
+    expect(loaded.musicVolume).toBe(1);
+    expect(loaded.sfxVolume).toBe(0);
+    expect(loaded.sound).toBe(false);
+    saveSettings({ ...loaded, musicVolume: 0.4, sfxVolume: 0.25 });
+    expect(loadSettings().musicVolume).toBe(0.4);
+    expect(loadSettings().sfxVolume).toBe(0.25);
+    const legacy = await load({ 'kicky.settings.v1': JSON.stringify({ sound: true }) });
+    expect(legacy.loadSettings().musicVolume).toBe(DEFAULT_SETTINGS.musicVolume);
+    expect(legacy.loadSettings().sfxVolume).toBe(1);
+    expect(legacy.loadSettings().song).toBe('shuffle');
+    saveSettings({ ...loaded, song: 'game-song-2' });
+    expect(loadSettings().song).toBe('game-song-2');
+    const junk = await load({ 'kicky.settings.v1': JSON.stringify({ song: 'not-a-track' }) });
+    expect(junk.loadSettings().song).toBe('shuffle');
+    expect(junk.loadSettings().enabledSongs).toEqual(['gameplay-instrumental', 'menu-song', 'game-song-2', 'game-song-3']);
+    const { loadSettings: loadKept, saveSettings: saveKept } = await load({
+      'kicky.settings.v1': JSON.stringify({ enabledSongs: ['menu-song', 'game-song-3'] }),
+    });
+    expect(loadKept().enabledSongs).toEqual(['menu-song', 'game-song-3']);
+    saveKept({ ...loadKept(), enabledSongs: ['game-song-2'] });
+    expect(loadKept().enabledSongs).toEqual(['game-song-2']);
+    const dropped = await load({
+      'kicky.settings.v1': JSON.stringify({ song: 'game-song-2', enabledSongs: ['menu-song'] }),
+    });
+    expect(dropped.loadSettings().song).toBe('shuffle');
+    expect(dropped.loadSettings().enabledSongs).toEqual(['menu-song']);
+    const empty = await load({ 'kicky.settings.v1': JSON.stringify({ enabledSongs: [] }) });
+    expect(empty.loadSettings().enabledSongs).toEqual(['gameplay-instrumental', 'menu-song', 'game-song-2', 'game-song-3']);
+  });
+
   it('validates settings and round-trips them', async () => {
     const { loadSettings, saveSettings, DEFAULT_SETTINGS } = await load({ 'kicky.settings.v1': JSON.stringify({ sound: 'yes', quality: 'ultra', vibration: false, skinId: 'coral-flash' }) });
     const s = loadSettings();

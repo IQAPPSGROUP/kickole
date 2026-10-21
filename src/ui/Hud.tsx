@@ -3,7 +3,8 @@ import type { GameController, Hud as HudState, ArmedTrick } from '../game/contro
 import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
 import { streakMultiplier } from '../engine/scoring';
-import { beatClock } from '../game/audio';
+import { beatClock, subscribeNowPlaying } from '../game/audio';
+import { trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
 import type { LeaderboardService } from '../game/leaderboard';
 import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
@@ -167,6 +168,48 @@ export function ClueMark({ gesture }: { gesture: PromptGesture }) {
       <i />
       <em>{label}</em>
     </span>
+  );
+}
+
+function SongChip({ controller, playing }: { controller: GameController; playing: boolean }) {
+  const [notice, setNotice] = useState<{ id: number; name: string } | null>(null);
+  const [quietId, setQuietId] = useState<number | null>(null);
+  const noticeSerial = useRef(0);
+  useEffect(() => subscribeNowPlaying((name) => {
+    if (!name) {
+      setNotice(null);
+      return;
+    }
+    noticeSerial.current += 1;
+    setNotice({ id: noticeSerial.current, name });
+  }), []);
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setQuietId(notice.id), 3000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  if (!playing || !notice) return null;
+  const title = trackTitle(notice.name);
+  const quiet = quietId === notice.id;
+  return (
+    <div className={`now-playing${quiet ? ' is-quiet' : ''}`} role="status">
+      <p className="now-playing-label">
+        <span className="now-playing-note" aria-hidden="true">♪</span>
+        <span className="now-playing-name">{title}</span>
+      </p>
+      <button
+        type="button"
+        className="now-playing-skip"
+        aria-label="Next song"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          controller.changeSong();
+        }}
+      >
+        <span aria-hidden="true">⏭</span>
+      </button>
+    </div>
   );
 }
 
@@ -381,7 +424,7 @@ function useFanStyle(): CSSProperties {
   } as CSSProperties;
 }
 
-export function TouchZones({ controller }: { controller: GameController }) {
+export function TouchZones({ controller, onPause }: { controller: GameController; onPause: () => void }) {
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const fanStyle = useFanStyle();
   const armed = snap.hud.armedTrick;
@@ -513,6 +556,19 @@ export function TouchZones({ controller }: { controller: GameController }) {
 
   return (
     <div className="zones" style={fanStyle}>
+      <button
+        type="button"
+        className="pause-btn"
+        aria-label="Pause"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onPause();
+        }}
+      >
+        <span className="pause-bars" aria-hidden="true" />
+      </button>
+      <SongChip controller={controller} playing={playing} />
       <p className="trick-help">H header · N neck · T thigh · F flick · W atw · G groove · Esc cancel</p>
       <div className="fan fan-left" role="group" aria-label="Left foot and tricks">
         {LEFT_FAN.map(trickButton)}

@@ -1,18 +1,24 @@
 Kickolé music, crowd and cheers
 --------------------------------
-Everything you hear is synthesised in the game by src/game/audio.ts
-and src/game/musicBed.ts (Web Audio oscillators and noise). No
-third-party recordings, sample libraries or music tracks are included.
+Menu and gameplay music are Rob's songs in public/audio/rob/ when
+those files are present. The game tries the .m4a first and falls
+back to the .ogg. If both fail to load, the generated boom-bap bed
+in src/game/musicBed.ts plays instead.
+
+Kicks, misses, stalls, the crowd murmur and the milestone cheers
+are synthesised in src/game/audio.ts (Web Audio oscillators and
+noise). No third-party sample library is included.
 
 The synthesis is original to this repository. IQ Apps Group may use it
 in Kickolé, including a paid commercial build. It is not derived from
 Kenney, OpenGameArt, Pixabay or any other sound pack.
 
-Kicks, misses, stalls, the crowd murmur and the milestone cheers are
-generated in audio.ts. The background music is an original boom-bap
-synthesis in musicBed.ts: kick and sub, snare and clap, swung hi-hats,
-an 808-style bass, filtered chord voices and a vinyl crackle. Gameplay
-is the street loop at 92 BPM. The menu is a sparser variation at 90 BPM.
-No recorded drum breaks, sample library or published composition is used.
+The fallback bed is an original boom-bap synthesis: kick and sub,
+snare and clap, swung hi-hats, an 808-style bass, filtered chord
+voices and a vinyl crackle. Gameplay is the street loop at 92 BPM.
+The menu is a sparser variation at 90 BPM. No recorded drum breaks
+or sample library are used for that fallback.
 
-There is nothing to decode, stream or attribute beyond this note.
+Rob's songs are the files in public/audio/rob/ when they are present.
+The fallback bed and the sound effects are synthesised here and need
+no further attribution.

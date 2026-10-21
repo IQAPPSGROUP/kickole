@@ -12,7 +12,7 @@ import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
-import { beatClock, cheer, setBed, sfx, unlockAudio } from './audio';
+import { beatClock, cheer, setBed, setEnabledTracks, setSongChoice, sfx, skipTrack, unlockAudio } from './audio';
 import {
   applyPromptAction,
   beginRun,
@@ -35,6 +35,7 @@ import { fx } from '../scene/fx';
 import { playHaptic, type HapticCue } from './haptics';
 import { prefersReducedMotion, swoopStrength } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
+import { normalizeEnabledTracks, SHUFFLE_SONG, toggleEnabled, type GameTrackId } from './tracks';
 import {
   buyOrEquipBoot,
   buyOrEquipKit,
@@ -135,6 +136,8 @@ export class GameController {
   private entitlementEpoch = 0;
   /** Drops a stale not-owned event that arrives just after a grant. */
   private grantGuardUntil = 0;
+  /** Pause menu is open, so the ball stays where it is. */
+  private playHeld = false;
   private readonly onVisibility = () => {
     if (!shouldRefreshEntitlementsOnResume(this.billing.platform, document.visibilityState)) return;
     void this.pullEntitlements();
@@ -145,6 +148,8 @@ export class GameController {
     this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
     this.engine.on((e) => this.onEvent(e));
     this.billing.setEntitlementListener((snapshot) => this.applyBillingSnapshot(snapshot));
+    setEnabledTracks(this.settings.enabledSongs);
+    setSongChoice(this.settings.song);
     this.snapshot = this.build();
     this.billingReady = this.initBilling();
     if (this.billing.platform !== 'web' && typeof document !== 'undefined') {
@@ -264,6 +269,8 @@ export class GameController {
       music: this.settings.sound && this.settings.music,
       sfx: this.voices(),
       crowd: playing && this.voices() ? crowdLevel(this.engine.streak) : 0,
+      musicVolume: this.settings.musicVolume,
+      sfxVolume: this.settings.sfxVolume,
     });
   }
 
@@ -385,12 +392,13 @@ export class GameController {
         } else if (e.kind === 'neckStall' && e.phase === 'execute') {
           this.show('good', 'NECK RELEASE', 0);
         }
+        if (e.points > 0 && sound) sfx.trick();
         this.noteTrickPrompt(e.kind, e.phase, e.points);
         this.publish();
         break;
       case 'combo':
         this.show('perfect', `${e.label} +${e.points}`, e.points);
-        if (sound) sfx.kick('perfect', this.engine.streak);
+        if (sound) sfx.combo();
         this.buzz('combo');
         fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, e.points, prefersReducedMotion()));
         this.publish();
@@ -444,6 +452,7 @@ export class GameController {
   refresh() { this.publish(); }
 
   tick(dt: number) {
+    if (this.playHeld) return;
     const before = this.engine.phase;
     const clock = beatClock();
     this.engine.beatPhase = clock.phase;
@@ -498,6 +507,7 @@ export class GameController {
   }
 
   press(side: Side, pointerId?: number) {
+    if (this.playHeld) return;
     const e = this.engine;
     const skippedDance = e.celebration != null;
     if (skippedDance) {
@@ -537,6 +547,7 @@ export class GameController {
   }
 
   attemptHeader() {
+    if (this.playHeld) return;
     if (this.engine.phase !== 'playing') {
       this.noteLockedTrick();
       return;
@@ -546,6 +557,7 @@ export class GameController {
   }
 
   pressNeck() {
+    if (this.playHeld) return;
     if (this.engine.phase !== 'playing') {
       this.noteLockedTrick();
       return;
@@ -560,6 +572,7 @@ export class GameController {
   }
 
   armTrick(kind: ArmedTrick | null) {
+    if (this.playHeld) return;
     if (kind !== null) {
       this.playTrick(kind);
       return;
@@ -571,6 +584,7 @@ export class GameController {
 
   /** One tap plays the trick. Before the first kick, say why the button is grey. */
   playTrick(kind: ArmedTrick): 'fired' | 'queued' | 'locked' {
+    if (this.playHeld) return 'locked';
     if (this.engine.phase !== 'playing') {
       this.noteLockedTrick();
       return 'locked';
@@ -581,6 +595,7 @@ export class GameController {
   }
 
   action() {
+    if (this.playHeld) return;
     const p = this.engine.phase;
     if (p === 'menu' || p === 'over') this.play();
     else if (p === 'ready') this.press('right');
@@ -627,9 +642,54 @@ export class GameController {
   }
 
   updateSettings(patch: Partial<Settings>) {
+    const beforeSong = this.settings.song;
     this.settings = applyGraphicsPatch(this.settings, patch);
+    if (patch.enabledSongs !== undefined) {
+      this.settings = { ...this.settings, enabledSongs: normalizeEnabledTracks(this.settings.enabledSongs) };
+    }
+    if (this.settings.song !== SHUFFLE_SONG && !this.settings.enabledSongs.includes(this.settings.song)) {
+      this.settings = { ...this.settings, song: SHUFFLE_SONG };
+    }
     if (patch.hints === false) this.prompts = freshClock(this.save.learnedTricks, false);
     if (patch.hints === true) this.prompts = beginRun(this.save.learnedTricks, true);
+    if (patch.enabledSongs !== undefined) setEnabledTracks(this.settings.enabledSongs);
+    if (patch.song !== undefined || this.settings.song !== beforeSong) setSongChoice(this.settings.song);
+    saveSettings(this.settings);
+    this.publish();
+  }
+
+  /** Turn a playlist track on or off. The last track that is on stays on. */
+  toggleSong(id: GameTrackId) {
+    const next = toggleEnabled(this.settings.enabledSongs, id);
+    const same = next.length === this.settings.enabledSongs.length
+      && next.every((trackId, index) => trackId === this.settings.enabledSongs[index]);
+    if (same) return;
+    const pin = this.settings.song;
+    const song = pin !== SHUFFLE_SONG && !next.includes(pin) ? SHUFFLE_SONG : pin;
+    this.settings = { ...this.settings, enabledSongs: next, song };
+    setEnabledTracks(next);
+    if (song !== pin) setSongChoice(song);
+    saveSettings(this.settings);
+    this.publish();
+  }
+
+  /** Freeze the run while the pause menu is open, and let go of a held foot or neck. */
+  holdPlay(held: boolean) {
+    if (this.playHeld === held) return;
+    this.playHeld = held;
+    if (held) {
+      this.engine.release('left');
+      this.engine.release('right');
+      this.engine.releaseNeck();
+    }
+    this.publish();
+  }
+
+  /** Crossfade to the next gameplay song. A pinned song moves to the next title. */
+  changeSong() {
+    const next = skipTrack();
+    if (next === this.settings.song) return;
+    this.settings = { ...this.settings, song: next };
     saveSettings(this.settings);
     this.publish();
   }

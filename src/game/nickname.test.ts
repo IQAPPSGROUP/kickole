@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ADJECTIVES, NOUNS } from './nicknameWords';
-import { checkNickname, composeNickname, parseNickname, pickFreePair, romanNumeral, romanValue, suggestNickname } from './nickname';
+import { checkNickname, composeNickname, isBlockedPair, parseNickname, pickFreePair, romanNumeral, romanValue, suggestNickname, unblockIndex } from './nickname';
 
 describe('nickname', () => {
   it('accepts a two-word list tag and a Roman suffix from II', () => {
@@ -51,5 +51,19 @@ describe('nickname', () => {
     ], current, () => 0)).toEqual({ adjective: 'Neon', noun: 'Falcon' });
     expect(pickFreePair([], current)).toBeNull();
     expect(pickFreePair([current], current, () => 0)).toEqual(current);
+  });
+
+  it('refuses trademark pairs and steps the changed word off them', () => {
+    expect(isBlockedPair('Ghost', 'Rider')).toBe(true);
+    expect(isBlockedPair('ghost', 'rider')).toBe(true);
+    expect(isBlockedPair('Silver', 'Fox')).toBe(true);
+    expect(isBlockedPair('Power', 'Ranger')).toBe(true);
+    expect(isBlockedPair('Ninja', 'Turtle')).toBe(true);
+    expect(isBlockedPair('Desert', 'Eagle')).toBe(true);
+    expect(isBlockedPair('Ghost', 'Striker')).toBe(false);
+    const ghost = ADJECTIVES.findIndex((word) => word === 'Ghost');
+    const rider = NOUNS.findIndex((word) => word === 'Rider');
+    expect(unblockIndex('noun', ghost, rider)).not.toBe(rider);
+    expect(isBlockedPair(ADJECTIVES[ghost] ?? '', NOUNS[unblockIndex('noun', ghost, rider)] ?? '')).toBe(false);
   });
 });

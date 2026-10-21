@@ -76,6 +76,7 @@ export function App() {
     board.submit(snap.result.score, Date.now(), {
       combo: snap.result.combos,
       durationMs: snap.result.durationMs,
+      kickTimesMs: snap.result.kickTimesMs,
     });
   }, [phase, snap.result, board]);
 

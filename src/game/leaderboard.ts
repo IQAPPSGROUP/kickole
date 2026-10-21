@@ -1,4 +1,5 @@
 import { COUNTRIES, countryByCode } from './countries';
+import { isBlockedPair } from './nickname';
 import { ADJECTIVES, NOUNS } from './nicknameWords';
 import { loadDeviceId } from './nicknameStore';
 
@@ -44,6 +45,8 @@ export interface RankSnapshot {
 export interface RunSubmit {
   combo: number;
   durationMs: number;
+  /** Kick timestamps in milliseconds from the start of the run. */
+  kickTimesMs?: readonly number[];
 }
 
 export interface AroundMe {
@@ -147,7 +150,12 @@ interface StoredBest {
 
 function crowdNickname(index: number): string {
   const adjective = ADJECTIVES[index % ADJECTIVES.length] ?? 'Turbo';
-  const noun = NOUNS[Math.floor(index / ADJECTIVES.length) % NOUNS.length] ?? 'Striker';
+  let nounIndex = Math.floor(index / ADJECTIVES.length) % NOUNS.length;
+  let noun = NOUNS[nounIndex] ?? 'Striker';
+  if (isBlockedPair(adjective, noun)) {
+    nounIndex = (nounIndex + 1) % NOUNS.length;
+    noun = NOUNS[nounIndex] ?? 'Striker';
+  }
   return `${adjective} ${noun}`;
 }
 
@@ -292,12 +300,21 @@ export function createMockLeaderboard(options: {
       });
     }
     combined.sort(byStanding);
+    const countryCounts = new Map<string, number>();
+    if (scope === 'world') {
+      for (const row of combined) {
+        if (!row.country) continue;
+        countryCounts.set(row.country, (countryCounts.get(row.country) ?? 0) + 1);
+      }
+    }
     return combined.map((row, index) => ({
       rank: index + 1,
       nickname: row.nickname,
       score: row.score,
       mine: row.mine,
-      country: row.country,
+      country: scope === 'world' && row.country && (countryCounts.get(row.country) ?? 0) < COUNTRY_BOARD_MIN
+        ? null
+        : row.country,
     }));
   };
 

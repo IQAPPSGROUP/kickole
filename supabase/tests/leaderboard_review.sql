@@ -63,6 +63,28 @@ begin
   if result->>'ok' <> 'false' or result->>'reason' <> 'not_in_list' then
     raise exception 'unknown word should be rejected: %', result;
   end if;
+  result := public.suggest_free_names(4, null);
+  if result->>'reason' <> 'device_required' then
+    raise exception 'suggest requires a device: %', result;
+  end if;
+  result := public.peek_nickname(null, 'Neon', 'Falcon');
+  if result->>'reason' <> 'device_required' then
+    raise exception 'peek requires a device: %', result;
+  end if;
+  result := public.suggest_free_names(4, a, 'Ghost', 'Rider');
+  if result->>'ok' <> 'true' or jsonb_array_length(result->'names') <> 0 then
+    raise exception 'suggest must skip a blocked pair: %', result;
+  end if;
+  result := public.register_or_update_player('00000000-0000-4000-8000-0000000000c3', 'Ghost', 'Rider', null);
+  if result->>'reason' <> 'blocked_pair' then
+    raise exception 'blocked pair must be refused: %', result;
+  end if;
+  if not exists (
+    select 1 from private.app_secrets s
+    where s.key = 'ip_hash_salt' and btrim(s.value) <> ''
+  ) then
+    raise exception 'ip salt was not created in the database';
+  end if;
 
   result := public.peek_nickname(a, 'Neon', 'Falcon');
   if result->>'ok' <> 'true' or result->>'nickname' <> 'Neon Falcon' then
@@ -92,6 +114,21 @@ begin
   if result->>'hidden' <> 'true' then
     raise exception 'a country with one player must be hidden: %', result;
   end if;
+  insert into private.period_best (player_id, period, period_start, score, achieved_at)
+  values (a, 'all', private.period_start('all'), 5, now());
+  result := public.get_board('all', 'world', null, 20, a);
+  if not exists (
+    select 1 from jsonb_array_elements(result->'rows') elem
+    where elem->>'nickname' = 'Turbo Striker'
+  ) then
+    raise exception 'world board should list Turbo Striker: %', result;
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(result->'rows') elem
+    where elem->>'nickname' = 'Turbo Striker' and elem->>'country' is not null
+  ) then
+    raise exception 'world row must hide a country under 20 players: %', result;
+  end if;
 
   update private.players set created_at = now() - interval '2 days' where id = b;
   insert into private.scores (player_id, score, combo, run_duration_ms) values (b, 10, 1, 1000);
@@ -104,6 +141,15 @@ begin
     select 1 from private.reports r where r.reporter_player_id = b and r.reported_player_id = a and r.status = 'pending'
   ) then
     raise exception 'eligible report was not stored';
+  end if;
+
+  result := public.block_player(b, 'No Such Player');
+  if result->>'ok' <> 'true' or result->>'reason' is not null then
+    raise exception 'a missing block target must be a generic ok: %', result;
+  end if;
+  result := public.report_player(b, 'No Such Player', null);
+  if result->>'ok' <> 'true' or result->>'reason' is not null then
+    raise exception 'a missing report target must be a generic ok: %', result;
   end if;
 
   result := public.report_player(a, 'Neon Falcon', null);
@@ -132,6 +178,12 @@ begin
   result := public.submit_score(b, 1, 0, 1000, token);
   if result->>'accepted' <> 'true' then
     raise exception 'token submit should be accepted: %', result;
+  end if;
+  result := public.start_run(b);
+  token := (result->>'token')::uuid;
+  result := public.submit_score(b, 500, 1, 1000, token);
+  if result->>'reason' <> 'implausible' then
+    raise exception 'score above 25 per server second must fail: %', result;
   end if;
   result := public.submit_score(b, 12, 1, 1000, token);
   if result->>'reason' <> 'invalid_token' then

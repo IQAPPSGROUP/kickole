@@ -73,6 +73,12 @@ describe('nickname words', () => {
     expect(ADJECTIVES).toEqual(expect.arrayContaining(['Jazzy', 'Zippy', 'Snazzy']));
     expect(NOUNS).not.toContain('Roulette');
     expect(NOUNS).toContain('Stepover');
+    expect(ADJECTIVES).not.toContain('Sonic');
+    expect(ADJECTIVES).not.toContain('Prime');
+    expect(ADJECTIVES).toEqual(expect.arrayContaining(['Peppy', 'Jaunty']));
+    expect(NOUNS).not.toContain('Cougar');
+    expect(NOUNS).not.toContain('Beaver');
+    expect(NOUNS).toEqual(expect.arrayContaining(['Puffin', 'Meerkat']));
   });
 
   it('updates a live word list without re-seeding the whole table', () => {
@@ -83,6 +89,19 @@ describe('nickname words', () => {
     expect(sql).toContain("('adjective', 'Zippy')");
     expect(sql).toContain("('adjective', 'Snazzy')");
     expect(sql).toContain("('noun', 'Stepover')");
+  });
+
+  it('ships the trademark-pair migration', () => {
+    const sql = readFileSync('supabase/migrations/20261021150000_nickname_words_and_blocked_pairs.sql', 'utf8');
+    expect(sql).toMatch(/lower\(word\) in \('sonic', 'prime'\)/);
+    expect(sql).toMatch(/lower\(word\) in \('cougar', 'beaver'\)/);
+    for (const word of ['Peppy', 'Jaunty', 'Puffin', 'Meerkat']) {
+      expect(sql).toContain(`'${word}'`);
+    }
+    for (const pair of ['ghost', 'rider', 'power', 'ranger', 'ninja', 'turtle', 'desert', 'eagle', 'silver', 'fox']) {
+      expect(sql).toContain(`'${pair}'`);
+    }
+    expect(sql).toContain('private.blocked_pairs');
   });
 
   it('scans every combo, including Roman suffixes through XL, against the blocked words', () => {

@@ -93,7 +93,9 @@ describe('mock leaderboard', () => {
     expect(around.me.mine).toBe(true);
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
-    expect(board.top('world', 23, 10, 'all', NOW).every((row) => row.country)).toBe(true);
+    const world = board.top('world', 23, 50, 'all', NOW);
+    expect(world.some((row) => row.country === 'GB')).toBe(true);
+    expect(world.some((row) => row.country == null)).toBe(true);
   });
 
   it('hides a country board with fewer than 20 players', () => {
@@ -102,6 +104,7 @@ describe('mock leaderboard', () => {
     expect(board.rankFor(23, NOW).countryRank).toBeNull();
     expect(board.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
     expect(board.board('day', 'world', 23, 10, NOW).hidden).toBe(false);
+    expect(board.around(23, 'world', 'all', NOW).me.country).toBeNull();
   });
 
   it('treats a week as Monday 00:00 UTC through the following Sunday', () => {

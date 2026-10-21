@@ -40,9 +40,9 @@ Sapphire
 Diamond
 Platinum
 Atomic
-Sonic
+Peppy
 Hyper
-Prime
+Jaunty
 Royal
 Noble
 Swift
@@ -220,12 +220,12 @@ Cheetah
 Lynx
 Ocelot
 Bobcat
-Cougar
+Puffin
 Bear
 Panda
 Koala
 Otter
-Beaver
+Meerkat
 Fox
 Coyote
 Hyena

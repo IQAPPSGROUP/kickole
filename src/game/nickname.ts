@@ -110,11 +110,54 @@ export function checkNickname(raw: string): NicknameCheck {
   return { ok: true, nickname: parsed.nickname };
 }
 
+/** Pairs that stay off the board even though each word is allowed on its own. */
+export const BLOCKED_PAIRS: readonly (readonly [string, string])[] = [
+  ['Ghost', 'Rider'],
+  ['Power', 'Ranger'],
+  ['Ninja', 'Turtle'],
+  ['Desert', 'Eagle'],
+  ['Silver', 'Fox'],
+];
+
+const BLOCKED_PAIR_KEYS = new Set(BLOCKED_PAIRS.map(([adjective, noun]) => `${adjective.toLowerCase()} ${noun.toLowerCase()}`));
+
+export function isBlockedPair(adjective: string, noun: string): boolean {
+  return BLOCKED_PAIR_KEYS.has(`${adjective.trim().toLowerCase()} ${noun.trim().toLowerCase()}`);
+}
+
+/** Move the side the player just changed until the pair is allowed. */
+export function unblockIndex(kind: 'adjective' | 'noun', adjIndex: number, nounIndex: number): number {
+  const length = kind === 'adjective' ? ADJECTIVES.length : NOUNS.length;
+  let adj = adjIndex;
+  let noun = nounIndex;
+  for (let step = 0; step < length; step += 1) {
+    const left = ADJECTIVES[adj];
+    const right = NOUNS[noun];
+    if (left && right && !isBlockedPair(left, right)) return kind === 'adjective' ? adj : noun;
+    switch (kind) {
+      case 'adjective':
+        adj = (adj + 1) % ADJECTIVES.length;
+        break;
+      case 'noun':
+        noun = (noun + 1) % NOUNS.length;
+        break;
+      default: {
+        const unexpected: never = kind;
+        return unexpected;
+      }
+    }
+  }
+  return kind === 'adjective' ? adjIndex : nounIndex;
+}
+
 /** A random pair such as Turbo Striker. Always passes checkNickname. */
 export function suggestNickname(random: () => number = Math.random): string {
-  const adjective = ADJECTIVES[Math.floor(random() * ADJECTIVES.length)] ?? 'Turbo';
-  const noun = NOUNS[Math.floor(random() * NOUNS.length)] ?? 'Striker';
-  return `${adjective} ${noun}`;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const adjective = ADJECTIVES[Math.floor(random() * ADJECTIVES.length)] ?? 'Turbo';
+    const noun = NOUNS[Math.floor(random() * NOUNS.length)] ?? 'Striker';
+    if (!isBlockedPair(adjective, noun)) return `${adjective} ${noun}`;
+  }
+  return `${ADJECTIVES[0] ?? 'Turbo'} ${NOUNS[0] ?? 'Striker'}`;
 }
 
 export function wordIndex(words: readonly string[], word: string): number {

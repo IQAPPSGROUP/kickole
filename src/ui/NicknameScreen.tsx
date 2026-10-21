@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { countryByCode, countryFlag, searchCountries, suggestedCountry } from '../game/countries';
 import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
-import { composeNickname, parseNickname, pickFreePair, wordIndex, type FreePair } from '../game/nickname';
+import { composeNickname, isBlockedPair, parseNickname, pickFreePair, unblockIndex, wordIndex, type FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import { GraffitiText } from './Hud';
 
@@ -93,6 +93,7 @@ export function NicknameForm({
     if (!left || !right || left.toLowerCase() !== name.adjective.toLowerCase() || right.toLowerCase() !== name.noun.toLowerCase()) {
       return false;
     }
+    if (isBlockedPair(left, right)) return false;
     setAdj(nextAdj);
     setNoun(nextNoun);
     setPreview(composeNickname(left, right) ?? `${left} ${right}`);
@@ -138,7 +139,8 @@ export function NicknameForm({
             noun: changeNoun ? null : nounWord,
           });
           const choice = pickFreePair(names.filter((name) => (
-            (changeAdj || name.adjective.toLowerCase() === adjective.toLowerCase())
+            !isBlockedPair(name.adjective, name.noun)
+            && (changeAdj || name.adjective.toLowerCase() === adjective.toLowerCase())
             && (changeNoun || name.noun.toLowerCase() === nounWord.toLowerCase())
           )), { adjective, noun: nounWord });
           const unchanged = choice
@@ -149,9 +151,16 @@ export function NicknameForm({
           /* a local roll still moves the wheels */
         }
       }
-      const nextAdj = changeAdj ? otherIndex(ADJECTIVES.length, adj) : adj;
-      const nextNoun = changeNoun ? otherIndex(NOUNS.length, noun) : noun;
+      let nextAdj = changeAdj ? otherIndex(ADJECTIVES.length, adj) : adj;
+      let nextNoun = changeNoun ? otherIndex(NOUNS.length, noun) : noun;
+      let guard = 0;
+      while (isBlockedPair(ADJECTIVES[nextAdj] ?? '', NOUNS[nextNoun] ?? '') && guard < 40) {
+        guard += 1;
+        if (changeAdj) nextAdj = otherIndex(ADJECTIVES.length, nextAdj);
+        if (changeNoun) nextNoun = otherIndex(NOUNS.length, nextNoun);
+      }
       if (nextAdj === adj && nextNoun === noun) return;
+      if (isBlockedPair(ADJECTIVES[nextAdj] ?? '', NOUNS[nextNoun] ?? '')) return;
       applyPair(nextAdj, nextNoun);
     })();
   };
@@ -165,6 +174,12 @@ export function NicknameForm({
         setBusy(true);
         setServerIssue(null);
         void (async () => {
+          const initialPair = parsed?.adjective === adjective && parsed?.noun === nounWord;
+          if (!initialPair && isBlockedPair(adjective, nounWord)) {
+            setServerIssue('Those two words can\'t go together.');
+            setBusy(false);
+            return;
+          }
           if (!acked) {
             const wasTaken = await peekPair(adjective, nounWord);
             if (wasTaken) {
@@ -192,8 +207,9 @@ export function NicknameForm({
           onToggleLock={() => setLockAdj((value) => !value)}
           onShuffle={() => roll('first')}
           onChange={(index) => {
-            setAdj(index);
-            showPair(ADJECTIVES[index] ?? adjective, nounWord);
+            const next = unblockIndex('adjective', index, noun);
+            setAdj(next);
+            showPair(ADJECTIVES[next] ?? adjective, nounWord);
           }}
         />
         <WordWheel
@@ -204,8 +220,9 @@ export function NicknameForm({
           onToggleLock={() => setLockNoun((value) => !value)}
           onShuffle={() => roll('second')}
           onChange={(index) => {
-            setNoun(index);
-            showPair(adjective, NOUNS[index] ?? nounWord);
+            const next = unblockIndex('noun', adj, index);
+            setNoun(next);
+            showPair(adjective, NOUNS[next] ?? nounWord);
           }}
         />
       </div>

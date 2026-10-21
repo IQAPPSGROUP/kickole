@@ -27,12 +27,12 @@ Each resolve writes `private.moderation_log` with the action, the report id, and
 
 ## Retention
 
-`private.purge_leaderboard()` is scheduled daily at 03:15 UTC when `pg_cron` is available:
+`private.purge_leaderboard()` is scheduled daily at 03:15 UTC. The migration raises if `pg_cron` is unavailable:
 
 - raw `private.scores` older than 12 months
-- settled reports and moderation log rows older than 90 days
+- settled reports (`upheld`, `dismissed`, `superseded`) and moderation log rows older than 90 days. Open reports stay.
 - hashed IP rate-limit rows older than 30 days
 - run tokens older than 7 days
 - players with no play for 2 years (bests go with them; a player who still has a report becomes a tombstone until that report ages out)
 
-The IP hash uses `private.app_secrets.ip_hash_salt`. Until Rob inserts that secret, per-IP limits are skipped and no address is stored.
+The IP hash uses `private.app_secrets.ip_hash_salt`. The migration creates that salt with `gen_random_bytes` when the row is missing. The hash reads only `cf-connecting-ip`. When that header is absent, rate limits share an `unknown` bucket and no address is stored on the player.

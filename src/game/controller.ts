@@ -88,6 +88,8 @@ export interface Result {
   combos: number;
   /** Run clock in milliseconds. Sent with the score. */
   durationMs: number;
+  /** Kick times in milliseconds from the start of this run. */
+  kickTimesMs: number[];
   newBest: boolean;
   rank: number;
   coinsEarned: number;
@@ -117,6 +119,7 @@ export class GameController {
   private settings = loadSettings();
   /** Per-run challenge tallies flushed into the save on game over. */
   private runChallenges: ChallengeProgress = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
+  private kickTimesMs: number[] = [];
   private perfects = 0;
   private progress: AudioProgress = { streak: 0, kickUps: 0, perfects: 0 };
   private pendingCheers: string[] = [];
@@ -340,6 +343,7 @@ export class GameController {
         this.buzz('launch');
         break;
       case 'kick': {
+        this.kickTimesMs.push(Math.max(0, Math.round(this.engine.time * 1000)));
         if (e.alternate) this.runChallenges.alternateFoot += 1;
         if (e.stall) this.runChallenges.stalls += 1;
         if (e.grade === 'perfect') this.runChallenges.perfectTouch += 1;
@@ -421,6 +425,7 @@ export class GameController {
           bestStreak: s.bestStreak,
           combos: s.combos,
           durationMs: Math.max(0, Math.round(this.engine.time * 1000)),
+          kickTimesMs: this.kickTimesMs,
           newBest: r.newBest,
           rank: r.rank,
           coinsEarned: r.coinsEarned,
@@ -601,6 +606,7 @@ export class GameController {
     this.feedback = null;
     this.result = null;
     this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
+    this.kickTimesMs = [];
     this.perfects = 0;
     this.progress = { streak: 0, kickUps: 0, perfects: 0 };
     this.pendingCheers = [];

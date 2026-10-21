@@ -9,7 +9,8 @@ import type {
   RunSubmit,
 } from './leaderboard';
 import { readBlockedNames, writeBlockedNames } from './leaderboard';
-import { composeNickname, parseNickname, type FreePair } from './nickname';
+import { composeNickname, isBlockedPair, parseNickname, type FreePair } from './nickname';
+import { kickTimesText, runChecksum } from './runProof';
 import { loadDeviceId } from './nicknameStore';
 import { liveRpc, type LeaderboardRpc } from './supabaseClient';
 
@@ -52,6 +53,7 @@ interface OutboxScore {
   durationMs: number;
   holdUntil: number;
   token: string;
+  kickTimesMs?: number[];
 }
 
 interface PendingModeration {
@@ -134,6 +136,10 @@ export function serverNicknameMessage(reason: string): string {
       return 'This device cannot join the board.';
     case 'rate_limited':
       return 'Try again in a little while.';
+    case 'blocked_pair':
+      return 'Those two words can\'t go together.';
+    case 'device_required':
+      return 'Try again in a little while.';
     default:
       return 'Pick a different nickname.';
   }
@@ -148,6 +154,8 @@ function permanentNicknameReason(reason: string): boolean {
       return true;
     case 'rename_limit':
     case 'rate_limited':
+    case 'blocked_pair':
+    case 'device_required':
       return false;
     default:
       return false;
@@ -202,6 +210,7 @@ export async function suggestFreeNames(input: {
   for (const item of body.names) {
     const row = asRecord(item);
     if (typeof row.adjective !== 'string' || typeof row.noun !== 'string') continue;
+    if (isBlockedPair(row.adjective, row.noun)) continue;
     names.push({ adjective: row.adjective, noun: row.noun });
   }
   return names;
@@ -264,6 +273,9 @@ function readOutbox(storage: Storage): OutboxScore | null {
       durationMs: parsed.durationMs,
       holdUntil: typeof parsed.holdUntil === 'number' ? parsed.holdUntil : 0,
       token: parsed.token,
+      kickTimesMs: Array.isArray(parsed.kickTimesMs)
+        ? parsed.kickTimesMs.filter((time): time is number => typeof time === 'number' && Number.isFinite(time))
+        : undefined,
     };
   } catch {
     return null;
@@ -386,9 +398,16 @@ export function createSupabaseLeaderboard(options: {
     }, Math.max(0, wait));
   };
 
-  const rememberOutbox = (score: number, combo: number, durationMs: number, holdUntil: number, token: string) => {
+  const rememberOutbox = (
+    score: number,
+    combo: number,
+    durationMs: number,
+    holdUntil: number,
+    token: string,
+    kickTimesMs?: number[],
+  ) => {
     if (outbox && outbox.deviceId === deviceId && score < outbox.score) return;
-    outbox = { deviceId, score, combo, durationMs, holdUntil, token };
+    outbox = { deviceId, score, combo, durationMs, holdUntil, token, kickTimesMs };
     persistOutbox();
   };
 
@@ -507,12 +526,26 @@ export function createSupabaseLeaderboard(options: {
   const flushOutbox = async (token: number): Promise<void> => {
     if (!outbox || outbox.deviceId !== deviceId || now() < outbox.holdUntil) return;
     const pendingScore = outbox;
+    const kickTimesMs = pendingScore.kickTimesMs;
+    const kickTimes = kickTimesMs ? kickTimesText(kickTimesMs) : null;
     const sent = await callRpc(rpc, 'submit_score', {
       device_id: deviceId,
       score: pendingScore.score,
       combo: pendingScore.combo,
       run_duration_ms: pendingScore.durationMs,
       run_token: pendingScore.token,
+      ...(kickTimesMs ? {
+        kick_count: kickTimesMs.length,
+        kick_times: kickTimes,
+        kick_checksum: runChecksum({
+          deviceId,
+          token: pendingScore.token,
+          score: pendingScore.score,
+          kickCount: kickTimesMs.length,
+          durationMs: pendingScore.durationMs,
+          kickTimes: kickTimes ?? '',
+        }),
+      } : {}),
     });
     if (token !== generation || stopped) return;
     if (sent.error) {
@@ -752,6 +785,7 @@ export function createSupabaseLeaderboard(options: {
       const rounded = Math.floor(score);
       const combo = Math.max(0, Math.floor(run?.combo ?? 0));
       const durationMs = Math.max(0, Math.floor(run?.durationMs ?? 0));
+      const kickTimesMs = run?.kickTimesMs?.map((time) => Math.max(0, Math.floor(time)));
       const known = Math.max(syncedBest, outbox?.score ?? 0);
       if (!Number.isFinite(score) || rounded <= 0 || durationMs <= 0) {
         return { accepted: false, best: known };
@@ -765,7 +799,7 @@ export function createSupabaseLeaderboard(options: {
       const token = generation;
       enqueue(async () => {
         if (!runToken) return;
-        rememberOutbox(rounded, combo, durationMs, 0, runToken);
+        rememberOutbox(rounded, combo, durationMs, 0, runToken, kickTimesMs);
         await flushOutbox(token);
         if (token !== generation || stopped) return;
         widgetAt = 0;

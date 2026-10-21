@@ -1,5 +1,7 @@
 -- Run in the SQL editor after the review migrations. Rolls back. Not part of app CI.
 -- psql "$DATABASE_URL" -f supabase/tests/leaderboard_review.sql
+-- Live nicknames are cleared inside this transaction so the numeral and board
+-- checks do not depend on names real players already hold. rollback puts them back.
 
 begin;
 
@@ -21,6 +23,27 @@ begin
   if not has_function_privilege('anon', 'public.register_or_update_player(uuid, text, text, text)', 'execute') then
     raise exception 'anon cannot register';
   end if;
+
+  -- Ranked boards ignore a player with no nickname, so this also leaves the
+  -- country and world checks with only the rows inserted below.
+  update private.players
+  set nickname = null
+  where nickname is not null;
+
+  update private.players
+  set hidden = false,
+      banned = false,
+      deleted_at = null,
+      renamed_at = null
+  where id in (
+    a,
+    b,
+    '00000000-0000-4000-8000-0000000000c3',
+    '00000000-0000-4000-8000-000000000099'
+  );
+
+  delete from private.period_best
+  where player_id in (a, b);
 
   result := public.register_or_update_player(a, 'Turbo', 'Striker', 'GB');
   if result->>'nickname' <> 'Turbo Striker' then
@@ -111,12 +134,12 @@ begin
     raise exception 'ZZ is not an ISO country we list: %', result;
   end if;
 
+  insert into private.period_best (player_id, period, period_start, score, achieved_at)
+  values (a, 'all', private.period_start('all'), 5, now());
   result := public.get_board('all', 'country', 'GB', 10, a);
   if result->>'hidden' <> 'true' then
     raise exception 'a country with one player must be hidden: %', result;
   end if;
-  insert into private.period_best (player_id, period, period_start, score, achieved_at)
-  values (a, 'all', private.period_start('all'), 5, now());
   result := public.get_board('all', 'world', null, 20, a);
   if not exists (
     select 1 from jsonb_array_elements(result->'rows') elem

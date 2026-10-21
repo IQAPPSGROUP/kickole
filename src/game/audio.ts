@@ -339,6 +339,7 @@ function noteRob(which: 'menu' | 'play', ok: boolean) {
 
 function noteTrack(name: string | null) {
   nowPlaying = name;
+  publishAudioDebug();
   trackListeners.forEach((listener) => listener(name));
 }
 
@@ -365,6 +366,25 @@ export function skipTrack(): SongChoice {
   return songChoice;
 }
 
+/** Drop decoded song PCM so a lost WebGL context has a chance to come back. */
+export function releaseDecodedMusic() {
+  rob?.releaseDecoded();
+}
+
+/** After the graphics context returns, decode only the track that should be audible. */
+export function restoreMusicAfterContext() {
+  if (!unlocked || !foreground || !bed.music || !rob) return;
+  const c = ctx;
+  if (c && (c.state as string) !== 'running') void c.resume();
+  rob.setMode(mode, true);
+}
+
+function publishAudioDebug() {
+  if (!import.meta.env.DEV) return;
+  const target = globalThis as { __KICKOLE_AUDIO?: { retained: () => readonly string[] } };
+  target.__KICKOLE_AUDIO = { retained: () => rob?.retainedTracks() ?? [] };
+}
+
 export function subscribeNowPlaying(listener: (name: string | null) => void): () => void {
   trackListeners.add(listener);
   listener(nowPlaying);
@@ -377,6 +397,7 @@ function ensureRob(c: AudioContext) {
   rob.setEnabled(enabledSongs);
   if (songChoice !== SHUFFLE_SONG && !enabledSongs.includes(songChoice)) songChoice = SHUFFLE_SONG;
   rob.setSongChoice(songChoice);
+  publishAudioDebug();
 }
 
 function recoverPlayback() {

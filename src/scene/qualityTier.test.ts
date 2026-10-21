@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { characterModelUrl } from './rig';
 import {
+  MAX_PIXEL_RATIO,
+  cappedDpr,
   characterLod,
   createFpsGuard,
   detectTier,
@@ -9,6 +11,7 @@ import {
   profileFor,
   resolveTier,
   stepFpsGuard,
+  useMsaa,
 } from './qualityTier';
 
 describe('quality tiers', () => {
@@ -118,5 +121,16 @@ describe('quality tiers', () => {
     expect(characterModelUrl(1)).toMatch(/kickole_player_v4_lod1\.glb$/);
     expect(characterModelUrl(0, 'female')).toMatch(/kickole_player_v4_female\.glb$/);
     expect(characterModelUrl(1, 'female')).toMatch(/kickole_player_v4_female_lod1\.glb$/);
+  });
+
+  it('caps the framebuffer at two device pixels and leaves MSAA off', () => {
+    expect(useMsaa()).toBe(false);
+    expect(cappedDpr([1, 3])).toEqual([1, 2]);
+    for (const tier of ['low', 'medium', 'high'] as const) {
+      const dpr = profileFor(tier).dpr;
+      expect(dpr[0]).toBeLessThanOrEqual(MAX_PIXEL_RATIO);
+      expect(dpr[1]).toBeLessThanOrEqual(MAX_PIXEL_RATIO);
+      expect(cappedDpr(dpr)).toEqual([dpr[0], dpr[1]]);
+    }
   });
 });

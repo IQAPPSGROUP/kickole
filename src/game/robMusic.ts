@@ -41,6 +41,43 @@ export const MODE_CROSSFADE_SEC = 1.8;
 /** Decode the next playlist track this early so the crossfade is not late. */
 const PREFETCH_SEC = 8;
 
+/** Every shuffle run opens on Alley Beat, then leaves it out of the automatic rotation. */
+export const OPENER_TRACK_ID = 'gameplay-instrumental';
+
+/** Songs that follow Alley Beat. Shuffled per run, never back to back. */
+export const ROTATION_TRACKS: readonly string[] = ['menu-song', 'game-song-2', 'game-song-3'];
+
+/**
+ * Alley Beat first when it is enabled, then a shuffle of We Rise, Keep It in the Air,
+ * and Don't Let It Drop. A disabled opener leaves only that shuffle.
+ */
+export function openingPlaylist(enabled: readonly string[], random: () => number = Math.random): string[] {
+  const allow = new Set(enabled);
+  const opener = allow.has(OPENER_TRACK_ID) ? [OPENER_TRACK_ID] : [];
+  const rest = shuffleNames(ROTATION_TRACKS.filter((id) => allow.has(id)), random);
+  return [...opener, ...rest];
+}
+
+/**
+ * The track that starts when the current one reaches its handoff.
+ * Alley Beat plays once per run. The later songs stay in their shuffle and do not repeat back to back.
+ * A one-song list is allowed to repeat.
+ */
+export function nextRotationTrack(
+  playlist: readonly string[],
+  current: string | null,
+  failed: ReadonlySet<string>,
+): TrackPick | null {
+  const rotation = playlist.filter((name) => name !== OPENER_TRACK_ID);
+  const pool = rotation.length > 0 ? rotation : playlist;
+  const index = current ? pool.indexOf(current) : -1;
+  const start = index >= 0 ? index + 1 : 0;
+  const pick = pickTrack(pool, start, failed, current);
+  if (!pick) return null;
+  const fullIndex = playlist.indexOf(pick.name);
+  return { name: pick.name, index: fullIndex >= 0 ? fullIndex : pick.index };
+}
+
 export interface SongLoop {
   start: number;
   end: number;
@@ -101,7 +138,7 @@ export function resumePlan(duration: number, savedOffset: number, name?: string)
   return { action: 'resume', offset: Math.min(duration, Math.max(window.offset, savedOffset)) };
 }
 
-/** Fisher-Yates. The session keeps this order so runs do not restart at track one. */
+/** Fisher-Yates. A run's rotation keeps this order until that run ends. */
 export function shuffleNames(names: readonly string[], random: () => number = Math.random): string[] {
   const order = names.slice();
   for (let i = order.length - 1; i > 0; i--) {
@@ -224,9 +261,8 @@ interface Playhead {
 }
 
 /**
- * Menu loops menu-song. Gameplay rotates a shuffled playlist for the whole
- * page session and only decodes the track that is playing, plus the next one
- * just before the crossfade.
+ * Menu loops menu-song. A shuffle run starts on Alley Beat, then rotates the
+ * other three songs. Only the audible buffer and the next one are decoded.
  */
 export class RobPlayer {
   private mode: BedMode | null = null;
@@ -251,9 +287,14 @@ export class RobPlayer {
   private songChoice: SongChoice = SHUFFLE_SONG;
   private skipSerial = 0;
   private jumping = false;
+  /** Set when a run begins from the menu. Resume keeps the place in the file. */
+  private freshRun = false;
+  /** Sources still holding PCM after they leave `voices`, so a new decode can drop them. */
+  private heldSources: AudioBufferSourceNode[] = [];
 
   private readonly load: (name: string) => Promise<AudioBuffer | null>;
   private readonly onTrack: (name: string | null) => void;
+  private readonly random: () => number;
 
   constructor(
     private readonly ctx: AudioContext,
@@ -261,9 +302,41 @@ export class RobPlayer {
     private readonly onResult: (mode: BedMode, ok: boolean) => void = () => {},
     load?: (name: string) => Promise<AudioBuffer | null>,
     onTrack?: (name: string | null) => void,
+    random: () => number = Math.random,
   ) {
     this.load = load ?? ((name) => loadTrack(ctx, name));
     this.onTrack = onTrack ?? (() => {});
+    this.random = random;
+  }
+
+  /** Names whose decoded PCM is still held. At most the audible track and the next one. */
+  retainedTracks(): readonly string[] {
+    const names = new Set<string>();
+    if (this.menuBuffer) names.add(ROB_MENU_NAME);
+    if (this.cache) names.add(this.cache.name);
+    for (const voice of this.voices) {
+      if (voice.source.buffer) names.add(voice.track);
+    }
+    return [...names];
+  }
+
+  /** Drop every decoded buffer. Used when the GPU context is lost and before a run's first decode. */
+  releaseDecoded() {
+    this.menuBuffer = null;
+    this.cache = null;
+    this.prefetch = null;
+    this.prefetchName = null;
+    this.prefetchAt = 0;
+    this.handoffAt = 0;
+    this.handoffFade = 0;
+    this.nextAt = 0;
+    this.loop = null;
+    for (const source of this.heldSources) {
+      try { source.stop(); } catch { /* already stopped */ }
+      try { source.buffer = null; } catch { /* already released */ }
+    }
+    this.heldSources = [];
+    this.voices = [];
   }
 
   /** Tracks the player turned off. The current song moves on when it is one of them. */
@@ -327,12 +400,14 @@ export class RobPlayer {
   setMode(mode: BedMode, force = false) {
     const live = this.voices.some((voice) => voice.stopAt > this.ctx.currentTime + 0.05);
     if (!force && this.mode === mode && (live || this.pending === mode)) return;
+    const enteringPlay = mode === 'play' && this.mode !== 'play';
     if (this.mode === 'play') this.capturePlayhead();
     this.skipSerial += 1;
     this.jumping = false;
     this.generation += 1;
     const generation = this.generation;
     this.mode = mode;
+    this.freshRun = force ? false : enteringPlay;
     this.pending = mode;
     this.fadeOutAll(MODE_CROSSFADE_SEC);
     this.ensureTicker();
@@ -381,6 +456,10 @@ export class RobPlayer {
   }
 
   private async startPlay(generation: number): Promise<boolean> {
+    const fresh = this.freshRun;
+    this.freshRun = false;
+    if (fresh) this.playhead = null;
+    if (fresh && this.songChoice === SHUFFLE_SONG) return this.beginFreshShuffle(generation);
     const order = this.ensureOrder();
     if (this.songChoice !== SHUFFLE_SONG) {
       const pinned = await this.startPinned(generation);
@@ -415,6 +494,23 @@ export class RobPlayer {
     return true;
   }
 
+  private async takeRotation(previous: string | null, generation: number) {
+    const order = this.order ?? [];
+    const tried = new Set<string>();
+    let current = previous;
+    while (tried.size < order.length) {
+      const pick = nextRotationTrack(order, current, this.unavailable());
+      if (!pick || tried.has(pick.name)) return null;
+      tried.add(pick.name);
+      const buffer = await this.song(pick.name, generation);
+      if (generation !== this.generation) return null;
+      if (buffer && buffer.duration > trackLeadIn(pick.name) + 0.05) return { ...pick, buffer };
+      this.failed.add(pick.name);
+      current = pick.name;
+    }
+    return null;
+  }
+
   private async takeNext(startIndex: number, previous: string | null, generation: number) {
     const order = this.order ?? [];
     const tried = new Set<string>();
@@ -434,13 +530,61 @@ export class RobPlayer {
     return null;
   }
 
+  private async beginFreshShuffle(generation: number): Promise<boolean> {
+    this.releaseDecoded();
+    const enabled = GAMEPLAY_TRACKS.filter((name) => !this.disabled.has(name));
+    this.order = openingPlaylist(enabled, this.random);
+    this.cursor = 0;
+    this.playhead = null;
+    let name = this.order.find((track) => !this.unavailable().has(track)) ?? null;
+    if (!name) return false;
+    let buffer = await this.song(name, generation);
+    if (generation !== this.generation || this.mode !== 'play') return false;
+    if (!buffer || !(buffer.duration > trackLeadIn(name) + 0.05)) {
+      this.failed.add(name);
+      const fallback = nextRotationTrack(this.order, name, this.unavailable());
+      if (!fallback) return false;
+      name = fallback.name;
+      buffer = await this.song(name, generation);
+      if (generation !== this.generation || this.mode !== 'play' || !buffer) return false;
+      this.cursor = fallback.index;
+    } else {
+      const index = this.order.indexOf(name);
+      if (index >= 0) this.cursor = index;
+    }
+    const offset = trackWindow(buffer.duration, undefined, name).offset;
+    this.spawnTrack(buffer, name, offset, this.ctx.currentTime, MODE_CROSSFADE_SEC);
+    return true;
+  }
+
   private async song(name: string, generation: number): Promise<AudioBuffer | null> {
     if (this.cache?.name === name) return this.cache.buffer;
     if (name === ROB_MENU_NAME && this.menuBuffer) return this.menuBuffer;
+    this.freeIdleAudio();
     const buffer = await this.load(name);
     if (!buffer || generation !== this.generation) return null;
     this.cache = { name, buffer };
     return buffer;
+  }
+
+  /** Drop PCM that is not currently audible so a decode never stacks a third song. */
+  private freeIdleAudio() {
+    const audible = new Set<string>();
+    const now = this.ctx.currentTime;
+    for (const voice of this.voices) {
+      if (voice.source.buffer && voice.stopAt > now) audible.add(voice.track);
+    }
+    if (this.menuBuffer && !audible.has(ROB_MENU_NAME)) this.menuBuffer = null;
+    if (this.cache && !audible.has(this.cache.name)) this.cache = null;
+    for (const voice of this.voices) {
+      if (audible.has(voice.track)) continue;
+      try { voice.source.buffer = null; } catch { /* already released */ }
+    }
+    for (const source of this.heldSources) {
+      const live = this.voices.some((voice) => voice.source === source && audible.has(voice.track));
+      if (live) continue;
+      try { source.buffer = null; } catch { /* already released */ }
+    }
   }
 
   private releaseMenu() {
@@ -511,7 +655,10 @@ export class RobPlayer {
   }
 
   private ensureOrder(): string[] {
-    if (!this.order) this.order = shuffleNames(GAMEPLAY_TRACKS);
+    if (!this.order) {
+      const enabled = GAMEPLAY_TRACKS.filter((name) => !this.disabled.has(name));
+      this.order = openingPlaylist(enabled, this.random);
+    }
     return this.order;
   }
 
@@ -557,13 +704,15 @@ export class RobPlayer {
       this.failed.add(name);
     }
     const previous = this.playhead?.name ?? order[this.cursor] ?? null;
+    const hoped = this.songChoice === SHUFFLE_SONG
+      ? nextRotationTrack(order, previous, this.unavailable())
+      : pickTrack(order, this.cursor + 1, this.unavailable(), previous);
     const loaded = this.prefetch;
     this.prefetch = null;
     this.prefetchName = null;
     let buffer: AudioBuffer | null = null;
     let pick: TrackPick | null = null;
-    if (loaded && previous) {
-      const hoped = pickTrack(order, this.cursor + 1, this.unavailable(), previous);
+    if (loaded && hoped) {
       const decoded = await loaded;
       if (generation !== this.generation || this.mode !== 'play') return;
       if (hoped && !decoded) this.failed.add(hoped.name);
@@ -573,7 +722,9 @@ export class RobPlayer {
       }
     }
     if (!pick || !buffer) {
-      const taken = await this.takeNext(this.cursor + 1, previous, generation);
+      const taken = this.songChoice === SHUFFLE_SONG
+        ? await this.takeRotation(previous, generation)
+        : await this.takeNext(this.cursor + 1, previous, generation);
       if (generation !== this.generation || this.mode !== 'play' || !taken) {
         if (generation === this.generation && this.mode === 'play') this.onResult('play', false);
         return;
@@ -598,7 +749,7 @@ export class RobPlayer {
     this.handoffFade = plan.fade;
     this.handoffAt = (started?.startedAt ?? when) + handoffDelay;
     const next = this.songChoice === SHUFFLE_SONG
-      ? pickTrack(this.order ?? [], this.cursor + 1, this.unavailable(), name)
+      ? nextRotationTrack(this.order ?? [], name, this.unavailable())
       : null;
     this.prefetch = null;
     this.prefetchName = next?.name ?? null;
@@ -672,8 +823,10 @@ export class RobPlayer {
     try { source.stop(end + 0.03); } catch { /* already scheduled */ }
     const voice: Voice = { source, gain, stopAt: end, role, track, fileStart: Math.max(0, offset), startedAt: start };
     this.voices.push(voice);
+    this.heldSources.push(source);
     source.onended = () => {
       this.voices = this.voices.filter((item) => item !== voice);
+      this.heldSources = this.heldSources.filter((item) => item !== source);
       try { source.buffer = null; } catch { /* the node has already released it */ }
     };
   }

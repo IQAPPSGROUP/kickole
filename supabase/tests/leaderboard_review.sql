@@ -9,7 +9,7 @@ declare
   b uuid := '00000000-0000-4000-8000-0000000000b2';
   result jsonb;
   token uuid;
-  report_id bigint;
+  v_report bigint;
 begin
   if has_function_privilege('anon', 'public.moderator_queue()', 'execute') then
     raise exception 'anon can execute moderator_queue';
@@ -145,12 +145,12 @@ begin
     raise exception 'duration past the token age should fail: %', result;
   end if;
 
-  select r.id into report_id from private.reports r where r.reported_player_id = a and r.status = 'pending' limit 1;
-  result := public.resolve_report(report_id, 'dismiss');
+  select r.id into v_report from private.reports r where r.reported_player_id = a and r.status = 'pending' limit 1;
+  result := public.resolve_report(v_report, 'dismiss');
   if result->>'ok' <> 'true' then
     raise exception 'dismiss failed: %', result;
   end if;
-  if not exists (select 1 from private.moderation_log m where m.report_id = report_id and m.action = 'dismiss') then
+  if not exists (select 1 from private.moderation_log m where m.report_id = v_report and m.action = 'dismiss') then
     raise exception 'moderation log missing';
   end if;
 end $$;

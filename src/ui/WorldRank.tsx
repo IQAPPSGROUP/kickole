@@ -33,7 +33,7 @@ export function WorldRank({
       {showCountry && snapshot.country && (
         <p className="world-rank-country">
           <span className="country-flag" aria-hidden="true">{countryFlag(snapshot.country)}</span>
-          {formatRank(snapshot.countryRank)}
+          <span className={snapshot.countryRank === 1 ? 'is-first' : ''}>{formatRank(snapshot.countryRank)}</span>
         </p>
       )}
       {gained > 0 && <p className="world-rank-delta" key={gained}>↑ +{gained}</p>}

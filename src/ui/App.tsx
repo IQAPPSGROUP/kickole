@@ -17,13 +17,13 @@ import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { NicknameScreen, OptInCard } from './NicknameScreen';
-import { DataScreen, Home, GameOver, SettingsScreen } from './Screens';
+import { DataScreen, Home, GameOver, LeaderboardDataScreen, SettingsScreen } from './Screens';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
-type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'data';
+type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'data' | 'how';
 
 const REVIEW_NICKNAME = 'Turbo Striker';
 const REVIEW_COUNTRY = 'GB';
@@ -292,7 +292,7 @@ export function App() {
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
       {!needsBody && needsOpt && phase === 'menu' && overlay === 'none' && (
-        <OptInCard onJoin={joinBoard} onNotNow={leaveBoardPrompt} onData={() => setOverlay('data')} />
+        <OptInCard onJoin={joinBoard} onNotNow={leaveBoardPrompt} onData={() => setOverlay('how')} />
       )}
       {!needsBody && !needsOpt && needsNick && phase === 'menu' && overlay === 'none' && (
         <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} onSuggest={mockBoard ? undefined : suggestTags} />
@@ -311,7 +311,7 @@ export function App() {
         <Hud
           hud={snap.hud}
           controller={controller}
-          nickname={nickname}
+          nickname={nickname ?? (reviewing ? boardName : null)}
           board={board}
           onSkipCelebration={() => controller.skipCelebration()}
         />
@@ -362,8 +362,11 @@ export function App() {
           onClose={closeOverlay}
         />
       )}
+      {overlay === 'how' && (
+        <DataScreen onClose={() => setOverlay('none')} />
+      )}
       {overlay === 'data' && (
-        <DataScreen onClose={() => setOverlay(leaderboardOn || optIn === 'out' ? 'settings' : 'none')} />
+        <LeaderboardDataScreen onClose={() => setOverlay('settings')} />
       )}
       {overlay === 'customise' && (
         <CustomiseScreen

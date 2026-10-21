@@ -18,7 +18,7 @@ import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { NicknameScreen, OptInCard } from './NicknameScreen';
-import { DataScreen, Home, GameOver, LeaderboardDataScreen, SettingsScreen } from './Screens';
+import { DataScreen, Home, GameOver, LeaderboardDataScreen, PauseScreen, SettingsScreen } from './Screens';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
@@ -45,6 +45,7 @@ export function App() {
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
   const [overlay, setOverlay] = useState<Overlay>('none');
+  const [paused, setPaused] = useState(false);
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
@@ -107,6 +108,13 @@ export function App() {
   }, [phase, snap.result, board]);
 
   useEffect(() => {
+    if (!paused) return;
+    if (phase === 'ready' || phase === 'playing') return;
+    setPaused(false);
+    controller.holdPlay(false);
+  }, [paused, phase, controller]);
+
+  useEffect(() => {
     const readInset = (name: string) => {
       const app = document.querySelector('.app');
       if (!app) return 0;
@@ -114,6 +122,7 @@ export function App() {
       return Number.isFinite(value) ? value : 0;
     };
     const onDown = (event: PointerEvent) => {
+      if (paused) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       const layout = fanLayout(window.innerWidth, readInset('--sat-l'), readInset('--sat-r'), readInset('--sat-b'));
       const side = footSideAt(event.clientX, event.clientY, window.innerWidth, window.innerHeight, layout);
@@ -131,7 +140,7 @@ export function App() {
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointercancel', onUp, true);
     };
-  }, [controller]);
+  }, [controller, paused]);
 
   useEffect(() => {
     installAudioLifecycle();
@@ -155,6 +164,14 @@ export function App() {
     const keys: Record<string, 'left' | 'right'> = { KeyA: 'left', KeyD: 'right' };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      if (paused) {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          setPaused(false);
+          controller.holdPlay(false);
+        }
+        return;
+      }
       if (blocking) return;
       if (e.code === 'Space') {
         if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
@@ -207,7 +224,7 @@ export function App() {
       window.removeEventListener('keyup', up);
       if (neckDown) controller.releaseNeck();
     };
-  }, [controller, blocking]);
+  }, [controller, blocking, paused]);
 
   const startGame = () => {
     cancelOpeningIntroForGameplay();
@@ -317,7 +334,26 @@ export function App() {
           onSkipCelebration={() => controller.skipCelebration()}
         />
       )}
-      {(phase === 'ready' || phase === 'playing') && <TouchZones controller={controller} />}
+      {(phase === 'ready' || phase === 'playing') && (
+        <TouchZones
+          controller={controller}
+          onPause={() => {
+            setPaused(true);
+            controller.holdPlay(true);
+          }}
+        />
+      )}
+      {paused && (phase === 'ready' || phase === 'playing') && (
+        <PauseScreen
+          song={snap.settings.song}
+          enabledSongs={snap.settings.enabledSongs}
+          onSong={(song) => controller.updateSettings({ song })}
+          onClose={() => {
+            setPaused(false);
+            controller.holdPlay(false);
+          }}
+        />
+      )}
       {reviewOpen && phase === 'menu' && overlay === 'none' && board && (
         <GameOver
           result={REVIEW_RESULT}
@@ -360,6 +396,7 @@ export function App() {
           onSuggest={mockBoard ? undefined : suggestTags}
           board={board}
           onChange={(p) => controller.updateSettings(p)}
+          onToggleSong={(id) => controller.toggleSong(id)}
           onClose={closeOverlay}
         />
       )}

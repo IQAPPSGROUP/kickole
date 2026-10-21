@@ -27,7 +27,7 @@ import {
   type MusicGraph,
 } from './musicBed';
 import { RobPlayer } from './robMusic';
-import { normalizeSongChoice, SHUFFLE_SONG, type SongChoice } from './tracks';
+import { GAME_TRACKS, normalizeEnabledTracks, normalizeSongChoice, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 
 /**
  * Kicks, misses and cheers are synthesised here.
@@ -62,6 +62,7 @@ let rob: RobPlayer | null = null;
 let robMenu: 'idle' | 'ready' | 'missing' = 'idle';
 let robPlay: 'idle' | 'ready' | 'missing' = 'idle';
 let songChoice: SongChoice = SHUFFLE_SONG;
+let enabledSongs: GameTrackId[] = GAME_TRACKS.map((track) => track.id);
 let nowPlaying: string | null = null;
 const trackListeners = new Set<(name: string | null) => void>();
 let interruptWatch = false;
@@ -344,7 +345,15 @@ function noteTrack(name: string | null) {
 /** The gameplay song to save: shuffle, or one track from tracks.ts. */
 export function setSongChoice(choice: SongChoice) {
   songChoice = normalizeSongChoice(choice);
+  if (songChoice !== SHUFFLE_SONG && !enabledSongs.includes(songChoice)) songChoice = SHUFFLE_SONG;
   rob?.setSongChoice(songChoice);
+}
+
+/** Tracks left on in Settings. A disabled track is skipped until it is turned back on. */
+export function setEnabledTracks(ids: readonly GameTrackId[]) {
+  enabledSongs = normalizeEnabledTracks(ids);
+  rob?.setEnabled(enabledSongs);
+  if (songChoice !== SHUFFLE_SONG && !enabledSongs.includes(songChoice)) songChoice = SHUFFLE_SONG;
 }
 
 /** Crossfade to the next gameplay track. Returns the choice to persist. */
@@ -365,6 +374,8 @@ export function subscribeNowPlaying(listener: (name: string | null) => void): ()
 function ensureRob(c: AudioContext) {
   if (rob || !musicMix) return;
   rob = new RobPlayer(c, musicMix, noteRob, undefined, noteTrack);
+  rob.setEnabled(enabledSongs);
+  if (songChoice !== SHUFFLE_SONG && !enabledSongs.includes(songChoice)) songChoice = SHUFFLE_SONG;
   rob.setSongChoice(songChoice);
 }
 

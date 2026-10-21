@@ -26,3 +26,21 @@ export function normalizeSongChoice(value: unknown): SongChoice {
   if (typeof value === 'string' && GAME_TRACKS.some((track) => track.id === value)) return value as GameTrackId;
   return SHUFFLE_SONG;
 }
+
+const ALL_TRACK_IDS: readonly GameTrackId[] = GAME_TRACKS.map((track) => track.id);
+
+/** Tracks the player left on. An empty or unknown save keeps every track on. */
+export function normalizeEnabledTracks(value: unknown): GameTrackId[] {
+  if (!Array.isArray(value)) return [...ALL_TRACK_IDS];
+  const enabled = ALL_TRACK_IDS.filter((id) => value.includes(id));
+  return enabled.length > 0 ? [...enabled] : [...ALL_TRACK_IDS];
+}
+
+/** Turn a track on or off. The last track that is on stays on. */
+export function toggleEnabled(enabled: readonly GameTrackId[], id: GameTrackId): GameTrackId[] {
+  const current = normalizeEnabledTracks(enabled);
+  const on = current.includes(id);
+  if (on && current.length <= 1) return current;
+  const next = on ? current.filter((item) => item !== id) : [...current, id];
+  return ALL_TRACK_IDS.filter((trackId) => next.includes(trackId));
+}

@@ -226,6 +226,7 @@ export class RobPlayer {
   private order: string[] | null = null;
   private cursor = 0;
   private failed = new Set<string>();
+  private disabled = new Set<string>();
   private playhead: Playhead | null = null;
   private songChoice: SongChoice = SHUFFLE_SONG;
   private skipSerial = 0;
@@ -243,6 +244,25 @@ export class RobPlayer {
   ) {
     this.load = load ?? ((name) => loadTrack(ctx, name));
     this.onTrack = onTrack ?? (() => {});
+  }
+
+  /** Tracks the player turned off. The current song moves on when it is one of them. */
+  setEnabled(ids: readonly string[]) {
+    const allowed = new Set(ids.filter((id) => (GAMEPLAY_TRACKS as readonly string[]).includes(id)));
+    if (allowed.size === 0) {
+      for (const name of GAMEPLAY_TRACKS) allowed.add(name);
+    }
+    this.disabled = new Set(GAMEPLAY_TRACKS.filter((name) => !allowed.has(name)));
+    if (this.songChoice !== SHUFFLE_SONG && this.disabled.has(this.songChoice)) {
+      this.songChoice = SHUFFLE_SONG;
+    }
+    if (this.mode === 'play' && this.playhead && this.disabled.has(this.playhead.name)) {
+      const plan = choiceAfterSkip(SHUFFLE_SONG, this.order ?? GAMEPLAY_TRACKS, this.playhead.name, this.unavailable());
+      if (!plan.track) return;
+      this.playhead = { name: plan.track.name, offset: TRACK_LEAD_IN_SEC };
+      const serial = ++this.skipSerial;
+      void this.jumpTo(plan.track.name, this.generation, serial);
+    }
   }
 
   /** Shuffle, or one catalogue track. A new pin starts that song from the lead-in. */
@@ -271,7 +291,7 @@ export class RobPlayer {
    */
   skip(): SongChoice {
     this.ensureOrder();
-    const plan = choiceAfterSkip(this.songChoice, this.order ?? GAMEPLAY_TRACKS, this.upcomingName(), this.failed);
+    const plan = choiceAfterSkip(this.songChoice, this.order ?? GAMEPLAY_TRACKS, this.upcomingName(), this.unavailable());
     if (!plan.track) return this.songChoice;
     this.songChoice = plan.choice;
     const index = (this.order ?? []).indexOf(plan.track.name);
@@ -348,7 +368,7 @@ export class RobPlayer {
       if (pinned) return true;
     }
     const saved = this.playhead;
-    if (saved && !this.failed.has(saved.name)) {
+    if (saved && !this.unavailable().has(saved.name)) {
       const buffer = await this.song(saved.name, generation);
       if (generation !== this.generation || this.mode !== 'play') return false;
       if (buffer) {
@@ -381,7 +401,7 @@ export class RobPlayer {
     let index = startIndex;
     let prior = previous;
     while (tried.size < order.length) {
-      const pick = pickTrack(order, index, this.failed, prior);
+      const pick = pickTrack(order, index, this.unavailable(), prior);
       if (!pick || tried.has(pick.name)) return null;
       tried.add(pick.name);
       const buffer = await this.song(pick.name, generation);
@@ -439,7 +459,7 @@ export class RobPlayer {
 
   private async startPinned(generation: number): Promise<boolean> {
     const name = this.songChoice;
-    if (name === SHUFFLE_SONG || this.failed.has(name)) return false;
+    if (name === SHUFFLE_SONG || this.unavailable().has(name)) return false;
     const buffer = await this.song(name, generation);
     if (generation !== this.generation || this.mode !== 'play') return false;
     if (!buffer || !(buffer.duration > TRACK_LEAD_IN_SEC + 0.05)) {
@@ -459,9 +479,15 @@ export class RobPlayer {
   private upcomingName(): string | null {
     if (this.mode === 'play' && this.playhead) return this.playhead.name;
     if (this.songChoice !== SHUFFLE_SONG) return this.songChoice;
-    if (this.playhead && !this.failed.has(this.playhead.name)) return this.playhead.name;
+    if (this.playhead && !this.unavailable().has(this.playhead.name)) return this.playhead.name;
     const order = this.order ?? GAMEPLAY_TRACKS;
-    return pickTrack(order, this.cursor, this.failed, null)?.name ?? null;
+    return pickTrack(order, this.cursor, this.unavailable(), null)?.name ?? null;
+  }
+
+  private unavailable(): Set<string> {
+    const names = new Set(this.failed);
+    for (const name of this.disabled) names.add(name);
+    return names;
   }
 
   private ensureOrder(): string[] {
@@ -498,7 +524,7 @@ export class RobPlayer {
   private async crossfadeNext(when: number, fade: number, generation: number) {
     const order = this.order;
     if (!order || this.mode !== 'play') return;
-    if (this.songChoice !== SHUFFLE_SONG && !this.failed.has(this.songChoice)) {
+    if (this.songChoice !== SHUFFLE_SONG && !this.unavailable().has(this.songChoice)) {
       const name = this.songChoice;
       const pinned = await this.song(name, generation);
       if (generation !== this.generation || this.mode !== 'play') return;
@@ -517,7 +543,7 @@ export class RobPlayer {
     let buffer: AudioBuffer | null = null;
     let pick: TrackPick | null = null;
     if (loaded && previous) {
-      const hoped = pickTrack(order, this.cursor + 1, this.failed, previous);
+      const hoped = pickTrack(order, this.cursor + 1, this.unavailable(), previous);
       const decoded = await loaded;
       if (generation !== this.generation || this.mode !== 'play') return;
       if (hoped && !decoded) this.failed.add(hoped.name);
@@ -552,7 +578,7 @@ export class RobPlayer {
     this.handoffFade = plan.fade;
     this.handoffAt = (started?.startedAt ?? when) + handoffDelay;
     const next = this.songChoice === SHUFFLE_SONG
-      ? pickTrack(this.order ?? [], this.cursor + 1, this.failed, name)
+      ? pickTrack(this.order ?? [], this.cursor + 1, this.unavailable(), name)
       : null;
     this.prefetch = null;
     this.prefetchName = next?.name ?? null;

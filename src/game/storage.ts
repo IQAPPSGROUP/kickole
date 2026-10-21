@@ -1,5 +1,5 @@
 import { Capacitor } from '@capacitor/core';
-import { normalizeSongChoice, SHUFFLE_SONG, type SongChoice } from './tracks';
+import { GAME_TRACKS, normalizeEnabledTracks, normalizeSongChoice, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 import type { Appearance, PlayerBody } from './appearance';
 import { normalizeAppearance } from './appearance';
 import { normalizeLearned, type LessonId } from './prompts';
@@ -34,8 +34,10 @@ export interface Settings {
   musicVolume: number;
   /** 0..1 effects level. The on/off switch is `sfx`. */
   sfxVolume: number;
-  /** Shuffle the gameplay playlist, or keep one track. */
+  /** Shuffle the gameplay playlist, or keep one track. Shuffle is the default. */
   song: SongChoice;
+  /** Tracks left on in Settings. At least one stays on. */
+  enabledSongs: GameTrackId[];
   vibration: boolean;
   /** On-screen trick prompts, glowing controls and tutorial tips. */
   hints: boolean;
@@ -64,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
   musicVolume: 1,
   sfxVolume: 1,
   song: SHUFFLE_SONG,
+  enabledSongs: GAME_TRACKS.map((track) => track.id),
   vibration: true,
   hints: true,
   graphics: 'auto',
@@ -176,6 +179,12 @@ export function graphicsFromSaved(raw: { graphics?: unknown; quality?: unknown }
   return 'auto';
 }
 
+function savedSong(value: unknown, enabled: readonly GameTrackId[]): SongChoice {
+  const song = normalizeSongChoice(value);
+  if (song !== SHUFFLE_SONG && !enabled.includes(song)) return SHUFFLE_SONG;
+  return song;
+}
+
 /** Keep the saved choice and the legacy quality field pointing at the same tier. */
 export function applyGraphicsPatch(current: Settings, patch: Partial<Settings>): Settings {
   const next: Settings = { ...current, ...patch };
@@ -193,7 +202,8 @@ export function loadSettings(): Settings {
     sfx: typeof d.sfx === 'boolean' ? d.sfx : DEFAULT_SETTINGS.sfx,
     musicVolume: unitVolume(d.musicVolume),
     sfxVolume: unitVolume(d.sfxVolume),
-    song: normalizeSongChoice(d.song),
+    song: savedSong(d.song, normalizeEnabledTracks(d.enabledSongs)),
+    enabledSongs: normalizeEnabledTracks(d.enabledSongs),
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
     hints: typeof d.hints === 'boolean' ? d.hints : DEFAULT_SETTINGS.hints,
     graphics,

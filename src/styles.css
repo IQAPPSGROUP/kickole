@@ -1429,8 +1429,8 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .board-report { color: #ff4f9a; }
 .board-block { color: #f7e9c5; }
-/* Change song sits in the top gap: score tile on the left, world rank on the right, mural below y≈110. */
-.song-skip {
+/* Pause sits in the top gap: score tile on the left, world rank on the right. */
+.pause-btn {
   position: absolute;
   z-index: 8;
   top: max(12px, var(--sat-t));
@@ -1444,40 +1444,78 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   border-radius: 12px;
   border: 2px solid #f7e9c5;
   background: rgba(16, 10, 14, .78);
-  color: #fffdf8;
-  font-size: 16px;
-  line-height: 1;
-  letter-spacing: 0;
+  color: #f7e9c5;
   cursor: pointer;
   pointer-events: auto;
 }
-.song-skip:active { transform: scale(.96); }
+.pause-btn:active { transform: scale(.96); }
+.pause-bars {
+  width: 12px;
+  height: 14px;
+  box-sizing: border-box;
+  border-left: 3px solid #f7e9c5;
+  border-right: 3px solid #f7e9c5;
+}
+/* Song chip sits under the world rank. It stays tappable at 60% after a few seconds. */
 .now-playing {
   position: absolute;
-  z-index: 7;
-  top: 104px;
+  z-index: 8;
+  top: 100px;
   right: max(6px, var(--sat-r));
-  width: max-content;
-  max-width: min(54vw, 210px);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  max-width: min(52vw, 200px);
   margin: 0;
-  text-align: right;
-  pointer-events: none;
-  animation: now-playing-fade 3s ease forwards;
+  padding: 0 0 0 10px;
+  border-radius: 14px;
+  border: 2px solid #f7e9c5;
+  background: rgba(16, 10, 14, .78);
+  pointer-events: auto;
+  opacity: 1;
+  transition: opacity .45s ease;
 }
-.now-playing-title { font-size: 15px; line-height: .95; }
-.now-playing .prompt-face .prompt-ch {
-  color: #fffdf8;
-  -webkit-text-fill-color: #fffdf8;
-  -webkit-text-stroke: 1px #140814;
-  paint-order: stroke fill;
+.now-playing.is-quiet { opacity: 0.6; }
+.now-playing-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
 }
-.now-playing .prompt-ink .prompt-ch { -webkit-text-stroke: 0.12em #140814; }
-@keyframes now-playing-fade {
-  0% { opacity: 0; transform: translateY(-4px); }
-  14% { opacity: 1; transform: none; }
-  70% { opacity: 1; }
-  100% { opacity: 0; }
+.now-playing-note,
+.now-playing-name {
+  color: #f7e9c5;
+  font-weight: 800;
 }
+.now-playing-note { font-size: 16px; line-height: 1; }
+.now-playing-name {
+  font-size: 14px;
+  line-height: 1.1;
+  max-width: 108px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now-playing-skip {
+  width: 44px;
+  height: 44px;
+  margin: -2px -2px -2px 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #f7e9c5;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.now-playing-skip:active { transform: scale(.96); }
 .song-list { display: flex; flex-direction: column; gap: 6px; }
 .song-list button {
   font: inherit;
@@ -1496,6 +1534,38 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   border-color: #f7e9c5;
   background: rgba(247, 233, 197, .16);
 }
+.song-ticks { display: flex; flex-direction: column; gap: 6px; }
+.song-tick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: rgba(247, 245, 237, .08);
+  color: #fffdf8;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+.song-tick-box {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #f7e9c5;
+  border-radius: 6px;
+  color: #1e2a5a;
+  font-size: 14px;
+  line-height: 1;
+}
+.song-tick.on .song-tick-box { background: #f7e9c5; }
+.song-tick[aria-disabled="true"] { cursor: default; }
 @media (orientation: landscape) and (max-height: 600px) {
   .world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }
 }

@@ -14,7 +14,7 @@ import {
 } from '../game/reportReasons';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
-import { GAME_TRACKS, SHUFFLE_SONG } from '../game/tracks';
+import { GAME_TRACKS, SHUFFLE_SONG, type GameTrackId, type SongChoice } from '../game/tracks';
 import { NicknameForm } from './NicknameScreen';
 import {
   detectTier,
@@ -373,7 +373,7 @@ function graphicsLabel(choice: GraphicsChoice): string {
 }
 
 export function SettingsScreen({
-  settings, nickname, country, leaderboardOn, blockedTick,   onNickname, onLeaderboard, onUnblock, onDelete, onData, onPeek, onSuggest, board, onChange, onClose,
+  settings, nickname, country, leaderboardOn, blockedTick,   onNickname, onLeaderboard, onUnblock, onDelete, onData, onPeek, onSuggest, board, onChange, onToggleSong, onClose,
 }: {
   settings: Settings;
   nickname: string;
@@ -389,6 +389,7 @@ export function SettingsScreen({
   onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
   board: LeaderboardService | null;
   onChange: (p: Partial<Settings>) => void;
+  onToggleSong: (id: GameTrackId) => void;
   onClose: () => void;
 }) {
   const [countrySuggestion] = useState(() => suggestedCountry());
@@ -446,25 +447,28 @@ export function SettingsScreen({
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
         <VolumeSlider label="Music volume" value={settings.musicVolume} onChange={(musicVolume) => onChange({ musicVolume })} />
         <div className="group">
-          <label id="song-choice-label">Song</label>
-          <div className="song-list" role="group" aria-labelledby="song-choice-label">
-            <button
-              type="button"
-              aria-pressed={settings.song === SHUFFLE_SONG}
-              onClick={() => onChange({ song: SHUFFLE_SONG })}
-            >
-              Shuffle
-            </button>
-            {GAME_TRACKS.map((track) => (
-              <button
-                key={track.id}
-                type="button"
-                aria-pressed={settings.song === track.id}
-                onClick={() => onChange({ song: track.id })}
-              >
-                {track.title}
-              </button>
-            ))}
+          <label id="song-ticks-label">Tracks</label>
+          <div className="song-ticks" role="group" aria-labelledby="song-ticks-label">
+            {GAME_TRACKS.map((track) => {
+              const on = settings.enabledSongs.includes(track.id);
+              const only = settings.enabledSongs.length === 1;
+              return (
+                <button
+                  key={track.id}
+                  type="button"
+                  className={`song-tick${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  aria-disabled={only && on}
+                  onClick={() => {
+                    if (only && on) return;
+                    onToggleSong(track.id);
+                  }}
+                >
+                  <span className="song-tick-box" aria-hidden="true">{on ? '✓' : ''}</span>
+                  {track.title}
+                </button>
+              );
+            })}
           </div>
         </div>
         <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />
@@ -576,6 +580,43 @@ export function SettingsScreen({
       </ScreenModal>
     )}
     </>
+  );
+}
+
+export function PauseScreen({
+  song, enabledSongs, onSong, onClose,
+}: {
+  song: SongChoice;
+  enabledSongs: readonly GameTrackId[];
+  onSong: (song: SongChoice) => void;
+  onClose: () => void;
+}) {
+  const tracks = GAME_TRACKS.filter((track) => enabledSongs.includes(track.id));
+  return (
+    <div className="screen settings">
+      <div className="card">
+        <h2>PAUSE</h2>
+        <div className="group">
+          <label id="pause-song-label">Change song</label>
+          <div className="song-list" role="group" aria-labelledby="pause-song-label">
+            <button type="button" aria-pressed={song === SHUFFLE_SONG} onClick={() => onSong(SHUFFLE_SONG)}>
+              Shuffle
+            </button>
+            {tracks.map((track) => (
+              <button
+                key={track.id}
+                type="button"
+                aria-pressed={song === track.id}
+                onClick={() => onSong(track.id)}
+              >
+                {track.title}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button type="button" className="btn primary" onClick={onClose}>RESUME</button>
+      </div>
+    </div>
   );
 }
 

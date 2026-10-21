@@ -171,43 +171,45 @@ export function ClueMark({ gesture }: { gesture: PromptGesture }) {
   );
 }
 
-function SongChrome({ controller, playing }: { controller: GameController; playing: boolean }) {
+function SongChip({ controller, playing }: { controller: GameController; playing: boolean }) {
   const [notice, setNotice] = useState<{ id: number; name: string } | null>(null);
+  const [quietId, setQuietId] = useState<number | null>(null);
+  const noticeSerial = useRef(0);
   useEffect(() => subscribeNowPlaying((name) => {
     if (!name) {
       setNotice(null);
       return;
     }
-    setNotice({ id: Date.now(), name });
+    noticeSerial.current += 1;
+    setNotice({ id: noticeSerial.current, name });
   }), []);
   useEffect(() => {
     if (!notice) return undefined;
-    const timer = window.setTimeout(() => {
-      setNotice((current) => (current?.id === notice.id ? null : current));
-    }, 3000);
+    const timer = window.setTimeout(() => setQuietId(notice.id), 3000);
     return () => window.clearTimeout(timer);
   }, [notice]);
-  const title = notice ? trackTitle(notice.name) : '';
+  if (!playing || !notice) return null;
+  const title = trackTitle(notice.name);
+  const quiet = quietId === notice.id;
   return (
-    <>
-      {playing && notice && (
-        <p key={notice.id} className="now-playing" role="status">
-          <GraffitiText text={`Now playing: ${title}`} className="graffiti now-playing-title" />
-        </p>
-      )}
+    <div className={`now-playing${quiet ? ' is-quiet' : ''}`} role="status">
+      <p className="now-playing-label">
+        <span className="now-playing-note" aria-hidden="true">♪</span>
+        <span className="now-playing-name">{title}</span>
+      </p>
       <button
         type="button"
-        className="song-skip"
-        aria-label="Change song"
+        className="now-playing-skip"
+        aria-label="Next song"
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
           controller.changeSong();
         }}
       >
-        <span aria-hidden="true">♫⏭</span>
+        <span aria-hidden="true">⏭</span>
       </button>
-    </>
+    </div>
   );
 }
 
@@ -422,7 +424,7 @@ function useFanStyle(): CSSProperties {
   } as CSSProperties;
 }
 
-export function TouchZones({ controller }: { controller: GameController }) {
+export function TouchZones({ controller, onPause }: { controller: GameController; onPause: () => void }) {
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const fanStyle = useFanStyle();
   const armed = snap.hud.armedTrick;
@@ -554,7 +556,19 @@ export function TouchZones({ controller }: { controller: GameController }) {
 
   return (
     <div className="zones" style={fanStyle}>
-      <SongChrome controller={controller} playing={playing} />
+      <button
+        type="button"
+        className="pause-btn"
+        aria-label="Pause"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onPause();
+        }}
+      >
+        <span className="pause-bars" aria-hidden="true" />
+      </button>
+      <SongChip controller={controller} playing={playing} />
       <p className="trick-help">H header · N neck · T thigh · F flick · W atw · G groove · Esc cancel</p>
       <div className="fan fan-left" role="group" aria-label="Left foot and tricks">
         {LEFT_FAN.map(trickButton)}

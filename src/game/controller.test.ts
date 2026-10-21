@@ -50,6 +50,46 @@ describe('GameController', () => {
     expect(c.getSnapshot().hud.phase).toBe('playing');
   });
 
+  it('holds the ball while paused and ignores a kick', async () => {
+    const { c } = await make(QUIET);
+    c.play();
+    const readyAt = c.engine.time;
+    c.holdPlay(true);
+    c.press('right');
+    c.action();
+    c.tick(0.5);
+    expect(c.engine.phase).toBe('ready');
+    expect(c.engine.time).toBe(readyAt);
+    expect(c.playTrick('thigh')).toBe('locked');
+    c.holdPlay(false);
+    c.press('right');
+    c.release('right');
+    expect(c.engine.phase).toBe('playing');
+    const playingAt = c.engine.time;
+    c.holdPlay(true);
+    c.tick(0.5);
+    expect(c.engine.phase).toBe('playing');
+    expect(c.engine.time).toBe(playingAt);
+  });
+
+  it('keeps the last track on and drops a pin that was turned off', async () => {
+    const { c, ls } = await make({ ...QUIET, song: 'menu-song' });
+    c.toggleSong('gameplay-instrumental');
+    c.toggleSong('game-song-2');
+    c.toggleSong('game-song-3');
+    expect(c.getSnapshot().settings.enabledSongs).toEqual(['menu-song']);
+    expect(c.getSnapshot().settings.song).toBe('menu-song');
+    c.toggleSong('menu-song');
+    expect(c.getSnapshot().settings.enabledSongs).toEqual(['menu-song']);
+    c.toggleSong('game-song-2');
+    c.toggleSong('menu-song');
+    expect(c.getSnapshot().settings.song).toBe('shuffle');
+    expect(c.getSnapshot().settings.enabledSongs).toEqual(['game-song-2']);
+    const saved = JSON.parse(ls.data['kicky.settings.v1']) as { song: string; enabledSongs: string[] };
+    expect(saved.song).toBe('shuffle');
+    expect(saved.enabledSongs).toEqual(['game-song-2']);
+  });
+
   it('space action starts from the menu and launches from ready', async () => {
     const { c } = await make(QUIET);
     c.action();

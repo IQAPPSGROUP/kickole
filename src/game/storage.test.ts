@@ -176,6 +176,20 @@ describe('storage', () => {
     expect(loadSettings().song).toBe('game-song-2');
     const junk = await load({ 'kicky.settings.v1': JSON.stringify({ song: 'not-a-track' }) });
     expect(junk.loadSettings().song).toBe('shuffle');
+    expect(junk.loadSettings().enabledSongs).toEqual(['gameplay-instrumental', 'menu-song', 'game-song-2', 'game-song-3']);
+    const { loadSettings: loadKept, saveSettings: saveKept } = await load({
+      'kicky.settings.v1': JSON.stringify({ enabledSongs: ['menu-song', 'game-song-3'] }),
+    });
+    expect(loadKept().enabledSongs).toEqual(['menu-song', 'game-song-3']);
+    saveKept({ ...loadKept(), enabledSongs: ['game-song-2'] });
+    expect(loadKept().enabledSongs).toEqual(['game-song-2']);
+    const dropped = await load({
+      'kicky.settings.v1': JSON.stringify({ song: 'game-song-2', enabledSongs: ['menu-song'] }),
+    });
+    expect(dropped.loadSettings().song).toBe('shuffle');
+    expect(dropped.loadSettings().enabledSongs).toEqual(['menu-song']);
+    const empty = await load({ 'kicky.settings.v1': JSON.stringify({ enabledSongs: [] }) });
+    expect(empty.loadSettings().enabledSongs).toEqual(['gameplay-instrumental', 'menu-song', 'game-song-2', 'game-song-3']);
   });
 
   it('validates settings and round-trips them', async () => {

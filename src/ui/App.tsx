@@ -170,7 +170,7 @@ export function App() {
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
-      {intro.active && <OpeningSkip onSkip={skipOpeningIntro} />}
+      {intro.active && !needsBody && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}

@@ -937,13 +937,13 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .nick-error { margin: 0; color: #ff4f9a; font-size: 13px; font-weight: 800; }
 .nick-form .btn { width: 100%; }
 .world-rank {
-  --prompt-lift: 13vh;
   position: absolute;
+  /* Right-hand brick between the wordmark and the hair. Prompt height covers the arm. */
+  top: 152px;
   right: max(8px, var(--sat-r));
-  bottom: calc(var(--fan-inset-b) + var(--fan-d) + var(--btn) + 6px + var(--prompt-lift));
   z-index: 6;
-  width: min(32vw, 124px);
-  padding: 6px 8px 7px;
+  width: min(26vw, 100px);
+  padding: 4px 7px 5px;
   border-radius: 3px;
   background: rgba(8, 12, 22, .34);
   border: 1px solid rgba(255, 225, 74, .78);
@@ -968,7 +968,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   align-items: baseline;
   gap: 6px;
   color: #ffe14a;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
   text-shadow: 0 1px 0 #140814;

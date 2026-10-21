@@ -264,6 +264,8 @@ export class GameController {
       music: this.settings.sound && this.settings.music,
       sfx: this.voices(),
       crowd: playing && this.voices() ? crowdLevel(this.engine.streak) : 0,
+      musicVolume: this.settings.musicVolume,
+      sfxVolume: this.settings.sfxVolume,
     });
   }
 
@@ -385,12 +387,13 @@ export class GameController {
         } else if (e.kind === 'neckStall' && e.phase === 'execute') {
           this.show('good', 'NECK RELEASE', 0);
         }
+        if (e.points > 0 && sound) sfx.trick();
         this.noteTrickPrompt(e.kind, e.phase, e.points);
         this.publish();
         break;
       case 'combo':
         this.show('perfect', `${e.label} +${e.points}`, e.points);
-        if (sound) sfx.kick('perfect', this.engine.streak);
+        if (sound) sfx.combo();
         this.buzz('combo');
         fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, e.points, prefersReducedMotion()));
         this.publish();

@@ -146,6 +146,9 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .board li em { font-style: normal; opacity: 1; color: #f7f4ee; font-size: 12px; }
 
 .toggle { display: flex; justify-content: space-between; align-items: center; font: inherit; font-weight: 800; letter-spacing: 1px; color: var(--white); background: rgba(247,245,237,.08); border: 0; border-radius: 14px; padding: 14px 16px; min-height: 52px; cursor: pointer; }
+.volume { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 44px; text-align: left; }
+.volume span { font-size: 13px; font-weight: 800; letter-spacing: .04em; color: #fffdf8; }
+.volume input[type="range"] { width: 100%; min-height: 44px; margin: 0; accent-color: #f7e9c5; cursor: pointer; }
 .toggle b { padding: 4px 12px; border-radius: 999px; background: rgba(247,245,237,.15); font-size: 12px; }
 .toggle.on b { background: var(--teal); color: var(--navy); }
 .group { text-align: left; }

@@ -29,6 +29,10 @@ export interface Settings {
   music: boolean;
   /** Kicks, cheers and the crowd bed. */
   sfx: boolean;
+  /** 0..1 music level. The on/off switch is `music`. */
+  musicVolume: number;
+  /** 0..1 effects level. The on/off switch is `sfx`. */
+  sfxVolume: number;
   vibration: boolean;
   /** On-screen trick prompts, glowing controls and tutorial tips. */
   hints: boolean;
@@ -54,6 +58,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   music: true,
   sfx: true,
+  musicVolume: 1,
+  sfxVolume: 1,
   vibration: true,
   hints: true,
   graphics: 'auto',
@@ -143,6 +149,11 @@ export function persistSave(save: SaveData) {
   write(SAVE_KEY, save);
 }
 
+function unitVolume(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 1;
+  return Math.min(1, Math.max(0, value));
+}
+
 function isQuality(value: unknown): value is Quality {
   return value === 'low' || value === 'medium' || value === 'high';
 }
@@ -176,6 +187,8 @@ export function loadSettings(): Settings {
     sound: typeof d.sound === 'boolean' ? d.sound : DEFAULT_SETTINGS.sound,
     music: typeof d.music === 'boolean' ? d.music : DEFAULT_SETTINGS.music,
     sfx: typeof d.sfx === 'boolean' ? d.sfx : DEFAULT_SETTINGS.sfx,
+    musicVolume: unitVolume(d.musicVolume),
+    sfxVolume: unitVolume(d.sfxVolume),
     vibration: typeof d.vibration === 'boolean' ? d.vibration : DEFAULT_SETTINGS.vibration,
     hints: typeof d.hints === 'boolean' ? d.hints : DEFAULT_SETTINGS.hints,
     graphics,

@@ -157,6 +157,22 @@ describe('storage', () => {
     expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
   });
 
+  it('persists music and effects volume and clamps a bad value', async () => {
+    const { loadSettings, saveSettings, DEFAULT_SETTINGS } = await load({
+      'kicky.settings.v1': JSON.stringify({ musicVolume: 1.5, sfxVolume: -2, sound: false }),
+    });
+    const loaded = loadSettings();
+    expect(loaded.musicVolume).toBe(1);
+    expect(loaded.sfxVolume).toBe(0);
+    expect(loaded.sound).toBe(false);
+    saveSettings({ ...loaded, musicVolume: 0.4, sfxVolume: 0.25 });
+    expect(loadSettings().musicVolume).toBe(0.4);
+    expect(loadSettings().sfxVolume).toBe(0.25);
+    const legacy = await load({ 'kicky.settings.v1': JSON.stringify({ sound: true }) });
+    expect(legacy.loadSettings().musicVolume).toBe(DEFAULT_SETTINGS.musicVolume);
+    expect(legacy.loadSettings().sfxVolume).toBe(1);
+  });
+
   it('validates settings and round-trips them', async () => {
     const { loadSettings, saveSettings, DEFAULT_SETTINGS } = await load({ 'kicky.settings.v1': JSON.stringify({ sound: 'yes', quality: 'ultra', vibration: false, skinId: 'coral-flash' }) });
     const s = loadSettings();

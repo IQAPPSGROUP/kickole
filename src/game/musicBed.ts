@@ -565,28 +565,28 @@ export function playCheerStab(
   big: boolean,
 ) {
   const filter = ctx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.value = 1800;
-  filter.Q.value = 0.7;
+  filter.type = 'lowpass';
+  filter.frequency.value = 880;
+  filter.Q.value = 0.5;
   filter.connect(bus);
   const src = ctx.createBufferSource();
   src.buffer = noise;
-  const noiseGain = pulse(ctx, at, big ? 0.16 : 0.1, 0, big ? 0.12 : 0.08);
+  const noiseGain = pulse(ctx, at, big ? 0.05 : 0.03, 0, big ? 0.08 : 0.05);
   src.connect(noiseGain).connect(filter);
   src.start(at);
-  src.stop(at + 0.16);
-  const root = big ? 392 : 440;
+  src.stop(at + 0.12);
+  const root = big ? 196 : 220;
   const tone = ctx.createOscillator();
-  tone.type = 'triangle';
+  tone.type = 'sine';
   tone.frequency.setValueAtTime(root, at);
-  const toneGain = pulse(ctx, at, big ? 0.1 : 0.07, 0.004, big ? 0.2 : 0.14);
+  const toneGain = pulse(ctx, at, big ? 0.05 : 0.035, 0.01, big ? 0.18 : 0.14);
   tone.connect(toneGain).connect(bus);
   tone.start(at);
-  tone.stop(at + 0.24);
+  tone.stop(at + 0.2);
   const fifth = ctx.createOscillator();
   fifth.type = 'sine';
   fifth.frequency.setValueAtTime(root * 1.5, at + 0.04);
-  const fifthGain = pulse(ctx, at + 0.04, big ? 0.07 : 0.045, 0.004, 0.16);
+  const fifthGain = pulse(ctx, at + 0.04, big ? 0.03 : 0.02, 0.012, 0.14);
   fifth.connect(fifthGain).connect(bus);
   fifth.start(at + 0.04);
   fifth.stop(at + 0.24);

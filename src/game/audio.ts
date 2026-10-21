@@ -1,5 +1,13 @@
 import type { Grade } from '../engine/config';
 import {
+  DUCK_ATTACK_SEC,
+  DUCK_RELEASE_SEC,
+  clampVolume,
+  duckTarget,
+  playbackDropped,
+  shouldResumeContext,
+} from './audioMix';
+import {
   DEFAULT_OUTPUT_LATENCY_SEC,
   GAMEPLAY_BPM,
   MENU_BPM,
@@ -18,10 +26,12 @@ import {
   swingDelay,
   type MusicGraph,
 } from './musicBed';
+import { loadRobStems, RobPlayer } from './robMusic';
 
 /**
- * All game audio is synthesised here. There are no sampled recordings.
- * The beds are original boom-bap loops (see musicBed.ts).
+ * Kicks, misses and cheers are synthesised here.
+ * Menu and gameplay music prefer Rob's songs in public/audio/rob/.
+ * The boom-bap bed in musicBed.ts plays only when those files fail to load.
  * See public/audio/LICENSE.txt.
  */
 
@@ -31,6 +41,8 @@ let foreground = true;
 let graphReady = false;
 
 let master: GainNode | null = null;
+let musicMix: GainNode | null = null;
+let duckGain: GainNode | null = null;
 let musicGain: GainNode | null = null;
 let sfxGain: GainNode | null = null;
 let crowdGain: GainNode | null = null;
@@ -45,8 +57,21 @@ let gridOrigin = 0;
 let visualOrigin = 0;
 let mode: 'menu' | 'play' = 'menu';
 let musicGraph: MusicGraph | null = null;
+let rob: RobPlayer | null = null;
+let robState: 'pending' | 'ready' | 'failed' = 'pending';
+let robLoad: Promise<void> | null = null;
+let interruptWatch = false;
+let resumeAttempt = 0;
+let droppedByInterrupt = false;
 
-let bed = { mode: 'menu' as 'menu' | 'play', music: true, sfx: true, crowd: 0 };
+let bed = {
+  mode: 'menu' as 'menu' | 'play',
+  music: true,
+  sfx: true,
+  crowd: 0,
+  musicVolume: 1,
+  sfxVolume: 1,
+};
 let lastCheer = -10;
 let pendingCheer: string | null = null;
 
@@ -62,8 +87,10 @@ function audioContext(): AudioContext | null {
       const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return null;
       ctx = new AC();
+      watchInterruptions(ctx);
     }
-    if (foreground && ctx.state === 'suspended') void ctx.resume();
+    const state = ctx.state as string;
+    if (shouldResumeContext(state, foreground, true)) void ctx.resume();
     return ctx;
   } catch {
     return null;
@@ -85,11 +112,15 @@ function ensureGraph(c: AudioContext) {
   master.gain.value = foreground ? 1 : 0;
   master.connect(c.destination);
 
+  musicMix = c.createGain();
+  duckGain = c.createGain();
+  duckGain.gain.value = 1;
   musicGain = c.createGain();
   musicGain.gain.value = 0;
-  musicGain.connect(master);
+  musicMix.connect(duckGain).connect(musicGain).connect(master);
   musicGraph = createMusicGraph(c);
-  musicGraph.out.connect(musicGain);
+  musicGraph.out.connect(musicMix);
+  ensureRob(c);
 
   sfxGain = c.createGain();
   sfxGain.gain.value = 1;
@@ -128,21 +159,85 @@ function sfxBus(): GainNode | null {
   return sfxGain;
 }
 
-function blip(freq: number, dur: number, type: OscillatorType, gain: number, slideTo?: number) {
+/** Soft ball contact: a short sine body through a low-pass, plus a little noise. */
+function touch(freq: number, dur: number, gain: number) {
   const bus = sfxBus();
   const c = ctx;
   if (!bus || !c) return;
-  const o = c.createOscillator();
-  const g = c.createGain();
   const t = c.currentTime;
-  o.type = type;
-  o.frequency.setValueAtTime(freq, t);
-  if (slideTo && slideTo > 0) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  const pitched = freq * (0.96 + Math.random() * 0.08);
+  const body = c.createOscillator();
+  body.type = 'sine';
+  body.frequency.setValueAtTime(pitched, t);
+  body.frequency.exponentialRampToValueAtTime(Math.max(48, pitched * 0.55), t + dur);
+  const low = c.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.setValueAtTime(240 + Math.random() * 70, t);
+  low.frequency.exponentialRampToValueAtTime(120, t + dur);
+  low.Q.value = 0.6;
+  const g = c.createGain();
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(bus);
-  o.start(t);
-  o.stop(t + dur);
+  body.connect(low).connect(g).connect(bus);
+  body.start(t);
+  body.stop(t + dur + 0.02);
+
+  const air = c.createBufferSource();
+  air.buffer = noiseBuffer(c);
+  const airFilter = c.createBiquadFilter();
+  airFilter.type = 'lowpass';
+  airFilter.frequency.value = 360;
+  const airGain = c.createGain();
+  airGain.gain.setValueAtTime(gain * 0.28, t);
+  airGain.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(dur, 0.06));
+  air.connect(airFilter).connect(airGain).connect(bus);
+  air.start(t);
+  air.stop(t + dur);
+}
+
+function sting(freq: number, dur: number, gain: number) {
+  const bus = sfxBus();
+  const c = ctx;
+  if (!bus || !c) return;
+  const t = c.currentTime;
+  const pitched = freq * (0.98 + Math.random() * 0.04);
+  const low = c.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.value = 720;
+  low.Q.value = 0.5;
+  low.connect(bus);
+  const tone = c.createOscillator();
+  tone.type = 'sine';
+  tone.frequency.setValueAtTime(pitched, t);
+  const g = c.createGain();
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  tone.connect(g).connect(low);
+  tone.start(t);
+  tone.stop(t + dur);
+  const fifth = c.createOscillator();
+  fifth.type = 'sine';
+  fifth.frequency.setValueAtTime(pitched * 1.5, t + 0.03);
+  const fifthGain = c.createGain();
+  fifthGain.gain.setValueAtTime(0.0001, t);
+  fifthGain.gain.linearRampToValueAtTime(gain * 0.45, t + 0.04);
+  fifthGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  fifth.connect(fifthGain).connect(low);
+  fifth.start(t + 0.02);
+  fifth.stop(t + dur);
+  duckMusic();
+}
+
+/** Pull the music down ~5 dB, then let it back in. */
+function duckMusic() {
+  const c = ctx;
+  const node = duckGain;
+  if (!c || !node || !bed.music || !(bed.sfxVolume > 0)) return;
+  const now = c.currentTime;
+  node.gain.cancelScheduledValues(now);
+  node.gain.setValueAtTime(node.gain.value, now);
+  node.gain.linearRampToValueAtTime(duckTarget(), now + DUCK_ATTACK_SEC);
+  node.gain.linearRampToValueAtTime(1, now + DUCK_ATTACK_SEC + DUCK_RELEASE_SEC);
 }
 
 function scheduleStep(index: number, at: number) {
@@ -192,19 +287,81 @@ function applyCrowd() {
   const c = ctx;
   if (!crowdGain || !crowdDepth || !c) return;
   const level = foreground && bed.sfx ? bed.crowd : 0;
-  const gain = level * 0.055;
+  const gain = level * 0.055 * (foreground && bed.sfx ? bed.sfxVolume : 0);
   crowdGain.gain.setTargetAtTime(Math.max(0.0001, gain), c.currentTime, 0.4);
   crowdDepth.gain.setTargetAtTime(gain * 0.45, c.currentTime, 0.4);
+}
+
+function applySfx() {
+  const c = ctx;
+  if (!sfxGain || !c) return;
+  const level = foreground && bed.sfx ? Math.max(0.0001, bed.sfxVolume) : 0.0001;
+  sfxGain.gain.setTargetAtTime(level, c.currentTime, 0.05);
 }
 
 function applyMusic() {
   const c = ctx;
   if (!musicGain || !c) return;
   const on = unlocked && foreground && bed.music;
-  const level = !on ? 0.0001 : mode === 'play' ? MUSIC_PLAY_LEVEL : MUSIC_MENU_LEVEL;
-  musicGain.gain.setTargetAtTime(level, c.currentTime, 0.35);
-  if (on) startScheduler();
-  else stopScheduler();
+  const base = mode === 'play' ? MUSIC_PLAY_LEVEL : MUSIC_MENU_LEVEL;
+  const level = !on ? 0.0001 : Math.max(0.0001, base * bed.musicVolume);
+  musicGain.gain.setTargetAtTime(level, c.currentTime, 0.2);
+  if (!on) {
+    stopScheduler();
+    rob?.stop();
+    return;
+  }
+  if (robState === 'ready' && rob) {
+    stopScheduler();
+    rob.setMode(mode);
+    return;
+  }
+  if (robState === 'failed') {
+    startScheduler();
+    return;
+  }
+  stopScheduler();
+}
+
+function ensureRob(c: AudioContext) {
+  if (robLoad || !musicMix) return;
+  const mix = musicMix;
+  robLoad = loadRobStems(c).then((stems) => {
+    if (!stems) {
+      robState = 'failed';
+      applyMusic();
+      return;
+    }
+    rob = new RobPlayer(c, stems, mix);
+    robState = 'ready';
+    applyMusic();
+  }).catch(() => {
+    robState = 'failed';
+    applyMusic();
+  });
+}
+
+function recoverPlayback() {
+  if (!foreground || !unlocked) return;
+  if (droppedByInterrupt) {
+    droppedByInterrupt = false;
+    rob?.resume();
+  }
+  applyBed();
+}
+
+function watchInterruptions(c: AudioContext) {
+  if (interruptWatch) return;
+  interruptWatch = true;
+  c.addEventListener('statechange', () => {
+    const state = c.state as string;
+    if (playbackDropped(state)) droppedByInterrupt = true;
+    if (!shouldResumeContext(state, foreground, unlocked)) return;
+    const now = Date.now();
+    if (now - resumeAttempt < 400) return;
+    resumeAttempt = now;
+    void c.resume().then(() => recoverPlayback());
+  });
 }
 
 function applyBed() {
@@ -214,6 +371,7 @@ function applyBed() {
   if (!c) return;
   ensureGraph(c);
   applyMusic();
+  applySfx();
   applyCrowd();
 }
 
@@ -227,6 +385,7 @@ function playCheerNow(id: string) {
   const big = cheerWeight(id) >= 2;
   playCheerStab(c, graph.noise, bus, at, big);
   if (id.startsWith('streak:') && bed.music) playScratch(graph, at);
+  duckMusic();
 }
 
 function flushCheer() {
@@ -239,15 +398,17 @@ function flushCheer() {
   playCheerNow(id);
 }
 
-/** Synthesised kicks, misses and stalls. No audio assets. */
+/** Soft synthesised contacts. Trick and combo stings duck the music. */
 export const sfx = {
   kick(grade: Grade, streak: number) {
-    if (grade === 'perfect') blip(520 + Math.min(streak, 12) * 30, 0.16, 'triangle', 0.18, 1040);
-    else blip(240, 0.09, 'square', 0.08, 120);
+    if (grade === 'perfect') touch(140 + Math.min(streak, 8) * 2, 0.09, 0.065);
+    else touch(112, 0.07, 0.05);
   },
-  miss() { blip(150, 0.12, 'sawtooth', 0.06, 90); },
-  drop() { blip(220, 0.5, 'sawtooth', 0.12, 55); },
-  stall() { blip(330, 0.2, 'sine', 0.12, 660); },
+  miss() { touch(78, 0.1, 0.04); },
+  drop() { touch(86, 0.22, 0.06); },
+  stall() { touch(156, 0.11, 0.045); },
+  trick() { sting(196, 0.16, 0.04); },
+  combo() { sting(220, 0.2, 0.045); },
 };
 
 export interface AudioBed {
@@ -256,12 +417,20 @@ export interface AudioBed {
   sfx: boolean;
   /** 0..1 crowd energy while a run is live. */
   crowd: number;
+  /** 0..1, multiplied by the bed's steady music level. */
+  musicVolume: number;
+  /** 0..1 on the effects bus. */
+  sfxVolume: number;
 }
 
 /** Remember the mix. The graph itself starts on the first gesture. */
 export function setBed(next: AudioBed) {
   const modeChanged = next.mode !== bed.mode;
-  bed = next;
+  bed = {
+    ...next,
+    musicVolume: clampVolume(next.musicVolume),
+    sfxVolume: clampVolume(next.sfxVolume),
+  };
   if (modeChanged) {
     step = 0;
     gridOrigin = 0;
@@ -327,7 +496,7 @@ function setForeground(active: boolean) {
     visualOrigin = 0;
     step = 0;
     master?.gain.setTargetAtTime(1, c.currentTime, 0.08);
-    applyBed();
+    recoverPlayback();
   });
 }
 

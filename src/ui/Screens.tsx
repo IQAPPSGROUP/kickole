@@ -329,6 +329,27 @@ function entryLabel(row: BoardEntry, scope: BoardScope): string {
   return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
 }
 
+function VolumeSlider({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  const percent = Math.round(Math.min(1, Math.max(0, value)) * 100);
+  return (
+    <label className="volume">
+      <span>{label}</span>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        step={1}
+        value={percent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        aria-label={label}
+        onChange={(event) => onChange(Number(event.target.value) / 100)}
+      />
+    </label>
+  );
+}
+
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button className={`toggle ${value ? 'on' : ''}`} onClick={() => onChange(!value)} aria-pressed={value}>
@@ -422,7 +443,9 @@ export function SettingsScreen({
         </div>
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />
+        <VolumeSlider label="Music volume" value={settings.musicVolume} onChange={(musicVolume) => onChange({ musicVolume })} />
         <Toggle label="SFX & crowd" value={settings.sfx} onChange={(sfx) => onChange({ sfx })} />
+        <VolumeSlider label="Sound effects volume" value={settings.sfxVolume} onChange={(sfxVolume) => onChange({ sfxVolume })} />
         <Toggle label="Vibration" value={settings.vibration} onChange={(vibration) => onChange({ vibration })} />
         <Toggle label="Trick hints" value={settings.hints} onChange={(hints) => onChange({ hints })} />
         <div className="group">

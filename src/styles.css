@@ -24,10 +24,10 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   position: fixed;
   inset: 0;
   overflow: hidden;
-  --trick-size: 52px;
-  --btn: 52px;
+  --trick-size: 65px;
+  --btn: 65px;
   /* Keep in step with FOOT_BUTTON in fanLayout.ts. */
-  --foot: 70px;
+  --foot: 72px;
   --trick-gap: 6px;
   --sat-t: env(safe-area-inset-top, 0px);
   --sat-l: env(safe-area-inset-left, 0px);
@@ -43,11 +43,12 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 @media (min-width: 360px) and (max-width: 430px) {
   .app {
-    --fan-inset-l: max(16px, var(--sat-l));
-    --fan-inset-r: max(16px, var(--sat-r));
-    --fan-d: 113px;
-    --fan-dx: 93px;
-    --fan-dy: 65px;
+    --fan-inset-l: max(8px, var(--sat-l));
+    --fan-inset-r: max(8px, var(--sat-r));
+    /* Narrow-phone packing. JS writes the live radius onto .app. */
+    --fan-d: 103px;
+    --fan-dx: 103px;
+    --fan-dy: 72px;
   }
 }
 .app canvas { display: block; touch-action: none; }
@@ -992,12 +993,14 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .world-rank {
   position: absolute;
-  /* Mid-right, level with the trick prompt. Kept off the wordmark. */
-  top: 396px;
-  right: max(8px, var(--sat-r));
+  /* Shoulder height, in the brick gap to the right of the arm.
+     On 390×844 the arm ends near x=324 and the bunting ends near y=321. */
+  top: 324px;
+  left: 84.6%;
+  right: max(4px, var(--sat-r));
   z-index: 6;
-  width: min(30vw, 112px);
-  padding: 3px 7px 2px;
+  width: auto;
+  padding: 2px 2px 1px;
   border-radius: 3px;
   background: rgba(8, 12, 22, .5);
   border: 1px solid rgba(255, 225, 74, .78);
@@ -1013,15 +1016,15 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .world-rank p { margin: 0; }
 .world-rank-kicker {
   color: #fffdf8;
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: .14em;
-  line-height: 1;
+  letter-spacing: .04em;
+  line-height: 1.05;
 }
 .world-rank-line {
   display: block;
   color: #ffe14a;
-  font-size: 20px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -1031,16 +1034,17 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   display: block;
   margin-top: 1px;
   color: #fffdf8;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
 }
+.world-rank-country .country-flag { font-size: 11px; margin-right: 2px; }
 .world-rank-delta {
   display: block;
-  margin-top: 2px;
+  margin-top: 1px;
   color: #ff4f9a;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
   text-align: right;
@@ -1049,7 +1053,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .world-rank-name {
   margin-top: 0;
   color: #fffdf8;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: .02em;
   overflow: hidden;
@@ -1083,7 +1087,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   cursor: pointer;
 }
 @media (orientation: landscape) and (max-height: 600px) {
-  .world-rank { top: auto; bottom: 64px; width: min(24vw, 140px); }
+  .world-rank { top: auto; left: auto; bottom: 64px; width: min(24vw, 140px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .world-rank-delta { animation: none; }

@@ -6,7 +6,7 @@ import { streakMultiplier } from '../engine/scoring';
 import { beatClock } from '../game/audio';
 import { prefersReducedMotion } from '../scene/juice';
 import type { LeaderboardService } from '../game/leaderboard';
-import { fanLayout } from './fanLayout';
+import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
 import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
 import { WorldRank } from './WorldRank';
 
@@ -348,7 +348,19 @@ function useFanStyle(): CSSProperties {
         const value = parseFloat(getComputedStyle(app).getPropertyValue(name));
         return Number.isFinite(value) ? value : 0;
       };
-      setLayout(fanLayout(window.innerWidth, read('--sat-l'), read('--sat-r'), read('--sat-b')));
+      const next = fanLayout(window.innerWidth, read('--sat-l'), read('--sat-r'), read('--sat-b'));
+      setLayout(next);
+      if (app instanceof HTMLElement) {
+        app.style.setProperty('--btn', `${next.button}px`);
+        app.style.setProperty('--trick-size', `${FAN_BUTTON}px`);
+        app.style.setProperty('--foot', `${FOOT_BUTTON}px`);
+        app.style.setProperty('--fan-d', `${next.d}px`);
+        app.style.setProperty('--fan-dx', `${next.dx}px`);
+        app.style.setProperty('--fan-dy', `${next.dy}px`);
+        app.style.setProperty('--fan-inset-l', `${next.insetLeft}px`);
+        app.style.setProperty('--fan-inset-r', `${next.insetRight}px`);
+        app.style.setProperty('--fan-inset-b', `${next.insetBottom}px`);
+      }
     };
     apply();
     window.addEventListener('resize', apply);

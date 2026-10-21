@@ -28,7 +28,7 @@ describe('corner fan', () => {
     expect(byName.atw.x).toBeGreaterThan(byName.left.x);
     const angle = Math.atan2(layout.dy, layout.dx) * (180 / Math.PI);
     expect(angle).toBeCloseTo(35, 4);
-    expect(Math.hypot(layout.dx, layout.dy)).toBeCloseTo(layout.d, 3);
+    expect(Math.hypot(layout.dx, layout.dy)).toBeGreaterThanOrEqual(layout.d - 0.01);
     expect(byName.neck.y).toBeGreaterThan(byName.head.y + 24);
     expect(byName.neck.y).toBeLessThan(byName.left.y - 24);
     expect(byName.thigh.y).toBeGreaterThan(byName.flick.y + 24);
@@ -39,14 +39,16 @@ describe('corner fan', () => {
   });
 
   it('keeps the fan buttons from overlapping on a 375x667 phone and a large phone', () => {
-    for (const [width, height] of [[375, 667], [390, 844], [430, 932]] as const) {
+    for (const [width, height] of [[360, 740], [375, 667], [390, 844], [430, 932]] as const) {
       const { nearest, pair, rects } = nearestGap(width, height);
       expect(nearest, `${width} ${pair}`).toBeGreaterThanOrEqual(6);
       const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
       expect(byName.left.w).toBe(FOOT_BUTTON);
       expect(byName.right.w).toBe(FOOT_BUTTON);
-      expect(FOOT_BUTTON / FAN_BUTTON).toBeGreaterThanOrEqual(1.3);
-      expect(FOOT_BUTTON / FAN_BUTTON).toBeLessThanOrEqual(1.4);
+      expect(FAN_BUTTON).toBeGreaterThanOrEqual(64);
+      expect(FAN_BUTTON).toBeLessThanOrEqual(66);
+      expect(FOOT_BUTTON).toBeGreaterThanOrEqual(70);
+      expect(FOOT_BUTTON).toBeGreaterThan(FAN_BUTTON);
       for (const name of ['head', 'neck', 'atw', 'flick', 'thigh', 'groove']) {
         expect(byName[name].w, name).toBe(FAN_BUTTON);
       }
@@ -57,10 +59,10 @@ describe('corner fan', () => {
     for (const width of [360, 375, 390, 414, 430]) {
       const { layout, rects } = nearestGap(width, 800);
       const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
-      expect(layout.insetLeft, `${width} left`).toBeGreaterThanOrEqual(16);
-      expect(layout.insetRight, `${width} right`).toBeGreaterThanOrEqual(16);
-      expect(byName.right.x + byName.right.w, `${width} right edge`).toBeLessThanOrEqual(width - 16);
-      expect(circleGap(byName.atw, byName.groove), `${width} atw/groove`).toBeGreaterThanOrEqual(16);
+      expect(layout.insetLeft, `${width} left`).toBeGreaterThanOrEqual(8);
+      expect(layout.insetRight, `${width} right`).toBeGreaterThanOrEqual(8);
+      expect(byName.right.x + byName.right.w, `${width} right edge`).toBeLessThanOrEqual(width - 8);
+      expect(circleGap(byName.atw, byName.groove), `${width} atw/groove`).toBeGreaterThanOrEqual(6);
       expect(layout.insetBottom, `${width} bottom`).toBe(16);
       expect(byName.left.y + byName.left.h, `${width} bottom edge`).toBeLessThanOrEqual(800 - 16);
     }

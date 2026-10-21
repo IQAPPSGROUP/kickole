@@ -618,9 +618,9 @@ export function createSupabaseLeaderboard(options: {
       const myRank = climbed(baseRank, baseScore, rounded, rows) ?? 0;
       const others = rows.filter((row) => !row.mine);
       return {
-        above: others.filter((row) => row.score > rounded).sort((a, b) => a.rank - b.rank).slice(-3),
-        me: { ...me, rank: myRank },
-        below: others.filter((row) => row.score <= rounded).sort((a, b) => a.rank - b.rank).slice(0, 3),
+        above: others.filter((row) => row.rank < myRank).sort((a, b) => a.rank - b.rank).slice(-3),
+        me: { ...me, rank: myRank, score: Math.max(baseScore, rounded) },
+        below: others.filter((row) => row.rank >= myRank).sort((a, b) => a.rank - b.rank).slice(0, 3),
       };
     },
     top(scope, _score, limit) {

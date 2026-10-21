@@ -124,6 +124,11 @@ describe('supabase leaderboard', () => {
     const firstRankCalls = calls.filter((call) => call.fn === 'get_rank').length;
     expect(board.rankFor(60).rank).toBe(3);
     expect(board.rankFor(101).rank).toBe(2);
+    const standing = board.around(0, 'world');
+    expect(standing.me.rank).toBe(4);
+    expect(standing.me.score).toBe(10);
+    expect(standing.above.map((row) => row.nickname)).toEqual(['HighKick', 'MidKick']);
+    expect(standing.below.map((row) => row.nickname)).toEqual(['LowKick']);
     expect(board.rankFor(0).countryRank).toBe(2);
     expect(calls.filter((call) => call.fn === 'get_rank')).toHaveLength(firstRankCalls);
 

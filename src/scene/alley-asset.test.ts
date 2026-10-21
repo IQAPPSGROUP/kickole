@@ -113,8 +113,8 @@ describe('alley environment', () => {
       cam.updateProjectionMatrix();
       const horiz = Math.hypot(GAMEPLAY_TARGET.x - cam.position.x, GAMEPLAY_TARGET.z - cam.position.z);
       const pitch = Math.atan2(cam.position.y - GAMEPLAY_TARGET.y, horiz) * 180 / Math.PI;
-      expect(cam.position.y).toBeGreaterThan(1.75);
-      expect(cam.position.y).toBeLessThan(2.05);
+      expect(cam.position.y).toBeGreaterThan(2.2);
+      expect(cam.position.y).toBeLessThan(2.55);
       expect(pitch).toBeGreaterThan(6);
       expect(pitch).toBeLessThan(14);
       const screen = (px: number, py: number, pz: number) => {
@@ -127,24 +127,35 @@ describe('alley environment', () => {
         screen(x - width / 2, letterBottom, z),
         screen(x + width / 2, letterBottom, z),
       ];
-      for (const corner of letters) {
-        // Right of the top-left score card, on screen, above the chain-link.
+      const muralTop = y + height / 2;
+      const muralBottom = y - height / 2;
+      const mural = [
+        screen(x - width / 2, muralTop, z),
+        screen(x + width / 2, muralTop, z),
+        screen(x - width / 2, muralBottom, z),
+        screen(x + width / 2, muralBottom, z),
+      ];
+      for (const corner of [...letters, ...mural]) {
+        // Right of the top-left score card, fully on screen, above the chain-link.
         expect(corner.x).toBeGreaterThan(0.38);
         expect(corner.x).toBeLessThan(0.99);
-        expect(corner.y).toBeGreaterThan(0.04);
-        expect(corner.y).toBeLessThan(0.16);
+        expect(corner.y).toBeGreaterThan(0.08);
+        expect(corner.y).toBeLessThan(0.36);
       }
       const crown = screen(0, 1.75, 0.02);
       const feet = screen(0, 0, 0.02);
       const body = feet.y - crown.y;
-      expect(body).toBeGreaterThan(0.35);
-      expect(body).toBeLessThan(0.45);
-      expect(feet.y).toBeGreaterThan(0.5);
-      expect(feet.y).toBeLessThan(0.59);
-      expect(crown.y).toBeGreaterThan(letters[2].y + 0.04);
+      expect(body).toBeGreaterThan(0.34);
+      expect(body).toBeLessThan(0.46);
+      // Feet sit low, just above the corner buttons, with the whole body still in frame.
+      expect(feet.y).toBeGreaterThan(0.78);
+      expect(feet.y).toBeLessThan(0.86);
+      expect(feet.x).toBeGreaterThan(0.46);
+      expect(feet.x).toBeLessThan(0.54);
+      expect(crown.y).toBeGreaterThan(letters[2].y + 0.1);
       const ballBottom = screen(0, 0.19, 0.42);
       const apex = screen(0, 2.15, 0.3);
-      expect(ballBottom.y).toBeLessThan(0.6);
+      expect(ballBottom.y).toBeLessThan(0.86);
       expect(ballBottom.y).toBeLessThan(feet.y + 0.02);
       expect(apex.y).toBeGreaterThan(0.02);
       expect(apex.y).toBeLessThan(ballBottom.y);

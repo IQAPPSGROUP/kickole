@@ -17,12 +17,14 @@ export function Hud({
   onSkipCelebration,
   nickname,
   board,
+  onOpenBoard,
 }: {
   hud: HudState;
   controller?: GameController;
   onSkipCelebration?: () => void;
   nickname?: string | null;
   board?: LeaderboardService | null;
+  onOpenBoard?: () => void;
 }) {
   const f = hud.feedback;
   const combo = streakMultiplier(hud.streak);
@@ -50,7 +52,7 @@ export function Hud({
       </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
       {nickname && board && (hud.phase === 'playing' || hud.phase === 'ready') && (
-        <WorldRank score={hud.score} nickname={nickname} service={board} />
+        <WorldRank score={hud.score} nickname={nickname} service={board} onOpen={onOpenBoard} />
       )}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>

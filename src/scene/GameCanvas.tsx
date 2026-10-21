@@ -1,6 +1,7 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Texture, Vector3, type BufferGeometry, type Material, type Mesh, type Object3D, type WebGLRenderer } from 'three';
+import { useGLTF } from '@react-three/drei';
+import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { releaseDecodedMusic, restoreMusicAfterContext } from '../game/audio';
 import type { GameController } from '../game/controller';
@@ -16,12 +17,14 @@ import { KeyLight } from './KeyLight';
 import { cameraSway, prefersReducedMotion } from './juice';
 import { SceneLife } from './SceneLife';
 import { AlleySky } from './AlleySky';
-import { ALLEY_VIEWS, alleyViewFromSearch } from './alleyLayout';
+import { ALLEY_VIEWS, alleyModelUrl, alleyViewFromSearch } from './alleyLayout';
 import { ENVIRONMENT_THEME } from './environment';
 import { PostFX } from './PostFX';
 import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
 import { installPcss, restorePcss } from './pcss';
 import { contextLostNeedsReload, CONTEXT_RESTORE_WAIT_MS } from './glRecovery';
+import { gpuGeneration, notifyGpuRestore, reuploadSceneTextures, subscribeGpuRestore } from './gpuRestore';
+import { characterModelUrl } from './rig';
 import {
   cappedDpr,
   createFpsGuard,
@@ -173,29 +176,15 @@ function Simulation({ controller }: { controller: GameController }) {
   return null;
 }
 
-/** Put textures and geometries back on the GPU after the browser restores the context. */
-function refreshGpuResources(root: Object3D) {
-  root.traverse((obj) => {
-    const mesh = obj as Mesh;
-    const geometry: BufferGeometry | undefined = mesh.geometry;
-    if (geometry) {
-      for (const key of Object.keys(geometry.attributes)) {
-        const attribute = geometry.attributes[key];
-        if (attribute) attribute.needsUpdate = true;
-      }
-      if (geometry.index) geometry.index.needsUpdate = true;
-    }
-    const material = mesh.material;
-    if (!material) return;
-    const materials: Material[] = Array.isArray(material) ? material : [material];
-    for (const mat of materials) {
-      mat.needsUpdate = true;
-      for (const key of Object.keys(mat)) {
-        const value = (mat as unknown as Record<string, unknown>)[key];
-        if (value instanceof Texture) value.needsUpdate = true;
-      }
-    }
-  });
+/** Drop cached GLBs so a restored context decodes fresh images instead of dead bitmaps. */
+function clearModelCache() {
+  useGLTF.clear(alleyModelUrl('high'));
+  useGLTF.clear(alleyModelUrl('medium'));
+  useGLTF.clear(alleyModelUrl('low'));
+  for (const body of ['male', 'female'] as const) {
+    useGLTF.clear(characterModelUrl(0, body));
+    useGLTF.clear(characterModelUrl(1, body));
+  }
 }
 
 /**
@@ -205,6 +194,7 @@ function refreshGpuResources(root: Object3D) {
 function ContextLossGuard({ onLost, onRestored }: { onLost: () => void; onRestored: () => void }) {
   const gl = useThree(state => state.gl);
   const scene = useThree(state => state.scene);
+  const camera = useThree(state => state.camera);
   useEffect(() => {
     const canvas = gl.domElement;
     const lost = (event: Event) => {
@@ -212,7 +202,15 @@ function ContextLossGuard({ onLost, onRestored }: { onLost: () => void; onRestor
       onLost();
     };
     const restored = () => {
-      refreshGpuResources(scene);
+      reuploadSceneTextures(gl, scene);
+      clearModelCache();
+      try {
+        gl.compile(scene, camera);
+      } catch (error) {
+        console.warn('material recompile failed', error);
+      }
+      gl.shadowMap.needsUpdate = true;
+      notifyGpuRestore();
       onRestored();
     };
     canvas.addEventListener('webglcontextlost', lost);
@@ -221,7 +219,7 @@ function ContextLossGuard({ onLost, onRestored }: { onLost: () => void; onRestor
       canvas.removeEventListener('webglcontextlost', lost);
       canvas.removeEventListener('webglcontextrestored', restored);
     };
-  }, [gl, scene, onLost, onRestored]);
+  }, [gl, scene, camera, onLost, onRestored]);
   return null;
 }
 
@@ -286,6 +284,7 @@ function CarnivalSky() {
 /** Shared sunny HDR for reflections. CarnivalSky is the visible sky. */
 function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
+  const generation = useSyncExternalStore(subscribeGpuRestore, gpuGeneration);
   useEffect(() => {
     let alive = true;
     let pmDisposed = false;
@@ -319,7 +318,7 @@ function SunnyIbl({ ibl }: { ibl: boolean }) {
       hdr?.dispose();
       disposePm();
     };
-  }, [gl, scene, ibl]);
+  }, [gl, scene, ibl, generation]);
   return null;
 }
 
@@ -383,6 +382,7 @@ function forcedTier(): Quality | null {
 function World({ controller, skin, quality, onReady }: SceneProps) {
   const alley = ENVIRONMENT_THEME === 'alley';
   const street = ENVIRONMENT_THEME === 'street';
+  const generation = useSyncExternalStore(subscribeGpuRestore, gpuGeneration);
   const profile = profileFor(quality);
   const shadows = profile.shadows !== 'none';
   useEffect(() => { onReady(); }, [onReady]);
@@ -399,10 +399,10 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
       <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
       <KeyLight quality={quality} engine={controller.engine} />
-      <Court shadows={shadows} quality={quality} />
+      <Court key={generation} shadows={shadows} quality={quality} />
       <SceneLife engine={controller.engine} quality={quality} />
       {/* drei ContactShadows paints a flat blue disc on this court, so it stays off. */}
-      <CharacterSwitch key={skin.playerBody} engine={controller.engine} skin={skin} quality={quality} />
+      <CharacterSwitch key={`${skin.playerBody}-${generation}`} engine={controller.engine} skin={skin} quality={quality} />
       <Ball engine={controller.engine} skin={skin} quality={quality} />
       <Effects engine={controller.engine} quality={quality} />
       <PostFX profile={postProfile} engine={controller.engine} />

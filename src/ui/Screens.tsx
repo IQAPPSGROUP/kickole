@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Result } from '../game/controller';
 import { countryByCode, countryFlag, suggestedCountry } from '../game/countries';
@@ -51,7 +51,7 @@ export function Logo() {
 }
 
 export function Home({
-  best, coins, onPlay, onSettings, onCustomise, onShop,
+  best, coins, onPlay, onSettings, onCustomise, onShop, onLeaderboard,
 }: {
   best: number;
   coins: number;
@@ -59,6 +59,7 @@ export function Home({
   onSettings: () => void;
   onCustomise: () => void;
   onShop: () => void;
+  onLeaderboard: () => void;
 }) {
   return (
     <div className="screen home">
@@ -77,6 +78,7 @@ export function Home({
           <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
           <button className="btn ghost" onClick={onShop}>SHOP</button>
         </div>
+        <button className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
         <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
         <p className="home-help">Tap to juggle · Hold L or R to kick higher · Hold through the ball to stall</p>
         <p className="credit">IQ Apps Group · v0.1</p>
@@ -86,62 +88,17 @@ export function Home({
 }
 
 export function GameOver({
-  result, best, coins, board, onAgain, onHome, onShop, rowLimit = 10, initialView = 'around',
+  result, best, coins, onAgain, onHome, onShop, onLeaderboard,
 }: {
   result: Result;
   best: number;
   coins: number;
-  board: LeaderboardService | null;
   onAgain: () => void;
   onHome: () => void;
   onShop: () => void;
-  /** How many rows the top list keeps. Country review boards need more than 10. */
-  rowLimit?: number;
-  initialView?: 'around' | 'top';
+  onLeaderboard: () => void;
 }) {
-  const [period, setPeriod] = useState<BoardPeriod>('all');
-  const [scope, setScope] = useState<BoardScope>('world');
-  const [view, setView] = useState<'around' | 'top'>(initialView);
-  const [sheet, setSheet] = useState<string | null>(null);
-  const [sheetStep, setSheetStep] = useState<SheetStep>('actions');
-  const [notice, setNotice] = useState<string | null>(null);
-  const [revision, setRevision] = useState(0);
-  const periodRow = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    periodRow.current?.querySelector('button.on')?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
-  }, [period]);
-  void useSyncExternalStore(
-    board ? board.subscribe : idleSubscribe,
-    () => board?.revision ?? 0,
-  );
-  const page = board ? board.board(period, scope, result.score, rowLimit) : { hidden: false, rows: [] as BoardEntry[] };
-  const optedOut = scope === 'country' && !board?.country;
-  const rows = board && !optedOut && !page.hidden
-    ? view === 'top'
-      ? page.rows
-      : flattenAround(board, result.score, scope, period)
-    : [];
-  void revision;
-  const closeSheet = () => {
-    setSheet(null);
-    setSheetStep('actions');
-  };
-  const reportName = (reason: ReportReason) => {
-    if (!sheet || !board) return;
-    board.report(sheet, reason);
-    setNotice(REPORT_THANKS);
-    closeSheet();
-    setRevision((value) => value + 1);
-  };
-  const blockName = () => {
-    if (!sheet || !board) return;
-    board.block(sheet);
-    setNotice(BLOCK_CONFIRMATION);
-    closeSheet();
-    setRevision((value) => value + 1);
-  };
   return (
-    <>
     <div className="screen over">
       <div className="card over-card">
         <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
@@ -152,68 +109,7 @@ export function GameOver({
           <div><b>{best}</b><span>BEST</span></div>
           <div><b>{result.bestStreak}</b><span>BEST COMBO</span></div>
         </div>
-        {board && (
-          <div className="world-board">
-            <div ref={periodRow} className="period-scroller" role="tablist" aria-label="Board period">
-              {PERIODS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={period === item.id ? 'on' : ''}
-                  title={item.title}
-                  onClick={() => setPeriod(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="seg board-tabs" role="tablist" aria-label="World or country">
-              {(['world', 'country'] as const).map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  className={scope === id ? 'on' : ''}
-                  onClick={() => setScope(id)}
-                >
-                  {id === 'world' ? 'World' : 'Country'}
-                </button>
-              ))}
-            </div>
-            {!optedOut && (
-              <div className="seg board-tabs" role="tablist" aria-label="Board view">
-                <button type="button" className={view === 'around' ? 'on' : ''} onClick={() => setView('around')}>AROUND YOU</button>
-                <button type="button" className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>TOP {rowLimit}</button>
-              </div>
-            )}
-            {optedOut && <p className="shop-note">You chose not to appear on a country board.</p>}
-            {!optedOut && page.hidden && <p className="shop-note">Not enough players in your country yet</p>}
-            {!optedOut && !page.hidden && <ol className="board">
-              {rows.map((row) => (
-                <li key={`${period}:${scope}:${view}:${row.rank}:${row.nickname}`} className={`${row.mine ? 'me' : ''}${row.rank === 1 ? ' is-first' : ''}`} aria-label={entryLabel(row, scope)}>
-                  <span className="board-rank">{row.rank > 0 ? row.rank.toLocaleString('en-US') : '—'}</span>
-                  {scope === 'country' && row.country && (
-                    <span className="country-flag" aria-hidden="true">{countryFlag(row.country)}</span>
-                  )}
-                  <b>{row.nickname}</b>
-                  <em>{row.score}</em>
-                  {!row.mine && (
-                    <button
-                      type="button"
-                      className="board-more"
-                      aria-label={`More actions for ${row.nickname}`}
-                      onClick={() => {
-                        setSheet(row.nickname);
-                        setSheetStep('actions');
-                      }}
-                    >
-                      ⋯
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ol>}
-          </div>
-        )}
+        <button type="button" className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
         <button className="btn primary big" onClick={onAgain} autoFocus>PLAY AGAIN</button>
         <div className="home-actions">
           <button className="btn ghost" onClick={onShop}>SHOP</button>
@@ -221,29 +117,6 @@ export function GameOver({
         </div>
       </div>
     </div>
-    {sheet && board && (
-      <ScreenModal label={`Actions for ${sheet}`} onBackdrop={closeSheet}>
-        <div className="board-sheet">
-          <p className="sheet-name">{sheet}</p>
-          {rowSheetStep(sheetStep, {
-            onReasons: () => setSheetStep('reasons'),
-            onReport: reportName,
-            onBlock: blockName,
-            onBack: () => setSheetStep('actions'),
-            onClose: closeSheet,
-          })}
-        </div>
-      </ScreenModal>
-    )}
-    {notice && (
-      <ScreenModal label="Confirmation">
-        <div className="centre-notice">
-          <p>{notice}</p>
-          <button type="button" className="btn primary" onClick={() => setNotice(null)}>OK</button>
-        </div>
-      </ScreenModal>
-    )}
-    </>
   );
 }
 
@@ -320,14 +193,158 @@ const PERIODS: readonly { id: BoardPeriod; label: string; title?: string }[] = [
   { id: 'all', label: 'All time' },
 ];
 
-function flattenAround(board: LeaderboardService, score: number, scope: BoardScope, period: BoardPeriod) {
-  const around = board.around(score, scope, period);
-  return [...around.above, around.me, ...around.below];
-}
-
 function entryLabel(row: BoardEntry, scope: BoardScope): string {
   const country = scope === 'country' && row.country ? countryByCode(row.country)?.name : null;
   return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
+}
+
+const BOARD_ROW_LIMIT = 50;
+
+/** Full-screen board. The list scrolls on its own so the court cannot eat the touch. */
+export function LeaderboardSheet({
+  board, score, onClose, onJoin,
+}: {
+  board: LeaderboardService | null;
+  score: number;
+  onClose: () => void;
+  onJoin?: () => void;
+}) {
+  const [period, setPeriod] = useState<BoardPeriod>('all');
+  const [scope, setScope] = useState<BoardScope>('world');
+  const [sheet, setSheet] = useState<string | null>(null);
+  const [sheetStep, setSheetStep] = useState<SheetStep>('actions');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  void useSyncExternalStore(board ? board.subscribe : idleSubscribe, () => board?.revision ?? 0);
+  void revision;
+  const page = board ? board.board(period, scope, score, BOARD_ROW_LIMIT) : { hidden: false, rows: [] as BoardEntry[] };
+  const optedOut = scope === 'country' && !board?.country;
+  const mine = board ? board.around(score, scope, period).me : null;
+  const rows = board && !optedOut && !page.hidden ? page.rows : [];
+  const closeActions = () => {
+    setSheet(null);
+    setSheetStep('actions');
+  };
+  const reportName = (reason: ReportReason) => {
+    if (!sheet || !board) return;
+    board.report(sheet, reason);
+    setNotice(REPORT_THANKS);
+    closeActions();
+    setRevision((value) => value + 1);
+  };
+  const blockName = () => {
+    if (!sheet || !board) return;
+    board.block(sheet);
+    setNotice(BLOCK_CONFIRMATION);
+    closeActions();
+    setRevision((value) => value + 1);
+  };
+  const rankText = mine && mine.rank > 0 ? mine.rank.toLocaleString('en-US') : '—';
+  return createPortal(
+    <div className="leaderboard-sheet" data-board-sheet role="dialog" aria-modal="true" aria-label="Leaderboard">
+      <div className="leaderboard-head">
+        <h2>LEADERBOARD</h2>
+        <div className="leaderboard-periods" role="tablist" aria-label="Board period">
+          {PERIODS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={period === item.id}
+              className={period === item.id ? 'on' : ''}
+              title={item.title}
+              onClick={() => setPeriod(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="seg board-tabs" role="tablist" aria-label="World or country">
+          {(['world', 'country'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={scope === id}
+              className={scope === id ? 'on' : ''}
+              onClick={() => setScope(id)}
+            >
+              {id === 'world' ? 'World' : 'Country'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {!board && (
+        <div className="leaderboard-scroll" data-board-scroll>
+          <p className="shop-note">The leaderboard is off until you join. A nickname from our word lists, your score and a country you choose are sent for the board.</p>
+          {onJoin && <button type="button" className="btn primary" onClick={onJoin}>TURN IT ON</button>}
+        </div>
+      )}
+      {board && (
+        <div className="leaderboard-scroll" data-board-scroll>
+          <div className="leaderboard-you" aria-label={`Your rank ${rankText} ${board.nickname} ${mine?.score ?? score}`}>
+            <span>YOUR RANK</span>
+            <b>{rankText}</b>
+            <em>{board.nickname}</em>
+            <strong>{mine?.score ?? score}</strong>
+          </div>
+          {optedOut && <p className="shop-note">You chose not to appear on a country board.</p>}
+          {!optedOut && page.hidden && <p className="shop-note">Not enough players in your country yet</p>}
+          {!optedOut && !page.hidden && (
+            <ol className="board">
+              {rows.map((row) => (
+                <li key={`${period}:${scope}:${row.rank}:${row.nickname}`} className={`${row.mine ? 'me' : ''}${row.rank === 1 ? ' is-first' : ''}`} aria-label={entryLabel(row, scope)}>
+                  <span className="board-rank">{row.rank > 0 ? row.rank.toLocaleString('en-US') : '—'}</span>
+                  {scope === 'country' && row.country && (
+                    <span className="country-flag" aria-hidden="true">{countryFlag(row.country)}</span>
+                  )}
+                  <b>{row.nickname}</b>
+                  <em>{row.score}</em>
+                  {!row.mine && (
+                    <button
+                      type="button"
+                      className="board-more"
+                      aria-label={`More actions for ${row.nickname}`}
+                      onClick={() => {
+                        setSheet(row.nickname);
+                        setSheetStep('actions');
+                      }}
+                    >
+                      ⋯
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      )}
+      <button type="button" className="btn primary leaderboard-close" onClick={onClose}>CLOSE</button>
+      {sheet && board && (
+        <ScreenModal label={`Actions for ${sheet}`} onBackdrop={closeActions}>
+          <div className="board-sheet">
+            <p className="sheet-name">{sheet}</p>
+            {rowSheetStep(sheetStep, {
+              onReasons: () => setSheetStep('reasons'),
+              onReport: reportName,
+              onBlock: blockName,
+              onBack: () => setSheetStep('actions'),
+              onClose: closeActions,
+            })}
+          </div>
+        </ScreenModal>
+      )}
+      {notice && (
+        <ScreenModal label="Confirmation">
+          <div className="centre-notice">
+            <p>{notice}</p>
+            <button type="button" className="btn primary" onClick={() => setNotice(null)}>OK</button>
+          </div>
+        </ScreenModal>
+      )}
+    </div>,
+    document.body,
+  );
 }
 
 function VolumeSlider({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {

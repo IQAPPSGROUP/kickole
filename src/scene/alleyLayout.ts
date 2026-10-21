@@ -27,8 +27,13 @@ export function alleyModelUrl(quality: Quality): string {
   return alleyUrl(quality === 'low' ? ALLEY_FILES.modelLow : ALLEY_FILES.model);
 }
 
-export function alleySkyUrl(quality: Quality): string {
-  return alleyUrl(quality === 'low' ? ALLEY_FILES.skyLow : ALLEY_FILES.sky);
+/**
+ * Every tier shows the tone-mapped JPEG. The 1K HDR stays in the repo for the
+ * daylight reference, but binding it as a float background was a large GPU
+ * allocation on the phone that lost the context.
+ */
+export function alleySkyUrl(_quality: Quality): string {
+  return alleyUrl(ALLEY_FILES.skyLow);
 }
 
 /** Contact-sheet cameras. Gameplay framing is unchanged when the query is absent. */

@@ -21,11 +21,20 @@ export function Hud({
   const combo = streakMultiplier(hud.streak);
   return (
     <div className="hud">
+      <svg className="prompt-filters" aria-hidden width="0" height="0">
+        <filter id="prompt-spray" x="-8%" y="-20%" width="116%" height="150%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="noise" />
+          <feColorMatrix in="noise" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.4 -0.55" result="speck" />
+          <feComposite in="speck" in2="SourceAlpha" operator="in" />
+        </filter>
+      </svg>
       <div className="hud-top">
-        <span className="score-label">YOUR RUN</span>
-        <div className="score" key={hud.score}>{hud.score}</div>
+        <GraffitiText text="YOUR RUN" className="graffiti score-label" />
+        <div className="score" key={hud.score}>
+          <GraffitiText text={String(hud.score)} className="graffiti score-num" />
+        </div>
         <div className="hud-sub">
-          <span>KICK-UPS <b>{hud.kickUps}</b></span>
+          <GraffitiText text={`KICK-UPS ${hud.kickUps}`} className="graffiti score-sub" />
           {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
         </div>
       </div>
@@ -89,13 +98,6 @@ function PromptBanner({ prompt, controller }: { prompt: ActivePrompt; controller
   const call = `${prompt.call}${chain}`;
   return (
     <div className="prompt-banner" key={`${prompt.id}:${prompt.startedAt}`}>
-      <svg className="prompt-filters" aria-hidden width="0" height="0">
-        <filter id="prompt-spray" x="-8%" y="-20%" width="116%" height="150%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="noise" />
-          <feColorMatrix in="noise" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.4 -0.55" result="speck" />
-          <feComposite in="speck" in2="SourceAlpha" operator="in" />
-        </filter>
-      </svg>
       <div className="prompt-bounce">
         <GraffitiText text={call} className={call.length > 16 ? 'graffiti prompt-call is-long' : 'graffiti prompt-call'} />
         <GraffitiText text={prompt.tip} className="graffiti prompt-tip" />

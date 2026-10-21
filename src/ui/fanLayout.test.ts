@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAN_BUTTON, circleGap, fanLayout, fanRects } from './fanLayout';
+import { FAN_BUTTON, FOOT_BUTTON, circleGap, fanLayout, fanRects } from './fanLayout';
 
 function nearestGap(width: number, height: number, safeLeft = 0, safeRight = 0, safeBottom = 0) {
   const layout = fanLayout(width, safeLeft, safeRight, safeBottom);
@@ -24,7 +24,7 @@ describe('corner fan', () => {
     const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
     expect(byName.head.x).toBeCloseTo(byName.left.x, 4);
     expect(byName.head.y).toBeLessThan(byName.left.y);
-    expect(byName.atw.y).toBeCloseTo(byName.left.y, 4);
+    expect(byName.atw.y + byName.atw.h).toBeCloseTo(byName.left.y + byName.left.h, 4);
     expect(byName.atw.x).toBeGreaterThan(byName.left.x);
     const angle = Math.atan2(layout.dy, layout.dx) * (180 / Math.PI);
     expect(angle).toBeCloseTo(35, 4);
@@ -33,8 +33,8 @@ describe('corner fan', () => {
     expect(byName.neck.y).toBeLessThan(byName.left.y - 24);
     expect(byName.thigh.y).toBeGreaterThan(byName.flick.y + 24);
     expect(byName.thigh.y).toBeLessThan(byName.right.y - 24);
-    expect(byName.flick.x).toBeCloseTo(byName.right.x, 4);
-    expect(byName.groove.y).toBeCloseTo(byName.right.y, 4);
+    expect(byName.flick.x + byName.flick.w).toBeCloseTo(byName.right.x + byName.right.w, 4);
+    expect(byName.groove.y + byName.groove.h).toBeCloseTo(byName.right.y + byName.right.h, 4);
     expect(byName.thigh.x).toBeLessThan(byName.right.x);
   });
 
@@ -42,7 +42,14 @@ describe('corner fan', () => {
     for (const [width, height] of [[375, 667], [390, 844], [430, 932]] as const) {
       const { nearest, pair, rects } = nearestGap(width, height);
       expect(nearest, `${width} ${pair}`).toBeGreaterThanOrEqual(6);
-      for (const rect of rects) expect(rect.w).toBe(FAN_BUTTON);
+      const byName = Object.fromEntries(rects.map((rect) => [rect.name, rect]));
+      expect(byName.left.w).toBe(FOOT_BUTTON);
+      expect(byName.right.w).toBe(FOOT_BUTTON);
+      expect(FOOT_BUTTON / FAN_BUTTON).toBeGreaterThanOrEqual(1.3);
+      expect(FOOT_BUTTON / FAN_BUTTON).toBeLessThanOrEqual(1.4);
+      for (const name of ['head', 'neck', 'atw', 'flick', 'thigh', 'groove']) {
+        expect(byName[name].w, name).toBe(FAN_BUTTON);
+      }
     }
   });
 

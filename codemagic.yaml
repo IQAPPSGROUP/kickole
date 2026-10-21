@@ -20,6 +20,9 @@ workflows:
         - app_store
       vars:
         BUNDLE_ID: com.iqappsgroup.kickole
+        # Publishable client key. Not a service-role secret.
+        VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
     scripts:
       - name: Require the Kickolé App Store Apple ID
         script: |
@@ -101,6 +104,9 @@ workflows:
     environment:
       node: "22"
       xcode: latest
+      vars:
+        VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
     scripts:
       - name: Require Xcode 26 or newer
         script: |

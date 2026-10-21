@@ -33,6 +33,9 @@ jobs:
       - name: Build production assets
         env:
           VITE_ENVIRONMENT_THEME: beach
+          # Publishable client key. Not a service-role secret.
+          VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
         run: npm run build
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

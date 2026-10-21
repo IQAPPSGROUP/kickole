@@ -1,12 +1,15 @@
+import { COUNTRIES, countryByCode } from './countries';
 import { loadDeviceId } from './nicknameStore';
 
-/** World is all-time. Week is the last seven days. */
-export type BoardScope = 'world' | 'week';
+/** World is all-time. Week is the last seven days. Country is all-time for one self-chosen code. */
+export type BoardScope = 'world' | 'week' | 'country';
 
 export interface BoardEntry {
   rank: number;
   nickname: string;
   score: number;
+  /** ISO alpha-2, or null when this player chose not to say. */
+  country: string | null;
   mine: boolean;
 }
 
@@ -15,6 +18,10 @@ export interface RankSnapshot {
   total: number;
   nickname: string;
   score: number;
+  /** Null when the player prefers not to say, or has not chosen. */
+  country: string | null;
+  /** Null when they are excluded from country boards. */
+  countryRank: number | null;
 }
 
 export interface AroundMe {
@@ -34,6 +41,8 @@ export interface SubmitResult {
  */
 export interface LeaderboardService {
   readonly nickname: string;
+  /** Self-chosen ISO alpha-2. Null excludes this player from country boards. */
+  readonly country: string | null;
   /** Install id sent with a score. Never render this. */
   readonly deviceId: string;
   rankFor(score: number, now?: number): RankSnapshot;
@@ -57,6 +66,15 @@ interface CrowdRow {
   nickname: string;
   score: number;
   at: number;
+  country: string;
+}
+
+interface StandingRow {
+  nickname: string;
+  score: number;
+  at: number;
+  mine: boolean;
+  country: string | null;
 }
 
 interface StoredBest {
@@ -82,6 +100,40 @@ function crowdAt(index: number, now: number): number {
   return now - ageDays * 24 * 60 * 60 * 1000 - (index % 50) * 60 * 1000;
 }
 
+function crowdCountry(index: number): string {
+  const country = COUNTRIES[index % COUNTRIES.length];
+  return country ? country.code : '';
+}
+
+function inScope(scope: BoardScope, at: number, now: number, code: string, playerCountry: string | null): boolean {
+  switch (scope) {
+    case 'world':
+      return true;
+    case 'week':
+      return now - at <= WEEK_MS;
+    case 'country':
+      return playerCountry != null && code === playerCountry;
+    default: {
+      const neverScope: never = scope;
+      return neverScope;
+    }
+  }
+}
+
+function playerOnBoard(scope: BoardScope, playerCountry: string | null): boolean {
+  switch (scope) {
+    case 'world':
+    case 'week':
+      return true;
+    case 'country':
+      return playerCountry != null;
+    default: {
+      const neverScope: never = scope;
+      return neverScope;
+    }
+  }
+}
+
 function readList(storage: Storage, key: string): string[] {
   try {
     const raw = storage.getItem(key);
@@ -105,7 +157,7 @@ function readBest(storage: Storage): StoredBest | null {
   }
 }
 
-function byStanding(a: CrowdRow, b: CrowdRow): number {
+function byStanding(a: { score: number; at: number }, b: { score: number; at: number }): number {
   return b.score - a.score || a.at - b.at;
 }
 
@@ -115,11 +167,14 @@ export function formatRank(rank: number): string {
 
 export function createMockLeaderboard(options: {
   nickname: string;
+  /** ISO alpha-2. Null or omitted means they are off the country board. */
+  country?: string | null;
   storage?: Storage;
   now?: number;
 }): LeaderboardService {
   const storage = options.storage ?? localStorage;
   const nickname = options.nickname;
+  const country = countryByCode(options.country)?.code ?? null;
   const deviceId = loadDeviceId(storage);
   const blocks = new Set(readList(storage, BLOCKS_KEY).map((name) => name.toLowerCase()));
   const reports = new Set(readList(storage, REPORTS_KEY).map((name) => name.toLowerCase()));
@@ -142,45 +197,67 @@ export function createMockLeaderboard(options: {
       const key = rowName.toLowerCase();
       if (key === mine || blocks.has(key)) continue;
       const at = crowdAt(index, now);
-      if (scope === 'week' && now - at > WEEK_MS) continue;
-      rows.push({ nickname: rowName, score: crowdScore(index), at });
+      const code = crowdCountry(index);
+      if (!inScope(scope, at, now, code, country)) continue;
+      rows.push({ nickname: rowName, score: crowdScore(index), at, country: code });
     }
     return rows;
   };
 
   const placed = (score: number, scope: BoardScope, now: number): BoardEntry[] => {
     const at = now;
-    const rows = crowd(now, scope);
-    const combined: Array<CrowdRow & { mine: boolean }> = [
-      ...rows.map((row) => ({ ...row, mine: false })),
-      { nickname, score: Math.max(0, Math.floor(score)), at, mine: true },
-    ];
+    const combined: StandingRow[] = crowd(now, scope).map((row) => ({ ...row, mine: false }));
+    if (playerOnBoard(scope, country)) {
+      combined.push({
+        nickname,
+        score: Math.max(0, Math.floor(score)),
+        at,
+        mine: true,
+        country,
+      });
+    }
     combined.sort(byStanding);
     return combined.map((row, index) => ({
       rank: index + 1,
       nickname: row.nickname,
       score: row.score,
       mine: row.mine,
+      country: row.country,
     }));
   };
 
   return {
     nickname,
+    country,
     deviceId,
     rankFor(score, now = Date.now()) {
       const board = placed(score, 'world', now);
       const me = board.find((row) => row.mine);
+      const rounded = Math.max(0, Math.floor(score));
+      const countryRank = country
+        ? placed(score, 'country', now).find((row) => row.mine)?.rank ?? null
+        : null;
       return {
         rank: me?.rank ?? board.length,
         total: board.length,
         nickname,
-        score: Math.max(0, Math.floor(score)),
+        score: rounded,
+        country,
+        countryRank,
       };
     },
     around(score, scope, now = Date.now()) {
       const board = placed(score, scope, now);
       const index = board.findIndex((row) => row.mine);
-      const me = board[index] ?? { rank: 1, nickname, score: Math.floor(score), mine: true };
+      const rounded = Math.max(0, Math.floor(score));
+      if (index < 0) {
+        return {
+          above: [],
+          me: { rank: 0, nickname, score: rounded, mine: true, country },
+          below: [],
+        };
+      }
+      const me = board[index] ?? { rank: 1, nickname, score: rounded, mine: true, country };
       return {
         above: board.slice(Math.max(0, index - 3), index),
         me,

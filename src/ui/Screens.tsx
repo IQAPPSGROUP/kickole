@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import type { Result } from '../game/controller';
-import type { BoardScope, LeaderboardService } from '../game/leaderboard';
+import { countryByCode, countryFlag } from '../game/countries';
+import type { BoardEntry, BoardScope, LeaderboardService } from '../game/leaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
 import { NicknameForm } from './NicknameScreen';
 import {
@@ -87,7 +88,8 @@ export function GameOver({
   const [view, setView] = useState<'around' | 'top'>('around');
   const [note, setNote] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
-  const rows = board
+  const optedOut = scope === 'country' && !board?.country;
+  const rows = board && !optedOut
     ? view === 'top'
       ? board.top(scope, result.score, 10)
       : flattenAround(board, result.score, scope)
@@ -107,18 +109,25 @@ export function GameOver({
         {board && (
           <div className="world-board">
             <div className="seg board-tabs" role="tablist" aria-label="Board scope">
-              <button type="button" className={scope === 'world' ? 'on' : ''} onClick={() => setScope('world')}>WORLD</button>
-              <button type="button" className={scope === 'week' ? 'on' : ''} onClick={() => setScope('week')}>THIS WEEK</button>
+              {(['world', 'week', 'country'] as const).map((id) => (
+                <button key={id} type="button" className={scope === id ? 'on' : ''} onClick={() => setScope(id)}>{scopeLabel(id)}</button>
+              ))}
             </div>
-            <div className="seg board-tabs" role="tablist" aria-label="Board view">
-              <button type="button" className={view === 'around' ? 'on' : ''} onClick={() => setView('around')}>AROUND YOU</button>
-              <button type="button" className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>TOP 10</button>
-            </div>
-            <ol className="board">
+            {!optedOut && (
+              <div className="seg board-tabs" role="tablist" aria-label="Board view">
+                <button type="button" className={view === 'around' ? 'on' : ''} onClick={() => setView('around')}>AROUND YOU</button>
+                <button type="button" className={view === 'top' ? 'on' : ''} onClick={() => setView('top')}>TOP 10</button>
+              </div>
+            )}
+            {optedOut && <p className="shop-note">You chose not to appear on a country board.</p>}
+            {!optedOut && <ol className="board">
               {rows.map((row) => (
-                <li key={`${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''}>
+                <li key={`${scope}:${view}:${row.rank}:${row.nickname}`} className={row.mine ? 'me' : ''} aria-label={entryLabel(row)}>
                   <span>{row.rank}</span>
-                  <b>{row.nickname}</b>
+                  <b>
+                    {row.country && <span className="country-flag" aria-hidden="true">{countryFlag(row.country)}</span>}
+                    {row.nickname}
+                  </b>
                   <em>{row.score}</em>
                   {!row.mine && (
                     <button
@@ -135,7 +144,7 @@ export function GameOver({
                   )}
                 </li>
               ))}
-            </ol>
+            </ol>}
             {note && <p className="shop-note">{note}</p>}
           </div>
         )}
@@ -149,9 +158,26 @@ export function GameOver({
   );
 }
 
+function scopeLabel(scope: BoardScope): string {
+  switch (scope) {
+    case 'world': return 'WORLD';
+    case 'week': return 'THIS WEEK';
+    case 'country': return 'COUNTRY';
+    default: {
+      const neverScope: never = scope;
+      return neverScope;
+    }
+  }
+}
+
 function flattenAround(board: LeaderboardService, score: number, scope: BoardScope) {
   const around = board.around(score, scope);
   return [...around.above, around.me, ...around.below];
+}
+
+function entryLabel(row: BoardEntry): string {
+  const country = row.country ? countryByCode(row.country)?.name : null;
+  return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
 }
 
 function Toggle({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
@@ -176,11 +202,12 @@ function graphicsLabel(choice: GraphicsChoice): string {
 }
 
 export function SettingsScreen({
-  settings, nickname, onNickname, onChange, onClose,
+  settings, nickname, country, onNickname, onChange, onClose,
 }: {
   settings: Settings;
   nickname: string;
-  onNickname: (nickname: string) => void;
+  country: string | null;
+  onNickname: (nickname: string, country: string | null) => void;
   onChange: (p: Partial<Settings>) => void;
   onClose: () => void;
 }) {
@@ -194,9 +221,9 @@ export function SettingsScreen({
       <div className="card">
         <h2>SETTINGS</h2>
         <div className="group">
-          <label>World nickname</label>
-          <NicknameForm initial={nickname} submitLabel="SAVE NICKNAME" onSubmit={onNickname} />
-          <p className="shop-note">Stored on this device. World scores are not uploaded yet.</p>
+          <label>Nickname and country</label>
+          <NicknameForm initial={nickname} initialCountry={country} submitLabel="SAVE" onSubmit={onNickname} />
+          <p className="shop-note">Stored on this device. World scores are not uploaded yet. Country is only the one you pick here.</p>
         </div>
         <Toggle label="Sound" value={settings.sound} onChange={(sound) => onChange({ sound })} />
         <Toggle label="Music" value={settings.music} onChange={(music) => onChange({ music })} />

@@ -1,7 +1,19 @@
+import { countryByCode } from './countries';
 import { checkNickname } from './nickname';
 
 export const NICKNAME_KEY = 'kicky.nickname.v1';
 export const DEVICE_ID_KEY = 'kicky.device.v1';
+export const COUNTRY_KEY = 'kicky.country.v1';
+
+/** Stored when the player chooses "Prefer not to say". Missing key means they have not chosen yet. */
+const COUNTRY_NONE = 'none';
+
+export interface StoredCountry {
+  /** True after a save, including prefer-not-to-say. */
+  chosen: boolean;
+  /** ISO alpha-2, or null when unset or prefer-not-to-say. */
+  country: string | null;
+}
 
 export function loadNickname(storage: Storage = localStorage): string | null {
   try {
@@ -78,4 +90,53 @@ export async function hydrateNickname(storage: Storage = localStorage): Promise<
     /* Preferences is absent in the browser and in tests. */
   }
   return loadNickname(storage);
+}
+
+export function loadStoredCountry(storage: Storage = localStorage): StoredCountry {
+  try {
+    const raw = storage.getItem(COUNTRY_KEY);
+    if (raw == null || raw === '') return { chosen: false, country: null };
+    if (raw === COUNTRY_NONE) return { chosen: true, country: null };
+    const country = countryByCode(raw);
+    if (!country) return { chosen: false, country: null };
+    return { chosen: true, country: country.code };
+  } catch {
+    return { chosen: false, country: null };
+  }
+}
+
+/** `null` stores prefer-not-to-say. A locale guess is not written until the player saves. */
+export function saveCountry(country: string | null, storage: Storage = localStorage): boolean {
+  const stored = country == null ? COUNTRY_NONE : countryByCode(country)?.code;
+  if (!stored) return false;
+  try {
+    storage.setItem(COUNTRY_KEY, stored);
+  } catch {
+    return false;
+  }
+  void mirrorPreference(COUNTRY_KEY, stored);
+  return true;
+}
+
+export async function hydrateCountry(storage: Storage = localStorage): Promise<StoredCountry> {
+  const local = loadStoredCountry(storage);
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()) return local;
+    const { Preferences } = await import('@capacitor/preferences');
+    const stored = await Preferences.get({ key: COUNTRY_KEY });
+    const value = stored.value;
+    const known = value ? countryByCode(value) : null;
+    if (value === COUNTRY_NONE || known) {
+      const normalized = known ? known.code : COUNTRY_NONE;
+      try { storage.setItem(COUNTRY_KEY, normalized); } catch { /* ignore */ }
+      return loadStoredCountry(storage);
+    }
+    if (local.chosen) {
+      await Preferences.set({ key: COUNTRY_KEY, value: local.country ?? COUNTRY_NONE });
+    }
+  } catch {
+    /* Preferences is absent in the browser and in tests. */
+  }
+  return loadStoredCountry(storage);
 }

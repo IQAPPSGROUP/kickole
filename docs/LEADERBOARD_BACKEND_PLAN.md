@@ -1,6 +1,6 @@
 # World leaderboard backend plan
 
-The app already has the client: a nickname on the device, a live rank tag, and the game-over board. Scores are **not** uploaded. `createMockLeaderboard` in `src/game/leaderboard.ts` implements `LeaderboardService`. A later Supabase client should implement that same interface and leave the UI alone.
+The app already has the client: a nickname and an optional self-chosen country on the device, a live rank tag, and the game-over board. Scores are **not** uploaded. `createMockLeaderboard` in `src/game/leaderboard.ts` implements `LeaderboardService`. A later Supabase client should implement that same interface and leave the UI alone.
 
 Checked against Supabase’s current API security docs: grants and row level security are separate layers, new `public` tables can be auto-granted to `anon`, views need `security_invoker = true` on Postgres 15+, and secret keys bypass RLS. Edge Functions still verify only the legacy JWT `anon` / `service_role` keys, so a publishable key needs `--no-verify-jwt` plus an in-function check.
 
@@ -9,9 +9,14 @@ Checked against Supabase’s current API security docs: grants and row level sec
 | Field | Role |
 | --- | --- |
 | `nickname` | Public label, 3–16 chars, `[A-Za-z0-9_]`, passed through the same filter as `checkNickname`. |
+| `country` | Optional ISO 3166-1 alpha-2 the player picked, or null. Null means “Prefer not to say” and that row is left off every country board. |
 | `score` | One integer for the run. |
 | `deviceId` | Random UUID from Capacitor Preferences / local storage (`kicky.device.v1`). It is an install key, not an account, not shown, and not linked to Apple ID, Google account, email or phone. |
 | `at` | Client clock, used only as a hint. The server stores its own timestamp. |
+
+## Data minimisation
+
+The board stores a nickname and an optional self-chosen country only. Nothing else about the person. The country is the alpha-2 code they confirm in the picker, stored on device as `kicky.country.v1` (`none` when they prefer not to say). The picker may suggest a code from the device locale region (`Intl.Locale.region`, or a trailing region subtag such as `en-GB`). It does not read GPS, IP address, timezone, or a network geolocation lookup, and the server must not fill `country` from the request IP. No precise location is collected or sent. A missing choice is not uploaded as a guess: the locale suggestion is only a default until the player saves.
 
 No other personal data. Reinstalling the app mints a new device id. Renaming the nickname does not create an account.
 
@@ -35,10 +40,12 @@ create table private.scores (
 create table private.device_best (
   device_id uuid primary key,
   nickname text not null,
+  country char(2),
   best_score integer not null,
   week_score integer not null,
   week_start date not null,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint device_best_country_iso check (country is null or country ~ '^[A-Z]{2}$')
 );
 
 create table private.nickname_reports (
@@ -67,6 +74,8 @@ alter table private.blocks enable row level security;
 alter table private.submit_log enable row level security;
 ```
 
+`device_best.country` is null when the player prefers not to say. Those rows are excluded from country boards. Do not add a latitude, longitude, city, IP, or any other location column. The audit table `private.scores` does not store a location either.
+
 Do not add a policy that treats a client-supplied device id as `auth.uid()`. Anyone could send someone else’s id. There is no Supabase Auth user for this board.
 
 Revoke the default Data API grants if this project still auto-grants `anon` (see “Securing your API”):
@@ -81,7 +90,7 @@ alter default privileges for role postgres in schema public
 The app calls one function. It does not insert into Postgres itself.
 
 1. Reject the request unless the publishable key (or legacy `anon` JWT) matches this project. Do not put the secret key in the app, the repo, or a `VITE_` variable.
-2. Re-run the nickname rules on the server (length, charset, email, phone, URL, profanity, real-name heuristic). The client filter is not the control.
+2. Re-run the nickname rules on the server (length, charset, email, phone, URL, profanity, real-name heuristic). The client filter is not the control. Accept `country` only when it is null or an alpha-2 code on the server’s ISO 3166-1 list. Reject anything else. Do not derive a country from the client IP, a timezone, or a location API.
 3. Plausibility, using the shipped scoring table (a touch is at most a few dozen points; around-the-world is 20 before the streak multiplier):
    - `score <= 20000`
    - `score <= kick_ups * 40`
@@ -93,9 +102,9 @@ The app calls one function. It does not insert into Postgres itself.
 
 ## Edge Function `leaderboard`
 
-Returns nickname, score and rank only.
+Returns nickname, score, rank, and the country code (so the client can show a flag). No coordinates.
 
-- `scope=world` reads `device_best.best_score`. `scope=week` reads rows whose `week_start` is the current UTC week.
+- `scope=world` reads `device_best.best_score`. `scope=week` reads rows whose `week_start` is the current UTC week. `scope=country` reads rows whose `country` equals the caller’s non-null code. A null country is excluded from that scope, and the client shows that they chose not to appear.
 - `around` returns the caller’s row plus three above and three below. `top` returns 10.
 - Drop nicknames this device has blocked, and nicknames with an unresolved report over the moderation threshold (start at 3 distinct reporters).
 - Cache the top 10 for a short TTL. Do not stream the whole table to the phone.
@@ -117,6 +126,6 @@ The local mock already filters, and Report hides the name on this device. It doe
 
 The Settings copy currently says scores stay on the device. That sentence has to change in the app, in `docs/STORE_DATA_SAFETY.md`, and in the App Store / Play Data safety forms **before** `submit-score` is called from a release build. Proposed wording:
 
-> Kickolé stores a nickname you choose and a random device id on this device. If you play online, we send that nickname, your score and the device id to our scoreboard so other players can see your tag and score. We do not ask for your real name, email, phone number or contacts. The device id is not your Apple or Google account. You can change the nickname in Settings. Uninstalling the app removes it from this device; ask the support address on the leaderboard to remove a score from the public board. We do not use the board for advertising.
+> Kickolé stores a nickname you choose and a random device id on this device. You can also choose a country, or prefer not to say. If you play online, we send that nickname, your score, the device id, and the country you chose (if any) to our scoreboard so other players can see your tag, flag and score. We do not ask for your real name, email, phone number, contacts, or precise location. We do not use GPS, your IP address, or a network lookup to pick your country. A suggestion may come from your device language region, and you can change it or leave it off. Choosing “Prefer not to say” keeps you off country boards. The device id is not your Apple or Google account. You can change the nickname and country in Settings. Uninstalling the app removes them from this device; ask the support address on the leaderboard to remove a score from the public board. We do not use the board for advertising.
 
 Also declare, when it ships: gameplay scores transmitted for app functionality, not tracking; no account; nickname is user-generated content.

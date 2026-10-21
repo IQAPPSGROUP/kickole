@@ -29,6 +29,8 @@ describe('mock leaderboard', () => {
     expect(mid.rank).toBeGreaterThan(high.rank);
     expect(low.total).toBe(mid.total);
     expect(formatRank(mid.rank)).toMatch(/^#[\d,]+$/);
+    expect(mid.country).toBeNull();
+    expect(mid.countryRank).toBeNull();
     expect(board.deviceId).not.toBe('StreetKick42');
     expect(board.deviceId).toMatch(/^[0-9a-f-]{16,64}$/i);
   });
@@ -69,5 +71,25 @@ describe('mock leaderboard', () => {
     expect(storage.getItem(DEVICE_ID_KEY)).toBe(board.deviceId);
     const entry = again.top('world', 23, 1, NOW)[0];
     expect(entry && 'deviceId' in entry).toBe(false);
+  });
+
+  it('ranks a chosen country separately and leaves prefer-not-to-say off that board', () => {
+    const hidden = createMockLeaderboard({ nickname: 'StreetKick42', country: null, storage: memory(), now: NOW });
+    expect(hidden.rankFor(23, NOW).countryRank).toBeNull();
+    expect(hidden.top('country', 23, 10, NOW)).toEqual([]);
+    expect(hidden.around(23, 'country', NOW).me.rank).toBe(0);
+
+    const board = createMockLeaderboard({ nickname: 'StreetKick42', country: 'gb', storage: memory(), now: NOW });
+    const snap = board.rankFor(23, NOW);
+    expect(board.country).toBe('GB');
+    expect(snap.country).toBe('GB');
+    expect(snap.countryRank).not.toBeNull();
+    expect(snap.countryRank!).toBeLessThan(snap.rank);
+    const around = board.around(23, 'country', NOW);
+    const rows = [...around.above, around.me, ...around.below];
+    expect(around.me.mine).toBe(true);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.every((row) => row.country === 'GB')).toBe(true);
+    expect(board.top('world', 23, 10, NOW).every((row) => row.country)).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } fr
 import { installAudioLifecycle } from '../game/audio';
 import { GameController } from '../game/controller';
 import { createMockLeaderboard } from '../game/leaderboard';
-import { hydrateNickname, loadNickname, saveNickname } from '../game/nicknameStore';
+import { hydrateCountry, hydrateNickname, loadNickname, loadStoredCountry, saveCountry, saveNickname } from '../game/nicknameStore';
 import { GameCanvas } from '../scene/GameCanvas';
 import {
   cancelOpeningIntroForGameplay,
@@ -30,9 +30,10 @@ export function App() {
   const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
+  const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const board = useMemo(
-    () => (nickname ? createMockLeaderboard({ nickname }) : null),
-    [nickname],
+    () => (nickname ? createMockLeaderboard({ nickname, country: countryChoice.country }) : null),
+    [nickname, countryChoice.country],
   );
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
@@ -45,6 +46,10 @@ export function App() {
     void hydrateNickname().then((name) => {
       if (!live || !name) return;
       setNickname((current) => current ?? name);
+    });
+    void hydrateCountry().then((stored) => {
+      if (!live) return;
+      setCountryChoice(stored);
     });
     return () => { live = false; };
   }, []);
@@ -175,7 +180,12 @@ export function App() {
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
       {!needsBody && needsNick && phase === 'menu' && (
-        <NicknameScreen onSave={(name) => { saveNickname(name); setNickname(name); }} />
+        <NicknameScreen onSave={(name, country) => {
+          saveNickname(name);
+          saveCountry(country);
+          setNickname(name);
+          setCountryChoice({ chosen: true, country });
+        }} />
       )}
       {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsNick && (
         <Home
@@ -213,7 +223,13 @@ export function App() {
         <SettingsScreen
           settings={snap.settings}
           nickname={nickname ?? ''}
-          onNickname={(name) => { saveNickname(name); setNickname(name); }}
+          country={countryChoice.country}
+          onNickname={(name, country) => {
+            saveNickname(name);
+            saveCountry(country);
+            setNickname(name);
+            setCountryChoice({ chosen: true, country });
+          }}
           onChange={(p) => controller.updateSettings(p)}
           onClose={closeOverlay}
         />

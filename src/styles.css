@@ -27,7 +27,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   --trick-size: 65px;
   --btn: 65px;
   /* Keep in step with FOOT_BUTTON in fanLayout.ts. */
-  --foot: 72px;
+  --foot: 86px;
   --trick-gap: 6px;
   --sat-t: env(safe-area-inset-top, 0px);
   --sat-l: env(safe-area-inset-left, 0px);
@@ -586,7 +586,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   transform: scale(.94);
 }
 .foot-btn-mark {
-  font-size: 30px;
+  font-size: 36px;
   font-weight: 900;
   font-style: italic;
   line-height: 1;
@@ -993,12 +993,15 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .world-rank {
   position: absolute;
-  /* Shoulder height on the right, under the mural. Wide enough for the full nickname. */
-  top: 324px;
+  /* Level with YOUR RUN. Portrait .hud-top is top: 0 with a 16px margin, and it
+     does not add the top safe area. Stay short enough that the panel ends
+     above the KICKOLÉ mural (plane top is about y=110 on 390×844). */
+  top: 0;
+  margin-top: 16px;
   right: max(4px, var(--sat-r));
   z-index: 6;
   width: 116px;
-  padding: 4px 6px 3px;
+  padding: 3px 6px 2px;
   border-radius: 3px;
   background: rgba(8, 12, 22, .5);
   border: 1px solid rgba(255, 225, 74, .78);
@@ -1023,7 +1026,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .world-rank-line {
   display: block;
   color: #ffe14a;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -1031,19 +1034,19 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .world-rank-country {
   display: block;
-  margin-top: 1px;
+  margin-top: 0;
   color: #fffdf8;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
 }
-.world-rank-country .country-flag { font-size: 13px; margin-right: 3px; }
+.world-rank-country .country-flag { font-size: 12px; margin-right: 3px; }
 .world-rank-delta {
   display: block;
-  margin-top: 2px;
+  margin-top: 1px;
   color: #ff4f9a;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
   text-align: right;
@@ -1084,7 +1087,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   cursor: pointer;
 }
 @media (orientation: landscape) and (max-height: 600px) {
-  .world-rank { top: auto; left: auto; bottom: 64px; width: min(24vw, 140px); }
+  .world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .world-rank-delta { animation: none; }

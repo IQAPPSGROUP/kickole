@@ -12,8 +12,8 @@ const SIN_35 = Math.sin(FAN_RAD);
 
 /** Trick chips (HEAD, FLICK, NECK, THIGH, ATW, GROOVE). */
 export const FAN_BUTTON = 65;
-/** Corner kick faces. Larger than the trick chips, and at least 70. */
-export const FOOT_BUTTON = 72;
+/** Corner kick faces. Larger than the trick chips, about 84–88px. */
+export const FOOT_BUTTON = 86;
 /** Face gap. The painted ring sits 3px outside the face, so 8px keeps those rings apart. */
 export const FAN_GAP = 8;
 const MIN_INSET_X = 4;

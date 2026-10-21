@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAN_BUTTON, FOOT_BUTTON, circleGap, fanLayout, fanRects } from './fanLayout';
+import { FAN_BUTTON, FAN_GAP, FOOT_BUTTON, circleGap, fanLayout, fanRects } from './fanLayout';
 
 function nearestGap(width: number, height: number, safeLeft = 0, safeRight = 0, safeBottom = 0) {
   const layout = fanLayout(width, safeLeft, safeRight, safeBottom);
@@ -47,8 +47,12 @@ describe('corner fan', () => {
       expect(byName.right.w).toBe(FOOT_BUTTON);
       expect(FAN_BUTTON).toBeGreaterThanOrEqual(64);
       expect(FAN_BUTTON).toBeLessThanOrEqual(66);
-      expect(FOOT_BUTTON).toBeGreaterThanOrEqual(70);
+      expect(FOOT_BUTTON).toBeGreaterThanOrEqual(84);
+      expect(FOOT_BUTTON).toBeLessThanOrEqual(88);
       expect(FOOT_BUTTON).toBeGreaterThan(FAN_BUTTON);
+      for (const [foot, neighbour] of [['left', 'atw'], ['left', 'head'], ['left', 'neck'], ['right', 'groove'], ['right', 'flick'], ['right', 'thigh']] as const) {
+        expect(circleGap(byName[foot], byName[neighbour]), `${width} ${foot}/${neighbour}`).toBeGreaterThanOrEqual(FAN_GAP);
+      }
       for (const name of ['head', 'neck', 'atw', 'flick', 'thigh', 'groove']) {
         expect(byName[name].w, name).toBe(FAN_BUTTON);
       }

@@ -22,10 +22,8 @@ export function WorldRank({
   return (
     <aside className="world-rank" aria-live="polite" aria-label={label}>
       <p className="world-rank-kicker">WORLD RANK</p>
-      <p className="world-rank-line">
-        <b>{formatRank(snapshot.rank)}</b>
-        {gained > 0 && <span className="world-rank-delta" key={gained}>↑ +{gained}</span>}
-      </p>
+      <p className="world-rank-line"><b>{formatRank(snapshot.rank)}</b></p>
+      {gained > 0 && <p className="world-rank-delta" key={gained}>↑ +{gained}</p>}
       <p className="world-rank-name">{nickname}</p>
     </aside>
   );

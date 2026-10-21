@@ -942,11 +942,11 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .nick-form .btn { width: 100%; }
 .world-rank {
   position: absolute;
-  /* Right-hand brick between the wordmark and the hair. Prompt height covers the arm. */
-  top: 152px;
+  /* Mid-right, level with the trick prompt. Kept off the wordmark. */
+  top: 396px;
   right: max(8px, var(--sat-r));
   z-index: 6;
-  width: min(26vw, 100px);
+  width: min(30vw, 112px);
   padding: 4px 7px 5px;
   border-radius: 3px;
   background: rgba(8, 12, 22, .5);
@@ -968,19 +968,22 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   letter-spacing: .14em;
 }
 .world-rank-line {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+  display: block;
   color: #ffe14a;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
+  white-space: nowrap;
   text-shadow: 0 1px 0 #140814;
 }
 .world-rank-delta {
+  display: block;
+  margin-top: 2px;
   color: #ff4f9a;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1;
+  text-align: right;
   animation: rank-climb .35s ease-out;
 }
 .world-rank-name {
@@ -1019,7 +1022,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   cursor: pointer;
 }
 @media (orientation: landscape) and (max-height: 600px) {
-  .world-rank { top: 8px; bottom: auto; width: min(24vw, 140px); }
+  .world-rank { top: auto; bottom: 64px; width: min(24vw, 140px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .world-rank-delta { animation: none; }

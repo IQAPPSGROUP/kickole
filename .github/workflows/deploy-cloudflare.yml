@@ -2,14 +2,15 @@ name: Deploy Kickolé to Cloudflare Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - '**'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: cloudflare-pages-production
+  group: cloudflare-pages-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -37,9 +38,12 @@ jobs:
           VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
         run: npm run build
+      # main stays the production branch. Any other branch is a Pages preview
+      # at https://<branch-alias>.<project>.pages.dev. A slash in the branch
+      # name becomes a hyphen in that alias.
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=${{ github.ref_name }}

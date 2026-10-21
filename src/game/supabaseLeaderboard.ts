@@ -591,6 +591,18 @@ export function createSupabaseLeaderboard(options: {
       return;
     }
     const reason = typeof body.reason === 'string' ? body.reason : '';
+    if (reason === 'implausible') {
+      const stamps = kickTimesMs;
+      console.debug('[kickole] score rejected', {
+        reason,
+        score: pendingScore.score,
+        combo: pendingScore.combo,
+        durationMs: pendingScore.durationMs,
+        kickCount: stamps.length,
+        firstKickMs: stamps.length > 0 ? stamps[0] : null,
+        lastKickMs: stamps.length > 0 ? stamps[stamps.length - 1] : null,
+      });
+    }
     if (reason === 'implausible' || reason === 'invalid' || reason === 'invalid_token' || reason === 'banned') {
       if (outbox && outbox.score === pendingScore.score) outbox = null;
       persistOutbox();

@@ -364,6 +364,7 @@ describe('supabase leaderboard', () => {
     board.start();
     board.startRun();
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'start_run')).toBe(true));
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
     board.submit(20, 4_000_000, { combo: 1, durationMs: 100 });
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'submit_score')).toBe(true));
     expect(calls.find((call) => call.fn === 'submit_score')?.args).toMatchObject({
@@ -379,6 +380,16 @@ describe('supabase leaderboard', () => {
       }),
     });
     await vi.waitFor(() => expect(storage.getItem('kicky.board.outbox.v1')).toBeNull());
+    expect(debug).toHaveBeenCalledWith('[kickole] score rejected', {
+      reason: 'implausible',
+      score: 20,
+      combo: 1,
+      durationMs: 100,
+      kickCount: 0,
+      firstKickMs: null,
+      lastKickMs: null,
+    });
+    debug.mockRestore();
   });
 
   it('sends a reason code, drops a rejected report, and ignores a legacy queue entry', async () => {

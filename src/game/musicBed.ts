@@ -1,9 +1,12 @@
 import { GAMEPLAY_BPM, MENU_BPM } from './beat';
 
 /**
- * Original boom-bap bed. Oscillators and noise only — no samples.
- * One vinyl loop, a short delay reverb, and a compressor plus limiter
- * on the music bus. Drums are scheduled a few notes ahead, not streamed.
+ * Original street boom-bap bed. Oscillators and noise only — no samples.
+ * Saturated kick, a cracked snare, a driven 808, and short minor chops.
+ * Hats stay on the swung grid with a short tick. Kicks duck the bass,
+ * hats and chops so the loop pumps. One vinyl loop, a short delay, and a
+ * compressor plus limiter on the music bus. Drums are scheduled a few
+ * notes ahead, not streamed. Streak scratches still land on this bus.
  */
 
 export type BedMode = 'menu' | 'play';
@@ -12,8 +15,8 @@ export const INTRO_BARS = 2;
 export const LOOP_BARS = 16;
 
 /** Steady-state level after the limiter. SFX bypass this bus. */
-export const MUSIC_PLAY_LEVEL = 0.17;
-export const MUSIC_MENU_LEVEL = 0.13;
+export const MUSIC_PLAY_LEVEL = 0.28;
+export const MUSIC_MENU_LEVEL = 0.22;
 
 const PLAY_SWING = 0.62;
 const MENU_SWING = 0.55;
@@ -47,18 +50,19 @@ interface Chord {
   color: readonly number[];
 }
 
+/** Dark minor loop. Section B swaps to `color`, still minor, a little tighter. */
 const PLAY_CHORDS: readonly Chord[] = [
-  { bass: 55, fifth: 41.2, notes: [220, 261.63, 329.63], color: [261.63, 329.63, 440] },
-  { bass: 36.71, fifth: 55, notes: [174.61, 220, 261.63], color: [220, 293.66, 349.23] },
-  { bass: 49, fifth: 36.71, notes: [196, 246.94, 293.66], color: [246.94, 311.13, 392] },
-  { bass: 32.7, fifth: 49, notes: [261.63, 329.63, 392], color: [329.63, 392, 493.88] },
+  { bass: 55, fifth: 41.2, notes: [110, 130.81, 164.81], color: [164.81, 196, 246.94] },
+  { bass: 36.71, fifth: 55, notes: [146.83, 174.61, 220], color: [174.61, 207.65, 261.63] },
+  { bass: 41.2, fifth: 61.74, notes: [164.81, 196, 246.94], color: [130.81, 155.56, 196] },
+  { bass: 43.65, fifth: 32.7, notes: [174.61, 207.65, 261.63], color: [146.83, 174.61, 220] },
 ];
 
 const MENU_CHORDS: readonly Chord[] = [
-  { bass: 41.2, fifth: 61.74, notes: [164.81, 246.94, 329.63], color: [246.94, 329.63, 415.3] },
-  { bass: 32.7, fifth: 49, notes: [261.63, 329.63, 392], color: [196, 246.94, 329.63] },
-  { bass: 49, fifth: 73.42, notes: [196, 246.94, 293.66], color: [246.94, 293.66, 392] },
-  { bass: 36.71, fifth: 55, notes: [146.83, 220, 293.66], color: [220, 277.18, 369.99] },
+  { bass: 36.71, fifth: 55, notes: [146.83, 174.61, 220], color: [110, 130.81, 164.81] },
+  { bass: 55, fifth: 41.2, notes: [110, 130.81, 164.81], color: [130.81, 164.81, 196] },
+  { bass: 49, fifth: 36.71, notes: [98, 116.54, 146.83], color: [116.54, 138.59, 174.61] },
+  { bass: 41.2, fifth: 30.87, notes: [82.41, 98, 123.47], color: [98, 116.54, 146.83] },
 ];
 
 const HAT_ROW = [0.92, 0.24, 0.58, 0.18, 0.78, 0.3, 0.5, 0.16, 0.88, 0.22, 0.62, 0.2, 0.74, 0.28, 0.52, 0.14];
@@ -70,9 +74,13 @@ export interface MusicGraph {
   /** Pre-compressor sum. */
   mix: GainNode;
   bassDuck: GainNode;
+  /** Sidechain target for the 808, hats and chops. Kicks and the snare stay outside it. */
+  pump: GainNode;
   noise: AudioBuffer;
+  kickBus: GainNode;
   kickClick: BiquadFilterNode;
   snareNoise: BiquadFilterNode;
+  snareCrack: BiquadFilterNode;
   snareBus: GainNode;
   closedHat: BiquadFilterNode;
   openHat: BiquadFilterNode;
@@ -142,9 +150,9 @@ export function chordNotes(step: number, mode: BedMode): readonly number[] | nul
 
 export function chordHoldSteps(step: number, mode: BedMode): number {
   const plan = planStep(step);
-  if (plan.intro) return 10;
-  if (plan.fill) return 10;
-  return mode === 'menu' ? 14 : 12;
+  if (plan.intro) return 4;
+  if (plan.fill) return 3;
+  return mode === 'menu' ? 4 : 2;
 }
 
 function chordAt(plan: StepPlan, mode: BedMode): Chord {
@@ -244,12 +252,24 @@ function pulse(ctx: BaseAudioContext, at: number, peak: number, attack: number, 
   return gain;
 }
 
-function duckBass(graph: MusicGraph, at: number) {
-  const gain = graph.bassDuck.gain;
+function driveCurve(amount: number): Float32Array<ArrayBuffer> {
+  const samples = 1024;
+  const curve = new Float32Array(samples);
+  const norm = Math.tanh(amount);
+  for (let i = 0; i < samples; i++) {
+    const x = (i / (samples - 1)) * 2 - 1;
+    curve[i] = Math.tanh(x * amount) / norm;
+  }
+  return curve;
+}
+
+/** Duck the bed under the kick so the loop pumps without swallowing the snare. */
+function duckPump(graph: MusicGraph, at: number) {
+  const gain = graph.pump.gain;
   gain.cancelScheduledValues(at);
   gain.setValueAtTime(1, at);
-  gain.linearRampToValueAtTime(0.25, at + 0.012);
-  gain.exponentialRampToValueAtTime(1, at + 0.18);
+  gain.linearRampToValueAtTime(0.3, at + 0.012);
+  gain.exponentialRampToValueAtTime(1, at + 0.2);
 }
 
 function wireReverb(ctx: BaseAudioContext, send: GainNode, mix: GainNode) {
@@ -277,53 +297,73 @@ export function createMusicGraph(ctx: BaseAudioContext): MusicGraph {
   const mix = ctx.createGain();
   mix.gain.value = 1;
 
+  const pump = ctx.createGain();
+  pump.gain.value = 1;
+  pump.connect(mix);
+
   const bassDuck = ctx.createGain();
   bassDuck.gain.value = 1;
+  const bassDrive = ctx.createWaveShaper();
+  bassDrive.curve = driveCurve(8);
+  bassDrive.oversample = '2x';
   const bassLow = ctx.createBiquadFilter();
   bassLow.type = 'lowpass';
-  bassLow.frequency.value = 240;
-  bassDuck.connect(bassLow).connect(mix);
+  bassLow.frequency.value = 340;
+  bassLow.Q.value = 0.7;
+  bassDuck.connect(bassDrive).connect(bassLow).connect(pump);
+
+  const kickBus = ctx.createGain();
+  kickBus.gain.value = 1.15;
+  const kickDrive = ctx.createWaveShaper();
+  kickDrive.curve = driveCurve(2.6);
+  kickDrive.oversample = '2x';
+  kickBus.connect(kickDrive).connect(mix);
 
   const kickClick = ctx.createBiquadFilter();
   kickClick.type = 'highpass';
-  kickClick.frequency.value = 1800;
-  kickClick.connect(mix);
+  kickClick.frequency.value = 2400;
+  kickClick.Q.value = 0.7;
+  kickClick.connect(kickBus);
 
   const snareNoise = ctx.createBiquadFilter();
   snareNoise.type = 'bandpass';
-  snareNoise.frequency.value = 2100;
-  snareNoise.Q.value = 0.45;
+  snareNoise.frequency.value = 1900;
+  snareNoise.Q.value = 0.7;
+  const snareCrack = ctx.createBiquadFilter();
+  snareCrack.type = 'highpass';
+  snareCrack.frequency.value = 4800;
+  snareCrack.Q.value = 0.6;
   const snareBus = ctx.createGain();
+  snareBus.gain.value = 1.15;
   snareNoise.connect(snareBus);
+  snareCrack.connect(snareBus);
   const snarePan = ctx.createStereoPanner();
-  snarePan.pan.value = -0.14;
+  snarePan.pan.value = -0.12;
   snareBus.connect(snarePan).connect(mix);
   const snareSend = ctx.createGain();
-  snareSend.gain.value = 0.5;
+  snareSend.gain.value = 0.28;
   snareBus.connect(snareSend);
   wireReverb(ctx, snareSend, mix);
 
   const closedHat = ctx.createBiquadFilter();
   closedHat.type = 'highpass';
-  closedHat.frequency.value = 5500;
+  closedHat.frequency.value = 7600;
   const openHat = ctx.createBiquadFilter();
   openHat.type = 'highpass';
-  openHat.frequency.value = 3200;
+  openHat.frequency.value = 4600;
   const hatBus = ctx.createGain();
+  hatBus.gain.value = 0.82;
   closedHat.connect(hatBus);
   openHat.connect(hatBus);
   const hatPan = ctx.createStereoPanner();
-  hatPan.pan.value = 0.22;
-  hatBus.connect(hatPan).connect(mix);
+  hatPan.pan.value = 0.28;
+  hatBus.connect(hatPan).connect(pump);
 
   const chordIn = ctx.createBiquadFilter();
-  chordIn.type = 'highpass';
-  chordIn.frequency.value = 180;
-  const chordLow = ctx.createBiquadFilter();
-  chordLow.type = 'lowpass';
-  chordLow.frequency.value = 1350;
-  chordLow.Q.value = 0.65;
-  chordIn.connect(chordLow).connect(mix);
+  chordIn.type = 'bandpass';
+  chordIn.frequency.value = 720;
+  chordIn.Q.value = 1.8;
+  chordIn.connect(pump);
 
   const crackle = makeNoise(ctx, 2, 0xa11ce);
   shapeCrackle(crackle);
@@ -335,15 +375,15 @@ export function createMusicGraph(ctx: BaseAudioContext): MusicGraph {
   vinylHigh.frequency.value = 1600;
   const vinylGain = ctx.createGain();
   vinylGain.gain.value = 0.045;
-  vinyl.connect(vinylHigh).connect(vinylGain).connect(mix);
+  vinyl.connect(vinylHigh).connect(vinylGain).connect(pump);
   vinyl.start(ctx instanceof AudioContext ? ctx.currentTime : 0);
 
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -14;
-  comp.knee.value = 8;
-  comp.ratio.value = 4;
-  comp.attack.value = 0.004;
-  comp.release.value = 0.16;
+  comp.threshold.value = -16;
+  comp.knee.value = 6;
+  comp.ratio.value = 3;
+  comp.attack.value = 0.018;
+  comp.release.value = 0.14;
   const limit = ctx.createDynamicsCompressor();
   limit.threshold.value = -2;
   limit.knee.value = 0;
@@ -361,9 +401,12 @@ export function createMusicGraph(ctx: BaseAudioContext): MusicGraph {
     out,
     mix,
     bassDuck,
+    pump,
     noise: makeNoise(ctx, 1, 0xc0ffee),
+    kickBus,
     kickClick,
     snareNoise,
+    snareCrack,
     snareBus,
     closedHat,
     openHat,
@@ -402,42 +445,51 @@ function playTone(
 }
 
 function playKick(graph: MusicGraph, at: number, vel: number) {
-  playNoise(graph, at, 0.011, 0.42 * vel, graph.kickClick);
-  playTone(graph, at, 170, 0.07, 'sine', 0.5 * vel, graph.mix, 74);
-  playTone(graph, at, 52, 0.24, 'sine', 0.4 * vel, graph.mix, 40);
-  duckBass(graph, at);
+  playNoise(graph, at, 0.008, 0.72 * vel, graph.kickClick);
+  playTone(graph, at, 186, 0.055, 'sine', 0.9 * vel, graph.kickBus, 62);
+  playTone(graph, at, 92, 0.16, 'sine', 0.78 * vel, graph.kickBus, 46);
+  playTone(graph, at, 52, 0.22, 'triangle', 0.42 * vel, graph.kickBus, 36);
+  duckPump(graph, at);
 }
 
 function playSnare(graph: MusicGraph, at: number, vel: number) {
-  playNoise(graph, at, 0.12, 0.78 * vel, graph.snareNoise);
-  playNoise(graph, at + 0.011, 0.09, 0.5 * vel, graph.snareNoise);
-  playTone(graph, at, 196, 0.08, 'triangle', 0.22 * vel, graph.snareBus);
+  playNoise(graph, at, 0.05, 0.62 * vel, graph.snareNoise);
+  playNoise(graph, at, 0.016, 0.95 * vel, graph.snareCrack);
+  playNoise(graph, at + 0.012, 0.03, 0.28 * vel, graph.snareNoise);
+  playTone(graph, at, 218, 0.04, 'triangle', 0.34 * vel, graph.snareBus);
+  playTone(graph, at, 164, 0.028, 'square', 0.07 * vel, graph.snareBus);
 }
 
 function playHat(graph: MusicGraph, at: number, level: number, open: boolean) {
   const dest = open ? graph.openHat : graph.closedHat;
   const offset = (Math.round(at * 17) % 8) * 0.09;
-  playNoise(graph, at, open ? 0.11 : 0.032, (open ? 0.24 : 0.2) * level, dest, offset);
+  playNoise(graph, at, open ? 0.05 : 0.014, (open ? 0.2 : 0.16) * level, dest, offset);
 }
 
 function play808(graph: MusicGraph, at: number, freq: number, dur: number, vel: number) {
-  playTone(graph, at, freq * 1.35, dur, 'sine', 0.42 * vel, graph.bassDuck, freq);
+  const length = Math.min(0.55, Math.max(0.12, dur));
+  playTone(graph, at, freq * 2, length, 'sine', 0.62 * vel, graph.bassDuck, freq);
+  playTone(graph, at, freq, Math.min(0.22, length), 'sawtooth', 0.2 * vel, graph.bassDuck, freq * 0.5);
 }
 
+/** Short dark chop: the shared bandpass falls, closer to a muted brass hit than a pad. */
 function playChord(graph: MusicGraph, at: number, notes: readonly number[], dur: number, vel: number) {
-  playNoise(graph, at, 0.014, 0.06 * vel, graph.chordIn);
+  const length = Math.min(0.18, Math.max(0.08, dur));
+  const filter = graph.chordIn.frequency;
+  filter.cancelScheduledValues(at);
+  filter.setValueAtTime(1280, at);
+  filter.exponentialRampToValueAtTime(460, at + length);
+  playNoise(graph, at, 0.02, 0.08 * vel, graph.chordIn);
   for (const freq of notes) {
-    playTone(graph, at, freq, dur, 'sine', 0.075 * vel, graph.chordIn);
-    playTone(graph, at, freq * 1.007, dur, 'sine', 0.032 * vel, graph.chordIn);
+    playTone(graph, at, freq, length, 'sawtooth', 0.11 * vel, graph.chordIn, freq * 0.94);
+    playTone(graph, at, freq * 1.003, length * 0.7, 'triangle', 0.04 * vel, graph.chordIn);
   }
-  const top = notes[notes.length - 1];
-  if (top) playTone(graph, at, top * 2, dur * 0.45, 'triangle', 0.02 * vel, graph.chordIn);
 }
 
 function kickVelocity(plan: StepPlan, mode: BedMode): number {
   let vel = plan.intro ? 0.72 : 1;
   if (plan.section === 'B') vel *= 1.04;
-  if (mode === 'menu') vel *= 0.78;
+  if (mode === 'menu') vel *= 0.9;
   return vel;
 }
 
@@ -451,7 +503,7 @@ function snareVelocity(plan: StepPlan, mode: BedMode): number {
     else vel = 0.72;
   }
   if (plan.intro) vel *= 0.7;
-  if (mode === 'menu') vel *= 0.6;
+  if (mode === 'menu') vel *= 0.82;
   return vel;
 }
 
@@ -478,9 +530,30 @@ export function scheduleMusicStep(
   const hat = hatLevel(step, mode);
   if (hat > 0) playHat(graph, at, hat, hits.openHat);
   const bass = bassEvent(step, mode);
-  if (bass) play808(graph, at, bass.freq, Math.max(0.08, bass.durSteps * stepLength), mode === 'menu' ? 0.7 : 0.92);
+  if (bass) play808(graph, at, bass.freq, Math.max(0.08, bass.durSteps * stepLength), mode === 'menu' ? 0.78 : 1);
   const notes = chordNotes(step, mode);
   if (notes) playChord(graph, at, notes, chordHoldSteps(step, mode) * stepLength, chordVelocity(plan, mode));
+  else if (chopStep(plan, mode)) {
+    const root = chordAt(plan, mode).notes[0];
+    if (root) playChord(graph, at, [root, root * 1.189], 0.11, mode === 'menu' ? 0.4 : 0.62);
+  }
+}
+
+/** One swung minor chop per bar, off the kick, so the stab pattern stays sparse. */
+function chopStep(plan: StepPlan, mode: BedMode): boolean {
+  if (plan.intro || plan.fill) return false;
+  switch (plan.section) {
+    case 'intro':
+      return false;
+    case 'A':
+      return mode === 'play' && plan.sixteenth === 7;
+    case 'B':
+      return plan.sixteenth === (mode === 'play' ? 9 : 7);
+    default: {
+      const exhaustive: never = plan.section;
+      return exhaustive;
+    }
+  }
 }
 
 /** Short chord stab on the SFX bus, so a milestone still cuts over the bed. */
@@ -530,7 +603,7 @@ export function playScratch(graph: MusicGraph, at: number) {
   filter.frequency.exponentialRampToValueAtTime(680, at + 0.18);
   filter.connect(graph.mix);
   playNoise(graph, at, 0.18, 0.22, filter);
-  playChord(graph, at, [349.23, 440, 523.25], 0.2, 0.85);
+  playChord(graph, at, [349.23, 415.3, 523.25], 0.16, 0.85);
 }
 
 export async function renderMusicTake(mode: BedMode, seconds: number): Promise<AudioBuffer> {

@@ -11,6 +11,8 @@ const SIN_35 = Math.sin(FAN_RAD);
 const CHORD_35 = 2 * Math.sin(FAN_RAD / 2);
 
 export const FAN_BUTTON = 52;
+/** Corner kick faces, about 1.35× the trick chips. */
+export const FOOT_BUTTON = 70;
 export const FAN_GAP = 6;
 const MIN_INSET_X = 4;
 const BOTTOM_LIFT = 16;
@@ -25,7 +27,7 @@ export interface FanLayout {
   insetLeft: number;
   insetRight: number;
   insetBottom: number;
-  /** Centre distance from the foot button to the horizontal and vertical tricks. */
+  /** Centre distance from the corner origin to the horizontal and vertical tricks. */
   d: number;
   /** Inward offset of the 35° trick. */
   dx: number;
@@ -64,20 +66,25 @@ export interface FanRect {
   h: number;
 }
 
-/** Screen rects, origin at the top-left, for overlap checks. */
+/**
+ * Screen rects, origin at the top-left, for overlap checks.
+ * Trick chips stay on the 52px fan. L and R grow from the same corner
+ * (left/bottom or right/bottom), so they stay inside the safe inset.
+ */
 export function fanRects(width: number, height: number, layout: FanLayout): FanRect[] {
   const { button: b, insetLeft: left, insetRight: right, insetBottom: bottom, d, dx, dy } = layout;
-  const yFoot = height - bottom - b;
-  const xRight = width - right - b;
+  const foot = FOOT_BUTTON;
+  const yBase = height - bottom;
+  const xRight = width - right;
   return [
-    { name: 'left', x: left, y: yFoot, w: b, h: b },
-    { name: 'atw', x: left + d, y: yFoot, w: b, h: b },
-    { name: 'head', x: left, y: yFoot - d, w: b, h: b },
-    { name: 'neck', x: left + dx, y: yFoot - dy, w: b, h: b },
-    { name: 'right', x: xRight, y: yFoot, w: b, h: b },
-    { name: 'groove', x: xRight - d, y: yFoot, w: b, h: b },
-    { name: 'flick', x: xRight, y: yFoot - d, w: b, h: b },
-    { name: 'thigh', x: xRight - dx, y: yFoot - dy, w: b, h: b },
+    { name: 'left', x: left, y: yBase - foot, w: foot, h: foot },
+    { name: 'atw', x: left + d, y: yBase - b, w: b, h: b },
+    { name: 'head', x: left, y: yBase - d - b, w: b, h: b },
+    { name: 'neck', x: left + dx, y: yBase - dy - b, w: b, h: b },
+    { name: 'right', x: xRight - foot, y: yBase - foot, w: foot, h: foot },
+    { name: 'groove', x: xRight - b - d, y: yBase - b, w: b, h: b },
+    { name: 'flick', x: xRight - b, y: yBase - d - b, w: b, h: b },
+    { name: 'thigh', x: xRight - b - dx, y: yBase - dy - b, w: b, h: b },
   ];
 }
 

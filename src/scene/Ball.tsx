@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { CanvasTexture, Color, Euler, MeshBasicMaterial, MeshPhysicalMaterial, RepeatWrapping, Vector2, Vector3, type Group, type Mesh } from 'three';
+import { CanvasTexture, Color, Euler, MeshPhysicalMaterial, RepeatWrapping, Vector2, type Group, type Mesh } from 'three';
 import type { Quality } from '../game/storage';
 import type { GameEngine } from '../engine/engine';
 import type { Skin } from '../game/skins';
-
-const TRAIL = 6;
 
 /** Stitch normal and roughness. High asks for a 2048 map; other tiers stay at 256. */
 function leatherMaps(size: number): { normal: CanvasTexture; rough: CanvasTexture } {
@@ -57,9 +55,6 @@ function leatherMaps(size: number): { normal: CanvasTexture; rough: CanvasTextur
 }
 
 export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin; quality: Quality }) {
-  const trail = useRef<Array<Mesh | null>>([]);
-  const hist = useRef<Vector3[]>(Array.from({ length: TRAIL * 2 }, () => new Vector3()));
-  const showTrail = quality !== 'low';
   const group = useRef<Group>(null);
   const spin = useRef<Group>(null);
   const shadow = useRef<Mesh>(null);
@@ -112,22 +107,6 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
       : 0;
     // Flatten only. Growing the ball, or wrapping it in a transparent shell, leaves a gap and a glassy ball.
     if (group.current) group.current.scale.set(1, 1 - 0.035 * squash, 1);
-    if (showTrail) {
-      const speed = Math.hypot(b.vx, b.vy, b.vz);
-      const h = hist.current;
-      for (let i = h.length - 1; i > 0; i--) h[i].copy(h[i - 1]);
-      h[0].set(b.x, b.y, b.z);
-      for (let i = 0; i < TRAIL; i++) {
-        const m = trail.current[i];
-        if (!m) continue;
-        const p = h[(i + 1) * 2 - 1];
-        m.visible = speed > 3.2 && engine.phase === 'playing';
-        (m.material as MeshBasicMaterial).color.set(engine.streak >= 4 ? '#FFD93D' : '#FF4F9A');
-        m.position.copy(p);
-        m.scale.setScalar(1 - (i + 1) / (TRAIL + 1));
-        (m.material as unknown as { opacity: number }).opacity = 0.28 * (1 - i / TRAIL);
-      }
-    }
     if (shadow.current) {
       const h = Math.max(0, b.y - r);
       const s = 1 / (1 + h * 0.9);
@@ -146,12 +125,6 @@ export function Ball({ engine, skin, quality }: { engine: GameEngine; skin: Skin
           </mesh>
         </group>
       </group>
-      {showTrail && Array.from({ length: TRAIL }, (_, i) => (
-        <mesh key={i} ref={(m) => { trail.current[i] = m; }} visible={false}>
-          <sphereGeometry args={[r, 12, 10]} />
-          <meshBasicMaterial color={engine.streak >= 4 ? '#FFD93D' : '#FF4F9A'} transparent opacity={0.2} depthWrite={false} />
-        </mesh>
-      ))}
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[r * 1.25, 24]} />
         <meshBasicMaterial color="#1E2A5A" transparent opacity={0.4} depthWrite={false} />

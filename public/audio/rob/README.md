@@ -1,16 +1,18 @@
 # Rob's music
 
-Gameplay and the menu play these files when they load. The generated bed in `src/game/musicBed.ts` is only the fallback, used when a file is missing or the browser cannot decode it.
+The menu loops `menu-song`. Gameplay rotates a shuffled playlist and keeps its place for the rest of the page session, so a new run does not start the same song from the top.
 
-Put the four files in this folder:
+Playlist, in no fixed play order:
 
-- `gameplay-instrumental.m4a`
-- `gameplay-instrumental.ogg`
-- `menu-song.m4a`
-- `menu-song.ogg`
+- `gameplay-instrumental.m4a` / `.ogg`
+- `menu-song.m4a` / `.ogg`
+- `game-song-2.m4a` / `.ogg`
+- `game-song-3.m4a` / `.ogg`
 
-The game requests `.m4a` first and falls back to `.ogg`.
+The game requests `.m4a` first and falls back to `.ogg`. A track that is missing or cannot be decoded is skipped. `game-song-2` and `game-song-3` can be added here later.
 
-The gameplay instrumental plays once per run. At about 145.5 seconds it crossfades for 2.5 seconds into the main song. The main song then loops from 0.6 seconds to 146.0 seconds with a 1.5–2 second crossfade. The menu loops that same region. Switching between the menu and play crossfades as well.
+Each playlist track starts about 0.6s in, so the lead-in is trimmed. The next track starts about 3.5s before the current file ends and the two crossfade for 2.5s. The same track is not played twice in a row when another track loaded. Only the current track is decoded, and the next one is decoded just before that crossfade.
 
-These are Rob's own songs for Kickolé.
+The menu still loops `menu-song` from 0.6s to 146.0s with a 1.5–2s crossfade. The first pass can include the opening. Switching between the menu and play crossfades as well.
+
+These are Rob's own songs for Kickolé. The generated bed in `src/game/musicBed.ts` plays only when a mode has no usable file.

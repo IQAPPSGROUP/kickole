@@ -26,11 +26,11 @@ import {
   swingDelay,
   type MusicGraph,
 } from './musicBed';
-import { loadRobStems, RobPlayer } from './robMusic';
+import { RobPlayer } from './robMusic';
 
 /**
  * Kicks, misses and cheers are synthesised here.
- * Menu and gameplay music prefer Rob's songs in public/audio/rob/.
+ * Menu music loops Rob's menu song. Gameplay rotates his playlist.
  * The boom-bap bed in musicBed.ts plays only when those files fail to load.
  * See public/audio/LICENSE.txt.
  */
@@ -58,8 +58,8 @@ let visualOrigin = 0;
 let mode: 'menu' | 'play' = 'menu';
 let musicGraph: MusicGraph | null = null;
 let rob: RobPlayer | null = null;
-let robState: 'pending' | 'ready' | 'failed' = 'pending';
-let robLoad: Promise<void> | null = null;
+let robMenu: 'idle' | 'ready' | 'missing' = 'idle';
+let robPlay: 'idle' | 'ready' | 'missing' = 'idle';
 let interruptWatch = false;
 let resumeAttempt = 0;
 let droppedByInterrupt = false;
@@ -311,34 +311,30 @@ function applyMusic() {
     rob?.stop();
     return;
   }
-  if (robState === 'ready' && rob) {
-    stopScheduler();
-    rob.setMode(mode);
-    return;
-  }
-  if (robState === 'failed') {
+  const status = mode === 'menu' ? robMenu : robPlay;
+  if (status === 'missing') {
+    rob?.stop();
     startScheduler();
     return;
   }
   stopScheduler();
+  rob?.setMode(mode);
+}
+
+function noteRob(which: 'menu' | 'play', ok: boolean) {
+  if (which === 'menu') robMenu = ok ? 'ready' : 'missing';
+  else robPlay = ok ? 'ready' : 'missing';
+  if (bed.mode !== which || !unlocked || !foreground || !bed.music) return;
+  if (ok) stopScheduler();
+  else {
+    rob?.stop();
+    startScheduler();
+  }
 }
 
 function ensureRob(c: AudioContext) {
-  if (robLoad || !musicMix) return;
-  const mix = musicMix;
-  robLoad = loadRobStems(c).then((stems) => {
-    if (!stems) {
-      robState = 'failed';
-      applyMusic();
-      return;
-    }
-    rob = new RobPlayer(c, stems, mix);
-    robState = 'ready';
-    applyMusic();
-  }).catch(() => {
-    robState = 'failed';
-    applyMusic();
-  });
+  if (rob || !musicMix) return;
+  rob = new RobPlayer(c, musicMix, noteRob);
 }
 
 function recoverPlayback() {

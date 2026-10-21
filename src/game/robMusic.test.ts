@@ -1,20 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { DUCK_DB, clampVolume, duckTarget, playbackDropped, shouldResumeContext } from './audioMix';
 import {
-  INSTRUMENTAL_FADE_SEC,
-  INSTRUMENTAL_HANDOFF_SEC,
+  GAMEPLAY_TRACKS,
   LOOP_END_SEC,
   LOOP_FADE_SEC,
   LOOP_START_SEC,
-  instrumentalHandoff,
-  loadRobStems,
+  TRACK_CROSSFADE_SEC,
+  TRACK_HANDOFF_BEFORE_END_SEC,
+  TRACK_LEAD_IN_SEC,
+  loadTrack,
   nextLoopAt,
-  playbackSection,
+  pickTrack,
+  resumePlan,
+  shuffleNames,
   songLoop,
+  trackWindow,
 } from './robMusic';
 
-function response(ok: boolean): Response {
-  return { ok, arrayBuffer: async () => new ArrayBuffer(4) } as Response;
+function response(ok: boolean, type = 'audio/mp4', bytes?: ArrayBuffer): Response {
+  const body = bytes ?? new ArrayBuffer(4);
+  return {
+    ok,
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? type : null) },
+    arrayBuffer: async () => body,
+  } as Response;
 }
 
 function context(onDecode: () => AudioBuffer | Error): BaseAudioContext {
@@ -42,21 +51,42 @@ describe('Rob song timing', () => {
     expect(songLoop(2)).toEqual({ start: 0, end: 2, fade: 0 });
   });
 
-  it('hands the instrumental to the song at 145.5s over 2.5s', () => {
-    expect(instrumentalHandoff(160)).toEqual({ at: INSTRUMENTAL_HANDOFF_SEC, fade: INSTRUMENTAL_FADE_SEC });
-    expect(instrumentalHandoff(100)).toEqual({ at: 97.5, fade: INSTRUMENTAL_FADE_SEC });
-  });
-
   it('schedules the next loop so the crossfade finishes at the loop end', () => {
     expect(nextLoopAt(10, 145.4, 1.75)).toBeCloseTo(153.65);
     expect(nextLoopAt(0, 1, 0)).toBe(0);
   });
+});
 
-  it('keeps a resumed run on the main song after the instrumental has handed off', () => {
-    expect(playbackSection('menu', false, false)).toBe('menu');
-    expect(playbackSection('play', false, false)).toBe('instrumental');
-    expect(playbackSection('play', true, false)).toBe('instrumental');
-    expect(playbackSection('play', true, true)).toBe('song');
+describe('gameplay playlist', () => {
+  it('trims the lead-in and starts the next track 3.5s before the file ends', () => {
+    expect(trackWindow(149)).toEqual({
+      offset: TRACK_LEAD_IN_SEC,
+      handoff: 149 - TRACK_HANDOFF_BEFORE_END_SEC,
+      fade: TRACK_CROSSFADE_SEC,
+    });
+    expect(trackWindow(149, 40)).toEqual({ offset: 40, handoff: 145.5, fade: TRACK_CROSSFADE_SEC });
+  });
+
+  it('continues a later run from the saved place and advances only in the ending', () => {
+    expect(resumePlan(149, 12)).toEqual({ action: 'resume', offset: 12 });
+    expect(resumePlan(149, 0.2)).toEqual({ action: 'resume', offset: TRACK_LEAD_IN_SEC });
+    expect(resumePlan(149, 146)).toEqual({ action: 'advance' });
+  });
+
+  it('shuffles without dropping or repeating a name', () => {
+    let step = 0;
+    const draws = [0.9, 0, 0.5];
+    const order = shuffleNames(['a', 'b', 'c', 'd'], () => draws[step++] ?? 0);
+    expect(order).toEqual(['c', 'b', 'a', 'd']);
+    expect(new Set(shuffleNames(GAMEPLAY_TRACKS, () => 0.3)).size).toBe(GAMEPLAY_TRACKS.length);
+  });
+
+  it('skips a missing track and does not play the same song twice in a row', () => {
+    const failed = new Set(['game-song-2', 'game-song-3']);
+    expect(pickTrack(GAMEPLAY_TRACKS, 0, failed, null)).toEqual({ name: 'gameplay-instrumental', index: 0 });
+    expect(pickTrack(GAMEPLAY_TRACKS, 1, failed, 'gameplay-instrumental')).toEqual({ name: 'menu-song', index: 1 });
+    expect(pickTrack(GAMEPLAY_TRACKS, 2, failed, 'menu-song')).toEqual({ name: 'gameplay-instrumental', index: 0 });
+    expect(pickTrack(['only'], 0, new Set(), 'only')).toEqual({ name: 'only', index: 0 });
   });
 });
 
@@ -67,13 +97,9 @@ describe('Rob file loading', () => {
       calls.push(String(url));
       return response(true);
     }) as typeof fetch;
-    const stems = await loadRobStems(context(() => buffer(20)), { base: 'audio/rob', fetchImpl });
-    expect(stems?.instrumental.duration).toBe(20);
-    expect(stems?.menu.duration).toBe(20);
-    expect(calls).toEqual([
-      'audio/rob/gameplay-instrumental.m4a',
-      'audio/rob/menu-song.m4a',
-    ]);
+    const decoded = await loadTrack(context(() => buffer(20)), 'menu-song', { base: 'audio/rob', fetchImpl });
+    expect(decoded?.duration).toBe(20);
+    expect(calls).toEqual(['audio/rob/menu-song.m4a']);
   });
 
   it('uses ogg when the m4a is missing', async () => {
@@ -82,14 +108,11 @@ describe('Rob file loading', () => {
       calls.push(String(url));
       return response(!String(url).endsWith('.m4a'));
     }) as typeof fetch;
-    const stems = await loadRobStems(context(() => buffer(30)), { base: '/audio/rob/', fetchImpl });
-    expect(stems?.instrumental.duration).toBe(30);
-    expect(stems?.menu.duration).toBe(30);
+    const decoded = await loadTrack(context(() => buffer(30)), 'game-song-2', { base: '/audio/rob/', fetchImpl });
+    expect(decoded?.duration).toBe(30);
     expect(calls).toEqual([
-      '/audio/rob/gameplay-instrumental.m4a',
-      '/audio/rob/gameplay-instrumental.ogg',
-      '/audio/rob/menu-song.m4a',
-      '/audio/rob/menu-song.ogg',
+      '/audio/rob/game-song-2.m4a',
+      '/audio/rob/game-song-2.ogg',
     ]);
   });
 
@@ -99,20 +122,36 @@ describe('Rob file loading', () => {
       calls.push(String(url));
       return response(true);
     }) as typeof fetch;
-    const stems = await loadRobStems(context(() => {
+    const decoded = await loadTrack(context(() => {
       const url = calls[calls.length - 1] ?? '';
       if (url.endsWith('.m4a')) throw new Error('decode');
       return buffer(18);
-    }), { base: '/audio/rob/', fetchImpl });
-    expect(stems?.instrumental.duration).toBe(18);
-    expect(stems?.menu.duration).toBe(18);
-    expect(calls).toHaveLength(4);
+    }), 'game-song-3', { base: '/audio/rob/', fetchImpl });
+    expect(decoded?.duration).toBe(18);
+    expect(calls).toEqual([
+      '/audio/rob/game-song-3.m4a',
+      '/audio/rob/game-song-3.ogg',
+    ]);
   });
 
-  it('returns null unless both songs load', async () => {
-    const fetchImpl = (async (url: string) => response(String(url).includes('instrumental'))) as typeof fetch;
-    const stems = await loadRobStems(context(() => buffer(12)), { base: '/audio/rob/', fetchImpl });
-    expect(stems).toBeNull();
+  it('skips an html shell and returns null when both formats fail', async () => {
+    const html = new TextEncoder().encode('<!doctype html><title>app</title>').buffer;
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(String(url));
+      return response(true, 'text/html; charset=utf-8', html);
+    }) as typeof fetch;
+    let decoded = 0;
+    const missing = await loadTrack(context(() => {
+      decoded += 1;
+      return buffer(12);
+    }), 'game-song-2', { base: '/audio/rob/', fetchImpl });
+    expect(missing).toBeNull();
+    expect(decoded).toBe(0);
+    expect(calls).toEqual([
+      '/audio/rob/game-song-2.m4a',
+      '/audio/rob/game-song-2.ogg',
+    ]);
   });
 });
 

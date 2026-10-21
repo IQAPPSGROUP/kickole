@@ -14,6 +14,16 @@ import {
   type UnlockRequirement,
 } from './catalogue';
 import {
+  COWBOY_BOOT_ID,
+  GOLD_LEGEND_STREAK,
+  cosmeticGrantAllowed,
+  getOutfit,
+  goldLegendUnlocked,
+  isOutfitId,
+  keepStoreCosmetic,
+  type OutfitId,
+} from './outfits';
+import {
   STARTER_DANCE_ID,
   equipDance,
   normalizeDances,
@@ -54,6 +64,14 @@ export interface WardrobeLocker {
   danceRank: number;
   ownedDances: DanceId[];
   equippedDance: DanceId;
+  /** Lifetime best combo. Gold Legend unlocks from this, not from a purchase. */
+  bestStreak: number;
+  /** Themed outfits granted by the store. Gold Legend is not stored here. */
+  ownedOutfits: OutfitId[];
+  /** Null wears the equipped kit. */
+  equippedOutfit: OutfitId | null;
+  /** Source of ownedOutfits and the cowboy boot. dev_sim is never accepted. */
+  cosmeticSource: EntitlementSource;
   /** Save schema version for migrations. */
   wardrobeVersion: number;
 }
@@ -123,6 +141,7 @@ export function buyOrEquipBoot(locker: WardrobeLocker, bootId: string): ShopResu
   if (locker.ownedBoots.includes(boot.id)) {
     return { ok: true, locker: { ...locker, equippedBoot: boot.id } };
   }
+  if (boot.storeProductId) return { ok: false, locker, reason: 'billing_unavailable' };
   if (!meetsChallenge(locker.challenges, boot.unlock)) {
     return { ok: false, locker, reason: 'locked' };
   }
@@ -200,6 +219,10 @@ export interface RawSaveFields {
   danceRank?: unknown;
   ownedDances?: unknown;
   equippedDance?: unknown;
+  bestStreak?: unknown;
+  ownedOutfits?: unknown;
+  equippedOutfit?: unknown;
+  cosmeticSource?: unknown;
   wardrobeVersion?: unknown;
   bodyChosen?: unknown;
   /** Set by loadSave when a save object already existed. Not written back. */
@@ -298,6 +321,18 @@ export function normalizeLocker(
     ownedDances: raw?.ownedDances,
     equippedDance: raw?.equippedDance,
   });
+  const bestStreak = typeof raw?.bestStreak === 'number' && Number.isFinite(raw.bestStreak) && raw.bestStreak > 0
+    ? Math.floor(raw.bestStreak)
+    : 0;
+  const cosmeticSource = parseEntitlementSource(raw?.cosmeticSource);
+  const keepCosmetic = keepStoreCosmetic(cosmeticSource, options?.trustStoreCache === true, import.meta.env.PROD);
+  const ownedOutfits = keepCosmetic && Array.isArray(raw?.ownedOutfits)
+    ? raw.ownedOutfits.filter((id): id is OutfitId => typeof id === 'string' && isOutfitId(id) && id !== 'gold-legend')
+    : [];
+  const equippedOutfitRaw = typeof raw?.equippedOutfit === 'string' ? raw.equippedOutfit : null;
+  const equippedOutfit = equippedOutfitRaw && (ownedOutfits.includes(equippedOutfitRaw as OutfitId) || (equippedOutfitRaw === 'gold-legend' && goldLegendUnlocked(bestStreak)))
+    ? equippedOutfitRaw as OutfitId
+    : null;
 
   // A bare boolean is not proof. On web, apple/google strings are not proof either.
   // Native builds may keep that cache and re-check it with the store.
@@ -313,10 +348,11 @@ export function normalizeLocker(
       ? false
       : raw?.hadSave === true || storedVersion > 0;
 
+  const visibleBoots = keepCosmetic ? ownedBoots : ownedBoots.filter((id) => id !== COWBOY_BOOT_ID);
   let locker: WardrobeLocker = {
     coins,
-    ownedBoots,
-    equippedBoot: ownedBoots.includes(equippedBoot) ? equippedBoot : STARTER_BOOT_ID,
+    ownedBoots: visibleBoots,
+    equippedBoot: visibleBoots.includes(equippedBoot) ? equippedBoot : STARTER_BOOT_ID,
     ownedKits,
     equippedKit: ownedKits.includes(equippedKit) ? equippedKit : STARTER_KIT_ID,
     appearance,
@@ -330,6 +366,10 @@ export function normalizeLocker(
     danceRank: dances.danceRank,
     ownedDances: dances.ownedDances,
     equippedDance: dances.equippedDance,
+    bestStreak,
+    ownedOutfits,
+    equippedOutfit,
+    cosmeticSource: keepCosmetic ? cosmeticSource : 'none',
     wardrobeVersion: WARDROBE_VERSION,
   };
 
@@ -346,6 +386,57 @@ export function normalizeLocker(
     );
   }
   return locker;
+}
+
+export function outfitOwned(locker: WardrobeLocker, id: string): boolean {
+  if (id === 'gold-legend') return goldLegendUnlocked(locker.bestStreak);
+  return isOutfitId(id) && locker.ownedOutfits.includes(id);
+}
+
+/** Equip a themed outfit the player already unlocked, or clear it with null. */
+export function equipOutfit(locker: WardrobeLocker, id: string | null): ShopResult {
+  if (id === null) return { ok: true, locker: { ...locker, equippedOutfit: null } };
+  if (!outfitOwned(locker, id)) return { ok: false, locker, reason: 'locked' };
+  const outfit = getOutfit(id);
+  if (!outfit) return { ok: false, locker, reason: 'unknown' };
+  return { ok: true, locker: { ...locker, equippedOutfit: outfit.id } };
+}
+
+/**
+ * Record a store grant for one themed outfit or the cowboy boots.
+ * dev_sim is refused. Launch Collection purchases do not call this.
+ */
+export function grantStoreCosmetic(
+  locker: WardrobeLocker,
+  id: string,
+  source: EntitlementSource,
+): WardrobeLocker {
+  if (!cosmeticGrantAllowed(source)) return locker;
+  if (id === COWBOY_BOOT_ID) {
+    const ownedBoots = locker.ownedBoots.includes(COWBOY_BOOT_ID)
+      ? locker.ownedBoots
+      : [...locker.ownedBoots, COWBOY_BOOT_ID];
+    return { ...locker, ownedBoots, cosmeticSource: source };
+  }
+  if (!isOutfitId(id) || id === 'gold-legend') return locker;
+  const ownedOutfits = locker.ownedOutfits.includes(id) ? locker.ownedOutfits : [...locker.ownedOutfits, id];
+  return { ...locker, ownedOutfits, cosmeticSource: source };
+}
+
+/** Development-only dress-up. Production builds leave the locker unchanged. */
+export function rememberDevCosmetic(locker: WardrobeLocker, id: string | null): WardrobeLocker {
+  if (import.meta.env.PROD) return locker;
+  if (id === null) return { ...locker, equippedOutfit: null };
+  if (id === COWBOY_BOOT_ID) {
+    const ownedBoots = locker.ownedBoots.includes(id) ? locker.ownedBoots : [...locker.ownedBoots, id];
+    return { ...locker, ownedBoots, equippedBoot: id, cosmeticSource: 'none' };
+  }
+  if (!isOutfitId(id)) return locker;
+  if (id === 'gold-legend') {
+    return { ...locker, bestStreak: Math.max(locker.bestStreak, GOLD_LEGEND_STREAK), equippedOutfit: id };
+  }
+  const ownedOutfits = locker.ownedOutfits.includes(id) ? locker.ownedOutfits : [...locker.ownedOutfits, id];
+  return { ...locker, ownedOutfits, equippedOutfit: id, cosmeticSource: 'none' };
 }
 
 /** Equip a dance the player already unlocked. Dances are not coin purchases. */
@@ -374,5 +465,5 @@ export function bumpChallenges(
   };
 }
 
-export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID };
+export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID, COWBOY_BOOT_ID, GOLD_LEGEND_STREAK };
 export type { DanceId, DanceLocker };

@@ -122,6 +122,7 @@ export function saveRun(
   save: SaveData,
   run: RunRecord,
   challengeDelta: Partial<ChallengeProgress> = {},
+  bestStreak = 0,
 ): { save: SaveData; newBest: boolean; rank: number; coinsEarned: number } {
   const newBest = run.score > save.best;
   const all = [...save.leaderboard, run].sort((a, b) => b.score - a.score || b.date - a.date);
@@ -134,6 +135,7 @@ export function saveRun(
     leaderboard,
     coins: save.coins + coinsEarned,
     challenges: bumpChallenges(save.challenges, challengeDelta),
+    bestStreak: Math.max(save.bestStreak, Number.isFinite(bestStreak) ? Math.floor(bestStreak) : 0),
   };
   write(SAVE_KEY, next);
   return { save: next, newBest, rank, coinsEarned };

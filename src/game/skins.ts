@@ -1,5 +1,6 @@
 import type { Appearance, PlayerBody } from './appearance';
 import { getBoot, getKit, STARTER_BOOT_ID, STARTER_KIT_ID, type BootDesign, type KitDesign, type SurfacePattern } from './catalogue';
+import { COWBOY_BOOT_ID, getOutfit, type OutfitPattern } from './outfits';
 
 export interface Skin {
   id: string;
@@ -13,6 +14,12 @@ export interface Skin {
   bootPattern: SurfacePattern;
   unlocked: boolean;
   productId: string | null;
+  /** Themed costume. Null keeps the equipped kit colours. */
+  outfitId?: string | null;
+  /** Pale multiply on the skin photograph. Null leaves the face alone. */
+  skinTint?: string | null;
+  patternPaint?: OutfitPattern | null;
+  bootStyle?: 'studs' | 'cowboy';
 }
 
 /**
@@ -76,15 +83,18 @@ export function composePlayerSkin(
   appearance: Appearance,
   kitId: string = STARTER_KIT_ID,
   bootId: string = STARTER_BOOT_ID,
-  preview?: { kit?: KitDesign | null; boot?: BootDesign | null },
+  preview?: { kit?: KitDesign | null; boot?: BootDesign | null; outfitId?: string | null },
 ): Skin {
   const kit = preview?.kit ?? getKit(kitId);
   const boot = preview?.boot ?? getBoot(bootId);
+  const outfit = getOutfit(preview?.outfitId);
   // Starter kit defers to free clothing colours; purchased kits keep their authored palette.
-  const clothing = kit.id === STARTER_KIT_ID ? { ...appearance.clothing } : { ...kit.clothing };
+  // A themed outfit replaces the kit cloth and keeps the footballer's face unless it tints it.
+  const clothing = outfit ? { ...outfit.clothing } : kit.id === STARTER_KIT_ID ? { ...appearance.clothing } : { ...kit.clothing };
+  const cowboy = boot.id === COWBOY_BOOT_ID;
   return {
-    id: `live:${kit.id}:${boot.id}:${appearance.body}`,
-    name: `${kit.name} · ${boot.name}`,
+    id: `live:${outfit?.id ?? kit.id}:${boot.id}:${appearance.body}`,
+    name: outfit ? `${outfit.name} · ${boot.name}` : `${kit.name} · ${boot.name}`,
     clothing,
     boots: {
       main: boot.main,
@@ -93,14 +103,18 @@ export function composePlayerSkin(
       trim: boot.trim,
     },
     body: {
-      skin: appearance.skinTone,
+      skin: outfit?.skinTint ?? appearance.skinTone,
       hair: appearance.hairColor,
     },
     football: { base: '#F8F9FB', panels: '#222831' },
     playerBody: appearance.body,
-    kitPattern: kit.pattern,
+    kitPattern: outfit ? 'plain' : kit.pattern,
     bootPattern: boot.pattern,
     unlocked: true,
     productId: null,
+    outfitId: outfit?.id ?? null,
+    skinTint: outfit?.skinTint ?? null,
+    patternPaint: outfit?.pattern ?? null,
+    bootStyle: cowboy ? 'cowboy' : 'studs',
   };
 }

@@ -26,10 +26,49 @@ const QUIET = { sound: false, vibration: false, quality: 'high', skinId: 'kicky-
 function tickTo(c: Awaited<ReturnType<typeof make>>['c'], ms = 5) {
   const e = c.engine;
   for (let i = 0; i < 100000; i++) {
+    if (e.celebration) {
+      c.tick(e.config.fixedStep);
+      continue;
+    }
     if (e.ball.vy < 0 && e.timingDeltaMs() <= ms) return;
     c.tick(e.config.fixedStep);
   }
   throw new Error('no contact');
+}
+
+function idle(c: Awaited<ReturnType<typeof make>>['c'], seconds: number) {
+  const step = c.engine.config.fixedStep;
+  for (let i = 0; i < Math.round(seconds / step); i++) c.tick(step);
+}
+
+function dropRun(c: Awaited<ReturnType<typeof make>>['c']) {
+  const step = c.engine.config.fixedStep;
+  for (let i = 0; i < 20000 && c.engine.phase !== 'over'; i++) c.tick(step);
+  if (c.engine.phase !== 'over') throw new Error('run did not end');
+}
+
+/** The live submit_score guards, using the token's age as elapsed time. */
+function serverRejects(input: {
+  score: number;
+  combo: number;
+  durationMs: number;
+  kickTimesMs: readonly number[];
+  elapsedMs: number;
+}): string | null {
+  const { score, combo, durationMs, kickTimesMs, elapsedMs } = input;
+  if (durationMs <= 0 || durationMs > 600000) return 'invalid';
+  if (durationMs > elapsedMs + 5000) return 'implausible';
+  const secs = elapsedMs / 1000;
+  if (score > 20000 || score > Math.ceil(secs * 25) || combo > Math.ceil(secs * 3) + 1) return 'implausible';
+  const kickCount = kickTimesMs.length;
+  if (kickCount < 0 || kickCount > Math.ceil(secs * 5) + 1) return 'implausible';
+  if (score > 0 && kickCount < 1) return 'implausible';
+  let prev = -1;
+  for (const stamp of kickTimesMs) {
+    if (!Number.isInteger(stamp) || stamp < prev || stamp > Math.ceil(elapsedMs) + 5000) return 'implausible';
+    prev = stamp;
+  }
+  return null;
 }
 
 describe('GameController', () => {
@@ -246,6 +285,93 @@ describe('GameController', () => {
     c.release('right');
     expect(c.getSnapshot().hud.stalling).toBe(false);
     expect(c.engine.stats.stalls).toBe(1);
+  });
+
+  it('starts kick times near zero on two runs after idling on the menu', async () => {
+    const { c } = await make({ ...QUIET, hints: false });
+    const playOne = () => {
+      idle(c, 20);
+      c.play();
+      c.press('right');
+      c.release('right');
+      tickTo(c);
+      c.press('left');
+      c.release('left');
+      c.tick(0.05);
+      tickTo(c);
+      c.press('right');
+      c.release('right');
+      c.tick(0.05);
+      dropRun(c);
+      const result = c.getSnapshot().result;
+      if (!result) throw new Error('missing result');
+      return result;
+    };
+    const first = playOne();
+    c.home();
+    const second = playOne();
+    for (const result of [first, second]) {
+      expect(result.kickTimesMs[0]).toBeGreaterThanOrEqual(0);
+      expect(result.kickTimesMs[0]).toBeLessThan(3000);
+      expect(result.durationMs).toBeGreaterThan(result.kickTimesMs[result.kickTimesMs.length - 1] ?? 0);
+      expect(result.durationMs).toBeLessThan(12_000);
+      expect(serverRejects({
+        score: result.score,
+        combo: result.combos,
+        durationMs: result.durationMs,
+        kickTimesMs: result.kickTimesMs,
+        elapsedMs: result.durationMs,
+      })).toBeNull();
+    }
+  });
+
+  function juggleTo(c: Awaited<ReturnType<typeof make>>['c'], target: number) {
+    c.play();
+    c.press('right');
+    c.release('right');
+    let side: 'left' | 'right' = 'left';
+    while (c.engine.streak < target && c.engine.phase === 'playing') {
+      tickTo(c);
+      c.press(side);
+      c.release(side);
+      c.tick(0.05);
+      side = side === 'left' ? 'right' : 'left';
+    }
+    if (c.engine.streak < target) throw new Error(`streak stopped at ${c.engine.streak}`);
+  }
+
+  it('accepts a finished x4 run at streak 70 under the 25 points per second cap', async () => {
+    const { c } = await make({ ...QUIET, hints: false });
+    juggleTo(c, 70);
+    dropRun(c);
+    const result = c.getSnapshot().result;
+    if (!result) throw new Error('missing result');
+    expect(result.bestStreak).toBeGreaterThanOrEqual(70);
+    expect(result.score).toBeLessThanOrEqual(Math.ceil((result.durationMs / 1000) * 25));
+    expect(serverRejects({
+      score: result.score,
+      combo: result.combos,
+      durationMs: result.durationMs,
+      kickTimesMs: result.kickTimesMs,
+      elapsedMs: result.durationMs,
+    })).toBeNull();
+  });
+
+  it('rejects a continuous alternate juggle once the streak reaches 100', async () => {
+    const { c } = await make({ ...QUIET, hints: false });
+    juggleTo(c, 100);
+    const playedMs = Math.max(1, Math.round(c.engine.time * 1000));
+    expect(c.engine.stats.score).toBeGreaterThan(Math.ceil((playedMs / 1000) * 25));
+    dropRun(c);
+    const result = c.getSnapshot().result;
+    if (!result) throw new Error('missing result');
+    expect(serverRejects({
+      score: result.score,
+      combo: result.combos,
+      durationMs: result.durationMs,
+      kickTimesMs: result.kickTimesMs,
+      elapsedMs: result.durationMs,
+    })).toBe('implausible');
   });
 
   it('gives unlock and restore feedback instead of leaving the shop busy', async () => {

@@ -121,6 +121,8 @@ export class GameController {
   /** Per-run challenge tallies flushed into the save on game over. */
   private runChallenges: ChallengeProgress = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
   private kickTimesMs: number[] = [];
+  /** Engine clock when this run was prepared. Submitted times are relative to it. */
+  private runStartTime = 0;
   private perfects = 0;
   private progress: AudioProgress = { streak: 0, kickUps: 0, perfects: 0 };
   private pendingCheers: string[] = [];
@@ -350,7 +352,7 @@ export class GameController {
         this.buzz('launch');
         break;
       case 'kick': {
-        this.kickTimesMs.push(Math.max(0, Math.round(this.engine.time * 1000)));
+        this.kickTimesMs.push(this.runElapsedMs());
         if (e.alternate) this.runChallenges.alternateFoot += 1;
         if (e.stall) this.runChallenges.stalls += 1;
         if (e.grade === 'perfect') this.runChallenges.perfectTouch += 1;
@@ -432,7 +434,7 @@ export class GameController {
           kickUps: s.kickUps,
           bestStreak: s.bestStreak,
           combos: s.combos,
-          durationMs: Math.max(0, Math.round(this.engine.time * 1000)),
+          durationMs: this.runElapsedMs(),
           kickTimesMs: this.kickTimesMs,
           newBest: r.newBest,
           rank: r.rank,
@@ -629,7 +631,13 @@ export class GameController {
     this.suppressKickPrompt = false;
     this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
     this.engine.prepare('ready');
+    this.runStartTime = this.engine.time;
     this.publish();
+  }
+
+  /** Milliseconds since play(), not since the app or the menu was opened. */
+  private runElapsedMs(): number {
+    return Math.max(0, Math.round((this.engine.time - this.runStartTime) * 1000));
   }
 
   home() {

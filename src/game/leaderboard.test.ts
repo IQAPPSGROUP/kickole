@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockLeaderboard, formatRank } from './leaderboard';
+import { createMockLeaderboard, formatRank, isoWeekStartUtc } from './leaderboard';
 import { DEVICE_ID_KEY } from './nicknameStore';
 
 const NOW = 1_700_000_000_000;
@@ -25,8 +25,11 @@ describe('mock leaderboard', () => {
     const low = board.rankFor(0, NOW);
     const mid = board.rankFor(23, NOW);
     const high = board.rankFor(2000, NOW);
-    expect(low.rank).toBeGreaterThan(mid.rank);
-    expect(mid.rank).toBeGreaterThan(high.rank);
+    expect(low.rank).not.toBeNull();
+    expect(mid.rank).not.toBeNull();
+    expect(high.rank).not.toBeNull();
+    expect(low.rank!).toBeGreaterThan(mid.rank!);
+    expect(mid.rank!).toBeGreaterThan(high.rank!);
     expect(low.total).toBe(mid.total);
     expect(formatRank(mid.rank)).toMatch(/^#[\d,]+$/);
     expect(mid.country).toBeNull();
@@ -59,7 +62,7 @@ describe('mock leaderboard', () => {
     expect(board.submit(23, NOW).accepted).toBe(true);
     expect(board.submit(10, NOW + 1)).toEqual({ accepted: false, best: 23 });
     expect(board.submit(40, NOW + 2)).toEqual({ accepted: true, best: 40 });
-    const before = board.rankFor(23, NOW).rank;
+    const before = board.rankFor(23, NOW).rank ?? 0;
     const target = board.around(23, 'world', NOW).above[0]?.nickname ?? '';
     board.report(target);
     board.report('StreetKick42');
@@ -84,12 +87,21 @@ describe('mock leaderboard', () => {
     expect(board.country).toBe('GB');
     expect(snap.country).toBe('GB');
     expect(snap.countryRank).not.toBeNull();
-    expect(snap.countryRank!).toBeLessThan(snap.rank);
+    expect(snap.countryRank!).toBeLessThan(snap.rank!);
     const around = board.around(23, 'country', NOW);
     const rows = [...around.above, around.me, ...around.below];
     expect(around.me.mine).toBe(true);
     expect(rows.length).toBeGreaterThan(1);
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
     expect(board.top('world', 23, 10, NOW).every((row) => row.country)).toBe(true);
+  });
+
+  it('treats a week as Monday 00:00 UTC through the following Sunday', () => {
+    const wednesday = Date.UTC(2026, 9, 21, 15, 0, 0);
+    expect(isoWeekStartUtc(wednesday)).toBe(Date.UTC(2026, 9, 19));
+    expect(new Date(isoWeekStartUtc(wednesday)).getUTCDay()).toBe(1);
+    const sundayEvening = Date.UTC(2026, 9, 18, 23, 0, 0);
+    expect(isoWeekStartUtc(sundayEvening)).toBe(Date.UTC(2026, 9, 12));
+    expect(formatRank(null)).toBe('—');
   });
 });

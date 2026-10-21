@@ -1075,17 +1075,20 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .world-board .board li span { width: auto; min-width: 2.4em; font-variant-numeric: tabular-nums; }
 .world-board .board li b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .world-board .board li em { font-size: 12px; }
-.board-report {
+.board-actions { display: flex; gap: 8px; flex: none; }
+.board-report,
+.board-block {
   font: inherit;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .3px;
-  color: #ff4f9a;
   background: transparent;
   border: 0;
-  padding: 4px 0 4px 4px;
+  padding: 4px 0;
   cursor: pointer;
 }
+.board-report { color: #ff4f9a; }
+.board-block { color: #f7e9c5; }
 @media (orientation: landscape) and (max-height: 600px) {
   .world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }
 }

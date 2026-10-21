@@ -11,11 +11,13 @@ export function NicknameForm({
   initial?: string;
   initialCountry?: string | null;
   submitLabel: string;
-  onSubmit: (nickname: string, country: string | null) => void;
+  onSubmit: (nickname: string, country: string | null) => void | string | Promise<void | string | undefined>;
 }) {
   const [value, setValue] = useState(initial);
   const [country, setCountry] = useState<string | null>(() => countryByCode(initialCountry)?.code ?? null);
   const [tried, setTried] = useState(false);
+  const [serverIssue, setServerIssue] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const check = checkNickname(value);
   const issue: NicknameIssue | null = !check.ok && (tried || value.trim().length > 0) ? check.issue : null;
   return (
@@ -24,8 +26,13 @@ export function NicknameForm({
       onSubmit={(event) => {
         event.preventDefault();
         setTried(true);
-        if (!check.ok) return;
-        onSubmit(check.nickname, country);
+        if (!check.ok || busy) return;
+        setBusy(true);
+        setServerIssue(null);
+        void Promise.resolve(onSubmit(check.nickname, country))
+          .then((message) => { if (message) setServerIssue(message); })
+          .catch(() => { setServerIssue('Pick a different nickname.'); })
+          .finally(() => { setBusy(false); });
       }}
     >
       <input
@@ -39,9 +46,13 @@ export function NicknameForm({
         enterKeyHint="done"
         aria-label="Nickname"
         placeholder="StreetKick42"
-        onChange={(event) => setValue(event.target.value)}
+        onChange={(event) => {
+          setValue(event.target.value);
+          setServerIssue(null);
+        }}
       />
       {issue && <p className="nick-error" role="alert">{nicknameMessage(issue)}</p>}
+      {!issue && serverIssue && <p className="nick-error" role="alert">{serverIssue}</p>}
       <CountryPicker country={country} onChange={setCountry} />
       <button
         type="button"
@@ -53,7 +64,7 @@ export function NicknameForm({
       >
         SUGGEST
       </button>
-      <button type="submit" className="btn primary" disabled={!check.ok}>{submitLabel}</button>
+      <button type="submit" className="btn primary" disabled={!check.ok || busy}>{busy ? 'SAVING' : submitLabel}</button>
     </form>
   );
 }
@@ -140,14 +151,18 @@ function CountryPicker({
   );
 }
 
-export function NicknameScreen({ onSave }: { onSave: (nickname: string, country: string | null) => void }) {
+export function NicknameScreen({
+  onSave,
+}: {
+  onSave: (nickname: string, country: string | null) => void | string | Promise<void | string | undefined>;
+}) {
   const [suggestion] = useState(() => suggestedCountry());
   return (
     <div className="screen settings nick-screen">
       <div className="card nick-card">
         <p className="court-label">WORLD BOARD</p>
         <h2 className="nick-title">YOUR TAG</h2>
-        <p className="shop-lead">Pick a nickname for the world board. Letters, numbers and underscore. No real name, email or phone. Country is your choice, not your location. Prefer not to say and you stay off country boards.</p>
+        <p className="shop-lead">Pick a nickname for the world board. Letters, numbers and underscore. No real name, email or phone. Country is your choice, not your location. Prefer not to say and you stay off country boards. Other players see this tag, your flag and your score.</p>
         <NicknameForm initialCountry={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} />
       </div>
     </div>

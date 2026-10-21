@@ -84,6 +84,10 @@ export interface Result {
   score: number;
   kickUps: number;
   bestStreak: number;
+  /** Combo events in the run. Sent with the score. */
+  combos: number;
+  /** Run clock in milliseconds. Sent with the score. */
+  durationMs: number;
   newBest: boolean;
   rank: number;
   coinsEarned: number;
@@ -415,6 +419,8 @@ export class GameController {
           score: s.score,
           kickUps: s.kickUps,
           bestStreak: s.bestStreak,
+          combos: s.combos,
+          durationMs: Math.max(0, Math.round(this.engine.time * 1000)),
           newBest: r.newBest,
           rank: r.rank,
           coinsEarned: r.coinsEarned,

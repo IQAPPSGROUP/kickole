@@ -1,7 +1,7 @@
 import { COUNTRIES, countryByCode } from './countries';
 import { loadDeviceId } from './nicknameStore';
 
-/** World is all-time. Week is the last seven days. Country is all-time for one self-chosen code. */
+/** World is all-time. Week is the ISO week starting Monday 00:00 UTC. Country is all-time for one self-chosen code. */
 export type BoardScope = 'world' | 'week' | 'country';
 
 export interface BoardEntry {
@@ -14,7 +14,8 @@ export interface BoardEntry {
 }
 
 export interface RankSnapshot {
-  rank: number;
+  /** Null when the live board has not answered. The panel shows a dash. */
+  rank: number | null;
   total: number;
   nickname: string;
   score: number;
@@ -22,6 +23,11 @@ export interface RankSnapshot {
   country: string | null;
   /** Null when they are excluded from country boards. */
   countryRank: number | null;
+}
+
+export interface RunSubmit {
+  combo: number;
+  durationMs: number;
 }
 
 export interface AroundMe {
@@ -36,8 +42,8 @@ export interface SubmitResult {
 }
 
 /**
- * The live client talks to this. `createMockLeaderboard` is the local stand-in.
- * A later Supabase client should implement the same methods and nothing else in the UI.
+ * The UI talks only to this. `createMockLeaderboard` is the local stand-in (`?mockBoard=1`).
+ * `createSupabaseLeaderboard` calls the private-schema RPCs.
  */
 export interface LeaderboardService {
   readonly nickname: string;
@@ -45,15 +51,29 @@ export interface LeaderboardService {
   readonly country: string | null;
   /** Install id sent with a score. Never render this. */
   readonly deviceId: string;
+  /** Bumps when an async refresh lands so React can re-render. */
+  readonly revision: number;
+  subscribe(listener: () => void): () => void;
+  /** Begin quiet fetches. Safe to call more than once. */
+  start(): void;
+  /** Ignore in-flight results. The next `start` fetches again. */
+  stop(): void;
   rankFor(score: number, now?: number): RankSnapshot;
   around(score: number, scope: BoardScope, now?: number): AroundMe;
   top(scope: BoardScope, score: number, limit: number, now?: number): BoardEntry[];
-  submit(score: number, at?: number): SubmitResult;
+  submit(score: number, at?: number, run?: RunSubmit): SubmitResult;
   report(nickname: string): void;
   block(nickname: string): void;
 }
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+/** Monday 00:00 UTC of the ISO week that contains `now`. */
+export function isoWeekStartUtc(now: number): number {
+  const date = new Date(now);
+  const midnight = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+  const daysFromMonday = (date.getUTCDay() + 6) % 7;
+  return midnight - daysFromMonday * 86_400_000;
+}
+
 const CROWD = 1600;
 const BEST_KEY = 'kicky.board.best.v1';
 const BLOCKS_KEY = 'kicky.board.blocks.v1';
@@ -110,7 +130,7 @@ function inScope(scope: BoardScope, at: number, now: number, code: string, playe
     case 'world':
       return true;
     case 'week':
-      return now - at <= WEEK_MS;
+      return at >= isoWeekStartUtc(now) && at <= now;
     case 'country':
       return playerCountry != null && code === playerCountry;
     default: {
@@ -161,8 +181,9 @@ function byStanding(a: { score: number; at: number }, b: { score: number; at: nu
   return b.score - a.score || a.at - b.at;
 }
 
-export function formatRank(rank: number): string {
-  return `#${Math.max(1, Math.floor(rank)).toLocaleString('en-US')}`;
+export function formatRank(rank: number | null): string {
+  if (rank == null || !Number.isFinite(rank) || rank < 1) return '—';
+  return `#${Math.floor(rank).toLocaleString('en-US')}`;
 }
 
 export function createMockLeaderboard(options: {
@@ -230,6 +251,10 @@ export function createMockLeaderboard(options: {
     nickname,
     country,
     deviceId,
+    revision: 0,
+    subscribe() { return () => {}; },
+    start() {},
+    stop() {},
     rankFor(score, now = Date.now()) {
       const board = placed(score, 'world', now);
       const me = board.find((row) => row.mine);
@@ -267,7 +292,7 @@ export function createMockLeaderboard(options: {
     top(scope, score, limit, now = Date.now()) {
       return placed(score, scope, now).slice(0, Math.max(1, limit));
     },
-    submit(score, at = Date.now()) {
+    submit(score, at = Date.now(), _run?: RunSubmit) {
       const rounded = Math.floor(score);
       const previous = best?.score ?? 0;
       if (!Number.isFinite(score) || rounded < 0 || (best && rounded <= best.score)) {

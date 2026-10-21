@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { installAudioLifecycle } from '../game/audio';
 import { GameController } from '../game/controller';
-import { createMockLeaderboard } from '../game/leaderboard';
-import { hydrateCountry, hydrateNickname, loadNickname, loadStoredCountry, saveCountry, saveNickname } from '../game/nicknameStore';
+import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
+import { hydrateCountry, hydrateDeviceId, hydrateNickname, loadDeviceId, loadNickname, loadStoredCountry, saveCountry, saveNickname } from '../game/nicknameStore';
+import { registerPlayer, serverNicknameMessage, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
 import {
   cancelOpeningIntroForGameplay,
@@ -31,10 +32,13 @@ export function App() {
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
-  const board = useMemo(
-    () => (nickname ? createMockLeaderboard({ nickname, country: countryChoice.country }) : null),
-    [nickname, countryChoice.country],
-  );
+  const [deviceReady, setDeviceReady] = useState(false);
+  const mockBoard = useMemo(() => new URLSearchParams(window.location.search).get('mockBoard') === '1', []);
+  const board = useMemo((): LeaderboardService | null => {
+    if (!nickname || !deviceReady) return null;
+    const options = { nickname, country: countryChoice.country };
+    return mockBoard ? createMockLeaderboard(options) : createSupabaseLeaderboard(options);
+  }, [nickname, countryChoice.country, deviceReady, mockBoard]);
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
@@ -43,20 +47,31 @@ export function App() {
 
   useEffect(() => {
     let live = true;
-    void hydrateNickname().then((name) => {
-      if (!live || !name) return;
-      setNickname((current) => current ?? name);
-    });
-    void hydrateCountry().then((stored) => {
+    void (async () => {
+      await hydrateDeviceId();
+      const name = await hydrateNickname();
+      const stored = await hydrateCountry();
       if (!live) return;
+      if (name) setNickname((current) => current ?? name);
       setCountryChoice(stored);
-    });
+      setDeviceReady(true);
+    })();
     return () => { live = false; };
   }, []);
 
   useEffect(() => {
+    if (!board) return undefined;
+    board.start();
+    return () => board.stop();
+  }, [board]);
+
+  useEffect(() => {
     if (phase !== 'over' || !snap.result || !board) return;
-    board.submit(snap.result.score);
+    if (snap.result.score <= 0 || snap.result.durationMs <= 0) return;
+    board.submit(snap.result.score, Date.now(), {
+      combo: snap.result.combos,
+      durationMs: snap.result.durationMs,
+    });
   }, [phase, snap.result, board]);
 
   useEffect(() => {
@@ -172,6 +187,23 @@ export function App() {
     setOverlay('none');
   };
 
+  const lockNickname = async (name: string, country: string | null): Promise<string | void> => {
+    const deviceId = await hydrateDeviceId();
+    if (!mockBoard) {
+      const result = await registerPlayer({
+        deviceId: deviceId || loadDeviceId(),
+        nickname: name,
+        country,
+      });
+      if (!result.ok) return serverNicknameMessage(result.reason);
+    }
+    saveNickname(name);
+    saveCountry(country);
+    setNickname(name);
+    setCountryChoice({ chosen: true, country });
+    setDeviceReady(true);
+  };
+
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
@@ -180,12 +212,7 @@ export function App() {
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
       {!needsBody && needsNick && phase === 'menu' && (
-        <NicknameScreen onSave={(name, country) => {
-          saveNickname(name);
-          saveCountry(country);
-          setNickname(name);
-          setCountryChoice({ chosen: true, country });
-        }} />
+        <NicknameScreen onSave={(name, country) => lockNickname(name, country)} />
       )}
       {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsNick && (
         <Home
@@ -224,12 +251,7 @@ export function App() {
           settings={snap.settings}
           nickname={nickname ?? ''}
           country={countryChoice.country}
-          onNickname={(name, country) => {
-            saveNickname(name);
-            saveCountry(country);
-            setNickname(name);
-            setCountryChoice({ chosen: true, country });
-          }}
+          onNickname={(name, country) => lockNickname(name, country)}
           onChange={(p) => controller.updateSettings(p)}
           onClose={closeOverlay}
         />

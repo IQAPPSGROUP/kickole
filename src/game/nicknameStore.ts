@@ -38,17 +38,33 @@ export function saveNickname(nickname: string, storage: Storage = localStorage):
   return true;
 }
 
+const DEVICE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function mintDeviceId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') crypto.getRandomValues(bytes);
+  else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.random() * 256);
+  const sixth = bytes[6] ?? 0;
+  const eighth = bytes[8] ?? 0;
+  bytes[6] = (sixth & 0x0f) | 0x40;
+  bytes[8] = (eighth & 0x3f) | 0x80;
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /** Random id for this install. It is not shown and is not the player's name. */
 export function loadDeviceId(storage: Storage = localStorage): string {
   try {
     const existing = storage.getItem(DEVICE_ID_KEY);
-    if (existing && /^[0-9a-f-]{16,64}$/i.test(existing)) return existing;
+    if (existing && DEVICE_UUID.test(existing)) {
+      void mirrorPreference(DEVICE_ID_KEY, existing);
+      return existing;
+    }
   } catch {
     /* fall through and mint one */
   }
-  const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-    ? crypto.randomUUID()
-    : `dev-${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+  const id = mintDeviceId();
   try {
     storage.setItem(DEVICE_ID_KEY, id);
   } catch {
@@ -56,6 +72,28 @@ export function loadDeviceId(storage: Storage = localStorage): string {
   }
   void mirrorPreference(DEVICE_ID_KEY, id);
   return id;
+}
+
+/**
+ * On a phone, Capacitor Preferences keeps the same install id if WebView
+ * storage is cleared. The browser keeps using localStorage.
+ */
+export async function hydrateDeviceId(storage: Storage = localStorage): Promise<string> {
+  const local = loadDeviceId(storage);
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (!Capacitor.isNativePlatform()) return local;
+    const { Preferences } = await import('@capacitor/preferences');
+    const stored = await Preferences.get({ key: DEVICE_ID_KEY });
+    if (stored.value && DEVICE_UUID.test(stored.value)) {
+      try { storage.setItem(DEVICE_ID_KEY, stored.value); } catch { /* ignore */ }
+      return stored.value;
+    }
+    await Preferences.set({ key: DEVICE_ID_KEY, value: local });
+  } catch {
+    /* Preferences is absent in the browser and in tests. */
+  }
+  return loadDeviceId(storage);
 }
 
 async function mirrorPreference(key: string, value: string): Promise<void> {

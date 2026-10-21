@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 import { countryFlag } from '../game/countries';
 import type { LeaderboardService } from '../game/leaderboard';
 import { formatRank } from '../game/leaderboard';
@@ -14,9 +14,10 @@ export function WorldRank({
   service: LeaderboardService;
 }) {
   const start = useRef<number | null>(null);
+  void useSyncExternalStore(service.subscribe, () => service.revision);
   const snapshot = service.rankFor(score);
-  if (start.current == null || score <= 0) start.current = snapshot.rank;
-  const gained = Math.max(0, start.current - snapshot.rank);
+  if (snapshot.rank != null && (start.current == null || score <= 0)) start.current = snapshot.rank;
+  const gained = snapshot.rank != null && start.current != null ? Math.max(0, start.current - snapshot.rank) : 0;
   const countryLine = snapshot.country != null && snapshot.countryRank != null
     ? `${snapshot.country} ${formatRank(snapshot.countryRank)}`
     : null;

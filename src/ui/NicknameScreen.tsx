@@ -197,6 +197,13 @@ export function NicknameForm({
       }}
     >
       <div className="nick-preview" aria-live="polite">
+        <svg className="prompt-filters" aria-hidden width="0" height="0">
+          <filter id="prompt-spray" x="-8%" y="-20%" width="116%" height="150%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="noise" />
+            <feColorMatrix in="noise" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.4 -0.55" result="speck" />
+            <feComposite in="speck" in2="SourceAlpha" operator="in" />
+          </filter>
+        </svg>
         <GraffitiText text={preview} className="graffiti nick-preview-tag" />
       </div>
       {taken && <p className="nick-error" role="alert">{taken}</p>}

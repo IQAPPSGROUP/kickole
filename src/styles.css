@@ -907,7 +907,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 
 /* World board. The rank tag sits opposite the trick prompt, in the right margin. */
 .nick-card { overflow: visible; }
-.nick-title {
+.nick-card h2.nick-title {
   margin: 0;
   font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
   font-size: 40px;
@@ -1014,70 +1014,93 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   right: max(4px, var(--sat-r));
   z-index: 6;
   width: 148px;
-  padding: 3px 6px 2px;
-  border-radius: 4px;
-  background:
-    linear-gradient(rgba(18, 12, 14, .42), rgba(18, 12, 14, .42)),
-    url('./ui/wall-tile.jpg') center / cover;
+  padding: 2px 2px 0;
+  border-radius: 0;
+  background: none;
   border: 0;
   box-shadow: none;
-  text-align: left;
+  text-align: right;
   pointer-events: none;
-  font-family: "Avenir Next Condensed", "Arial Narrow", "Nimbus Sans Narrow", "Helvetica Neue", Arial, sans-serif;
-  font-stretch: condensed;
-  letter-spacing: .04em;
+  font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
+  letter-spacing: 0;
+  transform: rotate(3deg);
+  transform-origin: 100% 0;
+}
+.world-rank::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -4px -2px 2px -10px;
+  background: radial-gradient(ellipse at 70% 35%, rgba(255, 79, 154, .28), rgba(255, 79, 154, 0) 72%);
+  filter: blur(1px);
+  pointer-events: none;
 }
 .world-rank p { margin: 0; }
 .world-rank-kicker {
   color: #fffdf8;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .1em;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: .04em;
   line-height: 1;
   white-space: nowrap;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
 }
 .world-rank-line {
   display: block;
   color: #ff4f9a;
-  font-size: 18px;
-  font-weight: 800;
-  line-height: 1;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: .9;
   white-space: nowrap;
-  text-shadow: 0 1px 0 #140814;
+  -webkit-text-stroke: 2px #140814;
+  paint-order: stroke fill;
 }
 .world-rank-line.is-first { color: #ffe14a; }
 .world-rank-country {
   display: block;
   margin-top: 0;
   color: #fffdf8;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1;
   white-space: nowrap;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
 }
-.world-rank-country .country-flag { font-size: 12px; margin-right: 3px; }
+.world-rank-country .country-flag {
+  font-size: 12px;
+  margin-right: 3px;
+  -webkit-text-stroke: 0;
+  paint-order: normal;
+}
 .world-rank-country span:not(.country-flag) { color: #ff4f9a; }
 .world-rank-country .is-first { color: #ffe14a; }
 .world-rank-delta {
   display: block;
   margin-top: 1px;
   color: #ff4f9a;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 400;
   line-height: 1;
   text-align: right;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
   animation: rank-climb .35s ease-out;
 }
 .world-rank-name {
-  margin-top: 0;
+  margin-top: 1px;
+  margin-left: auto;
   max-width: 140px;
   overflow: hidden;
   color: #fffdf8;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: .02em;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
   white-space: nowrap;
   text-overflow: ellipsis;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
 }
 @keyframes rank-climb {
   from { transform: translateY(6px); opacity: 0; }
@@ -1206,27 +1229,62 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .nick-wheel button.on { background: rgba(255, 79, 154, .28); border-color: #ff4f9a; }
 .nick-wheel.is-locked { border-color: #ff4f9a; }
-.nick-shuffle { min-height: 52px; }
+.nick-form .btn.primary {
+  min-width: 44px;
+  min-height: 44px;
+  color: #140814;
+  background: #fffdf8;
+  box-shadow: 0 5px 0 #8d7b68;
+}
+.nick-form .btn.primary.nick-shuffle {
+  min-height: 52px;
+  color: #140814;
+  background: #ff4f9a;
+  box-shadow: 0 5px 0 #8c1248;
+}
+.nick-form .btn.primary.nick-shuffle:disabled { opacity: .45; cursor: default; }
 .nick-real-name { margin: 0; text-align: center; font-size: 14px; font-weight: 800; color: #fffdf8; }
 .nick-preview {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 148px;
-  padding: 16px 8px 20px;
-  border-radius: 18px;
-  background:
-    linear-gradient(rgba(16, 10, 12, .28), rgba(16, 10, 12, .45)),
-    url('./ui/wall-tile.jpg') center / cover;
+  min-height: 168px;
+  padding: 22px 4px 28px;
+  border: 0;
+  border-radius: 6px 22px 10px 16px;
+  overflow: visible;
+  background: url('./ui/brick-wall.jpg') center / 220px;
+}
+.nick-preview::after {
+  content: '';
+  position: absolute;
+  left: 46%;
+  bottom: 8px;
+  width: 5px;
+  height: 14px;
+  border-radius: 0 0 5px 5px;
+  background: #ff4f9a;
+  box-shadow: 16px -2px 0 -1px #d21b72, -18px 1px 0 -1px #ff4f9a;
+  pointer-events: none;
 }
 .nick-preview-tag {
+  position: relative;
+  z-index: 1;
   width: 100%;
   font-size: clamp(40px, 12vw, 58px);
-  line-height: .92;
+  line-height: .9;
   text-align: center;
+  transform: rotate(-7deg);
+}
+.nick-preview-tag .prompt-ink .prompt-ch {
+  -webkit-text-stroke: 0.14em #140814;
+}
+.nick-preview-tag .prompt-shine {
+  transform: translate(-0.055em, -0.07em);
 }
 .nick-preview-tag .prompt-face .prompt-ch {
-  background: linear-gradient(180deg, #fff7fb 0%, #ffb3d6 14%, #ff4f9a 48%, #c41268 100%);
+  background: linear-gradient(180deg, #fff7fb 0%, #ffd0e8 18%, #ff4f9a 52%, #c41268 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

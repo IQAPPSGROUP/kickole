@@ -35,6 +35,14 @@ function seededWords(): { adjective: string[]; noun: string[] } {
   return { adjective, noun };
 }
 
+function documentedWords(): { adjective: string[]; noun: string[] } {
+  const markdown = readFileSync('docs/NICKNAME_WORDS.md', 'utf8');
+  const adjectives = markdown.split('## Adjectives')[1]?.split('## Nouns')[0] ?? '';
+  const nouns = markdown.split('## Nouns')[1] ?? '';
+  const lines = (section: string) => section.split('\n').map((line) => line.trim()).filter((line) => /^[A-Za-z]+$/.test(line));
+  return { adjective: lines(adjectives), noun: lines(nouns) };
+}
+
 function hits(name: string, blocked: BlockedWord[]): string[] {
   const letters = compact(name);
   const found: string[] = [];
@@ -47,14 +55,17 @@ function hits(name: string, blocked: BlockedWord[]): string[] {
 describe('nickname words', () => {
   const blocked = blockedWords();
 
-  it('keeps more than 120 words on each side and matches the SQL seed', () => {
-    expect(ADJECTIVES.length).toBeGreaterThanOrEqual(120);
-    expect(NOUNS.length).toBeGreaterThanOrEqual(120);
+  it('keeps about 150 words on each side and matches the SQL seed and the review file', () => {
+    expect(ADJECTIVES.length).toBe(150);
+    expect(NOUNS.length).toBe(150);
     expect(new Set(ADJECTIVES).size).toBe(ADJECTIVES.length);
     expect(new Set(NOUNS).size).toBe(NOUNS.length);
     const seeded = seededWords();
     expect(seeded.adjective).toEqual([...ADJECTIVES]);
     expect(seeded.noun).toEqual([...NOUNS]);
+    const documented = documentedWords();
+    expect(documented.adjective).toEqual([...ADJECTIVES]);
+    expect(documented.noun).toEqual([...NOUNS]);
     expect(ADJECTIVES.length * NOUNS.length).toBeGreaterThan(14_000);
   });
 

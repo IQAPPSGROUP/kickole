@@ -2,6 +2,7 @@
  * Curated nickname halves. Players only get `adjective + noun`.
  * Every pair is original: no people, clubs, or brands.
  * `nicknameWords.test.ts` scans every combo against the blocked-word list.
+ * `docs/NICKNAME_WORDS.md` and the SQL seed are generated from these arrays.
  */
 
 export const ADJECTIVES = [
@@ -20,12 +21,7 @@ export const ADJECTIVES = [
   'Desert', 'Oasis', 'Ocean', 'River', 'Frost', 'Glacier', 'Frozen', 'Molten', 'Ember', 'Flame',
   'Scorch', 'Zephyr', 'Aero', 'Kinetic', 'Quantum', 'Photon', 'Plasma', 'Circuit', 'Arcade', 'Fiesta',
   'Samba', 'Bravo', 'Vivid', 'Blizzard', 'Prism', 'Quartz', 'Onyx', 'Cobalt', 'Indigo',
-  'Magenta', 'Cyan', 'Coral', 'Blitz', 'Fleet', 'Zippy', 'Snappy', 'Bouncy', 'Lofty', 'Soaring',
-  'Hidden', 'Grand', 'Super', 'Giga', 'Nano', 'Orbital', 'Starlit', 'Moonlit', 'Sunlit', 'Fresh',
-  'Crisp', 'Cool', 'Snowy', 'Stormy', 'Misty', 'Polished', 'Tropical', 'Alley', 'Rooftop', 'Sunrise',
-  'Cyber', 'Carnival', 'Mellow', 'Silky', 'Granite', 'Encore', 'Magnetic', 'Binary', 'Planetary', 'Timeless',
-  'Ancient', 'Vintage', 'Classic', 'Windy', 'Foggy', 'Sandy', 'Rocky', 'Mossy', 'Maple', 'Mint',
-  'Mango', 'Coconut', 'Zesty', 'Tangy', 'Juicy', 'Fluffy', 'Fuzzy', 'Lively', 'Jolly', 'Cheerful',
+  'Magenta', 'Cyan',
 ] as const;
 
 export const NOUNS = [
@@ -44,12 +40,7 @@ export const NOUNS = [
   'Scorpion', 'Corner', 'Penalty', 'Touchline', 'Elastico', 'Roulette', 'Bicycle', 'Acrobat', 'Magician', 'Drummer',
   'Pioneer', 'Paladin', 'Warden', 'Flicker', 'Balancer', 'Poet', 'Skipper', 'Midfielder', 'Defender',
   'Forward', 'Condor', 'Macaw', 'Ibex', 'Okapi', 'Tapir', 'Bongo', 'Badger', 'Rabbit',
-  'Walrus', 'Narwhal', 'Starling', 'Sparrow', 'Puffin', 'Axolotl', 'Gibbon', 'Meerkat', 'Warthog',
-  'Aardvark', 'Platypus', 'Quokka', 'Dugong', 'Manatee', 'Starfish', 'Jellyfish', 'Angelfish', 'Swordfish',
-  'Piranha', 'Stingray', 'Hammerhead', 'Sailfish', 'Lobster', 'Nautilus', 'Firefly', 'Dragonfly', 'Ladybug', 'Cricket',
-  'Reindeer', 'Sloth', 'Armadillo', 'Porcupine', 'Hedgehog', 'Squirrel', 'Chipmunk', 'Raccoon', 'Wallaby',
-  'Ostrich', 'Kestrel', 'Osprey', 'Buzzard', 'Magpie', 'Jackal', 'Dingo', 'Grizzly',
-  'Newt', 'Salamander', 'Chameleon', 'Tarantula', 'Pegasus', 'Sphinx', 'Outlaw', 'Prodigy',
+  'Walrus', 'Narwhal', 'Starling', 'Sparrow',
 ] as const;
 
 export type NicknameAdjective = (typeof ADJECTIVES)[number];

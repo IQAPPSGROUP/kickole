@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "nickname-words": "tsx tools/syncNicknameWords.ts",
     "build:player": "tsx tools/build_fab_player.ts",
     "build:street": "tsx tools/build_street_court.ts",
     "ios:sync": "npm run build && npx cap sync ios",

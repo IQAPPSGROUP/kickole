@@ -50,6 +50,8 @@ export function NicknameForm({
   const [acked, setAcked] = useState(false);
   const [serverIssue, setServerIssue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lockAdj, setLockAdj] = useState(false);
+  const [lockNoun, setLockNoun] = useState(false);
   const adjective = ADJECTIVES[adj] ?? 'Turbo';
   const nounWord = NOUNS[noun] ?? 'Striker';
 
@@ -79,6 +81,38 @@ export function NicknameForm({
     setTaken(null);
     setAcked(true);
     return false;
+  };
+
+  const applyPair = (nextAdj: number, nextNoun: number) => {
+    setAdj(nextAdj);
+    setNoun(nextNoun);
+    setServerIssue(null);
+    void peekPair(ADJECTIVES[nextAdj] ?? adjective, NOUNS[nextNoun] ?? nounWord);
+  };
+
+  const roll = (side: 'first' | 'second' | 'both') => {
+    let changeAdj = false;
+    let changeNoun = false;
+    switch (side) {
+      case 'first':
+        changeAdj = true;
+        break;
+      case 'second':
+        changeNoun = true;
+        break;
+      case 'both':
+        changeAdj = true;
+        changeNoun = true;
+        break;
+      default: {
+        const neverSide: never = side;
+        return neverSide;
+      }
+    }
+    const nextAdj = changeAdj && !lockAdj ? otherIndex(ADJECTIVES.length, adj) : adj;
+    const nextNoun = changeNoun && !lockNoun ? otherIndex(NOUNS.length, noun) : noun;
+    if (nextAdj === adj && nextNoun === noun) return;
+    applyPair(nextAdj, nextNoun);
   };
 
   return (
@@ -113,6 +147,9 @@ export function NicknameForm({
           label="First word"
           words={ADJECTIVES}
           index={adj}
+          locked={lockAdj}
+          onToggleLock={() => setLockAdj((value) => !value)}
+          onShuffle={() => roll('first')}
           onChange={(index) => {
             setAdj(index);
             showPair(ADJECTIVES[index] ?? adjective, nounWord);
@@ -122,6 +159,9 @@ export function NicknameForm({
           label="Second word"
           words={NOUNS}
           index={noun}
+          locked={lockNoun}
+          onToggleLock={() => setLockNoun((value) => !value)}
+          onShuffle={() => roll('second')}
           onChange={(index) => {
             setNoun(index);
             showPair(adjective, NOUNS[index] ?? nounWord);
@@ -132,16 +172,10 @@ export function NicknameForm({
       <button
         type="button"
         className="btn primary nick-shuffle"
-        onClick={() => {
-          const left = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)] ?? 'Turbo';
-          const right = NOUNS[Math.floor(Math.random() * NOUNS.length)] ?? 'Striker';
-          setAdj(wordIndex(ADJECTIVES, left));
-          setNoun(wordIndex(NOUNS, right));
-          setServerIssue(null);
-          void peekPair(left, right);
-        }}
+        disabled={lockAdj && lockNoun}
+        onClick={() => roll('both')}
       >
-        Pick one for me
+        <span aria-hidden="true">🎲</span> Pick one for me
       </button>
       <CountryPicker country={country} onChange={setCountry} />
       <button type="submit" className="btn primary" disabled={busy}>{busy ? 'SAVING' : submitLabel}</button>
@@ -149,16 +183,28 @@ export function NicknameForm({
   );
 }
 
+function otherIndex(length: number, current: number): number {
+  if (length <= 1) return current;
+  const offset = 1 + Math.floor(Math.random() * (length - 1));
+  return (current + offset) % length;
+}
+
 function WordWheel({
   label,
   words,
   index,
+  locked,
   onChange,
+  onToggleLock,
+  onShuffle,
 }: {
   label: string;
   words: readonly string[];
   index: number;
+  locked: boolean;
   onChange: (index: number) => void;
+  onToggleLock: () => void;
+  onShuffle: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -168,7 +214,25 @@ function WordWheel({
   return (
     <div className="nick-wheel-col">
       <span className="country-label">{label}</span>
-      <div ref={ref} className="nick-wheel" role="listbox" aria-label={label}>
+      <div className="nick-word-tools">
+        <button
+          type="button"
+          aria-pressed={locked}
+          aria-label={locked ? `Unlock ${label}` : `Lock ${label}`}
+          onClick={onToggleLock}
+        >
+          {locked ? 'Locked' : 'Lock'}
+        </button>
+        <button
+          type="button"
+          aria-label={`Shuffle ${label}`}
+          disabled={locked}
+          onClick={onShuffle}
+        >
+          Shuffle
+        </button>
+      </div>
+      <div ref={ref} className={`nick-wheel${locked ? ' is-locked' : ''}`} role="listbox" aria-label={label}>
         {words.map((word, wordIndex) => (
           <button
             key={word}

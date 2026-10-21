@@ -1135,11 +1135,28 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .sheet-block { background: #f7e9c5; color: #24180c; }
 .nick-wheels { display: flex; gap: 8px; }
 .nick-wheel-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.nick-word-tools { display: flex; gap: 4px; }
+.nick-word-tools button {
+  flex: 1;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 4px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fffdf8;
+  background: #101827;
+  border: 2px solid #2c3b59;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.nick-word-tools button[aria-pressed="true"] { color: #24180c; background: #ffe14a; border-color: #ffe14a; }
+.nick-word-tools button:disabled { opacity: .45; cursor: default; }
 .nick-wheel {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 168px;
+  max-height: 120px;
   overflow-y: auto;
   padding: 4px;
   border: 2px solid #ffe14a;
@@ -1157,6 +1174,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   cursor: pointer;
 }
 .nick-wheel button.on { background: rgba(255, 79, 154, .28); border-color: #ff4f9a; }
+.nick-wheel.is-locked { border-color: #ffe14a; }
 .nick-shuffle { min-height: 52px; }
 .nick-real-name { margin: 0; text-align: center; font-size: 14px; font-weight: 800; color: #fffdf8; }
 .nick-preview { display: flex; justify-content: center; min-height: 48px; }

@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
-import { BackSide, EquirectangularReflectionMapping, PMREMGenerator, SRGBColorSpace, type Texture } from 'three';
-import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
-import { TextureLoader } from 'three';
+import { BackSide, EquirectangularReflectionMapping, PMREMGenerator, SRGBColorSpace, TextureLoader, type Texture } from 'three';
 import type { Quality } from '../game/storage';
 import { notifyEnvironmentReady } from './openingIntro';
 import { ALLEY_SKY_LOOK, alleySkyUrl } from './alleyLayout';
+import { gpuGeneration, subscribeGpuRestore } from './gpuRestore';
 
 const SKY_VERTEX = /* glsl */ `
   varying vec3 vDir;
@@ -45,19 +44,20 @@ function BrightFallback() {
 }
 
 /**
- * City-tower HDRI behind the open side of the alley.
- * High and medium use the 1K HDR for the background and image light.
- * Low uses the tone-mapped JPEG and skips PMREM.
+ * City photograph behind the open side of the alley.
+ * The JPEG is the visible background on every tier. High and medium also build
+ * a small PMREM from it. A context restore bumps `gpuGeneration`, which reloads
+ * the photograph and rebuilds the PMREM — a render target cannot be re-uploaded.
  */
 export function AlleySky({ quality }: { quality: Quality }) {
   const { gl, scene } = useThree();
+  const generation = useSyncExternalStore(subscribeGpuRestore, gpuGeneration);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
     const pm = quality === 'low' ? null : new PMREMGenerator(gl);
-    let hdr: Texture | null = null;
-    let env: Texture | null = null;
     let jpg: Texture | null = null;
+    let env: Texture | null = null;
     let pmDisposed = false;
     const disposePm = () => {
       if (pmDisposed || !pm) return;
@@ -70,50 +70,38 @@ export function AlleySky({ quality }: { quality: Quality }) {
       scene.backgroundIntensity = ALLEY_SKY_LOOK.background;
       scene.fog = null;
     };
-    const useJpeg = () => {
-      new TextureLoader().load(alleySkyUrl('low'), (loaded) => {
-        if (!alive) { loaded.dispose(); return; }
-        jpg = loaded;
-        loaded.mapping = EquirectangularReflectionMapping;
-        loaded.colorSpace = SRGBColorSpace;
-        scene.background = loaded;
-        applyLook();
-        notifyEnvironmentReady();
-      }, undefined, () => {
-        if (alive) setFailed(true);
-        notifyEnvironmentReady();
-      });
-    };
-    if (quality === 'low') {
-      useJpeg();
-    } else {
-      new HDRLoader().load(alleySkyUrl(quality), (loaded) => {
-        if (!alive) { loaded.dispose(); disposePm(); return; }
-        hdr = loaded;
-        loaded.mapping = EquirectangularReflectionMapping;
-        scene.background = loaded;
-        if (pm) {
-          env = pm.fromEquirectangular(loaded).texture;
-          scene.environment = env;
-          scene.environmentIntensity = ALLEY_SKY_LOOK.environment;
-        }
+    new TextureLoader().load(alleySkyUrl(quality), (loaded) => {
+      if (!alive) {
+        loaded.dispose();
         disposePm();
-        applyLook();
-        notifyEnvironmentReady();
-      }, undefined, () => {
-        disposePm();
-        useJpeg();
-      });
-    }
+        return;
+      }
+      jpg = loaded;
+      loaded.mapping = EquirectangularReflectionMapping;
+      loaded.colorSpace = SRGBColorSpace;
+      loaded.needsUpdate = true;
+      scene.background = loaded;
+      if (pm) {
+        env = pm.fromEquirectangular(loaded).texture;
+        scene.environment = env;
+        scene.environmentIntensity = ALLEY_SKY_LOOK.environment;
+      }
+      disposePm();
+      applyLook();
+      notifyEnvironmentReady();
+    }, undefined, () => {
+      disposePm();
+      if (alive) setFailed(true);
+      notifyEnvironmentReady();
+    });
     return () => {
       alive = false;
-      scene.background = null;
+      if (scene.background === jpg) scene.background = null;
       scene.environment = null;
-      hdr?.dispose();
-      env?.dispose();
       jpg?.dispose();
+      env?.dispose();
       disposePm();
     };
-  }, [gl, scene, quality]);
+  }, [gl, scene, quality, generation]);
   return failed ? <BrightFallback /> : null;
 }

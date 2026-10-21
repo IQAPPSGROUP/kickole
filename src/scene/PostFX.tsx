@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import {
   DataTexture,
@@ -25,6 +25,7 @@ import type { GameEngine } from '../engine/engine';
 import { STREET_BLOOM, streetPostPassNames, type StreetPassName } from './daylight';
 import { depthOfFieldActive, depthOfFieldFocus, depthOfFieldScale, gradeDisplayColor } from './presentation';
 import type { TierProfile } from './qualityTier';
+import { gpuGeneration, subscribeGpuRestore } from './gpuRestore';
 import { SsaoPass } from './ssaoPass';
 
 interface SceneStats {
@@ -275,7 +276,11 @@ const FORWARD = new Vector3();
  */
 export function PostFX({ profile, engine }: { profile: TierProfile; engine: GameEngine }) {
   const { gl, scene, camera, size } = useThree();
+  const generation = useSyncExternalStore(subscribeGpuRestore, gpuGeneration);
   const lut = useMemo(() => streetLut(), []);
+  useEffect(() => {
+    lut.needsUpdate = true;
+  }, [generation, lut]);
   const stack = useMemo((): { effect: EffectComposer; bokeh: BokehPass | null } => {
     const effect = new EffectComposer(gl as WebGLRenderer);
     let bokeh: BokehPass | null = null;
@@ -322,7 +327,7 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
     };
     for (const name of streetPostPassNames(profile)) add(name);
     return { effect, bokeh };
-  }, [gl, scene, camera, profile.ssao, profile.bloom, profile.dof, profile.aa, lut, size.width, size.height]);
+  }, [gl, scene, camera, profile.ssao, profile.bloom, profile.dof, profile.aa, lut, size.width, size.height, generation]);
 
   useEffect(() => {
     stack.effect.setSize(size.width, size.height);
@@ -332,10 +337,12 @@ export function PostFX({ profile, engine }: { profile: TierProfile; engine: Game
   }, [stack, size.width, size.height]);
 
   useEffect(() => () => {
-    lut.dispose();
     for (const pass of stack.effect.passes) pass.dispose();
     stack.effect.dispose();
-  }, [stack, lut]);
+  }, [stack]);
+  useEffect(() => () => {
+    lut.dispose();
+  }, [lut]);
 
   useFrame(() => {
     if (stack.bokeh) {

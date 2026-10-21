@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
-import { ALLEY_BUNTING, ALLEY_FILES, ALLEY_MURAL, ALLEY_OFFSET } from './alleyLayout';
+import { ALLEY_BUNTING, ALLEY_FILES, ALLEY_MURAL, ALLEY_OFFSET, alleySkyUrl } from './alleyLayout';
 import { resolveEnvironmentTheme } from './environment';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { inPlayVolume } from './streetLayout';
@@ -184,5 +184,8 @@ describe('alley environment', () => {
     expect(hdr.length).toBeLessThan(2_000_000);
     expect(jpg.length).toBeLessThan(80_000);
     expect(jpg[0]).toBe(0xff);
+    expect(alleySkyUrl('high')).toContain(ALLEY_FILES.skyLow);
+    expect(alleySkyUrl('medium')).toContain(ALLEY_FILES.skyLow);
+    expect(alleySkyUrl('low')).toContain(ALLEY_FILES.skyLow);
   });
 });

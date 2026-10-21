@@ -2,7 +2,7 @@
 
 The live client is `createSupabaseLeaderboard`. The review migrations (`20261021120000` through `20261021120002`, plus `20261021130000_suggest_free_names.sql`) replace free-text nicknames. Players pick two words from the lists. Shuffle and Pick one for me call `suggest_free_names` so the wheels land on a pair nobody else has yet. The client also calls `peek_nickname`, `register_or_update_player`, `start_run`, `submit_score`, `get_rank`, `get_around`, `get_board`, `report_player`, `block_player`, `unblock_player`, and `delete_player`. `moderator_queue` and `resolve_report` stay off the client. See `docs/MODERATION.md`. Tables stay in the private schema. `?mockBoard=1` keeps `createMockLeaderboard` for tests, local development, and preview-branch builds that set `VITE_ALLOW_MOCK=1`. Production web builds ignore it. Capacitor and store builds fail if `VITE_ALLOW_MOCK` is set. The mock does not call `suggest_free_names`.
 
-Week is the ISO week starting Monday 00:00 UTC. Submit limits are one score per 10 seconds per device, 200 per UTC day per device and per real IP hash, at most 25 points per second of server time since `start_run`, and combo at most 3 per second plus one. A run token expires 10 minutes after `start_run`.
+Week is the ISO week starting Monday 00:00 UTC. Submit limits are one score per 10 seconds per device, 200 per UTC day per device and per real IP hash, at most 110 points per second of server time since `start_run`, and combo at most 3 per second plus one. A run token expires 10 minutes after `start_run`.
 
 The notes below are the earlier sketch. Where they disagree with the migrations, the migrations win.
 

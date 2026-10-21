@@ -20,6 +20,7 @@ describe('report and country safeguarding', () => {
   it('pins the row menu and the confirmations in a centred modal', () => {
     expect(css).toMatch(/\.screen-modal \{[^}]*position: fixed;/s);
     expect(css).toMatch(/\.screen-modal \{[^}]*align-items: center;/s);
+    expect(css).toMatch(/\.centre-notice \{[^}]*width: min\(340px, calc\(100vw - 32px\)\);/s);
     expect(css).toMatch(/\.centre-notice p \{[^}]*font-size: 22px;/s);
     expect(css).toMatch(/\.board-sheet button \{[^}]*min-height: 44px;/s);
     expect(css).toMatch(/\.centre-notice \.btn \{[^}]*min-height: 44px;/s);

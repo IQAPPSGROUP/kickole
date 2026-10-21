@@ -1177,7 +1177,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: min(100%, 340px);
+  width: min(340px, calc(100vw - 32px));
   padding: 16px;
   border-radius: 18px;
   background: #140814;
@@ -1205,7 +1205,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: min(100%, 340px);
+  width: min(340px, calc(100vw - 32px));
   padding: 24px 18px;
   border-radius: 20px;
   background: #1E2A5A;

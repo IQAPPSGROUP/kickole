@@ -18,7 +18,8 @@ import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { NicknameScreen, OptInCard } from './NicknameScreen';
-import { DataScreen, Home, GameOver, LeaderboardDataScreen, PauseScreen, SettingsScreen } from './Screens';
+import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
+import { pointerOpensTheCourt } from './boardGesture';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
@@ -46,6 +47,7 @@ export function App() {
   const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [paused, setPaused] = useState(false);
+  const [boardOpen, setBoardOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
@@ -122,7 +124,8 @@ export function App() {
       return Number.isFinite(value) ? value : 0;
     };
     const onDown = (event: PointerEvent) => {
-      if (paused) return;
+      if (!pointerOpensTheCourt(event.target)) return;
+      if (paused || boardOpen) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       const layout = fanLayout(window.innerWidth, readInset('--sat-l'), readInset('--sat-r'), readInset('--sat-b'));
       const side = footSideAt(event.clientX, event.clientY, window.innerWidth, window.innerHeight, layout);
@@ -140,7 +143,7 @@ export function App() {
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointercancel', onUp, true);
     };
-  }, [controller, paused]);
+  }, [controller, paused, boardOpen]);
 
   useEffect(() => {
     installAudioLifecycle();
@@ -164,6 +167,11 @@ export function App() {
     const keys: Record<string, 'left' | 'right'> = { KeyA: 'left', KeyD: 'right' };
     const down = (e: KeyboardEvent) => {
       if (e.repeat) return;
+      if (boardOpen && e.code === 'Escape') {
+        e.preventDefault();
+        setBoardOpen(false);
+        return;
+      }
       if (paused) {
         if (e.code === 'Escape') {
           e.preventDefault();
@@ -224,7 +232,21 @@ export function App() {
       window.removeEventListener('keyup', up);
       if (neckDown) controller.releaseNeck();
     };
-  }, [controller, blocking, paused]);
+  }, [controller, blocking, paused, boardOpen]);
+
+  const openBoard = () => {
+    if (controller.engine.phase === 'ready' || controller.engine.phase === 'playing') {
+      setPaused(true);
+      controller.holdPlay(true);
+    }
+    setBoardOpen(true);
+  };
+
+  const boardScore = phase === 'over' && snap.result
+    ? snap.result.score
+    : phase === 'menu'
+      ? snap.save.best
+      : snap.hud.score;
 
   const startGame = () => {
     cancelOpeningIntroForGameplay();
@@ -323,6 +345,7 @@ export function App() {
           onSettings={() => setOverlay('settings')}
           onCustomise={() => setOverlay('customise')}
           onShop={() => setOverlay('shop')}
+          onLeaderboard={openBoard}
         />
       )}
       {phase !== 'menu' && (
@@ -331,6 +354,7 @@ export function App() {
           controller={controller}
           nickname={nickname ?? (reviewing ? boardName : null)}
           board={board}
+          onOpenBoard={openBoard}
           onSkipCelebration={() => controller.skipCelebration()}
         />
       )}
@@ -343,7 +367,7 @@ export function App() {
           }}
         />
       )}
-      {paused && (phase === 'ready' || phase === 'playing') && (
+      {paused && !boardOpen && (phase === 'ready' || phase === 'playing') && (
         <PauseScreen
           song={snap.settings.song}
           enabledSongs={snap.settings.enabledSongs}
@@ -359,12 +383,10 @@ export function App() {
           result={REVIEW_RESULT}
           best={Math.max(snap.save.best, REVIEW_RESULT.score)}
           coins={snap.save.coins}
-          board={board}
           onAgain={startGame}
           onHome={() => setReviewOpen(false)}
           onShop={() => setOverlay('shop')}
-          rowLimit={25}
-          initialView="top"
+          onLeaderboard={openBoard}
         />
       )}
       {phase === 'over' && snap.result && overlay === 'none' && (
@@ -372,11 +394,21 @@ export function App() {
           result={snap.result}
           best={snap.save.best}
           coins={snap.save.coins}
-          board={board}
           onAgain={startGame}
           onHome={() => controller.home()}
           onShop={() => setOverlay('shop')}
-          rowLimit={mockBoard ? 25 : 10}
+          onLeaderboard={openBoard}
+        />
+      )}
+      {boardOpen && (
+        <LeaderboardSheet
+          board={board}
+          score={boardScore}
+          onClose={() => setBoardOpen(false)}
+          onJoin={leaderboardOn ? undefined : () => {
+            setBoardOpen(false);
+            joinBoard();
+          }}
         />
       )}
       {InspectorPanel && <Suspense fallback={null}><InspectorPanel controller={controller} /></Suspense>}

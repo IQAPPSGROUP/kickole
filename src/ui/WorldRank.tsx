@@ -8,10 +8,12 @@ export function WorldRank({
   score,
   nickname,
   service,
+  onOpen,
 }: {
   score: number;
   nickname: string;
   service: LeaderboardService;
+  onOpen?: () => void;
 }) {
   const start = useRef<number | null>(null);
   void useSyncExternalStore(service.subscribe, () => service.revision);
@@ -27,7 +29,7 @@ export function WorldRank({
     nickname,
   ].filter((part) => part != null).join(', ');
   return (
-    <aside className="world-rank" aria-live="polite" aria-label={label}>
+    <button type="button" className="world-rank" aria-live="polite" aria-label={label} onClick={onOpen}>
       <p className="world-rank-kicker">WORLD RANK</p>
       <p className={`world-rank-line${snapshot.rank === 1 ? ' is-first' : ''}`}><b>{formatRank(snapshot.rank)}</b></p>
       {showCountry && snapshot.country && (
@@ -38,6 +40,6 @@ export function WorldRank({
       )}
       {gained > 0 && <p className="world-rank-delta" key={gained}>↑ +{gained}</p>}
       <p className="world-rank-name">{nickname}</p>
-    </aside>
+    </button>
   );
 }

@@ -436,7 +436,7 @@ export function DataScreen({ onClose }: { onClose: () => void }) {
         <h2>Leaderboard: how it works</h2>
         <ul>
           <li>It&apos;s off unless you turn it on.</li>
-          <li>Others see only your nickname, your country (if you pick one) and your score. No real names, photos or chat.</li>
+          <li>Build a nickname from our word lists, or tap Pick one for me. You can&apos;t type your own, so your real name stays private.</li>
           <li>Boards: Today, Week, Month, Year and All time, for the world and for your country. A country board only shows once it has 20 players.</li>
           <li>Your best scores stay until 2 years after you last play. Other runs go after 12 months.</li>
           <li>Tap &apos;Delete my leaderboard data&apos; any time to remove everything straight away.</li>

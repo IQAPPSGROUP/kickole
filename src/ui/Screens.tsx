@@ -409,9 +409,9 @@ export function SettingsScreen({
           </p>
           <p>
             Coins, appearance and purchases stay on this device. The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and the country you choose are sent for the board.
-            We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A hashed IP address may be kept for 30 days to limit cheating.
+            We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A scrambled version of your internet address is kept for up to 30 days to stop cheating.
             Purchases are verified with Apple or Google on the device; we do not log purchase tokens, receipts or credentials.
-            Tap Delete my leaderboard data to remove your nickname and scores. Store privacy declarations are documented for release builds.
+            Tap Delete my leaderboard data to remove your nickname and scores. If someone has reported you, we keep that report for up to 90 days so we can check it.
           </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>Music is a synthesised boom-bap beat. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>

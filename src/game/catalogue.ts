@@ -17,7 +17,8 @@ export type SurfacePattern =
   | 'stripe'
   | 'gold'
   | 'midnight'
-  | 'carnival';
+  | 'carnival'
+  | 'cowboy';
 
 export type DesignTheme =
   | 'Street Classic'
@@ -25,7 +26,8 @@ export type DesignTheme =
   | 'Beach Wave'
   | 'Midnight'
   | 'Mosaic'
-  | 'Gold';
+  | 'Gold'
+  | 'Cowboy';
 
 export interface UnlockRequirement {
   tier: UnlockTier;
@@ -46,6 +48,8 @@ export interface BootDesign {
   lace: string;
   trim: string;
   pattern: SurfacePattern;
+  /** Set when the boot is sold by the store instead of coins. */
+  storeProductId?: string | null;
   note: string;
 }
 
@@ -190,6 +194,19 @@ export const BOOTS: readonly BootDesign[] = [
     trim: '#FF805D',
     pattern: 'gold',
     note: 'Top-tier launch silhouette.',
+  },
+  {
+    id: 'boot-cowboy',
+    name: 'Cowboy Boots',
+    theme: 'Cowboy',
+    unlock: { tier: 'starter', price: 0, challenge: 'none', challengeTarget: 0 },
+    main: '#8A5A32',
+    sole: '#4A3424',
+    lace: '#E7D3A1',
+    trim: '#C4A574',
+    pattern: 'cowboy',
+    storeProductId: 'kickole_boot_cowboy',
+    note: 'Tan leather, stitching, a pointed toe and a block heel. Mixes with any outfit. Store price only.',
   },
 ];
 

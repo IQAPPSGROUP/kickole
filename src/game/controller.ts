@@ -39,7 +39,9 @@ import { normalizeEnabledTracks, SHUFFLE_SONG, toggleEnabled, type GameTrackId }
 import {
   buyOrEquipBoot,
   buyOrEquipKit,
+  equipOutfit,
   equipOwnedDance,
+  rememberDevCosmetic,
   type ChallengeProgress,
 } from './shop';
 import {
@@ -215,15 +217,17 @@ export class GameController {
 
   getSnapshot = () => this.snapshot;
 
-  private liveSkin(preview?: { kitId?: string | null; bootId?: string | null }): Skin {
+  private liveSkin(preview?: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }): Skin {
+    const outfitId = preview && 'outfitId' in preview ? preview.outfitId : this.save.equippedOutfit;
     return composePlayerSkin(
       this.save.appearance,
       preview?.kitId ?? this.save.equippedKit,
       preview?.bootId ?? this.save.equippedBoot,
+      { outfitId },
     );
   }
 
-  private build(preview?: { kitId?: string | null; bootId?: string | null }): Snapshot {
+  private build(preview?: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }): Snapshot {
     const e = this.engine;
     const armed = e.selectedTrick;
     return {
@@ -254,7 +258,7 @@ export class GameController {
     };
   }
 
-  private publish(preview?: { kitId?: string | null; bootId?: string | null }) {
+  private publish(preview?: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }) {
     this.noteMilestones();
     this.snapshot = this.build(preview);
     this.listeners.forEach((l) => l());
@@ -419,13 +423,21 @@ export class GameController {
       case 'over': {
         const s = this.engine.stats;
         const beforeLocker = { coins: this.save.coins, challenges: this.save.challenges };
+        const streak = Math.max(this.save.bestStreak, s.bestStreak);
         const r = s.score > 0
           ? saveRun(
             this.save,
             { score: s.score, kickUps: s.kickUps, date: Date.now() },
             this.runChallenges,
+            streak,
           )
-          : { save: this.save, newBest: false, rank: -1, coinsEarned: 0 };
+          : {
+            save: streak === this.save.bestStreak ? this.save : { ...this.save, bestStreak: streak },
+            newBest: false,
+            rank: -1,
+            coinsEarned: 0,
+          };
+        if (s.score <= 0 && streak !== this.save.bestStreak) persistSave(r.save);
         if (r.newBest) this.pendingCheers.push('best');
         for (const tier of newlyOpenedTiers(beforeLocker, r.save)) this.pendingCheers.push(`tier:${tier}`);
         this.save = r.save;
@@ -730,8 +742,28 @@ export class GameController {
     return result.ok;
   }
 
+  /** Equip a themed outfit the player already owns, or pass null to wear the kit. */
+  wearOutfit(id: string | null): boolean {
+    const result = equipOutfit(this.save, id);
+    this.save = { ...this.save, ...result.locker };
+    if (result.ok) persistSave(this.save);
+    this.publish();
+    return result.ok;
+  }
+
+  /**
+   * Development dress-up for local previews. Production builds do not grant
+   * the cosmetic and do not write it into the save.
+   */
+  debugWear(id: string | null) {
+    if (import.meta.env.PROD) return;
+    this.save = { ...this.save, ...rememberDevCosmetic(this.save, id) };
+    persistSave(this.save);
+    this.publish();
+  }
+
   /** Preview a locked/unowned item without equipping it. */
-  previewEquipment(opts: { kitId?: string | null; bootId?: string | null }) {
+  previewEquipment(opts: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }) {
     this.publish(opts);
   }
 

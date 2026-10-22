@@ -7,6 +7,8 @@ import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import { alignFootWindow, clearFootContactAnchors, setFootContactAnchors, type BallCenter } from '../engine/footContact';
+import { cowboyBootSpecs, outfitSpecs } from '../game/outfitFit';
+import { isOutfitId } from '../game/outfits';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
 import { applyContractBones } from './contractPose';
@@ -23,6 +25,8 @@ import {
 import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
+import { mountOutfitSpecs } from './outfitAttach';
+import { paintOutfitTexture } from './outfitTexture';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
 function ballCenter(v: Vector3): BallCenter {
@@ -273,6 +277,63 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   }, [skin, materials]);
 
   useEffect(() => {
+    const painted = skin.patternPaint
+      ? paintOutfitTexture(skin.patternPaint, skin.clothing.shirt, skin.clothing.shirtTrim)
+      : null;
+    const mapHoldsColour = skin.patternPaint === 'stripes'
+      || skin.patternPaint === 'chain'
+      || skin.patternPaint === 'torn'
+      || skin.patternPaint === 'gold';
+    for (const material of materials) {
+      const standard = material as MeshStandardMaterial;
+      if (!standard.isMeshStandardMaterial) continue;
+      if (standard.userData.baseMap === undefined) standard.userData.baseMap = standard.map ?? null;
+      if (standard.userData.baseRough === undefined) standard.userData.baseRough = standard.roughness;
+      if (standard.userData.baseMetal === undefined) standard.userData.baseMetal = standard.metalness;
+      if (standard.userData.baseColor === undefined) standard.userData.baseColor = `#${standard.color.getHexString()}`;
+      const cloth = material.name === MATERIAL_NAMES.shirt
+        || material.name === MATERIAL_NAMES.shorts
+        || material.name === MATERIAL_NAMES.socks
+        || material.name === MATERIAL_NAMES.shirtTrim;
+      if (cloth && painted) {
+        standard.map = painted;
+        if (mapHoldsColour) standard.color.set('#ffffff');
+        if (skin.patternPaint === 'gold') {
+          standard.roughness = 0.32;
+          standard.metalness = 0.65;
+        } else if (skin.patternPaint === 'leather') {
+          standard.roughness = 0.45;
+          standard.metalness = 0.18;
+        }
+      } else if (cloth) {
+        standard.map = standard.userData.baseMap;
+        standard.roughness = standard.userData.baseRough;
+        standard.metalness = standard.userData.baseMetal;
+      }
+      if (material.name === MATERIAL_NAMES.skin) {
+        standard.color.set(skin.skinTint ?? standard.userData.baseColor);
+      }
+      standard.needsUpdate = true;
+    }
+    const specs = [
+      ...(skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),
+      ...(skin.bootStyle === 'cowboy' ? cowboyBootSpecs(skin.playerBody) : []),
+    ];
+    const release = specs.length > 0 ? mountOutfitSpecs(scene, specs) : null;
+    return () => {
+      release?.();
+      for (const material of materials) {
+        const standard = material as MeshStandardMaterial;
+        if (!standard.isMeshStandardMaterial || standard.userData.baseMap === undefined) continue;
+        standard.map = standard.userData.baseMap;
+        if (typeof standard.userData.baseRough === 'number') standard.roughness = standard.userData.baseRough;
+        if (typeof standard.userData.baseMetal === 'number') standard.metalness = standard.userData.baseMetal;
+      }
+      painted?.dispose();
+    };
+  }, [skin, materials, scene]);
+
+  useEffect(() => {
     if (pbr || quality === 'low') return;
     const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
     const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
@@ -520,7 +581,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   return (
     <>
       <primitive object={scene} />
-      {pbr && chest && <ShirtNumber bone={chest} id={skin.id} />}
+      {pbr && chest && !skin.outfitId && <ShirtNumber bone={chest} id={skin.id} />}
     </>
   );
 }

@@ -14,6 +14,8 @@ import {
   type BootDesign,
   type KitDesign,
 } from '../game/catalogue';
+import { COWBOY_PRODUCT_ID, GOLD_LEGEND_STREAK, OUTFITS, cosmeticPriceString } from '../game/outfits';
+import { outfitOwned } from '../game/shop';
 import type { BillingPlatform, StoreProduct } from '../billing/types';
 import { LAUNCH_COLLECTION_DISPLAY_NAME } from '../billing/config';
 import { launchCollectionBlurb, launchPurchaseLabel, launchStoreNote } from '../billing/storeCopy';
@@ -23,7 +25,7 @@ import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
 import { PlayerPreview } from './PlayerPreview';
 
-type ShopTab = 'boots' | 'kits' | 'dances';
+type ShopTab = 'boots' | 'kits' | 'looks' | 'dances';
 
 function SwatchRow({
   colours,
@@ -82,8 +84,8 @@ export function CustomiseScreen({
 }) {
   const a = save.appearance;
   const skin = useMemo(
-    () => composePlayerSkin(a, save.equippedKit, save.equippedBoot),
-    [a, save.equippedKit, save.equippedBoot],
+    () => composePlayerSkin(a, save.equippedKit, save.equippedBoot, { outfitId: save.equippedOutfit }),
+    [a, save.equippedKit, save.equippedBoot, save.equippedOutfit],
   );
 
   const patch = (p: Partial<Appearance>) => {
@@ -193,6 +195,7 @@ export function ShopScreen({
   billingBusy,
   onBuyBoot,
   onBuyKit,
+  onWearOutfit,
   onEquipDance,
   onPurchaseLaunch,
   onRestorePurchases,
@@ -206,32 +209,46 @@ export function ShopScreen({
   billingBusy: boolean;
   onBuyBoot: (id: string) => boolean;
   onBuyKit: (id: string) => boolean;
+  onWearOutfit: (id: string | null) => boolean;
   onEquipDance: (id: string) => boolean;
   onPurchaseLaunch: () => void;
   onRestorePurchases: () => void;
-  onPreview: (opts: { kitId?: string | null; bootId?: string | null }) => void;
+  onPreview: (opts: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }) => void;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<ShopTab>('boots');
   const [focusBoot, setFocusBoot] = useState(save.equippedBoot);
   const [focusKit, setFocusKit] = useState(save.equippedKit);
+  const [focusOutfit, setFocusOutfit] = useState<string | null>(save.equippedOutfit);
   const [focusDance, setFocusDance] = useState(save.equippedDance);
+  const [previewBody, setPreviewBody] = useState(save.appearance.body);
   const priceLabel = launchProduct?.priceString ?? null;
+  const products = launchProduct ? [launchProduct] : [];
   const ownedLaunch = save.launchCollectionOwned;
   const storeNote = launchStoreNote(billingPlatform, !!priceLabel);
 
   const previewSkin = useMemo(
-    () => composePlayerSkin(save.appearance, focusKit, focusBoot),
-    [save.appearance, focusKit, focusBoot],
+    () => composePlayerSkin(
+      { ...save.appearance, body: previewBody },
+      focusKit,
+      focusBoot,
+      { outfitId: focusOutfit },
+    ),
+    [save.appearance, focusKit, focusBoot, focusOutfit, previewBody],
   );
 
   const selectBoot = (boot: BootDesign) => {
     setFocusBoot(boot.id);
-    onPreview({ bootId: boot.id, kitId: focusKit });
+    onPreview({ bootId: boot.id, kitId: focusKit, outfitId: focusOutfit });
   };
   const selectKit = (kit: KitDesign) => {
     setFocusKit(kit.id);
-    onPreview({ kitId: kit.id, bootId: focusBoot });
+    setFocusOutfit(null);
+    onPreview({ kitId: kit.id, bootId: focusBoot, outfitId: null });
+  };
+  const selectOutfit = (id: string) => {
+    setFocusOutfit(id);
+    onPreview({ kitId: focusKit, bootId: focusBoot, outfitId: id });
   };
 
   return (
@@ -239,8 +256,8 @@ export function ShopScreen({
       <div className="card wardrobe-card shop-card">
         <h2>SHOP</h2>
         <p className="shop-lead">
-          Boots and kits are cosmetic only — they never widen timing or boost scores.
-          Coins come from your runs. Challenges are lifetime play totals.
+          Boots, kits and themed looks are cosmetic only — they never widen timing or boost scores.
+          Coins buy the launch kits. Themed looks use the store price when the store lists them.
         </p>
         <div className="economy-row">
           <span className="best-pill">COINS <b>{save.coins.toLocaleString()}</b></span>
@@ -277,18 +294,26 @@ export function ShopScreen({
           label="Shop preview"
           dance={tab === 'dances' ? focusDance : null}
         />
-        <div className="seg">
+        <div className="seg" role="listbox" aria-label="Preview footballer">
+          <button type="button" className={previewBody === 'male' ? 'on' : ''} aria-selected={previewBody === 'male'} onClick={() => setPreviewBody('male')}>MALE</button>
+          <button type="button" className={previewBody === 'female' ? 'on' : ''} aria-selected={previewBody === 'female'} onClick={() => setPreviewBody('female')}>FEMALE</button>
+        </div>
+        <p className="shop-note">Both footballers wear the same full kit. Hats, capes and boots are fitted to that body.</p>
+        <div className="seg wrap">
           <button type="button" className={tab === 'boots' ? 'on' : ''} onClick={() => setTab('boots')}>BOOTS</button>
           <button type="button" className={tab === 'kits' ? 'on' : ''} onClick={() => setTab('kits')}>KITS</button>
+          <button type="button" className={tab === 'looks' ? 'on' : ''} onClick={() => setTab('looks')}>LOOKS</button>
           <button type="button" className={tab === 'dances' ? 'on' : ''} onClick={() => setTab('dances')}>DANCES</button>
         </div>
         <div className="shop-list">
           {tab === 'boots' && BOOTS.map((boot) => {
             const owned = save.ownedBoots.includes(boot.id);
             const equipped = save.equippedBoot === boot.id;
+            const storeBoot = Boolean(boot.storeProductId);
+            const storePrice = storeBoot ? cosmeticPriceString(boot.storeProductId ?? null, products) : null;
             const challengeOk = meetsChallenge(save.challenges, boot.unlock);
-            const afford = owned || (challengeOk && save.coins >= boot.unlock.price);
-            const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : afford ? `BUY ${boot.unlock.price}` : 'LOCKED';
+            const afford = owned || (!storeBoot && challengeOk && save.coins >= boot.unlock.price);
+            const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : storeBoot ? (storePrice ?? 'STORE') : afford ? `BUY ${boot.unlock.price}` : 'LOCKED';
             return (
               <div key={boot.id} className={`shop-item ${focusBoot === boot.id ? 'focus' : ''} ${equipped ? 'on' : ''}`}>
                 <button type="button" className="shop-item-main" onClick={() => selectBoot(boot)}>
@@ -297,7 +322,7 @@ export function ShopScreen({
                     <b>{boot.name}</b>
                     <em>{boot.theme} · {boot.pattern}</em>
                     <small>{boot.note}</small>
-                    <UnlockHint item={boot} save={save} />
+                    {storeBoot ? (storePrice ? <small className="dance-price">{storePrice}</small> : <small>Price appears when the store lists {COWBOY_PRODUCT_ID === boot.storeProductId ? 'these boots' : 'this boot'}.</small>) : <UnlockHint item={boot} save={save} />}
                   </span>
                 </button>
                 <button
@@ -333,6 +358,48 @@ export function ShopScreen({
                   className="btn ghost shop-action"
                   disabled={equipped || (!owned && !afford)}
                   onClick={() => { selectKit(kit); onBuyKit(kit.id); }}
+                >
+                  {label}
+                </button>
+              </div>
+            );
+          })}
+          {tab === 'looks' && (
+            <div className={`shop-item ${focusOutfit === null ? 'focus' : ''} ${save.equippedOutfit === null ? 'on' : ''}`}>
+              <button type="button" className="shop-item-main" onClick={() => { setFocusOutfit(null); onPreview({ kitId: focusKit, bootId: focusBoot, outfitId: null }); }}>
+                <i style={{ background: '#FFD93D' }} />
+                <span>
+                  <b>Street kit</b>
+                  <em>No themed costume</em>
+                  <small>Wear the equipped kit colours.</small>
+                </span>
+              </button>
+              <button type="button" className="btn ghost shop-action" disabled={save.equippedOutfit === null} onClick={() => onWearOutfit(null)}>
+                {save.equippedOutfit === null ? 'EQUIPPED' : 'EQUIP'}
+              </button>
+            </div>
+          )}
+          {tab === 'looks' && OUTFITS.map((outfit) => {
+            const owned = outfitOwned(save, outfit.id);
+            const equipped = save.equippedOutfit === outfit.id;
+            const price = cosmeticPriceString(outfit.productId, products);
+            const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : outfit.productId ? (price ?? 'STORE') : `STREAK ${GOLD_LEGEND_STREAK}`;
+            return (
+              <div key={outfit.id} className={`shop-item ${focusOutfit === outfit.id ? 'focus' : ''} ${equipped ? 'on' : ''}`}>
+                <button type="button" className="shop-item-main" onClick={() => selectOutfit(outfit.id)}>
+                  <i style={{ background: outfit.clothing.shirt, boxShadow: `inset 0 -6px 0 ${outfit.clothing.shorts}` }} />
+                  <span>
+                    <b>{outfit.name}</b>
+                    <em>{outfit.pattern}</em>
+                    <small>{outfit.note}</small>
+                    {price && <small className="dance-price">{price}</small>}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost shop-action"
+                  disabled={equipped || !owned}
+                  onClick={() => { selectOutfit(outfit.id); onWearOutfit(outfit.id); }}
                 >
                   {label}
                 </button>

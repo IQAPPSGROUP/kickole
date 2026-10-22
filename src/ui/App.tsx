@@ -455,6 +455,7 @@ export function App() {
           billingBusy={snap.billingBusy}
           onBuyBoot={(id) => controller.buyBoot(id)}
           onBuyKit={(id) => controller.buyKit(id)}
+          onWearOutfit={(id) => controller.wearOutfit(id)}
           onEquipDance={(id) => controller.equipDance(id)}
           onPurchaseLaunch={() => { void controller.purchaseLaunchCollection(); }}
           onRestorePurchases={() => { void controller.restorePurchases(); }}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { installAudioLifecycle } from '../game/audio';
 import { GameController, type Result } from '../game/controller';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
@@ -20,6 +20,7 @@ import { OpeningSkip } from './OpeningSkip';
 import { NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
+import { RUN_LINEUP_MS, RunLineup } from './RunLineup';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
@@ -48,6 +49,13 @@ export function App() {
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [paused, setPaused] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
+  const [lineup, setLineup] = useState(false);
+  const runGate = useRef({
+    lineup: false,
+    begin: () => {},
+    request: () => {},
+  });
+  const runStarting = useRef(false);
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
@@ -184,8 +192,18 @@ export function App() {
       if (e.code === 'Space') {
         if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
         e.preventDefault();
+        const gate = runGate.current;
+        if (gate.lineup) {
+          gate.begin();
+          return;
+        }
+        const phaseNow = controller.engine.phase;
+        if (phaseNow === 'menu' || phaseNow === 'over') {
+          gate.request();
+          return;
+        }
         cancelOpeningIntroForGameplay();
-        spaceDown = controller.engine.phase === 'ready';
+        spaceDown = phaseNow === 'ready';
         controller.action();
       } else if (keys[e.code]) {
         if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
@@ -248,12 +266,36 @@ export function App() {
       ? snap.save.best
       : snap.hud.score;
 
-  const startGame = () => {
+  const beginRun = useCallback(() => {
+    if (runStarting.current) return;
+    runStarting.current = true;
+    setLineup(false);
     cancelOpeningIntroForGameplay();
     setOverlay('none');
     board?.startRun();
     controller.play();
-  };
+  }, [board, controller]);
+  const requestRun = useCallback(() => {
+    cancelOpeningIntroForGameplay();
+    setOverlay('none');
+    if (board) {
+      runStarting.current = false;
+      setLineup(true);
+      return;
+    }
+    beginRun();
+  }, [board, beginRun]);
+  runGate.current = { lineup, begin: beginRun, request: requestRun };
+
+  useEffect(() => {
+    if (phase === 'menu' || phase === 'over') runStarting.current = false;
+  }, [phase]);
+
+  useEffect(() => {
+    if (!lineup) return undefined;
+    const timer = window.setTimeout(beginRun, RUN_LINEUP_MS);
+    return () => window.clearTimeout(timer);
+  }, [lineup, beginRun]);
 
   const closeOverlay = () => {
     controller.clearPreview();
@@ -337,24 +379,21 @@ export function App() {
       {!needsBody && !needsOpt && needsNick && phase === 'menu' && overlay === 'none' && (
         <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} onSuggest={mockBoard ? undefined : suggestTags} />
       )}
-      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !(reviewOpen && board) && (
+      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !lineup && !(reviewOpen && board) && (
         <Home
           best={snap.save.best}
           coins={snap.save.coins}
-          onPlay={startGame}
+          onPlay={requestRun}
           onSettings={() => setOverlay('settings')}
           onCustomise={() => setOverlay('customise')}
           onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
       )}
-      {phase !== 'menu' && (
+      {phase !== 'menu' && !lineup && (
         <Hud
           hud={snap.hud}
           controller={controller}
-          nickname={nickname ?? (reviewing ? boardName : null)}
-          board={board}
-          onOpenBoard={openBoard}
           onSkipCelebration={() => controller.skipCelebration()}
         />
       )}
@@ -378,27 +417,30 @@ export function App() {
           }}
         />
       )}
-      {reviewOpen && phase === 'menu' && overlay === 'none' && board && (
+      {reviewOpen && phase === 'menu' && overlay === 'none' && board && !lineup && (
         <GameOver
           result={REVIEW_RESULT}
           best={Math.max(snap.save.best, REVIEW_RESULT.score)}
           coins={snap.save.coins}
-          onAgain={startGame}
+          onAgain={requestRun}
           onHome={() => setReviewOpen(false)}
           onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
       )}
-      {phase === 'over' && snap.result && overlay === 'none' && (
+      {phase === 'over' && snap.result && overlay === 'none' && !lineup && (
         <GameOver
           result={snap.result}
           best={snap.save.best}
           coins={snap.save.coins}
-          onAgain={startGame}
+          onAgain={requestRun}
           onHome={() => controller.home()}
           onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
+      )}
+      {lineup && board && (
+        <RunLineup board={board} score={boardScore} onStart={beginRun} />
       )}
       {boardOpen && (
         <LeaderboardSheet

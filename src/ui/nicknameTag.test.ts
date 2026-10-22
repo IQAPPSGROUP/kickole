@@ -32,8 +32,9 @@ describe('nickname picker colours', () => {
     expect(css).not.toMatch(/\.nick-preview \{[^}]*wall-tile/s);
   });
 
-  it('keeps the in-game rank on the wall and the landscape position', () => {
-    expect(css).toMatch(/\.world-rank \{[^}]*background: none;/s);
-    expect(css).toContain('.world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }');
+  it('keeps the pre-run board below the alley mural', () => {
+    expect(css).not.toContain('.world-rank');
+    expect(css).toMatch(/\.run-lineup \{[^}]*bottom: max\(12px, var\(--sat-b\)\);/s);
+    expect(css).toMatch(/\.run-lineup \{[^}]*max-height: 58%;/s);
   });
 });

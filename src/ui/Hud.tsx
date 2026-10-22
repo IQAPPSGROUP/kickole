@@ -6,25 +6,17 @@ import { streakMultiplier } from '../engine/scoring';
 import { beatClock, subscribeNowPlaying } from '../game/audio';
 import { trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
-import type { LeaderboardService } from '../game/leaderboard';
 import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
 import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
-import { WorldRank } from './WorldRank';
 
 export function Hud({
   hud,
   controller,
   onSkipCelebration,
-  nickname,
-  board,
-  onOpenBoard,
 }: {
   hud: HudState;
   controller?: GameController;
   onSkipCelebration?: () => void;
-  nickname?: string | null;
-  board?: LeaderboardService | null;
-  onOpenBoard?: () => void;
 }) {
   const f = hud.feedback;
   const combo = streakMultiplier(hud.streak);
@@ -51,9 +43,6 @@ export function Hud({
         {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
       </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
-      {nickname && board && (hud.phase === 'playing' || hud.phase === 'ready') && (
-        <WorldRank score={hud.score} nickname={nickname} service={board} onOpen={onOpenBoard} />
-      )}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}

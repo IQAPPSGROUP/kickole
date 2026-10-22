@@ -11,11 +11,11 @@ function target(hit: string | null) {
 }
 
 describe('court gestures leave the leaderboard alone', () => {
-  it('kicks on the canvas and ignores the sheet, rank panel, and menus', () => {
+  it('kicks on the canvas and ignores the sheet, pre-run board, and menus', () => {
     expect(pointerOpensTheCourt(target(null) as never)).toBe(true);
     expect(pointerOpensTheCourt(null)).toBe(true);
     expect(pointerOpensTheCourt(target('[data-board-sheet]') as never)).toBe(false);
-    expect(pointerOpensTheCourt(target('.world-rank') as never)).toBe(false);
+    expect(pointerOpensTheCourt(target('.run-lineup-hit') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.screen') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.screen-modal') as never)).toBe(false);
   });
@@ -29,6 +29,6 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(css).toMatch(/\.leaderboard-close \{[^}]*min-height: 52px;/s);
     expect(css).toMatch(/\.leaderboard-sheet \{[^}]*env\(safe-area-inset-top/s);
     expect(css).toMatch(/\.leaderboard-periods \{[^}]*overflow-x: auto;/s);
-    expect(css).toContain('.world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }');
+    expect(css).not.toContain('.world-rank');
   });
 });

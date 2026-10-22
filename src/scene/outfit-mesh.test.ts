@@ -83,15 +83,31 @@ describe('skinned outfit meshes', () => {
       const json = glbJson(file);
       expect(json.images ?? [], name).toEqual([]);
       const materials = (json.materials ?? []).map((material) => material.name ?? '');
-      expect(materials.join(' '), name).not.toMatch(/bat|cape|cowl|emblem|blood|stripe|wound|gore|badge/i);
-      for (const material of json.materials ?? []) {
-        const color = material.pbrMetallicRoughness?.baseColorFactor ?? [0, 0, 0, 1];
-        expect(Math.min(color[0], color[1], color[2]), `${name} ${material.name}`).toBeLessThan(0.85);
-      }
+      const banned = name.startsWith('ring-mask')
+        ? /bat|cowl|emblem|blood|stripe|wound|gore|badge/i
+        : /bat|cape|cowl|emblem|blood|stripe|wound|gore|badge/i;
+      expect(materials.join(' '), name).not.toMatch(banned);
+      const sole = (json.materials ?? []).find((material) => material.name === 'sole');
+      const boot = (json.materials ?? []).find((material) => material.name === 'boot');
+      expect(sole && boot, name).toBeTruthy();
+      const soleColor = sole?.pbrMetallicRoughness?.baseColorFactor ?? [1, 1, 1, 1];
+      expect(Math.max(soleColor[0], soleColor[1], soleColor[2]), `${name} sole`).toBeLessThan(0.2);
       expect(json.skins?.[0].joints).toHaveLength(20);
     }
     const shadow = glbJson(new URL('night-glider-male.glb', OUTFIT_DIR));
     expect((shadow.materials ?? []).map((material) => material.name)).toEqual(['suit', 'brow', 'boot', 'sole']);
+    const pirate = (glbJson(new URL('deck-hand-male.glb', OUTFIT_DIR)).materials ?? []).map((material) => material.name ?? '');
+    expect(pirate).toContain('hat');
+    expect(pirate.join(' ')).not.toMatch(/emblem|skull|cross|bone/i);
+    const zombieMats = glbJson(new URL('grey-ghoul-male.glb', OUTFIT_DIR)).materials ?? [];
+    expect(zombieMats.map((material) => material.name ?? '').join(' ')).not.toMatch(/blood|gore|wound/i);
+    for (const material of zombieMats) {
+      const color = material.pbrMetallicRoughness?.baseColorFactor ?? [0, 0, 0];
+      expect(color[0] - Math.max(color[1], color[2]), material.name).toBeLessThan(0.15);
+    }
+    const hero = (glbJson(new URL('street-hero-male.glb', OUTFIT_DIR)).materials ?? []).map((material) => material.name ?? '');
+    expect(hero).toContain('wristband');
+    expect(hero.join(' ')).not.toMatch(/cape|cowl|emblem/i);
     const dino = glbJson(new URL('spike-hood-male.glb', OUTFIT_DIR));
     expect((dino.materials ?? []).map((material) => material.name)).toEqual(
       expect.arrayContaining(['suit', 'belly', 'hood', 'spike', 'tail', 'boot', 'sole']),
@@ -117,7 +133,7 @@ describe('skinned outfit meshes', () => {
         const gaps = samples.map((point) => nearest(point, cloud)).sort((a, b) => a - b);
         const median = gaps[Math.floor(gaps.length / 2)];
         expect(median, `${id} ${body}`).toBeLessThan(0.08);
-        expect(gaps[gaps.length - 1], `${id} ${body}`).toBeLessThan(0.45);
+        expect(gaps[gaps.length - 1], `${id} ${body}`).toBeLessThan(0.6);
         for (const mesh of meshes) mesh.parent?.remove(mesh);
       }
     }

@@ -45,6 +45,47 @@ const KNIGHT_BOOT = hex('#24262A');
 const NIGHT = hex('#2C3036');
 const BROW = hex('#9AA3AC');
 const NIGHT_BOOT = hex('#1A1C20');
+const WHITE = hex('#F7F5ED');
+const APRON = hex('#E7E2D6');
+const BLACK = hex('#161616');
+const CARD_RED = hex('#C0392B');
+const CARD_YELLOW = hex('#F2C14E');
+const SNOW = hex('#F4F8FC');
+const SCARF = hex('#E24B4B');
+const BUTTON = hex('#2A2E33');
+const CARROT = hex('#E07A3D');
+const GOLD = hex('#E3B341');
+const GOLD_BOOT = hex('#C4922A');
+const TEAL = hex('#1F8A8A');
+const CORAL = hex('#F26B5B');
+const ALIEN_GREEN = hex('#2F9A5A');
+const ALIEN_DARK = hex('#1F6B45');
+const SPACE = hex('#F4F7F8');
+const VISOR = hex('#7E93A3');
+const PACK = hex('#D5DDE3');
+const NINJA = hex('#1C1C1C');
+const NINJA_BAND = hex('#C0392B');
+const PIRATE_LIGHT = hex('#F4F1EA');
+const PIRATE_DARK = hex('#6B1D1D');
+const WAIST = hex('#1E3A5F');
+const AGENT = hex('#1E2430');
+const GLASS = hex('#14161C');
+const LUCHA_RED = hex('#E23B4A');
+const LUCHA_TEAL = hex('#1F6B8A');
+const LUCHA_DOT = hex('#F2C14E');
+const ROCK = hex('#2B241C');
+const QUIFF = hex('#1A120C');
+const ORANGE = hex('#E07A3D');
+const YELLOW = hex('#F2C14E');
+const TAN_BOOT = hex('#C46A32');
+const MOUSTACHE = hex('#4A3428');
+const SANTA = hex('#B4232A');
+const SANTA_BOOT = hex('#8E1C22');
+const ZOMBIE = hex('#8E9089');
+const WRAP = hex('#E4E0D4');
+const ZOMBIE_BOOT = hex('#5E615C');
+const GOLD_MAT = { roughness: 0.28, metalness: 0.72 };
+const LEATHER = { roughness: 0.45, metalness: 0.18 };
 
 function decodeVec(accessor) {
   const raw = accessor.getArray();
@@ -319,9 +360,9 @@ function highest(mesh) {
 function spikes(hood, joint) {
   const top = highest(hood);
   const specs = [
-    { at: [top[0], top[1] + 0.004, top[2] + 0.01], height: 0.11, radius: 0.026 },
-    { at: [top[0] + 0.05, top[1] - 0.01, top[2] - 0.02], height: 0.08, radius: 0.022 },
-    { at: [top[0] - 0.05, top[1] - 0.01, top[2] - 0.02], height: 0.08, radius: 0.022 },
+    { at: [top[0], top[1] + 0.012, top[2] + 0.045], height: 0.16, radius: 0.032 },
+    { at: [top[0] + 0.055, top[1], top[2] - 0.005], height: 0.12, radius: 0.028 },
+    { at: [top[0] - 0.055, top[1], top[2] - 0.005], height: 0.12, radius: 0.028 },
   ];
   return mergeGeoms(specs.map((spec) => cone(spec.at, spec.height, spec.radius, 7, joint)));
 }
@@ -467,6 +508,193 @@ function inWindow(c, n, face, minY, maxY) {
   return n.z > 0.18 && c.z > face.minZ && Math.abs(c.x) < face.halfX && c.y > minY && c.y < maxY;
 }
 
+function cylinder(base, height, radius, segments, joint) {
+  const positions = [];
+  const indices = [];
+  for (let ring = 0; ring < 2; ring++) {
+    for (let step = 0; step < segments; step++) {
+      const angle = (step / segments) * Math.PI * 2;
+      positions.push(base[0] + Math.cos(angle) * radius, base[1] + height * ring, base[2] + Math.sin(angle) * radius);
+    }
+  }
+  const bottom = positions.length / 3;
+  positions.push(base[0], base[1], base[2]);
+  const top = positions.length / 3;
+  positions.push(base[0], base[1] + height, base[2]);
+  for (let step = 0; step < segments; step++) {
+    const a = step;
+    const b = (step + 1) % segments;
+    const c = segments + step;
+    const d = segments + b;
+    indices.push(a, c, b, b, c, d, bottom, b, a, top, c, d);
+  }
+  return rigidMesh(positions, indices, joint);
+}
+
+function sphere(center, radius, joint) {
+  const stacks = 4;
+  const slices = 6;
+  const positions = [];
+  const indices = [];
+  for (let stack = 0; stack <= stacks; stack++) {
+    const phi = (stack / stacks) * Math.PI;
+    for (let slice = 0; slice < slices; slice++) {
+      const theta = (slice / slices) * Math.PI * 2;
+      positions.push(
+        center[0] + radius * Math.sin(phi) * Math.cos(theta),
+        center[1] + radius * Math.cos(phi),
+        center[2] + radius * Math.sin(phi) * Math.sin(theta),
+      );
+    }
+  }
+  for (let stack = 0; stack < stacks; stack++) {
+    for (let slice = 0; slice < slices; slice++) {
+      const a = stack * slices + slice;
+      const b = stack * slices + ((slice + 1) % slices);
+      const c = a + slices;
+      const d = b + slices;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  return rigidMesh(positions, indices, joint);
+}
+
+function torus(center, major, minor, joint) {
+  const rings = 8;
+  const sides = 5;
+  const positions = [];
+  const indices = [];
+  for (let ring = 0; ring < rings; ring++) {
+    const u = (ring / rings) * Math.PI * 2;
+    const cx = Math.cos(u) * major;
+    const cz = Math.sin(u) * major;
+    for (let side = 0; side < sides; side++) {
+      const v = (side / sides) * Math.PI * 2;
+      positions.push(
+        center[0] + cx + Math.cos(u) * Math.sin(v) * minor,
+        center[1] + Math.cos(v) * minor,
+        center[2] + cz + Math.sin(u) * Math.sin(v) * minor,
+      );
+    }
+  }
+  for (let ring = 0; ring < rings; ring++) {
+    for (let side = 0; side < sides; side++) {
+      const a = ring * sides + side;
+      const b = ring * sides + ((side + 1) % sides);
+      const c = ((ring + 1) % rings) * sides + side;
+      const d = ((ring + 1) % rings) * sides + ((side + 1) % sides);
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  return rigidMesh(positions, indices, joint);
+}
+
+function boxMesh(center, size, joint) {
+  const [cx, cy, cz] = center;
+  const hx = size[0] / 2;
+  const hy = size[1] / 2;
+  const hz = size[2] / 2;
+  const positions = [
+    cx - hx, cy - hy, cz - hz, cx + hx, cy - hy, cz - hz, cx + hx, cy + hy, cz - hz, cx - hx, cy + hy, cz - hz,
+    cx - hx, cy - hy, cz + hz, cx + hx, cy - hy, cz + hz, cx + hx, cy + hy, cz + hz, cx - hx, cy + hy, cz + hz,
+  ];
+  const indices = [
+    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
+    1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7,
+  ];
+  return rigidMesh(positions, indices, joint);
+}
+
+function disc(center, radius, joint) {
+  const segments = 8;
+  const positions = [center[0], center[1], center[2]];
+  const indices = [];
+  for (let step = 0; step < segments; step++) {
+    const angle = (step / segments) * Math.PI * 2;
+    positions.push(center[0] + Math.cos(angle) * radius, center[1] + Math.sin(angle) * radius, center[2]);
+    indices.push(0, 1 + ((step + 1) % segments), 1 + step);
+  }
+  return rigidMesh(positions, indices, joint);
+}
+
+function brim(center, inner, outer, joint) {
+  const segments = 10;
+  const positions = [];
+  const indices = [];
+  for (let step = 0; step < segments; step++) {
+    const angle = (step / segments) * Math.PI * 2;
+    positions.push(center[0] + Math.cos(angle) * inner, center[1], center[2] + Math.sin(angle) * inner);
+    positions.push(center[0] + Math.cos(angle) * outer, center[1], center[2] + Math.sin(angle) * outer);
+  }
+  for (let step = 0; step < segments; step++) {
+    const a = step * 2;
+    const b = a + 1;
+    const c = ((step + 1) % segments) * 2;
+    const d = c + 1;
+    indices.push(a, b, d, a, d, c);
+  }
+  return rigidMesh(positions, indices, joint);
+}
+
+function coneAlong(base, tip, radius, segments, joint) {
+  const axis = normalize([tip[0] - base[0], tip[1] - base[1], tip[2] - base[2]]);
+  const helper = Math.abs(axis[1]) > 0.85 ? [1, 0, 0] : [0, 1, 0];
+  const side = normalize(cross(axis, helper));
+  const lift = normalize(cross(side, axis));
+  const positions = [...tip];
+  const indices = [];
+  for (let step = 0; step < segments; step++) {
+    const angle = (step / segments) * Math.PI * 2;
+    positions.push(
+      base[0] + (side[0] * Math.cos(angle) + lift[0] * Math.sin(angle)) * radius,
+      base[1] + (side[1] * Math.cos(angle) + lift[1] * Math.sin(angle)) * radius,
+      base[2] + (side[2] * Math.cos(angle) + lift[2] * Math.sin(angle)) * radius,
+    );
+    indices.push(0, 1 + ((step + 1) % segments), 1 + step);
+  }
+  return rigidMesh(positions, indices, joint);
+}
+
+function stamp(mesh, donor, point) {
+  const influence = nearestWeights(donor, point);
+  const joints = new Uint8Array(mesh.joints.length);
+  const weights = new Float32Array(mesh.weights.length);
+  for (let i = 0; i < joints.length; i += 4) {
+    joints.set(influence.joints, i);
+    weights.set(influence.weights, i);
+  }
+  return { ...mesh, joints, weights };
+}
+
+function jointCentroid(prims, joint) {
+  const sum = [0, 0, 0];
+  let count = 0;
+  for (const prim of prims) {
+    for (let vertex = 0; vertex < prim.positions.length / 3; vertex++) {
+      if (dominantJoint(prim, vertex) !== joint) continue;
+      sum[0] += prim.positions[vertex * 3];
+      sum[1] += prim.positions[vertex * 3 + 1];
+      sum[2] += prim.positions[vertex * 3 + 2];
+      count += 1;
+    }
+  }
+  if (count === 0) return null;
+  return [sum[0] / count, sum[1] / count, sum[2] / count];
+}
+
+function yBands(mesh, count) {
+  const bounds = boundsOf(mesh.positions);
+  const span = bounds.max[1] - bounds.min[1] || 1;
+  const out = [];
+  for (let band = 0; band < count; band++) {
+    const y0 = bounds.min[1] + span * (band / count);
+    const y1 = bounds.min[1] + span * ((band + 1) / count);
+    const slice = splitTriangles(mesh, (point) => point.y >= y0 && (band === count - 1 || point.y < y1)).yes;
+    if (slice.indices.length >= 3) out.push(slice);
+  }
+  return out;
+}
+
 function part(name, mesh, color, material, ratio = 0.3, error = 0.008, lockBorder = false) {
   if (mesh.indices.length < 3) throw new Error(`empty part ${name}`);
   const simplified = simplify(mesh, ratio, error, lockBorder);
@@ -474,10 +702,22 @@ function part(name, mesh, color, material, ratio = 0.3, error = 0.008, lockBorde
   return { name, mesh: simplified, color, ...material };
 }
 
+function wear(name, mesh, color, material, ratio = 0.12, error = 0.02, lockBorder = false) {
+  return part(name, mesh, color, material, ratio, error, lockBorder);
+}
+
+function bootPair(boots, sole, color) {
+  return [
+    wear('boot', boots, color, BOOT, 0.5, 0.004),
+    wear('sole', sole, SOLE, SOLE_MAT, 0.6, 0.003),
+  ];
+}
+
 function recipes(body) {
   const face = faceOf(body.prims);
   const headJoint = body.jointIndex('Head');
   const hipJoint = body.jointIndex('Hips');
+  const neckJoint = body.jointIndex('Neck');
   const suit = shell(body.prims, ['shirt', 'shorts', 'socks', 'arm', 'thigh'], 0.012);
   const boots = shell(body.prims, ['boots'], 0.01);
   const sole = shell(body.prims, ['sole'], 0.004);
@@ -485,47 +725,299 @@ function recipes(body) {
   const hood = splitTriangles(head, (c, n) => inWindow(c, n, face, face.minY, face.maxY)).no;
   const plate = shell(body.prims, ['shirt', 'arm'], 0.016);
   const legs = shell(body.prims, ['shorts', 'thigh', 'socks'], 0.012);
+  const shirt = shell(body.prims, ['shirt'], 0.012);
+  const arms = shell(body.prims, ['arm'], 0.01);
   const tabardShell = shell(body.prims, ['shirt', 'shorts'], 0.028);
   const tabard = splitTriangles(tabardShell, (c, n) => n.z > 0.35 && Math.abs(c.x) < 0.09 && c.y > face.minY - 0.55).yes;
   const helmet = splitTriangles(shell(body.prims, ['head'], 0.022), (c, n) => inWindow(c, n, face, face.visorMinY, face.visorMaxY)).no;
   const brow = splitTriangles(shell(body.prims, ['head'], 0.02), (c, n) => inWindow(c, n, face, face.browMinY, face.browMaxY)).yes;
   const belly = splitTriangles(suit, (c, n) => n.z > 0.4 && Math.abs(c.x) < 0.07 && c.y > -0.02 && c.y < 0.42).yes;
   const cloth = splitTriangles(suit, (c, n) => n.z > 0.4 && Math.abs(c.x) < 0.07 && c.y > -0.02 && c.y < 0.42).no;
+  const eyes = body.prims.find((prim) => prim.kind === 'eyes');
+  const eyeY = (eyes.bounds.min[1] + eyes.bounds.max[1]) / 2;
+  const eyeZ = eyes.bounds.max[2] + 0.015;
+  const eyeX = Math.max(0.035, (eyes.bounds.max[0] - eyes.bounds.min[0]) * 0.28);
+  const crown = extremePoint(body.prims, 'head', 1, 1);
+  const neck = [0, face.minY - 0.02, eyeZ - 0.04];
+  const chest = chestPoint(suit);
+  const back = backAnchor(body.prims);
+  const bands = yBands(shirt, 6);
+  const stripeLight = mergeGeoms(bands.filter((_, index) => index % 2 === 0));
+  const stripeDark = mergeGeoms(bands.filter((_, index) => index % 2 === 1));
+  const waist = splitTriangles(tabard, (point) => point.y > chest[1] - 0.08).yes;
+  const beard = splitTriangles(head, (c, n) => n.z > 0.2 && c.y < face.minY + 0.015 && c.y > face.minY - 0.08 && Math.abs(c.x) < face.halfX * 0.75).yes;
+  const beardMesh = beard.indices.length >= 12
+    ? beard
+    : stamp(boxMesh([0, face.minY - 0.03, eyeZ], [0.08, 0.045, 0.035], headJoint), suit, chest);
+  const mask = splitTriangles(shell(body.prims, ['head'], 0.02), (c, n) => {
+    const eyesOpen = inWindow(c, n, face, face.visorMinY, face.visorMaxY);
+    const mouthOpen = n.z > 0.2 && c.z > face.minZ && Math.abs(c.x) < face.halfX * 0.45 && c.y < face.visorMinY && c.y > face.minY;
+    return eyesOpen || mouthOpen;
+  }).no;
+  const leftArm = jointCentroid(body.prims, body.jointIndex('LowerArm_L'));
+  const rightArm = jointCentroid(body.prims, body.jointIndex('LowerArm_R'));
+  const thigh = jointCentroid(body.prims, body.jointIndex('UpperLeg_L'));
+  const tailAnchor = backPoint(body.prims);
+  const plain = (color) => bootPair(boots, sole, color);
+  const suitPart = (color, material = CLOTH) => wear('suit', suit, color, material);
+  const browPart = (color) => wear('brow', brow, color, { roughness: 0.6, metalness: 0.05 }, 0.55, 0.006, true);
+  const rings = (color, name) => {
+    if (!leftArm || !rightArm) throw new Error(`missing forearm for ${name}`);
+    return wear(name, mergeGeoms([
+      torus(leftArm, 0.038, 0.012, body.jointIndex('LowerArm_L')),
+      torus(rightArm, 0.038, 0.012, body.jointIndex('LowerArm_R')),
+    ]), color, CLOTH, 1, 1);
+  };
+  const spineJoint = body.jointIndex('Spine2');
   return {
     'spike-hood': [
-      part('suit', cloth, GREEN, CLOTH, 0.12, 0.02),
-      part('belly', belly, BELLY, CLOTH, 0.35, 0.012),
-      part('hood', hood, GREEN, CLOTH, 0.32, 0.01, true),
-      part('spike', spikes(hood, headJoint), SPIKE, CLOTH, 1, 1),
-      part('tail', tube(
-        [backPoint(body.prims)[0], backPoint(body.prims)[1], backPoint(body.prims)[2] - 0.02],
-        [0, -0.28, -1],
-        0.34,
-        0.045,
-        0.012,
-        6,
-        6,
-        hipJoint,
-      ), GREEN, CLOTH, 1, 1),
-      part('boot', boots, DINO_BOOT, BOOT, 0.5, 0.004),
-      part('sole', sole, SOLE, SOLE_MAT, 0.6, 0.003),
+      wear('suit', cloth, GREEN, CLOTH),
+      wear('belly', belly, BELLY, CLOTH, 0.35, 0.012),
+      wear('hood', hood, GREEN, CLOTH, 0.32, 0.01, true),
+      wear('spike', spikes(hood, headJoint), SPIKE, CLOTH, 1, 1),
+      wear('tail', tube([tailAnchor[0], tailAnchor[1], tailAnchor[2] - 0.02], [0, -0.28, -1], 0.34, 0.045, 0.012, 6, 6, hipJoint), GREEN, CLOTH, 1, 1),
+      ...plain(DINO_BOOT),
     ],
     'keep-guard': [
-      part('plate', plate, PLATE_COLOR, PLATE, 0.12, 0.02),
-      part('legs', legs, CHAIN_COLOR, CHAIN, 0.14, 0.018),
-      part('tabard', tabard, TABARD, CLOTH, 0.28, 0.012),
-      part('mark', diamond(chestPoint(tabard), 0.045, tabard), MARK, { roughness: 0.4, metalness: 0.35 }, 1, 1),
-      part('helmet', helmet, HELMET, PLATE, 0.32, 0.01, true),
-      part('boot', boots, KNIGHT_BOOT, BOOT, 0.5, 0.004),
-      part('sole', sole, SOLE, SOLE_MAT, 0.6, 0.003),
+      wear('plate', plate, PLATE_COLOR, PLATE),
+      wear('legs', legs, CHAIN_COLOR, CHAIN, 0.14, 0.018),
+      wear('tabard', tabard, TABARD, CLOTH, 0.28, 0.012),
+      wear('mark', diamond(chestPoint(tabard), 0.045, tabard), MARK, { roughness: 0.4, metalness: 0.35 }, 1, 1),
+      wear('helmet', helmet, HELMET, PLATE, 0.32, 0.01, true),
+      ...plain(KNIGHT_BOOT),
     ],
     'night-glider': [
-      part('suit', suit, NIGHT, CLOTH, 0.12, 0.02),
-      part('brow', brow, BROW, { roughness: 0.6, metalness: 0.05 }, 0.55, 0.006, true),
-      part('boot', boots, NIGHT_BOOT, BOOT, 0.5, 0.004),
-      part('sole', sole, SOLE, SOLE_MAT, 0.6, 0.003),
+      suitPart(NIGHT),
+      browPart(BROW),
+      ...plain(NIGHT_BOOT),
+    ],
+    'kitchen-whites': [
+      suitPart(WHITE),
+      wear('apron', tabard, APRON, CLOTH, 0.28, 0.012),
+      wear('toque', mergeGeoms([
+        cylinder(crown, 0.16, 0.058, 8, headJoint),
+        cylinder([crown[0], crown[1] + 0.14, crown[2]], 0.07, 0.078, 8, headJoint),
+      ]), WHITE, CLOTH, 1, 1),
+      ...plain(WHITE),
+    ],
+    'match-official': [
+      suitPart(BLACK),
+      wear('whistle', sphere([neck[0] + 0.04, neck[1], neck[2]], 0.018, neckJoint), hex('#C5C8CE'), { roughness: 0.35, metalness: 0.4 }, 1, 1),
+      wear('card-yellow', stamp(boxMesh([chest[0] - 0.06, chest[1] - 0.02, chest[2] + 0.02], [0.04, 0.06, 0.006], 0), suit, chest), CARD_YELLOW, CLOTH, 1, 1),
+      wear('card-red', stamp(boxMesh([chest[0] + 0.06, chest[1] - 0.05, chest[2] + 0.02], [0.04, 0.06, 0.006], 0), suit, chest), CARD_RED, CLOTH, 1, 1),
+      ...plain(BLACK),
+    ],
+    'snow-friend': [
+      suitPart(SNOW),
+      wear('scarf', torus([0, neck[1], 0.02], 0.09, 0.022, neckJoint), SCARF, CLOTH, 1, 1),
+      wear('button', mergeGeoms([0, 1, 2].map((step) => sphere([chest[0], chest[1] - step * 0.07, chest[2] + 0.012], 0.016, spineJoint))), BUTTON, CLOTH, 1, 1),
+      wear('carrot', coneAlong([0, eyeY - 0.05, eyeZ], [0, eyeY - 0.06, eyeZ + 0.07], 0.016, 6, headJoint), CARROT, CLOTH, 1, 1),
+      ...plain(SNOW),
+    ],
+    'gold-legend': [
+      suitPart(GOLD, GOLD_MAT),
+      ...plain(GOLD_BOOT),
+    ],
+    'street-hero': [
+      suitPart(TEAL),
+      browPart(CORAL),
+      rings(CORAL, 'wristband'),
+      ...plain(hex('#163E3E')),
+    ],
+    alien: [
+      suitPart(ALIEN_GREEN),
+      browPart(ALIEN_DARK),
+      wear('antenna', mergeGeoms([
+        cylinder([crown[0] - 0.04, crown[1], crown[2]], 0.14, 0.008, 5, headJoint),
+        cylinder([crown[0] + 0.04, crown[1], crown[2]], 0.14, 0.008, 5, headJoint),
+        sphere([crown[0] - 0.04, crown[1] + 0.15, crown[2]], 0.02, headJoint),
+        sphere([crown[0] + 0.04, crown[1] + 0.15, crown[2]], 0.02, headJoint),
+      ]), ALIEN_DARK, CLOTH, 1, 1),
+      ...plain(ALIEN_DARK),
+    ],
+    spaceman: [
+      suitPart(SPACE),
+      wear('pack', stamp(boxMesh([back[0], back[1] + 0.02, back[2] - 0.08], [0.16, 0.22, 0.1], 0), suit, back), PACK, CLOTH, 1, 1),
+      wear('visor', stamp(boxMesh([0, eyeY + 0.07, eyeZ], [0.12, 0.045, 0.012], headJoint), suit, chest), VISOR, { roughness: 0.25, metalness: 0.15 }, 1, 1),
+      ...plain(SPACE),
+    ],
+    'night-wrap': [
+      suitPart(NINJA),
+      wear('hood', hood, NINJA, CLOTH, 0.32, 0.01, true),
+      browPart(NINJA_BAND),
+      rings(NINJA_BAND, 'tape'),
+      ...plain(NINJA),
+    ],
+    'deck-hand': [
+      wear('shirt-light', stripeLight, PIRATE_LIGHT, CLOTH, 0.18, 0.018),
+      wear('shirt-dark', stripeDark, PIRATE_DARK, CLOTH, 0.18, 0.018),
+      wear('sleeve', arms, PIRATE_LIGHT, CLOTH, 0.1, 0.02),
+      wear('legs', legs, WAIST, CLOTH, 0.1, 0.02),
+      wear('waistcoat', waist, WAIST, CLOTH, 0.25, 0.014),
+      wear('bandana', hood, PIRATE_DARK, CLOTH, 0.2, 0.012, true),
+      wear('hat', mergeGeoms([
+        cylinder([crown[0], crown[1] + 0.02, crown[2]], 0.07, 0.05, 8, headJoint),
+        brim([crown[0], crown[1] + 0.02, crown[2]], 0.05, 0.13, headJoint),
+      ]), BLACK, CLOTH, 1, 1),
+      wear('patch', disc([-eyeX, eyeY, eyeZ], 0.022, headJoint), BLACK, CLOTH, 1, 1),
+      ...plain(BLACK),
+    ],
+    'secret-agent': [
+      suitPart(AGENT),
+      wear('tie', stamp(boxMesh([chest[0], chest[1] - 0.06, chest[2] + 0.016], [0.028, 0.16, 0.008], 0), suit, chest), WHITE, CLOTH, 1, 1),
+      wear('glasses', mergeGeoms([
+        torus([-eyeX, eyeY, eyeZ], 0.02, 0.004, headJoint),
+        torus([eyeX, eyeY, eyeZ], 0.02, 0.004, headJoint),
+        boxMesh([0, eyeY, eyeZ], [0.045, 0.006, 0.006], headJoint),
+      ]), GLASS, { roughness: 0.3, metalness: 0.2 }, 1, 1),
+      ...plain(AGENT),
+    ],
+    'ring-mask': [
+      wear('plate', plate, LUCHA_RED, CLOTH),
+      wear('legs', legs, LUCHA_TEAL, CLOTH, 0.14, 0.018),
+      wear('mask', mask, LUCHA_TEAL, CLOTH, 0.4, 0.008, true),
+      wear('dot', mergeGeoms([
+        sphere([-0.035, eyeY - 0.03, eyeZ], 0.012, headJoint),
+        sphere([0.035, eyeY - 0.03, eyeZ], 0.012, headJoint),
+      ]), LUCHA_DOT, CLOTH, 1, 1),
+      wear('cape', capeSheet(back, suit), LUCHA_RED, CLOTH, 1, 1),
+      ...plain(BLACK),
+    ],
+    'stage-jacket': [
+      wear('jacket', plate, ROCK, LEATHER),
+      wear('legs', legs, hex('#1A1612'), CLOTH, 0.16, 0.016),
+      wear('shade', mergeGeoms([
+        disc([-eyeX, eyeY, eyeZ], 0.02, headJoint),
+        disc([eyeX, eyeY, eyeZ], 0.02, headJoint),
+        boxMesh([0, eyeY, eyeZ], [0.04, 0.006, 0.006], headJoint),
+      ]), GLASS, { roughness: 0.2, metalness: 0.1 }, 1, 1),
+      wear('quiff', coneAlong([0, crown[1] - 0.03, crown[2] + 0.05], [0, crown[1] + 0.12, crown[2] - 0.02], 0.042, 6, headJoint), QUIFF, CLOTH, 1, 1),
+      ...plain(hex('#1A1612')),
+    ],
+    seventies: [
+      wear('shirt', shirt, ORANGE, CLOTH, 0.2, 0.016),
+      wear('sleeve', arms, ORANGE, CLOTH, 0.2, 0.016),
+      wear('legs', legs, YELLOW, CLOTH, 0.16, 0.016),
+      browPart(WHITE),
+      wear('moustache', stamp(boxMesh([0, eyeY - 0.055, eyeZ + 0.005], [0.07, 0.016, 0.02], headJoint), suit, chest), MOUSTACHE, CLOTH, 1, 1),
+      ...plain(TAN_BOOT),
+    ],
+    'north-pole': [
+      suitPart(SANTA),
+      wear('hat', coneAlong(crown, [crown[0] + 0.1, crown[1] + 0.2, crown[2]], 0.07, 8, headJoint), SANTA, CLOTH, 1, 1),
+      wear('pom', sphere([crown[0] + 0.1, crown[1] + 0.21, crown[2]], 0.028, headJoint), WHITE, CLOTH, 1, 1),
+      wear('brim', brim(crown, 0.02, 0.095, headJoint), WHITE, CLOTH, 1, 1),
+      wear('beard', beardMesh, WHITE, CLOTH, 0.5, 0.008, true),
+      ...plain(SANTA_BOOT),
+    ],
+    'grey-ghoul': [
+      suitPart(ZOMBIE),
+      wear('wrap', mergeGeoms([
+        ...(leftArm ? [torus(leftArm, 0.04, 0.012, body.jointIndex('LowerArm_L')), torus([leftArm[0], leftArm[1] - 0.04, leftArm[2]], 0.036, 0.01, body.jointIndex('LowerArm_L'))] : []),
+        ...(rightArm ? [torus(rightArm, 0.04, 0.012, body.jointIndex('LowerArm_R'))] : []),
+        ...(thigh ? [torus(thigh, 0.07, 0.014, body.jointIndex('UpperLeg_L'))] : []),
+      ]), WRAP, CLOTH, 1, 1),
+      ...plain(ZOMBIE_BOOT),
     ],
   };
+}
+
+function extremePoint(prims, kind, axis, dir) {
+  let best = null;
+  let score = dir > 0 ? -Infinity : Infinity;
+  for (const prim of prims) {
+    if (prim.kind !== kind) continue;
+    for (let i = 0; i < prim.positions.length; i += 3) {
+      const value = prim.positions[i + axis];
+      if ((dir > 0 && value > score) || (dir < 0 && value < score)) {
+        score = value;
+        best = [prim.positions[i], prim.positions[i + 1], prim.positions[i + 2]];
+      }
+    }
+  }
+  if (!best) throw new Error(`no ${kind} point`);
+  return best;
+}
+
+function backAnchor(prims) {
+  let best = null;
+  let bestZ = Infinity;
+  for (const prim of prims) {
+    if (prim.kind !== 'shirt') continue;
+    for (let i = 0; i < prim.positions.length; i += 3) {
+      if (Math.abs(prim.positions[i]) > 0.06) continue;
+      const z = prim.positions[i + 2];
+      if (z < bestZ) {
+        bestZ = z;
+        best = [prim.positions[i], prim.positions[i + 1], z];
+      }
+    }
+  }
+  if (!best) throw new Error('no back anchor');
+  return best;
+}
+
+function capeSheet(anchor, donor) {
+  const cols = 4;
+  const rows = 3;
+  const positions = [];
+  const indices = [];
+  for (let row = 0; row <= rows; row++) {
+    for (let col = 0; col <= cols; col++) {
+      const u = col / cols - 0.5;
+      const v = row / rows;
+      positions.push(anchor[0] + u * 0.22, anchor[1] - v * 0.26, anchor[2] - 0.03 - v * 0.05);
+    }
+  }
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const a = row * (cols + 1) + col;
+      const b = a + 1;
+      const d = a + cols + 1;
+      const e = d + 1;
+      indices.push(a, d, b, b, d, e);
+    }
+  }
+  return stamp(rigidMesh(positions, indices, 0), donor, anchor);
+}
+
+function dominantJoint(prim, vertex) {
+  let best = 0;
+  let weight = -1;
+  for (let influence = 0; influence < 4; influence++) {
+    const value = prim.weights[vertex * 4 + influence];
+    if (value > weight) {
+      weight = value;
+      best = prim.joints[vertex * 4 + influence];
+    }
+  }
+  return best;
+}
+
+/** The female body keeps arms and legs in one skin primitive. Split it by joint. */
+function splitLimbs(prims, jointNames) {
+  const arms = new Set(['UpperArm_L', 'LowerArm_L', 'Hand_L', 'UpperArm_R', 'LowerArm_R', 'Hand_R']);
+  const legs = new Set(['UpperLeg_L', 'LowerLeg_L', 'UpperLeg_R', 'LowerLeg_R', 'Hips']);
+  const next = [];
+  for (const prim of prims) {
+    if (prim.kind !== 'thigh' && prim.kind !== 'arm' && prim.kind !== 'skin') {
+      next.push(prim);
+      continue;
+    }
+    const groups = { arm: [], thigh: [] };
+    for (let i = 0; i < prim.indices.length; i += 3) {
+      const ids = [prim.indices[i], prim.indices[i + 1], prim.indices[i + 2]];
+      const names = ids.map((id) => jointNames[dominantJoint(prim, id)] ?? '');
+      const armVotes = names.filter((name) => arms.has(name)).length;
+      const bucket = armVotes >= 2 ? 'arm' : 'thigh';
+      if (armVotes < 2 && !names.some((name) => legs.has(name)) && prim.kind === 'arm') groups.arm.push(...ids);
+      else groups[bucket].push(...ids);
+    }
+    for (const [kind, indices] of Object.entries(groups)) {
+      if (indices.length >= 3) next.push({ ...prim, kind, indices: Uint32Array.from(indices) });
+    }
+  }
+  return next;
 }
 
 async function loadBody(io, file) {
@@ -554,12 +1046,13 @@ async function loadBody(io, file) {
       bounds,
     });
   }
-  const head = boundsOf(prims.find((prim) => prim.kind === 'head').positions);
+  const limbs = splitLimbs(prims, jointNames);
+  const head = boundsOf(limbs.find((prim) => prim.kind === 'head').positions);
   if (head.max[1] > 5) throw new Error(`positions were not decoded (${head.max[1]})`);
   return {
     skin,
     jointNames,
-    prims,
+    prims: limbs,
     jointIndex(name) {
       const index = jointNames.indexOf(name);
       if (index < 0) throw new Error(`missing joint ${name}`);
@@ -608,7 +1101,7 @@ function addPart(doc, buffer, mesh, partDef) {
     .setBaseColorFactor(partDef.color)
     .setRoughnessFactor(partDef.roughness)
     .setMetallicFactor(partDef.metalness)
-    .setDoubleSided(partDef.name === 'spike' || partDef.name === 'tail' || partDef.name === 'mark');
+    .setDoubleSided(/^(spike|tail|mark|hat|brim|cape|shade|tie|moustache|pom|beard|wrap|apron|visor|whistle|toque)$/.test(partDef.name) || partDef.name.startsWith('card'));
   const prim = doc.createPrimitive()
     .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(src.positions).setBuffer(buffer))
     .setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(src.normals).setBuffer(buffer))
@@ -646,8 +1139,13 @@ const io = new NodeIO()
   .registerExtensions([EXTMeshoptCompression, KHRMeshQuantization, KHRTextureBasisu, KHRMaterialsClearcoat])
   .registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
 
+const ALL_IDS = [
+  'spike-hood', 'keep-guard', 'night-glider', 'kitchen-whites', 'match-official', 'snow-friend',
+  'gold-legend', 'street-hero', 'alien', 'spaceman', 'night-wrap', 'deck-hand', 'secret-agent',
+  'ring-mask', 'stage-jacket', 'seventies', 'north-pole', 'grey-ghoul',
+];
 const requested = process.argv.slice(2);
-const ids = requested.length > 0 ? requested : ['spike-hood', 'keep-guard', 'night-glider'];
+const ids = requested.length > 0 ? requested : ALL_IDS;
 mkdirSync(OUT_DIR, { recursive: true });
 for (const [bodyName, file] of Object.entries(BODIES)) {
   const body = await loadBody(io, file);

@@ -11,6 +11,7 @@ import {
   specFits,
 } from './outfitFit';
 import {
+  getOutfit,
   COWBOY_BOOT_ID,
   CONTENT_PACK_IDS,
   EARNED_OUTFIT_IDS,
@@ -21,6 +22,9 @@ import {
   cosmeticGrantAllowed,
   cosmeticPriceString,
   earnedOutfit,
+  everythingIncludesLine,
+  everythingOwnedLine,
+  everythingSavingLabel,
   keepStoreCosmetic,
   outfitCoversBody,
   packsGrantedBy,
@@ -133,6 +137,24 @@ describe('themed outfits', () => {
       expect(zombie).not.toMatch(/blood|gore|wound/i);
     }
     expect(outfitSpecs('ring-mask', 'male').some((spec) => spec.slot === 'cape')).toBe(true);
+    const copied = /badge|crest|shield|fifa|uefa|premier|lion|eagle|cross|santo|mysterio|demon/i;
+    for (const id of ['match-official', 'seventies', 'ring-mask'] as const) {
+      for (const body of ['male', 'female'] as const) {
+        const specs = outfitSpecs(id, body);
+        const names = specs.map((spec) => `${spec.name} ${spec.slot}`).join(' ');
+        expect(names, `${id} ${body}`).not.toMatch(copied);
+      }
+      expect(getOutfit(id)?.note ?? '').not.toMatch(/fifa|uefa|premier league|\bfa\b|barcelona|liverpool/i);
+    }
+    const referee = outfitSpecs('match-official', 'male').map((spec) => spec.name);
+    expect(referee).toContain('whistle');
+    expect(referee).toContain('card-yellow');
+    expect(referee).toContain('card-red');
+    expect(outfitSpecs('seventies', 'male').some((spec) => spec.slot === 'chest')).toBe(false);
+    const lucha = outfitSpecs('ring-mask', 'female').map((spec) => spec.name);
+    expect(lucha).toContain('lucha-brow');
+    expect(lucha).toContain('lucha-dot-l');
+    expect(lucha).toContain('lucha-dot-r');
     const maleBoot = cowboyBootSpecs('male').find((spec) => spec.name === 'cowboy-shaft');
     const femaleBoot = cowboyBootSpecs('female').find((spec) => spec.name === 'cowboy-shaft');
     expect(femaleBoot && maleBoot && femaleBoot.size[0] > maleBoot.size[0]).toBe(true);
@@ -217,5 +239,33 @@ describe('themed outfits', () => {
     const engine = readFileSync(new URL('../engine/engine.ts', import.meta.url), 'utf8');
     expect(scoring).not.toMatch(/outfit/);
     expect(engine).not.toMatch(/outfit/);
+  });
+
+  it('lists the packs inside Everything and says Saving only when the bundle costs less', () => {
+    const includes = everythingIncludesLine();
+    expect(includes).toBe('Includes Heroes & Space, Adventure, Party and Spooky.');
+    expect(everythingOwnedLine([])).toBeNull();
+    expect(everythingOwnedLine(['heroes-space'])).toBe('Already owned: Heroes & Space.');
+    expect(everythingOwnedLine(['party', 'spooky', 'heroes-space'])).toBe('Already owned: Heroes & Space, Party and Spooky.');
+    expect(everythingOwnedLine(['everything'])).toBe('Already owned: Heroes & Space, Adventure, Party and Spooky.');
+
+    const row = (productId: string, priceMicros: number, currencyCode = 'GBP') => ({ productId, priceMicros, currencyCode });
+    const packs = [
+      row('kickole_pack_heroes_space', 199),
+      row('kickole_pack_adventure', 199),
+      row('kickole_pack_party', 199),
+      row('kickole_pack_spooky', 99),
+    ];
+    expect(everythingSavingLabel([])).toBeNull();
+    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 800)])).toBeNull();
+    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 696)])).toBeNull();
+    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 695)])).toBe('Saving');
+    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 100, 'EUR')])).toBeNull();
+    expect(everythingSavingLabel([
+      ...packs.slice(0, 3),
+      row('kickole_pack_spooky', 0),
+      row('kickole_pack_everything', 100),
+    ])).toBeNull();
+    expect(includes.toLowerCase()).not.toContain('saving');
   });
 });

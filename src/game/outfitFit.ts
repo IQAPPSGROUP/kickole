@@ -199,14 +199,13 @@ export function cowboyBootSpecs(body: PlayerBody): MeshSpec[] {
   return [...left, ...left.map(mirrorFoot)];
 }
 
+/** Original bars and dots. Not a cross, eagle, animal, or a known wrestler's mask. */
 function luchaMask(m: BodyMeasures): MeshSpec[] {
   const z = m.faceZ + 0.008;
-  const w = m.headHalf * 1.35;
   return [
-    box('head', 'face', 'lucha-brow', [0, m.browY + 0.02, z], [w, 0.028, 0.01], '#E23B4A'),
-    box('head', 'face', 'lucha-cheek-l', [-m.headHalf * 0.42, m.browY - 0.035, z], [m.headHalf * 0.55, 0.022, 0.01], '#F2C14E'),
-    box('head', 'face', 'lucha-cheek-r', [m.headHalf * 0.42, m.browY - 0.035, z], [m.headHalf * 0.55, 0.022, 0.01], '#F2C14E'),
-    box('head', 'face', 'lucha-chin', [0, 0.0, z], [w * 0.7, 0.026, 0.01], '#1F6B8A'),
+    box('head', 'face', 'lucha-brow', [0, m.browY + 0.018, z], [m.headHalf * 1.15, 0.018, 0.01], '#1F8A8A'),
+    box('head', 'face', 'lucha-dot-l', [-m.headHalf * 0.36, m.browY - 0.028, z], [0.018, 0.018, 0.01], '#F26B5B'),
+    box('head', 'face', 'lucha-dot-r', [m.headHalf * 0.36, m.browY - 0.028, z], [0.018, 0.018, 0.01], '#F26B5B'),
   ];
 }
 
@@ -271,7 +270,8 @@ export function outfitSpecs(id: OutfitId, body: PlayerBody): MeshSpec[] {
     case 'match-official':
       return [
         box('spine2', 'chest', 'whistle', [0.04, 0.1, m.chestFront + 0.012], [0.02, 0.016, 0.012], '#C0C4C8', 0.35, 0.4),
-        box('spine2', 'chest', 'cards', [-0.045, 0.02, m.chestFront + 0.012], [0.04, 0.05, 0.008], '#F4F1EA', 0.6),
+        box('spine2', 'chest', 'card-yellow', [-0.034, 0.02, m.chestFront + 0.012], [0.016, 0.026, 0.006], '#F2C14E', 0.55),
+        box('spine2', 'chest', 'card-red', [-0.016, 0.016, m.chestFront + 0.016], [0.016, 0.026, 0.006], '#E23B4A', 0.55),
       ];
     case 'seventies':
       return [

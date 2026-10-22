@@ -5,6 +5,9 @@ import {
   EARNED_OUTFIT_IDS,
   SHOP_PACKS,
   cosmeticPriceString,
+  everythingIncludesLine,
+  everythingOwnedLine,
+  everythingSavingLabel,
   getOutfit,
   milestoneCurrent,
   type ShopPack,
@@ -94,6 +97,9 @@ export function ShopPacks({
             const owned = packOwned(save, pack.id);
             const price = cosmeticPriceString(pack.productId, products);
             const label = packButtonLabel(platform, price, busy, owned);
+            const detail = pack.id === 'everything' ? everythingIncludesLine() : pack.blurb;
+            const ownedLine = pack.id === 'everything' ? everythingOwnedLine(save.ownedPacks) : null;
+            const saving = pack.id === 'everything' ? everythingSavingLabel(products) : null;
             return (
               <div key={pack.id} className="shop-item">
                 <button type="button" className="shop-item-main" onClick={() => previewPack(pack)}>
@@ -101,7 +107,9 @@ export function ShopPacks({
                   <span>
                     <b>{pack.name}</b>
                     <em>Cosmetic pack</em>
-                    <small>{pack.blurb}</small>
+                    <small>{detail}</small>
+                    {ownedLine && <small>{ownedLine}</small>}
+                    {saving && <small>{saving}</small>}
                   </span>
                 </button>
                 <button

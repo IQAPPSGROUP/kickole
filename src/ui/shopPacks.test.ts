@@ -24,6 +24,10 @@ describe('shop packs screen', () => {
     expect(packs).toContain('COSMETIC_SHOP_LINE');
     expect(packs).toContain('RESTORE PURCHASES');
     expect(packs).toContain('EARNED IN PLAY');
+    expect(packs).toContain('everythingIncludesLine');
+    expect(packs).toContain('everythingOwnedLine');
+    expect(packs).toContain('everythingSavingLabel');
+    expect(packs).not.toMatch(/>\s*Saving\s*</);
     expect(packs).not.toMatch(/\b(coins|gems|loot|popular|gifting|timer|limited)\b|£|€|\$\d/i);
     expect(packs).not.toMatch(/stripe-bandit|bank robber/i);
   });

@@ -215,7 +215,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
     clothing: cloth('#E23B4A', '#F2C14E', '#1F6B8A', '#F2C14E'),
     pattern: 'weave',
     skinTint: null,
-    note: 'Bright original wrestling mask and a short cape.',
+    note: 'Teal brow band, two dots, and a short cape. An original mask.',
   },
   {
     id: 'match-official',
@@ -224,7 +224,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
     clothing: cloth('#1A1A1A', '#F7F5ED', '#141414', '#1A1A1A'),
     pattern: 'night',
     skinTint: null,
-    note: 'All black, a whistle, and cards in a pocket. Earned in play.',
+    note: 'All black, a whistle, and two plain cards. No league or club mark. Earned in play.',
   },
   {
     id: 'seventies',
@@ -233,7 +233,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
     clothing: cloth('#E07A3D', '#F4F1EA', '#F2C14E', '#F7F5ED'),
     pattern: 'weave',
     skinTint: null,
-    note: 'Sweatband and a small costume moustache. Shorts stay the footballer cut.',
+    note: 'Sweatband and a costume moustache. No club mark. Shorts stay the footballer cut.',
   },
   {
     id: 'north-pole',
@@ -312,7 +312,7 @@ export const SHOP_PACKS: readonly ShopPack[] = [
     productId: 'kickole_pack_everything',
     outfitIds: [],
     bootIds: [],
-    blurb: 'All four packs: Heroes & Space, Adventure, Party and Spooky.',
+    blurb: 'Includes Heroes & Space, Adventure, Party and Spooky.',
   },
 ];
 
@@ -342,6 +342,57 @@ export function shopPackForProduct(productId: string): ShopPack | null {
 export function packsGrantedBy(id: ShopPackId): ShopPackId[] {
   if (id === 'everything') return [...CONTENT_PACK_IDS, 'everything'];
   return [id];
+}
+
+function packList(names: readonly string[]): string {
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0];
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+function contentPackNames(ids: readonly ShopPackId[]): string[] {
+  const names: string[] = [];
+  for (const id of ids) {
+    const pack = getShopPack(id);
+    if (pack) names.push(pack.name);
+  }
+  return names;
+}
+
+/** Names the four packs inside Everything. The card always shows this list. */
+export function everythingIncludesLine(): string {
+  return `Includes ${packList(contentPackNames([...CONTENT_PACK_IDS]))}.`;
+}
+
+/** Packs the player already has, named on the Everything card. Null when they have none. */
+export function everythingOwnedLine(ownedIds: readonly string[]): string | null {
+  const hasBundle = ownedIds.includes('everything');
+  const owned = CONTENT_PACK_IDS.filter((id) => hasBundle || ownedIds.includes(id));
+  if (owned.length === 0) return null;
+  return `Already owned: ${packList(contentPackNames(owned))}.`;
+}
+
+/**
+ * The word Saving only when every pack has a store price in one currency and
+ * the bundle priceMicros is strictly below the sum of the four packs.
+ * Missing prices, mixed currencies, and a bundle that costs the same or more
+ * produce no label. Price strings are not parsed or invented.
+ */
+export function everythingSavingLabel(
+  products: readonly Pick<StoreProduct, 'productId' | 'priceMicros' | 'currencyCode'>[],
+): 'Saving' | null {
+  const rows = SHOP_PACKS.map((pack) => products.find((product) => product.productId === pack.productId));
+  if (rows.some((row) => !row)) return null;
+  const priced = rows.filter((row): row is NonNullable<typeof row> => row != null);
+  const currency = priced[0]?.currencyCode ?? '';
+  if (!currency || priced.some((row) => row.currencyCode !== currency)) return null;
+  if (priced.some((row) => !Number.isFinite(row.priceMicros) || row.priceMicros <= 0)) return null;
+  const bundle = priced.find((row) => row.productId === getShopPack('everything')?.productId);
+  const parts = priced.filter((row) => row.productId !== bundle?.productId);
+  if (!bundle || parts.length !== CONTENT_PACK_IDS.length) return null;
+  const sum = parts.reduce((total, row) => total + row.priceMicros, 0);
+  if (bundle.priceMicros < sum) return 'Saving';
+  return null;
 }
 
 export function milestoneMet(stats: MilestoneStats, milestone: PlayMilestone): boolean {

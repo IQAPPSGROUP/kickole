@@ -8,6 +8,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import type { GameEngine } from '../engine/engine';
 import { alignFootWindow, clearFootContactAnchors, setFootContactAnchors, type BallCenter } from '../engine/footContact';
 import { cowboyBootSpecs, outfitSpecs } from '../game/outfitFit';
+import { isMeshOutfit, OUTFIT_COVER, outfitModelUrl } from '../game/outfitMesh';
 import { isOutfitId } from '../game/outfits';
 import type { Skin } from '../game/skins';
 import type { Quality } from '../game/storage';
@@ -26,6 +27,7 @@ import { ueDeltaQuaternion } from './ue-pose';
 import { ueMovementQuaternion } from './ue-motion';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { mountOutfitSpecs } from './outfitAttach';
+import { MountedOutfit } from './outfitSkin';
 import { paintOutfitTexture } from './outfitTexture';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
@@ -315,9 +317,10 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       }
       standard.needsUpdate = true;
     }
+    const meshed = isMeshOutfit(skin.outfitId);
     const specs = [
-      ...(skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),
-      ...(skin.bootStyle === 'cowboy' ? cowboyBootSpecs(skin.playerBody) : []),
+      ...(!meshed && skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),
+      ...(!meshed && skin.bootStyle === 'cowboy' ? cowboyBootSpecs(skin.playerBody) : []),
     ];
     const release = specs.length > 0 ? mountOutfitSpecs(scene, specs) : null;
     return () => {
@@ -334,7 +337,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   }, [skin, materials, scene]);
 
   useEffect(() => {
-    if (pbr || quality === 'low') return;
+    if (pbr || quality === 'low' || isMeshOutfit(skin.outfitId)) return;
     const laceGeos = LACES.map((spec) => new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]));
     const heelGeo = new BoxGeometry(0.078, 0.05, 0.018);
     const soleGeo = new BoxGeometry(SOLE.size[0], SOLE.size[1], SOLE.size[2]);
@@ -394,7 +397,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       soleGeo.dispose();
       studGeo.dispose();
     };
-  }, [scene, clips, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, pbr, quality, freestyle, engine]);
+  }, [scene, clips, bones, skin.boots.lace, skin.boots.trim, skin.boots.main, skin.clothing.shirtTrim, skin.outfitId, pbr, quality, freestyle, engine]);
 
   const mixer = useMemo(() => new AnimationMixer(scene), [scene]);
   const actions = useMemo(() => {
@@ -581,6 +584,9 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   return (
     <>
       <primitive object={scene} />
+      {isMeshOutfit(skin.outfitId) && (
+        <MountedOutfit url={outfitModelUrl(skin.outfitId, skin.playerBody)} host={scene} cover={OUTFIT_COVER[skin.outfitId]} />
+      )}
       {pbr && chest && !skin.outfitId && <ShirtNumber bone={chest} id={skin.id} />}
     </>
   );

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "nickname-words": "tsx tools/syncNicknameWords.ts",
     "build:player": "tsx tools/build_fab_player.ts",
+    "build:outfits": "node tools/build-outfits.mjs",
     "build:street": "tsx tools/build_street_court.ts",
     "build:store": "KICKOLE_STORE_BUILD=1 npm run build",
     "ios:sync": "npm run build:store && npx cap sync ios",

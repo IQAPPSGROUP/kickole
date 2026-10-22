@@ -57,6 +57,24 @@ describe('mock leaderboard', () => {
     expect(top.some((row) => row.mine)).toBe(false);
   });
 
+  it('hides a reported name and a blocked name from the pre-run five and the full board', () => {
+    const board = createMockLeaderboard({ nickname: 'StreetKick42', storage: memory(), now: NOW });
+    const before = board.board('all', 'world', 0, 5, NOW);
+    const reported = before.rows[0]?.nickname ?? '';
+    const blockedName = before.rows[1]?.nickname ?? '';
+    expect(reported).not.toBe('');
+    expect(blockedName).not.toBe(reported);
+    board.report(reported, 'rude');
+    board.block(blockedName);
+    const preview = board.board('all', 'world', 0, 5, NOW);
+    const full = board.board('all', 'world', 0, 50, NOW);
+    expect(preview.rows).toEqual(full.rows.slice(0, 5));
+    expect(preview.rows).toHaveLength(5);
+    const shown = [...preview.rows, ...full.rows].map((row) => row.nickname);
+    expect(shown).not.toContain(reported);
+    expect(shown).not.toContain(blockedName);
+  });
+
   it('keeps the best submit and hides a reported name', () => {
     const storage = memory();
     const board = createMockLeaderboard({ nickname: 'StreetKick42', storage, now: NOW });

@@ -282,11 +282,19 @@ describe('supabase leaderboard', () => {
     await vi.waitFor(() => expect(board.top('world', 10, 10).length).toBeGreaterThan(0));
     expect(board.top('world', 10, 10).every((row) => row.country == null)).toBe(true);
     expect(board.around(10, 'country').me.country).toBe('GB');
+    expect(board.board('all', 'world', 10, 5).rows.some((row) => row.nickname === 'HighKick')).toBe(true);
+    expect(board.board('all', 'world', 10, 50).rows.some((row) => row.nickname === 'MidKick')).toBe(true);
 
     board.report('HighKick', 'rude');
     expect(board.around(10, 'world').above.some((row) => row.nickname === 'HighKick')).toBe(false);
     board.block('MidKick');
     expect(board.around(10, 'world').above.some((row) => row.nickname === 'MidKick')).toBe(false);
+    const preview = board.board('all', 'world', 10, 5);
+    const full = board.board('all', 'world', 10, 50);
+    expect(preview.rows).toEqual(full.rows.slice(0, 5));
+    const shown = [...preview.rows, ...full.rows].map((row) => row.nickname);
+    expect(shown).not.toContain('HighKick');
+    expect(shown).not.toContain('MidKick');
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'report_player' && call.args.reported_nickname === 'HighKick' && call.args.reason === 'rude')).toBe(true));
     await vi.waitFor(() => expect(calls.some((call) => call.fn === 'block_player' && call.args.blocked_nickname === 'MidKick')).toBe(true));
   });

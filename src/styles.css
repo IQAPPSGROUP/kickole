@@ -1075,6 +1075,15 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .run-lineup-you span { font-size: 11px; letter-spacing: .06em; }
 .run-lineup-you b { font-size: 18px; color: #ffe14a; }
 .run-lineup-you em { flex: 1; font-style: normal; text-align: right; font-size: 15px; }
+.run-lineup-best {
+  font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
+  font-size: 56px;
+  line-height: 1;
+  text-align: center;
+  color: #ffe14a;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
+}
 .run-lineup-go {
   text-align: center;
   font-size: 12px;

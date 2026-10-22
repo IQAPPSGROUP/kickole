@@ -20,7 +20,7 @@ import { OpeningSkip } from './OpeningSkip';
 import { NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
-import { RUN_LINEUP_MS, RunLineup } from './RunLineup';
+import { BestLineup, RUN_LINEUP_MS, RunLineup } from './RunLineup';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
@@ -278,13 +278,9 @@ export function App() {
   const requestRun = useCallback(() => {
     cancelOpeningIntroForGameplay();
     setOverlay('none');
-    if (board) {
-      runStarting.current = false;
-      setLineup(true);
-      return;
-    }
-    beginRun();
-  }, [board, beginRun]);
+    runStarting.current = false;
+    setLineup(true);
+  }, []);
   runGate.current = { lineup, begin: beginRun, request: requestRun };
 
   useEffect(() => {
@@ -439,9 +435,11 @@ export function App() {
           onLeaderboard={openBoard}
         />
       )}
-      {lineup && board && (
+      {lineup && (leaderboardOn && board ? (
         <RunLineup board={board} score={boardScore} onStart={beginRun} />
-      )}
+      ) : (
+        <BestLineup best={snap.save.best} onStart={beginRun} />
+      ))}
       {boardOpen && (
         <LeaderboardSheet
           board={board}

@@ -13,4 +13,16 @@ describe('pre-run leaderboard', () => {
     expect(css).toMatch(/\.run-lineup \{[^}]*max-height: 58%;/s);
     expect(css).not.toContain('.world-rank');
   });
+
+  it('takes the top five from the same board call the full sheet uses', () => {
+    const source = readFileSync(new URL('./RunLineup.tsx', import.meta.url), 'utf8');
+    expect(source).toContain("board.board('all', 'world', score, 5)");
+  });
+
+  it('shows the world board only after opt-in and a best score otherwise', () => {
+    const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8');
+    expect(app).toContain('leaderboardOn && board ?');
+    expect(app).toContain('<BestLineup best={snap.save.best}');
+    expect(app).toContain('<RunLineup board={board}');
+  });
 });

@@ -1061,20 +1061,31 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .run-lineup-rows { gap: 3px; }
 .run-lineup-rows li { padding: 4px 10px; }
 .run-lineup-rows li b { font-size: 15px; }
-.run-lineup-you {
+.run-lineup-rank {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 4px 10px;
-  border-radius: 10px;
+  gap: 2px;
+  padding: 8px 10px 6px;
+  border-radius: 12px;
   background: rgba(255, 225, 74, .16);
-  color: #fffdf8;
-  font-weight: 800;
 }
-.run-lineup-you span { font-size: 11px; letter-spacing: .06em; }
-.run-lineup-you b { font-size: 18px; color: #ffe14a; }
-.run-lineup-you em { flex: 1; font-style: normal; text-align: right; font-size: 15px; }
+.run-lineup-rank b {
+  font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
+  font-size: 28px;
+  line-height: 1.05;
+  font-weight: 400;
+  text-align: center;
+  color: #ffe14a;
+  -webkit-text-stroke: 1px #140814;
+  paint-order: stroke fill;
+}
+.run-lineup-rank em {
+  font-style: normal;
+  font-size: 14px;
+  font-weight: 800;
+  color: #fffdf8;
+}
 .run-lineup-best {
   font-family: 'Rubik Wet Paint', 'Trebuchet MS', var(--font);
   font-size: 56px;

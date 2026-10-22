@@ -26,7 +26,7 @@ function LineupFrame({
 }
 
 /**
- * Top five world names and this player's rank, shown before a run.
+ * Top five world names and this player's World Rank, shown before a run.
  * Rows come from `board.board`, the same call the full sheet uses, so a
  * blocked or reported name is already absent. The card sits at the bottom
  * so it stays clear of the alley mural.
@@ -47,6 +47,10 @@ export function RunLineup({
   const rows = page.hidden ? [] : page.rows;
   return (
     <LineupFrame kicker="WORLD BOARD" onStart={onStart}>
+      <span className="run-lineup-rank">
+        <b>World Rank {formatRank(rank.rank)}</b>
+        <em>{board.nickname}</em>
+      </span>
       {rows.length === 0 ? (
         <span className="run-lineup-wait">The top five will show when the board answers.</span>
       ) : (
@@ -59,11 +63,6 @@ export function RunLineup({
           ))}
         </ol>
       )}
-      <span className="run-lineup-you">
-        <span>YOUR RANK</span>
-        <b>{formatRank(rank.rank)}</b>
-        <em>{board.nickname}</em>
-      </span>
     </LineupFrame>
   );
 }

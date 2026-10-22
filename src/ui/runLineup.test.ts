@@ -25,4 +25,12 @@ describe('pre-run leaderboard', () => {
     expect(app).toContain('<BestLineup best={snap.save.best}');
     expect(app).toContain('<RunLineup board={board}');
   });
+
+  it('prints the opted-in place as World Rank and keeps that phrase off the best-score card', () => {
+    const source = readFileSync(new URL('./RunLineup.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('World Rank {formatRank(rank.rank)}');
+    const best = source.slice(source.indexOf('export function BestLineup'));
+    expect(best).toContain('YOUR BEST');
+    expect(best).not.toContain('World Rank');
+  });
 });

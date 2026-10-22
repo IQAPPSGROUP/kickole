@@ -523,6 +523,14 @@ public class KickoleBillingPlugin extends Plugin implements PurchasesUpdatedList
         ), () -> call.reject(UNAVAILABLE, "billing_unavailable"));
     }
 
+    /** TestFlight is iOS-only. Play installs, including internal tracks, stay on real purchases. */
+    @PluginMethod
+    public void isSandboxReceipt(PluginCall call) {
+        JSObject out = new JSObject();
+        out.put("sandboxReceipt", false);
+        call.resolve(out);
+    }
+
     @PluginMethod
     public void restorePurchases(PluginCall call) {
         whenReady(

@@ -86,6 +86,7 @@ export class PurchaseService {
   private adapter: BillingAdapter;
   private product: StoreProduct | null = null;
   private packProducts: StoreProduct[] = [];
+  private testerUnlockFlag = false;
   private ready = false;
   private initPromise: Promise<void> | null = null;
   private entitlementListener: ((snapshot: EntitlementSnapshot) => void) | null = null;
@@ -111,6 +112,11 @@ export class PurchaseService {
 
   get cosmeticProducts() {
     return this.packProducts;
+  }
+
+  /** Runtime TestFlight receipt. Stays false when the check fails. */
+  get testerUnlock() {
+    return this.testerUnlockFlag;
   }
 
   setEntitlementListener(listener: ((snapshot: EntitlementSnapshot) => void) | null) {
@@ -144,6 +150,11 @@ export class PurchaseService {
       this.packProducts = await this.adapter.getProducts(SHOP_PACKS.map((pack) => pack.productId));
     } catch {
       this.packProducts = [];
+    }
+    try {
+      this.testerUnlockFlag = await this.adapter.isTestFlight();
+    } catch {
+      this.testerUnlockFlag = false;
     }
     this.ready = true;
   }

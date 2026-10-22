@@ -19,7 +19,7 @@ import type { BillingPlatform, StoreProduct } from '../billing/types';
 import { LAUNCH_COLLECTION_DISPLAY_NAME } from '../billing/config';
 import { launchCollectionBlurb, launchPurchaseLabel } from '../billing/storeCopy';
 import { DANCES, dancePriceString, type DanceDesign } from '../game/dances';
-import { challengeValue, meetsChallenge, milestoneStatsOf, outfitOwned } from '../game/shop';
+import { challengeValue, meetsChallenge, milestoneStatsOf, outfitSelectable } from '../game/shop';
 import { ShopPacks } from './ShopPacks';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
@@ -203,6 +203,7 @@ export function ShopScreen({
   onRestorePurchases,
   onPreview,
   onClose,
+  testerUnlock,
 }: {
   save: SaveData;
   launchProduct: StoreProduct | null;
@@ -219,6 +220,7 @@ export function ShopScreen({
   onRestorePurchases: () => void;
   onPreview: (opts: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }) => void;
   onClose: () => void;
+  testerUnlock: boolean;
 }) {
   const [tab, setTab] = useState<ShopTab>('boots');
   const [focusBoot, setFocusBoot] = useState(save.equippedBoot);
@@ -277,6 +279,7 @@ export function ShopScreen({
           onWearOutfit={onWearOutfit}
           onPurchasePack={onPurchasePack}
           onRestore={onRestorePurchases}
+          testerUnlock={testerUnlock}
         />
         <PlayerPreview
           skin={previewSkin}
@@ -299,11 +302,12 @@ export function ShopScreen({
             const owned = save.ownedBoots.includes(boot.id);
             const equipped = save.equippedBoot === boot.id;
             const packBoot = boot.id === COWBOY_BOOT_ID;
+            const testerBoot = testerUnlock && packBoot;
             const storeBoot = Boolean(boot.storeProductId);
             const storePrice = storeBoot ? cosmeticPriceString(boot.storeProductId ?? null, products) : null;
             const challengeOk = meetsChallenge(save.challenges, boot.unlock);
-            const afford = owned || (!packBoot && !storeBoot && challengeOk && save.coins >= boot.unlock.price);
-            const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : packBoot ? 'IN A PACK' : storeBoot ? (storePrice ?? 'STORE UNAVAILABLE') : afford ? `BUY ${boot.unlock.price}` : 'LOCKED';
+            const afford = owned || testerBoot || (!packBoot && !storeBoot && challengeOk && save.coins >= boot.unlock.price);
+            const label = equipped ? 'EQUIPPED' : owned || testerBoot ? 'EQUIP' : packBoot ? 'IN A PACK' : storeBoot ? (storePrice ?? 'STORE UNAVAILABLE') : afford ? `BUY ${boot.unlock.price}` : 'LOCKED';
             return (
               <div key={boot.id} className={`shop-item ${focusBoot === boot.id ? 'focus' : ''} ${equipped ? 'on' : ''}`}>
                 <button type="button" className="shop-item-main" onClick={() => selectBoot(boot)}>
@@ -319,7 +323,7 @@ export function ShopScreen({
                   type="button"
                   className="btn ghost shop-action"
                   disabled={equipped || (!owned && !afford)}
-                  onClick={() => { selectBoot(boot); if (!packBoot) onBuyBoot(boot.id); }}
+                  onClick={() => { selectBoot(boot); if (!packBoot || testerBoot) onBuyBoot(boot.id); }}
                 >
                   {label}
                 </button>
@@ -370,7 +374,7 @@ export function ShopScreen({
             </div>
           )}
           {tab === 'looks' && OUTFITS.map((outfit) => {
-            const owned = outfitOwned(save, outfit.id);
+            const owned = outfitSelectable(save, outfit.id, testerUnlock);
             const equipped = save.equippedOutfit === outfit.id;
             const milestone = outfit.milestone;
             const progress = milestone

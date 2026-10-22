@@ -69,6 +69,11 @@ export interface BillingAdapter {
    * Throws when the store does not answer. An empty list is a real answer.
    */
   ownedProductIds(): Promise<string[]>;
+  /**
+   * True only for an iOS receipt named sandboxReceipt (TestFlight).
+   * App Store, Android, and web return false. Never throws into a grant.
+   */
+  isTestFlight(): Promise<boolean>;
   /** Live store updates (Ask to Buy, pending completion, refunds). */
   setEntitlementListener?(listener: ((snapshot: EntitlementSnapshot) => void) | null): void;
   /** Tear down listeners (transaction updates / billing client). */

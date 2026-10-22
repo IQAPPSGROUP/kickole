@@ -93,6 +93,11 @@ export class BrowserBillingAdapter implements BillingAdapter {
       this.busy = false;
     }
   }
+
+  /** The browser has no App Store receipt. ?simPurchase does not count as TestFlight. */
+  async isTestFlight(): Promise<boolean> {
+    return false;
+  }
 }
 
 function canDevSimulate(): boolean {

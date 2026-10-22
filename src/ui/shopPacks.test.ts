@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COSMETIC_SHOP_LINE } from '../game/outfits';
+import { TESTER_UNLOCK_NOTE } from '../billing/testFlight';
 
 describe('shop packs screen', () => {
   it('opens the shop only from a tap and keeps the pack copy free of a currency', () => {
@@ -24,6 +25,9 @@ describe('shop packs screen', () => {
     expect(packs).toContain('COSMETIC_SHOP_LINE');
     expect(packs).toContain('RESTORE PURCHASES');
     expect(packs).toContain('EARNED IN PLAY');
+    expect(packs).toContain('TESTER_UNLOCK_NOTE');
+    expect(packs).toContain('testerUnlock &&');
+    expect(readFileSync(new URL('../billing/testFlight.ts', import.meta.url), 'utf8')).toContain(TESTER_UNLOCK_NOTE);
     expect(packs).toContain('everythingIncludesLine');
     expect(packs).toContain('everythingOwnedLine');
     expect(packs).toContain('everythingSavingLabel');

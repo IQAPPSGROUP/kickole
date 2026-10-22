@@ -1,4 +1,5 @@
 import { packButtonLabel } from '../billing/storeCopy';
+import { TESTER_UNLOCK_NOTE } from '../billing/testFlight';
 import type { BillingPlatform, StoreProduct } from '../billing/types';
 import {
   COSMETIC_SHOP_LINE,
@@ -12,7 +13,7 @@ import {
   milestoneCurrent,
   type ShopPack,
 } from '../game/outfits';
-import { milestoneStatsOf, outfitOwned, packOwned } from '../game/shop';
+import { milestoneStatsOf, outfitSelectable, packOwned } from '../game/shop';
 import type { SaveData } from '../game/storage';
 
 function earnedProgress(save: SaveData, id: (typeof EARNED_OUTFIT_IDS)[number]): string {
@@ -35,6 +36,7 @@ export function ShopPacks({
   onWearOutfit,
   onPurchasePack,
   onRestore,
+  testerUnlock,
 }: {
   save: SaveData;
   products: readonly StoreProduct[];
@@ -47,6 +49,7 @@ export function ShopPacks({
   onWearOutfit: (id: string | null) => boolean;
   onPurchasePack: (productId: string) => void;
   onRestore: () => void;
+  testerUnlock: boolean;
 }) {
   const previewPack = (pack: ShopPack) => {
     const outfitId = pack.outfitIds[0] ?? null;
@@ -58,13 +61,14 @@ export function ShopPacks({
   return (
     <div className="shop-packs">
       <p className="shop-lead">{COSMETIC_SHOP_LINE}</p>
+      {testerUnlock && <p className="shop-note">{TESTER_UNLOCK_NOTE}</p>}
       <section className="shop-section" aria-label="Earned in play">
         <h3>EARNED IN PLAY</h3>
         <div className="shop-list">
           {EARNED_OUTFIT_IDS.map((id) => {
             const outfit = getOutfit(id);
             if (!outfit) return null;
-            const owned = outfitOwned(save, id);
+            const owned = outfitSelectable(save, id, testerUnlock);
             const equipped = save.equippedOutfit === id;
             const label = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : 'LOCKED';
             return (

@@ -143,10 +143,13 @@ export type ShopResult =
   | { ok: true; locker: WardrobeLocker }
   | { ok: false; locker: WardrobeLocker; reason: ShopFailure };
 
-export function buyOrEquipBoot(locker: WardrobeLocker, bootId: string): ShopResult {
+export function buyOrEquipBoot(locker: WardrobeLocker, bootId: string, testerUnlock = false): ShopResult {
   const boot = BOOTS.find((b) => b.id === bootId);
   if (!boot) return { ok: false, locker, reason: 'unknown' };
   if (locker.ownedBoots.includes(boot.id)) {
+    return { ok: true, locker: { ...locker, equippedBoot: boot.id } };
+  }
+  if (testerUnlock && boot.id === COWBOY_BOOT_ID) {
     return { ok: true, locker: { ...locker, equippedBoot: boot.id } };
   }
   if (boot.id === COWBOY_BOOT_ID || boot.storeProductId) return { ok: false, locker, reason: 'billing_unavailable' };
@@ -441,12 +444,32 @@ function CONTENT_PACKS_OWNED(locker: WardrobeLocker): boolean {
 }
 
 /** Equip a themed outfit the player already unlocked, or clear it with null. */
-export function equipOutfit(locker: WardrobeLocker, id: string | null): ShopResult {
+export function equipOutfit(locker: WardrobeLocker, id: string | null, testerUnlock = false): ShopResult {
   if (id === null) return { ok: true, locker: { ...locker, equippedOutfit: null } };
-  if (!outfitOwned(locker, id)) return { ok: false, locker, reason: 'locked' };
-  const outfit = getOutfit(id);
-  if (!outfit) return { ok: false, locker, reason: 'unknown' };
-  return { ok: true, locker: { ...locker, equippedOutfit: outfit.id } };
+  if (!isOutfitId(id)) return { ok: false, locker, reason: 'unknown' };
+  if (!testerUnlock && !outfitOwned(locker, id)) return { ok: false, locker, reason: 'locked' };
+  return { ok: true, locker: { ...locker, equippedOutfit: id } };
+}
+
+/** TestFlight can wear a costume without writing a store grant. */
+export function outfitSelectable(locker: WardrobeLocker, id: string, testerUnlock: boolean): boolean {
+  if (testerUnlock && isOutfitId(id)) return true;
+  return outfitOwned(locker, id);
+}
+
+/**
+ * Put a TestFlight selection back after a store sync.
+ * Does not add owned outfits, owned packs, or a purchase source.
+ */
+export function keepTesterWear(
+  locker: WardrobeLocker,
+  outfitId: string | null,
+  bootId: string | null,
+): WardrobeLocker {
+  let next = locker;
+  if (outfitId && isOutfitId(outfitId)) next = { ...next, equippedOutfit: outfitId };
+  if (bootId === COWBOY_BOOT_ID) next = { ...next, equippedBoot: COWBOY_BOOT_ID };
+  return next;
 }
 
 /**

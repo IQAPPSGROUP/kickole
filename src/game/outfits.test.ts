@@ -35,8 +35,10 @@ import {
   equipOutfit,
   grantShopPack,
   grantStoreCosmetic,
+  keepTesterWear,
   normalizeLocker,
   outfitOwned,
+  outfitSelectable,
   rememberDevCosmetic,
 } from './shop';
 
@@ -267,5 +269,32 @@ describe('themed outfits', () => {
       row('kickole_pack_everything', 100),
     ])).toBeNull();
     expect(includes.toLowerCase()).not.toContain('saving');
+  });
+
+  it('wears any costume on TestFlight without a store grant or dev_sim', () => {
+    const start = normalizeLocker(null);
+    expect(outfitSelectable(start, 'alien', false)).toBe(false);
+    expect(outfitSelectable(start, 'gold-legend', true)).toBe(true);
+    const worn = equipOutfit(start, 'alien', true);
+    expect(worn.ok).toBe(true);
+    if (worn.ok) {
+      expect(worn.locker.equippedOutfit).toBe('alien');
+      expect(worn.locker.ownedOutfits).toEqual([]);
+      expect(worn.locker.cosmeticSource).toBe('none');
+      expect(worn.locker.ownedPacks).toEqual([]);
+    }
+    expect(equipOutfit(start, 'alien').ok).toBe(false);
+    const boots = buyOrEquipBoot(start, COWBOY_BOOT_ID, true);
+    expect(boots.ok).toBe(true);
+    if (boots.ok) {
+      expect(boots.locker.equippedBoot).toBe(COWBOY_BOOT_ID);
+      expect(boots.locker.ownedBoots).not.toContain(COWBOY_BOOT_ID);
+    }
+    expect(buyOrEquipBoot(start, COWBOY_BOOT_ID).ok).toBe(false);
+    const kept = keepTesterWear(start, 'gold-legend', COWBOY_BOOT_ID);
+    expect(kept.equippedOutfit).toBe('gold-legend');
+    expect(kept.equippedBoot).toBe(COWBOY_BOOT_ID);
+    expect(kept.ownedOutfits).toEqual([]);
+    expect(grantStoreCosmetic(kept, 'alien', 'dev_sim').ownedOutfits).toEqual([]);
   });
 });

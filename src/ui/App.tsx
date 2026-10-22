@@ -463,6 +463,7 @@ export function App() {
           onRestorePurchases={() => { void controller.restorePurchases(); }}
           onPreview={(opts) => controller.previewEquipment(opts)}
           onClose={closeOverlay}
+          testerUnlock={snap.testerUnlock}
         />
       )}
     </div>

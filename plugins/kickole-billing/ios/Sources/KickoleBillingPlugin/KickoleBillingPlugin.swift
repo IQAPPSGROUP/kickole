@@ -19,6 +19,7 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getProducts", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "purchaseProduct", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "ownedProductIds", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isSandboxReceipt", returnType: CAPPluginReturnPromise),
     ]
 
     private let productId = "kickole_launch_collection"
@@ -199,6 +200,13 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(self.packPayload(outcome: "failed", productId: requested, source: "none", message: "Purchase could not be completed."))
             }
         }
+    }
+
+    /// TestFlight receipts use the sandbox file name. App Store receipts do not.
+    /// The URL is not logged.
+    @objc func isSandboxReceipt(_ call: CAPPluginCall) {
+        let name = Bundle.main.appStoreReceiptURL?.lastPathComponent
+        call.resolve(["sandboxReceipt": name == "sandboxReceipt"])
     }
 
     /// Every non-revoked entitlement id. The JS layer keeps only known pack ids.

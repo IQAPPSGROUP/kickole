@@ -64,10 +64,11 @@ These must match the existing App Store Connect app and Play Console app owned b
 3. **Local cache:** on **native**, `launchCollectionOwned` + `entitlementSource` (`apple`|`google`) + `entitlementVerifiedAt` retain access when a store query fails or returns no definitive answer. A bare boolean without a store source is ignored. On **web**, an `apple` or `google` source string is also ignored — it is not a receipt. Coin-owned item IDs in the save are still accepted, because that is how local coin purchases are stored.
 4. **Revoke only when definitive:** a non-OK Play `queryPurchasesAsync` (or a timed-out connection) must not clear an owned Launch Collection. Revoke when the store reports the product is not `PURCHASED` (refund, revoke, or a completed restore that finds nothing).
 5. **While the app is open:** StoreKit `Transaction.updates` and Play `PurchasesUpdatedListener` emit `entitlementChanged`. The app also re-queries on resume (iOS foreground, Android `onResume`, and the web view becoming visible).
-6. **Web:** purchases unavailable; `?simPurchase=1` grants `dev_sim` only in **development** builds.
-7. **Refunds / revokes:** StoreKit `revocationDate` and Play absence on a successful query remove `launchGrantedItemIds` only. Coin-purchased items remain.
-8. **Cross-store:** Apple ↔ Google do not transfer. Restore is per store account.
-9. **No secrets in logs:** adapters never log receipts, purchase tokens or credentials. `transactionRef` is a truncated opaque handle only.
+6. **Web:** purchases unavailable; `?simPurchase=1` grants `dev_sim` only in **development** builds. Production never grants from `dev_sim`.
+7. **TestFlight costumes:** the iOS plugin reads `Bundle.main.appStoreReceiptURL?.lastPathComponent` at runtime. `sandboxReceipt` unlocks every outfit for that session only and shows “Tester: all outfits unlocked”. An App Store receipt (`receipt`) does not. There is no build flag, because the same binary is promoted. Android returns false. The unlock is not written as a store purchase.
+8. **Refunds / revokes:** StoreKit `revocationDate` and Play absence on a successful query remove `launchGrantedItemIds` only. Coin-purchased items remain.
+9. **Cross-store:** Apple ↔ Google do not transfer. Restore is per store account.
+10. **No secrets in logs:** adapters never log receipts, purchase tokens or credentials. `transactionRef` is a truncated opaque handle only.
 
 ### Play Billing Library 9.1.0
 

@@ -50,6 +50,8 @@ export interface KickoleBillingPlugin {
     message?: string;
   }>;
   ownedProductIds(): Promise<{ productIds: string[] }>;
+  /** iOS app receipt file name. Android and web report sandboxReceipt false. */
+  isSandboxReceipt(): Promise<{ sandboxReceipt: boolean }>;
   addListener(
     eventName: 'entitlementChanged',
     listenerFunc: (event: {

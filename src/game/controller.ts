@@ -41,6 +41,7 @@ import {
   buyOrEquipKit,
   equipOutfit,
   equipOwnedDance,
+  keepTesterWear,
   rememberDevCosmetic,
   type ChallengeProgress,
 } from './shop';
@@ -49,6 +50,7 @@ import {
   applyGraphicsPatch,
   loadSave,
   loadSettings,
+  peekEquippedCosmetics,
   persistSave,
   saveRun,
   saveSettings,
@@ -109,6 +111,8 @@ export interface Snapshot {
   billingPlatform: BillingPlatform;
   billingMessage: string | null;
   billingBusy: boolean;
+  /** True only while the iOS receipt is the TestFlight sandbox receipt. */
+  testerUnlock: boolean;
 }
 
 /** Glues the engine to storage, audio, haptics and React (via subscribe/getSnapshot). */
@@ -141,6 +145,10 @@ export class GameController {
   private entitlementEpoch = 0;
   /** Drops a stale not-owned event that arrives just after a grant. */
   private grantGuardUntil = 0;
+  /** Runtime receipt check. Never set from dev_sim or a build flag. */
+  private testerUnlock = false;
+  /** Costume the tester picked. Restored after a store sync without granting ownership. */
+  private testerWorn = { outfit: null as string | null, boot: null as string | null };
   /** Pause menu is open, so the ball stays where it is. */
   private playHeld = false;
   private readonly onVisibility = () => {
@@ -163,11 +171,22 @@ export class GameController {
   }
 
   private async initBilling() {
+    this.testerWorn = peekEquippedCosmetics();
     try {
       await this.billing.init();
+      this.testerUnlock = this.billing.testerUnlock;
+    } catch {
+      this.testerUnlock = false;
+      this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
+    }
+    try {
       await this.pullEntitlements();
     } catch {
       this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
+    }
+    if (this.testerUnlock) {
+      this.save = { ...this.save, ...keepTesterWear(this.save, this.testerWorn.outfit, this.testerWorn.boot) };
+      persistSave(this.save);
     }
     this.publish();
   }
@@ -180,7 +199,9 @@ export class GameController {
       return;
     }
     const packed = await this.billing.syncPacks(next);
-    this.save = { ...this.save, ...packed };
+    let save = { ...this.save, ...packed } as SaveData;
+    if (this.testerUnlock) save = { ...save, ...keepTesterWear(save, this.testerWorn.outfit, this.testerWorn.boot) };
+    this.save = save;
     persistSave(this.save);
     this.publish();
   }
@@ -258,6 +279,7 @@ export class GameController {
       billingPlatform: this.billing.platform,
       billingMessage: this.billingMessage,
       billingBusy: this.billingBusy,
+      testerUnlock: this.testerUnlock,
     };
   }
 
@@ -730,9 +752,12 @@ export class GameController {
 
   /** Buy or equip a boot. Returns false when broke/locked/unknown. */
   buyBoot(id: string): boolean {
-    const result = buyOrEquipBoot(this.save, id);
+    const result = buyOrEquipBoot(this.save, id, this.testerUnlock);
     this.save = { ...this.save, ...result.locker };
-    if (result.ok) persistSave(this.save);
+    if (result.ok) {
+      if (this.testerUnlock) this.testerWorn = { ...this.testerWorn, boot: result.locker.equippedBoot };
+      persistSave(this.save);
+    }
     this.publish();
     return result.ok;
   }
@@ -747,9 +772,12 @@ export class GameController {
 
   /** Equip a themed outfit the player already owns, or pass null to wear the kit. */
   wearOutfit(id: string | null): boolean {
-    const result = equipOutfit(this.save, id);
+    const result = equipOutfit(this.save, id, this.testerUnlock);
     this.save = { ...this.save, ...result.locker };
-    if (result.ok) persistSave(this.save);
+    if (result.ok) {
+      if (this.testerUnlock) this.testerWorn = { ...this.testerWorn, outfit: result.locker.equippedOutfit };
+      persistSave(this.save);
+    }
     this.publish();
     return result.ok;
   }

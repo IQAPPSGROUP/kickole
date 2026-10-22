@@ -100,6 +100,15 @@ function write(key: string, value: unknown) {
   }
 }
 
+/** Equipped ids as stored, before a locker normalise drops unowned costumes. */
+export function peekEquippedCosmetics(): { outfit: string | null; boot: string | null } {
+  const saved = read<{ equippedOutfit?: unknown; equippedBoot?: unknown }>(SAVE_KEY);
+  return {
+    outfit: typeof saved?.equippedOutfit === 'string' ? saved.equippedOutfit : null,
+    boot: typeof saved?.equippedBoot === 'string' ? saved.equippedBoot : null,
+  };
+}
+
 export function loadSave(): SaveData {
   const d = read<SaveData & { ownedBoots?: string[] }>(SAVE_KEY);
   const settings = read<Settings>(SETTINGS_KEY);

@@ -226,6 +226,16 @@ export class NativeBillingAdapter implements BillingAdapter {
     return Array.isArray(raw.productIds) ? raw.productIds.filter((id) => typeof id === 'string') : [];
   }
 
+  async isTestFlight(): Promise<boolean> {
+    if (this.platform !== 'ios') return false;
+    try {
+      const raw = await withTimeout(KickoleBilling.isSandboxReceipt(), BILLING_CALL_TIMEOUT_MS);
+      return raw.sandboxReceipt === true;
+    } catch {
+      return false;
+    }
+  }
+
   dispose() {
     void this.listener?.remove();
     this.listener = null;

@@ -69,6 +69,8 @@ class FakeAdapter implements BillingAdapter {
     if (this.throwOwned) throw new Error('billing_query_failed');
     return this.ownedProductIdList;
   }
+  testFlight = false;
+  async isTestFlight() { return this.testFlight; }
   async refreshEntitlements(): Promise<EntitlementSnapshot> {
     if (this.failRefresh) throw new Error('billing_unavailable');
     if (this.refreshSnapshot) return this.refreshSnapshot;
@@ -250,5 +252,17 @@ describe('PurchaseService', () => {
     const bought = await service.purchasePack(normalizeLocker(null), 'kickole_pack_party');
     expect(bought.locker.ownedPacks).toEqual([]);
     expect(bought.locker.ownedBoots).not.toContain('boot-cowboy');
+  });
+
+  it('records a TestFlight receipt without turning dev_sim into ownership', async () => {
+    const adapter = new FakeAdapter();
+    adapter.testFlight = true;
+    const service = new PurchaseService(adapter);
+    await service.init();
+    expect(service.testerUnlock).toBe(true);
+    adapter.testFlight = false;
+    const store = new PurchaseService(new FakeAdapter());
+    await store.init();
+    expect(store.testerUnlock).toBe(false);
   });
 });

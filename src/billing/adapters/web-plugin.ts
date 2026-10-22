@@ -58,4 +58,8 @@ export class KickoleBillingWeb extends WebPlugin implements KickoleBillingPlugin
   async ownedProductIds() {
     return { productIds: [] };
   }
+
+  async isSandboxReceipt() {
+    return { sandboxReceipt: false };
+  }
 }

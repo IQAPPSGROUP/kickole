@@ -2,7 +2,9 @@
  * Builds small skinned outfit GLBs from the kickole_player_v4 body surface.
  * Shells share the source joint order and inverse bind matrices.
  * Boots are a flat upper plus a dark sole: no stripe texture and no lace mesh.
- * Shadow Hero has a brow band only — no cape, cowl, bat symbol, or chest emblem.
+ * The knight is matte plate (helmet, breastplate, pauldrons, gauntlets, tabard, armoured boots).
+ * Shadow Hero is a panelled suit with a teal visor, belt, gloves and a small yellow triangle.
+ * No cape, bat symbol, or logo emblem.
  */
 import { mkdirSync, statSync } from 'node:fs';
 import { Document, NodeIO } from '@gltf-transform/core';
@@ -19,8 +21,8 @@ const MAX_BYTES = 180_000;
 const CLOTH = { roughness: 0.78, metalness: 0 };
 const BOOT = { roughness: 0.72, metalness: 0.04 };
 const SOLE_MAT = { roughness: 0.92, metalness: 0 };
-const PLATE = { roughness: 0.34, metalness: 0.62 };
-const CHAIN = { roughness: 0.55, metalness: 0.28 };
+const MATTE_PLATE = { roughness: 0.64, metalness: 0.16 };
+const DARK_METAL = { roughness: 0.58, metalness: 0.22 };
 
 function linear(channel) {
   return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -37,14 +39,18 @@ const SPIKE = hex('#163318');
 const DINO_BOOT = hex('#217A32');
 const SOLE = hex('#141414');
 const PLATE_COLOR = hex('#C8CCD1');
-const CHAIN_COLOR = hex('#7E868E');
 const TABARD = hex('#7A2030');
 const MARK = hex('#E2B34A');
 const HELMET = hex('#D5D8DC');
-const KNIGHT_BOOT = hex('#24262A');
-const NIGHT = hex('#2C3036');
-const BROW = hex('#9AA3AC');
-const NIGHT_BOOT = hex('#1A1C20');
+const NIGHT = hex('#242830');
+const NIGHT_PANEL = hex('#3C4554');
+const NIGHT_BELT = hex('#101216');
+const TEAL_VISOR = hex('#2ED3C6');
+const TRIANGLE = hex('#F2C14E');
+const NIGHT_GLOVE = hex('#14161C');
+const NIGHT_BOOT = hex('#0E1014');
+const PADDING = hex('#3A404A');
+const VISOR_SLIT = hex('#1A1C20');
 const WHITE = hex('#F7F5ED');
 const APRON = hex('#E7E2D6');
 const BLACK = hex('#161616');
@@ -713,6 +719,84 @@ function bootPair(boots, sole, color) {
   ];
 }
 
+function meshJoint(mesh, vertex) {
+  let best = 0;
+  let weight = -1;
+  for (let influence = 0; influence < 4; influence++) {
+    const value = mesh.weights[vertex * 4 + influence];
+    if (value > weight) {
+      weight = value;
+      best = mesh.joints[vertex * 4 + influence];
+    }
+  }
+  return best;
+}
+
+function keepJoints(mesh, joints) {
+  const wanted = new Set(joints);
+  const yes = [];
+  for (let i = 0; i < mesh.indices.length; i += 3) {
+    const ids = [mesh.indices[i], mesh.indices[i + 1], mesh.indices[i + 2]];
+    const votes = ids.filter((id) => wanted.has(meshJoint(mesh, id))).length;
+    if (votes >= 2) yes.push(...ids);
+  }
+  if (yes.length < 3) return null;
+  return { ...mesh, indices: Uint32Array.from(yes) };
+}
+
+function indexedBounds(mesh) {
+  const min = [Infinity, Infinity, Infinity];
+  const max = [-Infinity, -Infinity, -Infinity];
+  for (const index of mesh.indices) {
+    for (let k = 0; k < 3; k++) {
+      const value = mesh.positions[index * 3 + k];
+      min[k] = Math.min(min[k], value);
+      max[k] = Math.max(max[k], value);
+    }
+  }
+  return { min, max };
+}
+
+function mustMesh(mesh, name) {
+  if (!mesh || mesh.indices.length < 3) throw new Error(`empty ${name}`);
+  return mesh;
+}
+
+function outerPlate(mesh, jointId, side) {
+  const piece = keepJoints(mesh, [jointId]);
+  if (!piece) return null;
+  const bounds = indexedBounds(piece);
+  const mid = (bounds.min[0] + bounds.max[0]) / 2;
+  const plate = splitTriangles(piece, (point) => (side < 0 ? point.x < mid : point.x > mid)).yes;
+  if (plate.indices.length < 12) return null;
+  return offsetAlongNormals(plate, 0.014);
+}
+
+function triangleMark(center, size, donor) {
+  const [x, y, z] = center;
+  const positions = [
+    x, y + size, z + 0.028,
+    x + size * 0.9, y - size * 0.72, z + 0.028,
+    x - size * 0.9, y - size * 0.72, z + 0.028,
+  ];
+  const indices = [0, 1, 2, 0, 2, 1];
+  const influence = nearestWeights(donor, center);
+  const joints = new Uint8Array(3 * 4);
+  const weights = new Float32Array(3 * 4);
+  for (let i = 0; i < 3; i++) {
+    joints.set(influence.joints, i * 4);
+    weights.set(influence.weights, i * 4);
+  }
+  const indexArray = Uint32Array.from(indices);
+  return {
+    positions: Float32Array.from(positions),
+    normals: computeNormals(Float32Array.from(positions), indexArray),
+    joints,
+    weights,
+    indices: indexArray,
+  };
+}
+
 function recipes(body) {
   const face = faceOf(body.prims);
   const headJoint = body.jointIndex('Head');
@@ -723,13 +807,12 @@ function recipes(body) {
   const sole = shell(body.prims, ['sole'], 0.004);
   const head = shell(body.prims, ['head'], 0.018);
   const hood = splitTriangles(head, (c, n) => inWindow(c, n, face, face.minY, face.maxY)).no;
+  const shirt = shell(body.prims, ['shirt'], 0.012);
   const plate = shell(body.prims, ['shirt', 'arm'], 0.016);
   const legs = shell(body.prims, ['shorts', 'thigh', 'socks'], 0.012);
-  const shirt = shell(body.prims, ['shirt'], 0.012);
   const arms = shell(body.prims, ['arm'], 0.01);
   const tabardShell = shell(body.prims, ['shirt', 'shorts'], 0.028);
   const tabard = splitTriangles(tabardShell, (c, n) => n.z > 0.35 && Math.abs(c.x) < 0.09 && c.y > face.minY - 0.55).yes;
-  const helmet = splitTriangles(shell(body.prims, ['head'], 0.022), (c, n) => inWindow(c, n, face, face.visorMinY, face.visorMaxY)).no;
   const brow = splitTriangles(shell(body.prims, ['head'], 0.02), (c, n) => inWindow(c, n, face, face.browMinY, face.browMaxY)).yes;
   const belly = splitTriangles(suit, (c, n) => n.z > 0.4 && Math.abs(c.x) < 0.07 && c.y > -0.02 && c.y < 0.42).yes;
   const cloth = splitTriangles(suit, (c, n) => n.z > 0.4 && Math.abs(c.x) < 0.07 && c.y > -0.02 && c.y < 0.42).no;
@@ -769,6 +852,48 @@ function recipes(body) {
     ]), color, CLOTH, 1, 1);
   };
   const spineJoint = body.jointIndex('Spine2');
+  const upperL = body.jointIndex('UpperArm_L');
+  const upperR = body.jointIndex('UpperArm_R');
+  const lowerL = body.jointIndex('LowerArm_L');
+  const lowerR = body.jointIndex('LowerArm_R');
+  const handL = body.jointIndex('Hand_L');
+  const handR = body.jointIndex('Hand_R');
+  const armPlate = shell(body.prims, ['arm'], 0.016);
+  const shirtArmour = shell(body.prims, ['shirt'], 0.02);
+  const pauldrons = mustMesh(offsetAlongNormals(mustMesh(mergeGeoms([
+    mustMesh(keepJoints(shirtArmour, [upperL]), 'pauldron-l'),
+    mustMesh(keepJoints(shirtArmour, [upperR]), 'pauldron-r'),
+  ]), 'pauldron'), 0.02), 'pauldron');
+  const gauntlets = mustMesh(offsetAlongNormals(mustMesh(keepJoints(shell(body.prims, ['arm'], 0.022), [handL, handR]), 'gauntlet'), 0.012), 'gauntlet');
+  const vambraces = mustMesh(mergeGeoms([
+    mustMesh(outerPlate(armPlate, lowerL, -1), 'vambrace-l'),
+    mustMesh(outerPlate(armPlate, lowerR, 1), 'vambrace-r'),
+  ]), 'vambrace');
+  const breastShell = shell(body.prims, ['shirt'], 0.034);
+  const breastBounds = indexedBounds(breastShell);
+  const breastSpan = breastBounds.max[1] - breastBounds.min[1] || 1;
+  const breast = mustMesh(splitTriangles(breastShell, (c, n) => n.z > 0.28 && Math.abs(c.x) < 0.16 && c.y > breastBounds.min[1] + breastSpan * 0.3).yes, 'breastplate');
+  const greave = mustMesh(splitTriangles(shell(body.prims, ['socks'], 0.022), (c, n) => n.z > 0.15).yes, 'greave');
+  const helmShell = shell(body.prims, ['head'], 0.03);
+  const mouthOpen = (c, n) => n.z > 0.28 && c.y < face.visorMinY && Math.abs(c.x) < face.halfX;
+  const eyeOpen = (c, n) => inWindow(c, n, face, face.visorMinY - 0.01, face.visorMaxY + 0.012);
+  const knightHelm = mustMesh(splitTriangles(helmShell, (c, n) => !mouthOpen(c, n) && !eyeOpen(c, n)).yes, 'helmet');
+  const knightVisor = stamp(boxMesh([0, eyeY, eyeZ + 0.03], [Math.max(0.15, face.halfX * 1.8), 0.016, 0.016], headJoint), suit, [0, eyeY, eyeZ]);
+  const padding = shell(body.prims, ['shirt', 'shorts', 'socks', 'arm', 'thigh'], 0.008);
+  const knightBoot = shell(body.prims, ['boots'], 0.022);
+  const nightHead = shell(body.prims, ['head'], 0.022);
+  const nightEye = (c, n) => inWindow(c, n, face, face.visorMinY - 0.016, face.visorMaxY + 0.02);
+  const nightHood = mustMesh(splitTriangles(nightHead, (c, n) => !nightEye(c, n)).yes, 'hood');
+  const nightVisor = stamp(boxMesh([0, eyeY, eyeZ + 0.032], [Math.max(0.16, face.halfX * 2), 0.05, 0.02], headJoint), suit, [0, eyeY, eyeZ]);
+  const panelShell = shell(body.prims, ['shirt'], 0.026);
+  const panelBounds = indexedBounds(panelShell);
+  const panelSpan = panelBounds.max[1] - panelBounds.min[1] || 1;
+  const chestPanel = mustMesh(splitTriangles(panelShell, (c, n) => n.z > 0.32 && Math.abs(c.x) < 0.13 && c.y > panelBounds.min[1] + panelSpan * 0.36).yes, 'panel');
+  const waistY = panelBounds.min[1] + panelSpan * 0.08;
+  const beltBand = splitTriangles(shell(body.prims, ['shirt', 'shorts'], 0.024), (c) => Math.abs(c.y - waistY) < 0.03).yes;
+  const belt = beltBand.indices.length >= 18 ? offsetAlongNormals(beltBand, 0.012) : torus([0, waistY, 0.02], 0.11, 0.016, hipJoint);
+  const gloves = mustMesh(offsetAlongNormals(mustMesh(keepJoints(shell(body.prims, ['arm'], 0.026), [handL, handR]), 'glove'), 0.01), 'glove');
+  const nightBoot = shell(body.prims, ['boots'], 0.024);
   return {
     'spike-hood': [
       wear('suit', cloth, GREEN, CLOTH),
@@ -779,17 +904,30 @@ function recipes(body) {
       ...plain(DINO_BOOT),
     ],
     'keep-guard': [
-      wear('plate', plate, PLATE_COLOR, PLATE),
-      wear('legs', legs, CHAIN_COLOR, CHAIN, 0.14, 0.018),
-      wear('tabard', tabard, TABARD, CLOTH, 0.28, 0.012),
-      wear('mark', diamond(chestPoint(tabard), 0.045, tabard), MARK, { roughness: 0.4, metalness: 0.35 }, 1, 1),
-      wear('helmet', helmet, HELMET, PLATE, 0.32, 0.01, true),
-      ...plain(KNIGHT_BOOT),
+      wear('padding', padding, PADDING, CLOTH, 0.06, 0.03),
+      wear('breastplate', breast, PLATE_COLOR, MATTE_PLATE, 0.28, 0.016, true),
+      wear('pauldron', pauldrons, HELMET, MATTE_PLATE, 0.55, 0.012, true),
+      wear('vambrace', vambraces, PLATE_COLOR, MATTE_PLATE, 0.28, 0.016),
+      wear('gauntlet', gauntlets, HELMET, MATTE_PLATE, 0.45, 0.012, true),
+      wear('greave', greave, PLATE_COLOR, MATTE_PLATE, 0.25, 0.016),
+      wear('tabard', tabard, TABARD, CLOTH, 0.22, 0.016),
+      wear('mark', diamond(chestPoint(tabard), 0.045, tabard), MARK, { roughness: 0.45, metalness: 0.2 }, 1, 1),
+      wear('helmet', knightHelm, HELMET, MATTE_PLATE, 0.22, 0.014, true),
+      wear('visor', knightVisor, VISOR_SLIT, { roughness: 0.4, metalness: 0.08 }, 1, 1),
+      wear('boot', knightBoot, hex('#2A2E34'), DARK_METAL, 0.45, 0.006),
+      wear('sole', sole, SOLE, SOLE_MAT, 0.6, 0.003),
     ],
     'night-glider': [
-      suitPart(NIGHT),
-      browPart(BROW),
-      ...plain(NIGHT_BOOT),
+      wear('suit', suit, NIGHT, CLOTH, 0.07, 0.028),
+      wear('panel', chestPanel, NIGHT_PANEL, CLOTH, 0.3, 0.016, true),
+      wear('belt', belt, NIGHT_BELT, CLOTH, 0.35, 0.014, true),
+      wear('hood', nightHood, NIGHT, CLOTH, 0.22, 0.014, true),
+      wear('visor', nightVisor, TEAL_VISOR, { roughness: 0.28, metalness: 0.08 }, 1, 1),
+      wear('triangle', triangleMark([chest[0], chest[1] + 0.02, chest[2]], 0.034, suit), TRIANGLE, { roughness: 0.42, metalness: 0.05 }, 1, 1),
+      wear('glove', gloves, NIGHT_GLOVE, CLOTH, 0.4, 0.012, true),
+      rings(NIGHT_PANEL, 'seam'),
+      wear('boot', nightBoot, NIGHT_BOOT, BOOT, 0.45, 0.006),
+      wear('sole', sole, SOLE, SOLE_MAT, 0.6, 0.003),
     ],
     'kitchen-whites': [
       suitPart(WHITE),
@@ -1101,7 +1239,7 @@ function addPart(doc, buffer, mesh, partDef) {
     .setBaseColorFactor(partDef.color)
     .setRoughnessFactor(partDef.roughness)
     .setMetallicFactor(partDef.metalness)
-    .setDoubleSided(/^(spike|tail|mark|hat|brim|cape|shade|tie|moustache|pom|beard|wrap|apron|visor|whistle|toque)$/.test(partDef.name) || partDef.name.startsWith('card'));
+    .setDoubleSided(/^(spike|tail|mark|triangle|hat|brim|cape|shade|tie|moustache|pom|beard|wrap|apron|visor|whistle|toque)$/.test(partDef.name) || partDef.name.startsWith('card'));
   const prim = doc.createPrimitive()
     .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(src.positions).setBuffer(buffer))
     .setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(src.normals).setBuffer(buffer))

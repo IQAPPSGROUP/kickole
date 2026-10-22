@@ -17,7 +17,7 @@ function glbJson(file: URL) {
   const length = view.getUint32(12, true);
   return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + length))) as {
     images?: unknown[];
-    materials?: { name?: string; pbrMetallicRoughness?: { baseColorFactor?: number[] } }[];
+    materials?: { name?: string; pbrMetallicRoughness?: { baseColorFactor?: number[]; roughnessFactor?: number; metallicFactor?: number } }[];
     skins?: { joints: number[] }[];
     nodes?: { name?: string }[];
   };
@@ -95,7 +95,21 @@ describe('skinned outfit meshes', () => {
       expect(json.skins?.[0].joints).toHaveLength(20);
     }
     const shadow = glbJson(new URL('night-glider-male.glb', OUTFIT_DIR));
-    expect((shadow.materials ?? []).map((material) => material.name)).toEqual(['suit', 'brow', 'boot', 'sole']);
+    expect((shadow.materials ?? []).map((material) => material.name)).toEqual([
+      'suit', 'panel', 'belt', 'hood', 'visor', 'triangle', 'glove', 'seam', 'boot', 'sole',
+    ]);
+    const knight = glbJson(new URL('keep-guard-male.glb', OUTFIT_DIR));
+    const knightNames = (knight.materials ?? []).map((material) => material.name);
+    expect(knightNames).toEqual(expect.arrayContaining([
+      'breastplate', 'pauldron', 'gauntlet', 'helmet', 'visor', 'tabard', 'greave', 'boot',
+    ]));
+    for (const material of knight.materials ?? []) {
+      if (!['breastplate', 'pauldron', 'vambrace', 'gauntlet', 'greave', 'helmet', 'boot'].includes(material.name ?? '')) continue;
+      const rough = material.pbrMetallicRoughness?.roughnessFactor ?? 1;
+      const metal = material.pbrMetallicRoughness?.metallicFactor ?? 1;
+      expect(rough, material.name).toBeGreaterThan(0.5);
+      expect(metal, material.name).toBeLessThan(0.35);
+    }
     const pirate = (glbJson(new URL('deck-hand-male.glb', OUTFIT_DIR)).materials ?? []).map((material) => material.name ?? '');
     expect(pirate).toContain('hat');
     expect(pirate.join(' ')).not.toMatch(/emblem|skull|cross|bone/i);

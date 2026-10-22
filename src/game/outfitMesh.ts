@@ -31,7 +31,7 @@ export const OUTFIT_COVER: Record<MeshOutfitId, OutfitCover> = {
   alien: covered(false),
   spaceman: covered(false),
   'street-hero': covered(false),
-  'night-glider': covered(false),
+  'night-glider': covered(true),
   'night-wrap': covered(true),
   'deck-hand': covered(true),
   'secret-agent': covered(false),

@@ -144,7 +144,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
     clothing: cloth('#2A2E33', '#8B939C', '#1A1D21', '#3A3F45'),
     pattern: 'night',
     skinTint: null,
-    note: 'Charcoal kit and a plain brow band. No cape, cowl or chest emblem.',
+    note: 'Charcoal suit, teal visor, belt and a small yellow triangle. No cape and no bat symbol.',
   },
   {
     id: 'night-wrap',
@@ -189,7 +189,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
     clothing: cloth('#C0C4C8', '#7A1F2B', '#4A4E55', '#D9DDE2'),
     pattern: 'chain',
     skinTint: null,
-    note: 'Chainmail-look top and a tabard with an original crest. Earned in play.',
+    note: 'Matte plate: helmet, breastplate, pauldrons, gauntlets and a maroon tabard. Earned in play.',
   },
   {
     id: 'kitchen-whites',

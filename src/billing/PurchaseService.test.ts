@@ -235,13 +235,31 @@ describe('PurchaseService', () => {
 
     adapter.throwOwned = true;
     const kept = await service.syncPacks(bought.locker);
-    expect(kept.ownedPacks).toEqual(['adventure']);
+    expect(kept.confirmed).toBe(false);
+    expect(kept.locker.ownedPacks).toEqual(['adventure']);
 
     adapter.platform = 'web';
     adapter.throwOwned = false;
     adapter.ownedProductIdList = [];
     const preview = await service.syncPacks(bought.locker);
-    expect(preview.ownedOutfits).toContain('secret-agent');
+    expect(preview.confirmed).toBe(false);
+    expect(preview.locker.ownedOutfits).toContain('secret-agent');
+  });
+
+  it('grants a Play test-card pack from an ordinary owned product id', async () => {
+    const adapter = new FakeAdapter();
+    adapter.platform = 'android';
+    adapter.testFlight = false;
+    adapter.ownedProductIdList = ['kickole_pack_spooky'];
+    const service = new PurchaseService(adapter);
+    await service.init();
+    expect(service.testerUnlock).toBe(false);
+    const synced = await service.syncPacks(normalizeLocker(null));
+    expect(synced.confirmed).toBe(true);
+    expect(synced.locker.ownedPacks).toEqual(['spooky']);
+    expect(synced.locker.ownedOutfits).toContain('grey-ghoul');
+    expect(synced.locker.cosmeticSource).toBe('google');
+    expect(synced.locker.launchCollectionOwned).toBe(false);
   });
 
   it('does not grant a pack from a dev_sim purchase result', async () => {

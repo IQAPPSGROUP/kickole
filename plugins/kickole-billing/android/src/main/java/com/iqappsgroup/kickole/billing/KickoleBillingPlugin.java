@@ -501,6 +501,11 @@ public class KickoleBillingPlugin extends Plugin implements PurchasesUpdatedList
         }
     }
 
+    /**
+     * Every PURCHASED in-app product, including a Play license-tester purchase
+     * made with the free test card. Those rows are often missing an order id.
+     * Do not skip them, and do not treat a closed track as an unlock.
+     */
     @PluginMethod
     public void ownedProductIds(PluginCall call) {
         whenReady(() -> billingClient.queryPurchasesAsync(
@@ -523,7 +528,11 @@ public class KickoleBillingPlugin extends Plugin implements PurchasesUpdatedList
         ), () -> call.reject(UNAVAILABLE, "billing_unavailable"));
     }
 
-    /** TestFlight is iOS-only. Play installs, including internal tracks, stay on real purchases. */
+    /**
+     * TestFlight is iOS-only. Play cannot tell a closed-track install from
+     * production, so this never unlocks outfits. License testers buy with the
+     * free test card and restore through ownedProductIds.
+     */
     @PluginMethod
     public void isSandboxReceipt(PluginCall call) {
         JSObject out = new JSObject();

@@ -4,6 +4,7 @@ import {
   shouldIgnoreStaleRevoke,
   shouldKeepRecentGrant,
 } from '../billing/PurchaseService';
+import { restoreBillingMessage } from '../billing/restoreMessage';
 import {
   shouldRefreshEntitlementsOnResume,
   STORE_UNAVAILABLE_MESSAGE,
@@ -199,7 +200,7 @@ export class GameController {
       return;
     }
     const packed = await this.billing.syncPacks(next);
-    let save = { ...this.save, ...packed } as SaveData;
+    let save = { ...this.save, ...packed.locker } as SaveData;
     if (this.testerUnlock) save = { ...save, ...keepTesterWear(save, this.testerWorn.outfit, this.testerWorn.boot) };
     this.save = save;
     persistSave(this.save);
@@ -881,11 +882,16 @@ export class GameController {
       const restored = await this.billing.restore(this.save);
       const packed = await this.billing.syncPacks(restored.locker);
       const result = restored.result;
-      this.save = { ...this.save, ...packed };
+      this.save = { ...this.save, ...packed.locker };
       if (this.save.launchCollectionOwned) this.grantGuardUntil = Date.now() + 10_000;
       persistSave(this.save);
-      this.billingMessage = result.message
-        ?? (result.outcome === 'failed' || result.outcome === 'unavailable' ? STORE_UNAVAILABLE_MESSAGE : null);
+      this.billingMessage = restoreBillingMessage({
+        outcome: result.outcome,
+        launchOwned: result.entitlement.owned,
+        launchMessage: result.message,
+        packsConfirmed: packed.confirmed,
+        ownedPacks: this.save.ownedPacks,
+      });
       return result;
     } catch {
       return this.failedBilling();

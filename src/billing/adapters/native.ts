@@ -227,6 +227,7 @@ export class NativeBillingAdapter implements BillingAdapter {
   }
 
   async isTestFlight(): Promise<boolean> {
+    // Play closed tracks are indistinguishable from production. Android buys packs.
     if (this.platform !== 'ios') return false;
     try {
       const raw = await withTimeout(KickoleBilling.isSandboxReceipt(), BILLING_CALL_TIMEOUT_MS);

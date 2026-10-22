@@ -28,5 +28,10 @@ describe('TestFlight receipt', () => {
     expect(swift).not.toMatch(/KICKOLE_TESTER|TESTFLIGHT_UNLOCK|SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
     expect(java).toContain('sandboxReceipt');
     expect(java).toMatch(/put\("sandboxReceipt", false\)/);
+    expect(java).not.toMatch(/getInstallerPackageName|closedTrack|licenseTesterUnlock/);
+    const owned = java.slice(java.indexOf('void ownedProductIds'), java.indexOf('void isSandboxReceipt'));
+    expect(owned).toContain('PURCHASED');
+    expect(owned).toContain('acknowledge');
+    expect(owned).not.toContain('getOrderId');
   });
 });

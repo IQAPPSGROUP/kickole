@@ -71,7 +71,8 @@ export interface BillingAdapter {
   ownedProductIds(): Promise<string[]>;
   /**
    * True only for an iOS receipt named sandboxReceipt (TestFlight).
-   * App Store, Android, and web return false. Never throws into a grant.
+   * App Store, Android, and web return false. A Play closed track is not
+   * detected here. Never throws into a grant.
    */
   isTestFlight(): Promise<boolean>;
   /** Live store updates (Ask to Buy, pending completion, refunds). */

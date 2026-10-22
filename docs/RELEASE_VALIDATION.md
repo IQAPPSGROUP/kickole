@@ -91,7 +91,7 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 1. Confirm bundle/application id matches live listings.
 2. Create IAP `kickole_launch_collection` (£2.99 UK) in App Store Connect and Play Console; Paid Apps / merchant setup active.
 3. Codemagic TestFlight upload (`ios-testflight`). Hand steps, including the App Store profile for `com.iqappsgroup.kickole`, are in [`TESTFLIGHT.md`](./TESTFLIGHT.md).
-4. Play App Signing + upload keystore; build signed AAB; upload internal track. Configure **licence testers** (internal-track alone may still be charged).
+4. Play App Signing + upload keystore; build signed AAB; upload internal track. Add **license testers** and have them buy packs with Google’s free test card. There is no in-app Android unlock for closed tracks. An internal-track tester who is not a license tester may still be charged.
 5. Complete physical purchase matrix on small/large iPhone and Android phones.
 6. Publish privacy policy URL + ASC / Play Data safety from [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md).
 7. Optional: server-side App Store Server API / Play Developer API verification ([`BILLING.md`](./BILLING.md)).

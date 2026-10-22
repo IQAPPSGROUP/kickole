@@ -37,7 +37,7 @@ Use these notes for **TestFlight** and **Google Play internal testing**. Public 
 
 **iOS:** Sandbox Apple ID or StoreKit Configuration in Xcode; TestFlight uses sandbox for IAP. Cover success, cancel, Ask to Buy / pending, airplane mode during purchase, force-quit mid-flow, double-tap purchase, restore with/without ownership, reinstall, second device same Apple ID, refund via App Store Connect if available.
 
-**Android:** Add accounts under Play Console → Licence testing / license testers. Prefer test instruments. Cover PURCHASED vs PENDING, cancel, network loss, restore / check purchases, reinstall, second device same Google account, revoke. An internal-track tester alone is **not** always protected from real charges — confirm licence testing before tapping Buy.
+**Android:** Add the Google account under Play Console → License testing. Buy packs with Google’s free test card (Test card, always approves). The app does not unlock outfits because the install is on a closed or internal track — Play cannot tell that apart from production. Cover PURCHASED vs PENDING, cancel, network loss, restore, reinstall, second device on the same Google account, and revoke. An internal-track tester who is not a license tester can still be charged.
 
 **Web / browser:** Purchases are unavailable. Development `?simPurchase=1` must **not** grant real ownership in production builds.
 
@@ -46,7 +46,7 @@ Use these notes for **TestFlight** and **Google Play internal testing**. Public 
 1. Install from TestFlight or Play internal track.
 2. Sign in with the **same** Apple / Google account used for the purchase.
 3. Open Shop → **Restore Purchases**.
-4. Launch boots/kits should become owned; coin balance and earned items from a previous install are **local** — they do not sync across devices unless you still have the same device save.
+4. Launch boots and kits become owned when that account bought the Launch Collection. Shop packs become owned when that account bought them, including a Play license-tester purchase made with the free test card. Restore says the packs were restored even when the Launch Collection was not bought. Coin balance and earned items from a previous install are **local** — they do not sync across devices unless you still have the same device save.
 
 ## Device checklist (testers)
 

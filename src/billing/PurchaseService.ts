@@ -205,16 +205,18 @@ export class PurchaseService {
   /**
    * Apply a successful native pack query. A thrown query leaves the locker as it was.
    * Web is ignored so a browser cannot wipe a hand-checked dev preview.
+   * Play license-tester purchases use this same list: a free test card is
+   * PURCHASED, and a null order id is still ownership.
    */
-  async syncPacks(locker: WardrobeLocker): Promise<WardrobeLocker> {
+  async syncPacks(locker: WardrobeLocker): Promise<PackSync> {
     await this.init();
-    if (this.adapter.platform === 'web') return locker;
+    if (this.adapter.platform === 'web') return { locker, confirmed: false };
     try {
       const productIds = await this.adapter.ownedProductIds();
       const source = this.adapter.platform === 'ios' ? 'apple' : 'google';
-      return applyOwnedPackProducts(locker, productIds, source);
+      return { locker: applyOwnedPackProducts(locker, productIds, source), confirmed: true };
     } catch {
-      return locker;
+      return { locker, confirmed: false };
     }
   }
 
@@ -232,6 +234,12 @@ export class PurchaseService {
   dispose() {
     this.adapter.dispose();
   }
+}
+
+export interface PackSync {
+  locker: WardrobeLocker;
+  /** True when the store answered. False on web and when the query throws. */
+  confirmed: boolean;
 }
 
 export function createDefaultPurchaseService() {

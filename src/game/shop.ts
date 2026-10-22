@@ -17,11 +17,17 @@ import {
   COWBOY_BOOT_ID,
   GOLD_LEGEND_STREAK,
   cosmeticGrantAllowed,
+  earnedOutfit,
   getOutfit,
-  goldLegendUnlocked,
+  getShopPack,
   isOutfitId,
+  isShopPackId,
   keepStoreCosmetic,
+  milestoneMet,
+  packsGrantedBy,
+  shopPackForProduct,
   type OutfitId,
+  type ShopPackId,
 } from './outfits';
 import {
   STARTER_DANCE_ID,
@@ -70,8 +76,10 @@ export interface WardrobeLocker {
   ownedOutfits: OutfitId[];
   /** Null wears the equipped kit. */
   equippedOutfit: OutfitId | null;
-  /** Source of ownedOutfits and the cowboy boot. dev_sim is never accepted. */
+  /** Source of ownedOutfits, ownedPacks and the cowboy boot. dev_sim is never accepted. */
   cosmeticSource: EntitlementSource;
+  /** Non-consumable packs granted by the store. Everything also lists the four packs. */
+  ownedPacks: ShopPackId[];
   /** Save schema version for migrations. */
   wardrobeVersion: number;
 }
@@ -141,7 +149,7 @@ export function buyOrEquipBoot(locker: WardrobeLocker, bootId: string): ShopResu
   if (locker.ownedBoots.includes(boot.id)) {
     return { ok: true, locker: { ...locker, equippedBoot: boot.id } };
   }
-  if (boot.storeProductId) return { ok: false, locker, reason: 'billing_unavailable' };
+  if (boot.id === COWBOY_BOOT_ID || boot.storeProductId) return { ok: false, locker, reason: 'billing_unavailable' };
   if (!meetsChallenge(locker.challenges, boot.unlock)) {
     return { ok: false, locker, reason: 'locked' };
   }
@@ -222,6 +230,7 @@ export interface RawSaveFields {
   bestStreak?: unknown;
   ownedOutfits?: unknown;
   equippedOutfit?: unknown;
+  ownedPacks?: unknown;
   cosmeticSource?: unknown;
   wardrobeVersion?: unknown;
   bodyChosen?: unknown;
@@ -327,11 +336,24 @@ export function normalizeLocker(
   const cosmeticSource = parseEntitlementSource(raw?.cosmeticSource);
   const keepCosmetic = keepStoreCosmetic(cosmeticSource, options?.trustStoreCache === true, import.meta.env.PROD);
   const ownedOutfits = keepCosmetic && Array.isArray(raw?.ownedOutfits)
-    ? raw.ownedOutfits.filter((id): id is OutfitId => typeof id === 'string' && isOutfitId(id) && id !== 'gold-legend')
+    ? raw.ownedOutfits.filter((id): id is OutfitId => typeof id === 'string' && isOutfitId(id) && !earnedOutfit(id))
     : [];
-  const equippedOutfitRaw = typeof raw?.equippedOutfit === 'string' ? raw.equippedOutfit : null;
-  const equippedOutfit = equippedOutfitRaw && (ownedOutfits.includes(equippedOutfitRaw as OutfitId) || (equippedOutfitRaw === 'gold-legend' && goldLegendUnlocked(bestStreak)))
-    ? equippedOutfitRaw as OutfitId
+  const ownedPacks = keepCosmetic && Array.isArray(raw?.ownedPacks)
+    ? raw.ownedPacks.filter((id): id is ShopPackId => typeof id === 'string' && isShopPackId(id))
+    : [];
+  const milestoneStats = {
+    stalls: challenges.stalls,
+    alternateFoot: challenges.alternateFoot,
+    perfectTouch: challenges.perfectTouch,
+    bestStreak,
+  };
+  const equippedCandidate = getOutfit(typeof raw?.equippedOutfit === 'string' ? raw.equippedOutfit : null);
+  const equippedOutfit = equippedCandidate && (
+    equippedCandidate.milestone
+      ? milestoneMet(milestoneStats, equippedCandidate.milestone)
+      : ownedOutfits.includes(equippedCandidate.id)
+  )
+    ? equippedCandidate.id
     : null;
 
   // A bare boolean is not proof. On web, apple/google strings are not proof either.
@@ -370,6 +392,7 @@ export function normalizeLocker(
     ownedOutfits,
     equippedOutfit,
     cosmeticSource: keepCosmetic ? cosmeticSource : 'none',
+    ownedPacks,
     wardrobeVersion: WARDROBE_VERSION,
   };
 
@@ -388,9 +411,33 @@ export function normalizeLocker(
   return locker;
 }
 
+export function milestoneStatsOf(locker: WardrobeLocker) {
+  return {
+    stalls: locker.challenges.stalls,
+    alternateFoot: locker.challenges.alternateFoot,
+    perfectTouch: locker.challenges.perfectTouch,
+    bestStreak: locker.bestStreak,
+  };
+}
+
 export function outfitOwned(locker: WardrobeLocker, id: string): boolean {
-  if (id === 'gold-legend') return goldLegendUnlocked(locker.bestStreak);
-  return isOutfitId(id) && locker.ownedOutfits.includes(id);
+  const outfit = getOutfit(id);
+  if (!outfit) return false;
+  if (outfit.milestone) return milestoneMet(milestoneStatsOf(locker), outfit.milestone);
+  return locker.ownedOutfits.includes(outfit.id);
+}
+
+export function packOwned(locker: WardrobeLocker, id: ShopPackId): boolean {
+  if (locker.ownedPacks.includes(id)) return true;
+  if (id === 'everything') return CONTENT_PACKS_OWNED(locker);
+  return false;
+}
+
+function CONTENT_PACKS_OWNED(locker: WardrobeLocker): boolean {
+  return locker.ownedPacks.includes('heroes-space')
+    && locker.ownedPacks.includes('adventure')
+    && locker.ownedPacks.includes('party')
+    && locker.ownedPacks.includes('spooky');
 }
 
 /** Equip a themed outfit the player already unlocked, or clear it with null. */
@@ -418,9 +465,55 @@ export function grantStoreCosmetic(
       : [...locker.ownedBoots, COWBOY_BOOT_ID];
     return { ...locker, ownedBoots, cosmeticSource: source };
   }
-  if (!isOutfitId(id) || id === 'gold-legend') return locker;
+  if (!isOutfitId(id) || earnedOutfit(id)) return locker;
   const ownedOutfits = locker.ownedOutfits.includes(id) ? locker.ownedOutfits : [...locker.ownedOutfits, id];
   return { ...locker, ownedOutfits, cosmeticSource: source };
+}
+
+/**
+ * Replace pack ownership with what the store currently entitles.
+ * Call only after a successful native query. Web must not call this with an empty list.
+ */
+export function applyOwnedPackProducts(
+  locker: WardrobeLocker,
+  productIds: readonly string[],
+  source: EntitlementSource,
+): WardrobeLocker {
+  if (!cosmeticGrantAllowed(source)) return locker;
+  const equipped = locker.equippedOutfit;
+  let next: WardrobeLocker = {
+    ...locker,
+    ownedPacks: [],
+    ownedOutfits: [],
+    ownedBoots: locker.ownedBoots.filter((id) => id !== COWBOY_BOOT_ID),
+    equippedBoot: locker.equippedBoot === COWBOY_BOOT_ID ? STARTER_BOOT_ID : locker.equippedBoot,
+    cosmeticSource: 'none',
+  };
+  for (const productId of productIds) {
+    const pack = shopPackForProduct(productId);
+    if (pack) next = grantShopPack(next, pack.id, source);
+  }
+  if (equipped && outfitOwned(next, equipped)) next = { ...next, equippedOutfit: equipped };
+  else if (equipped) next = { ...next, equippedOutfit: null };
+  return next;
+}
+
+/** Grant every look in a non-consumable pack. Everything also grants the other four. */
+export function grantShopPack(
+  locker: WardrobeLocker,
+  packId: string,
+  source: EntitlementSource,
+): WardrobeLocker {
+  if (!cosmeticGrantAllowed(source) || !isShopPackId(packId)) return locker;
+  let next = locker;
+  for (const id of packsGrantedBy(packId)) {
+    const pack = getShopPack(id);
+    if (!pack || next.ownedPacks.includes(id)) continue;
+    for (const outfitId of pack.outfitIds) next = grantStoreCosmetic(next, outfitId, source);
+    for (const bootId of pack.bootIds) next = grantStoreCosmetic(next, bootId, source);
+    next = { ...next, ownedPacks: next.ownedPacks.includes(id) ? next.ownedPacks : [...next.ownedPacks, id], cosmeticSource: source };
+  }
+  return next;
 }
 
 /** Development-only dress-up. Production builds leave the locker unchanged. */

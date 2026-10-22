@@ -205,8 +205,7 @@ export const BOOTS: readonly BootDesign[] = [
     lace: '#E7D3A1',
     trim: '#C4A574',
     pattern: 'cowboy',
-    storeProductId: 'kickole_boot_cowboy',
-    note: 'Tan leather, stitching, a pointed toe and a block heel. Mixes with any outfit. Store price only.',
+    note: 'Tan leather, stitching, a pointed toe and a block heel. Comes with the Party pack, not on its own.',
   },
 ];
 

@@ -19,6 +19,7 @@ import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.QueryProductDetailsParams;
 import com.android.billingclient.api.QueryProductDetailsResult;
 import com.android.billingclient.api.QueryPurchasesParams;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -51,6 +52,9 @@ public class KickoleBillingPlugin extends Plugin implements PurchasesUpdatedList
     private BillingClient billingClient;
     private ProductDetails launchProduct;
     @Nullable private String launchOfferToken;
+    @Nullable private ProductDetails packProduct;
+    @Nullable private String packOfferToken;
+    @Nullable private String packProductId;
     private final AtomicBoolean purchaseInFlight = new AtomicBoolean(false);
     private PluginCall pendingPurchaseCall;
     private boolean connecting = false;
@@ -245,23 +249,79 @@ public class KickoleBillingPlugin extends Plugin implements PurchasesUpdatedList
         mainHandler.post(() -> deliverPurchaseUpdate(billingResult, purchases));
     }
 
+    private void clearPackPurchase() {
+        packProductId = null;
+        packProduct = null;
+        packOfferToken = null;
+    }
+
     private void deliverPurchaseUpdate(@NonNull BillingResult billingResult, @Nullable List<Purchase> purchases) {
         PluginCall call = pendingPurchaseCall;
         pendingPurchaseCall = null;
         purchaseInFlight.set(false);
+        final String buyingPack = packProductId;
 
         int code = billingResult.getResponseCode();
         if (code == BillingClient.BillingResponseCode.USER_CANCELED) {
-            if (call != null) call.resolve(result("cancelled", false, "none", null, "Purchase cancelled."));
+            clearPackPurchase();
+            if (call != null) {
+                JSObject out = result("cancelled", false, "none", null, "Purchase cancelled.");
+                if (buyingPack != null) out.put("productId", buyingPack);
+                call.resolve(out);
+            }
             return;
         }
         if (code == BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED) {
+            if (buyingPack != null) {
+                clearPackPurchase();
+                if (call != null) {
+                    JSObject out = result("already_owned", false, "google", null, null);
+                    out.put("productId", buyingPack);
+                    call.resolve(out);
+                }
+                return;
+            }
             if (call != null) queryOwned(call, "already_owned");
             else queryAndNotify();
             return;
         }
         if (code != BillingClient.BillingResponseCode.OK || purchases == null) {
-            if (call != null) call.resolve(result("failed", false, "none", null, purchaseFailureMessage(billingResult)));
+            clearPackPurchase();
+            if (call != null) {
+                JSObject out = result("failed", false, "none", null, purchaseFailureMessage(billingResult));
+                if (buyingPack != null) out.put("productId", buyingPack);
+                call.resolve(out);
+            }
+            return;
+        }
+
+        if (buyingPack != null) {
+            boolean packUnlocked = false;
+            boolean packPending = false;
+            for (Purchase purchase : purchases) {
+                if (!purchase.getProducts().contains(buyingPack)) continue;
+                if (purchase.getPurchaseState() == Purchase.PurchaseState.PENDING) {
+                    packPending = true;
+                    continue;
+                }
+                if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) continue;
+                packUnlocked = true;
+                acknowledge(purchase);
+            }
+            clearPackPurchase();
+            if (call != null && packUnlocked) {
+                JSObject out = result("purchased", false, "google", null, null);
+                out.put("productId", buyingPack);
+                call.resolve(out);
+            } else if (call != null && packPending) {
+                JSObject out = result("pending", false, "none", null, "Purchase is pending. Content unlocks after Google Play confirms payment.");
+                out.put("productId", buyingPack);
+                call.resolve(out);
+            } else if (call != null) {
+                JSObject out = result("failed", false, "none", null, "Purchase could not be completed.");
+                out.put("productId", buyingPack);
+                call.resolve(out);
+            }
             return;
         }
 
@@ -307,6 +367,160 @@ public class KickoleBillingPlugin extends Plugin implements PurchasesUpdatedList
             return UNAVAILABLE;
         }
         return "Purchase could not be completed.";
+    }
+
+    @PluginMethod
+    public void getProducts(PluginCall call) {
+        JSArray requested;
+        try {
+            requested = call.getArray("productIds");
+        } catch (Exception error) {
+            requested = null;
+        }
+        final JSArray ids = requested;
+        whenReady(() -> queryPackProducts(call, ids), () -> {
+            JSObject empty = new JSObject();
+            empty.put("products", new JSArray());
+            call.resolve(empty);
+        });
+    }
+
+    private void queryPackProducts(PluginCall call, @Nullable JSArray ids) {
+        List<QueryProductDetailsParams.Product> productList = new ArrayList<>();
+        if (ids != null) {
+            for (int i = 0; i < ids.length(); i++) {
+                String id = ids.optString(i, "");
+                if (id.isEmpty()) continue;
+                productList.add(
+                    QueryProductDetailsParams.Product.newBuilder()
+                        .setProductId(id)
+                        .setProductType(BillingClient.ProductType.INAPP)
+                        .build()
+                );
+            }
+        }
+        if (productList.isEmpty()) {
+            JSObject empty = new JSObject();
+            empty.put("products", new JSArray());
+            call.resolve(empty);
+            return;
+        }
+        QueryProductDetailsParams params = QueryProductDetailsParams.newBuilder()
+            .setProductList(productList)
+            .build();
+        billingClient.queryProductDetailsAsync(params, (billingResult, productDetailsResult) ->
+            mainHandler.post(() -> {
+                JSArray rows = new JSArray();
+                List<ProductDetails> products = productDetailsResult.getProductDetailsList();
+                if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK && products != null) {
+                    for (ProductDetails details : products) {
+                        ProductDetails.OneTimePurchaseOfferDetails offer = selectOffer(details);
+                        if (offer == null || offer.getFormattedPrice() == null || offer.getFormattedPrice().isEmpty()) continue;
+                        rows.put(productPayload(details));
+                    }
+                }
+                JSObject out = new JSObject();
+                out.put("products", rows);
+                call.resolve(out);
+            })
+        );
+    }
+
+    @PluginMethod
+    public void purchaseProduct(PluginCall call) {
+        String id = call.getString("productId", "");
+        if (id == null || id.isEmpty()) {
+            JSObject missing = result("unavailable", false, "none", null, "Product is not available in Play Console for this build.");
+            missing.put("productId", "");
+            call.resolve(missing);
+            return;
+        }
+        if (!purchaseInFlight.compareAndSet(false, true)) {
+            JSObject busy = result("busy", false, "none", null, "Purchase already in progress.");
+            busy.put("productId", id);
+            call.resolve(busy);
+            return;
+        }
+        pendingPurchaseCall = call;
+        packProductId = id;
+        whenReady(() -> queryOnePack(call, id), () -> {
+            clearPackPurchase();
+            failPurchase(call, "unavailable", UNAVAILABLE);
+        });
+    }
+
+    private void queryOnePack(PluginCall call, String id) {
+        List<QueryProductDetailsParams.Product> productList = new ArrayList<>();
+        productList.add(
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(id)
+                .setProductType(BillingClient.ProductType.INAPP)
+                .build()
+        );
+        QueryProductDetailsParams params = QueryProductDetailsParams.newBuilder()
+            .setProductList(productList)
+            .build();
+        billingClient.queryProductDetailsAsync(params, (billingResult, productDetailsResult) ->
+            mainHandler.post(() -> {
+                List<ProductDetails> products = productDetailsResult.getProductDetailsList();
+                if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK
+                    || products == null
+                    || products.isEmpty()) {
+                    packProductId = null;
+                    failPurchase(call, "unavailable", "Product is not available in Play Console for this build.");
+                    return;
+                }
+                packProduct = products.get(0);
+                ProductDetails.OneTimePurchaseOfferDetails offer = selectOffer(packProduct);
+                String token = offer != null ? offer.getOfferToken() : null;
+                packOfferToken = token == null || token.isEmpty() ? null : token;
+                launchPackFlow(call);
+            })
+        );
+    }
+
+    private void launchPackFlow(PluginCall call) {
+        Activity activity = getActivity();
+        if (activity == null || packProduct == null) {
+            packProductId = null;
+            failPurchase(call, "failed", "Purchase could not be started.");
+            return;
+        }
+        BillingFlowParams.ProductDetailsParams.Builder productParams =
+            BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(packProduct);
+        if (packOfferToken != null) productParams.setOfferToken(packOfferToken);
+        List<BillingFlowParams.ProductDetailsParams> paramsList = new ArrayList<>();
+        paramsList.add(productParams.build());
+        BillingFlowParams flowParams = BillingFlowParams.newBuilder()
+            .setProductDetailsParamsList(paramsList)
+            .build();
+        BillingResult launched = billingClient.launchBillingFlow(activity, flowParams);
+        if (launched.getResponseCode() != BillingClient.BillingResponseCode.OK) {
+            packProductId = null;
+            failPurchase(call, "failed", purchaseFailureMessage(launched));
+        }
+    }
+
+    @PluginMethod
+    public void ownedProductIds(PluginCall call) {
+        whenReady(() -> billingClient.queryPurchasesAsync(
+            QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build(),
+            (billingResult, purchases) -> mainHandler.post(() -> {
+                if (billingResult.getResponseCode() != BillingClient.BillingResponseCode.OK || purchases == null) {
+                    call.reject("Could not check purchases right now.", "billing_query_failed");
+                    return;
+                }
+                JSArray ids = new JSArray();
+                for (Purchase purchase : purchases) {
+                    if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) continue;
+                    acknowledge(purchase);
+                    for (String id : purchase.getProducts()) ids.put(id);
+                }
+                JSObject out = new JSObject();
+                out.put("productIds", ids);
+                call.resolve(out);
+            })
+        ), () -> call.reject(UNAVAILABLE, "billing_unavailable"));
     }
 
     @PluginMethod

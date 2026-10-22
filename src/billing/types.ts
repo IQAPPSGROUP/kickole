@@ -42,6 +42,13 @@ export interface PurchaseResult {
   message?: string;
 }
 
+export interface PackPurchaseResult {
+  outcome: PurchaseOutcome;
+  productId: string;
+  source: EntitlementSource;
+  message?: string;
+}
+
 export interface BillingAdapter {
   readonly platform: BillingPlatform;
   init(): Promise<void>;
@@ -50,6 +57,18 @@ export interface BillingAdapter {
   restorePurchases(): Promise<PurchaseResult>;
   /** Query current store entitlements without presenting UI. */
   refreshEntitlements(): Promise<EntitlementSnapshot>;
+  /**
+   * Localised store rows for the given product ids.
+   * Missing store listings are omitted. Never invent a priceString.
+   */
+  getProducts(productIds: readonly string[]): Promise<StoreProduct[]>;
+  /** Non-consumable purchase of one placeholder pack id. */
+  purchaseProduct(productId: string): Promise<PackPurchaseResult>;
+  /**
+   * Product ids the store currently entitles.
+   * Throws when the store does not answer. An empty list is a real answer.
+   */
+  ownedProductIds(): Promise<string[]>;
   /** Live store updates (Ask to Buy, pending completion, refunds). */
   setEntitlementListener?(listener: ((snapshot: EntitlementSnapshot) => void) | null): void;
   /** Tear down listeners (transaction updates / billing client). */

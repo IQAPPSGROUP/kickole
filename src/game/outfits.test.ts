@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { LAUNCH_COLLECTION_ITEM_IDS } from './catalogue';
 import { grantLaunchCollection } from '../billing/entitlement';
@@ -11,17 +12,24 @@ import {
 } from './outfitFit';
 import {
   COWBOY_BOOT_ID,
-  COWBOY_PRODUCT_ID,
+  CONTENT_PACK_IDS,
+  EARNED_OUTFIT_IDS,
   GOLD_LEGEND_STREAK,
+  OUTFIT_IDS,
   OUTFITS,
+  SHOP_PACKS,
   cosmeticGrantAllowed,
   cosmeticPriceString,
+  earnedOutfit,
   keepStoreCosmetic,
   outfitCoversBody,
+  packsGrantedBy,
 } from './outfits';
 import {
+  applyOwnedPackProducts,
   buyOrEquipBoot,
   equipOutfit,
+  grantShopPack,
   grantStoreCosmetic,
   normalizeLocker,
   outfitOwned,
@@ -35,22 +43,24 @@ describe('themed outfits', () => {
       expect(ids.has(outfit.id)).toBe(false);
       ids.add(outfit.id);
       expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(outfit.id);
-      expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(outfit.productId);
       expect(outfitCoversBody(outfit)).toBe(true);
       expect(familySafeName(outfit.name)).toBe(true);
       expect(outfit.note.toLowerCase()).not.toContain('batman');
+      expect(outfit.milestone === null || earnedOutfit(outfit.id)).toBe(true);
     }
     expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(COWBOY_BOOT_ID);
-    expect(OUTFITS.find((outfit) => outfit.id === 'gold-legend')?.productId).toBeNull();
-    expect(OUTFITS.filter((outfit) => outfit.id !== 'gold-legend').every((outfit) => outfit.productId)).toBe(true);
+    expect(OUTFITS.find((outfit) => outfit.id === 'gold-legend')?.milestone?.kind).toBe('bestStreak');
+    expect((OUTFIT_IDS as readonly string[]).includes('stripe-bandit')).toBe(false);
+    expect((OUTFIT_IDS as readonly string[]).includes('secret-agent')).toBe(true);
+    expect(OUTFITS.some((outfit) => /robber|bandit/i.test(outfit.name))).toBe(false);
   });
 
   it('shows a store priceString and never invents one', () => {
-    expect(cosmeticPriceString('kickole_outfit_alien', [])).toBeNull();
-    expect(cosmeticPriceString('kickole_outfit_alien', [{ productId: 'kickole_outfit_alien', priceString: '  ' }])).toBeNull();
-    expect(cosmeticPriceString('kickole_outfit_alien', [{ productId: 'kickole_outfit_alien', priceString: '€1,99' }])).toBe('€1,99');
-    expect(cosmeticPriceString(null, [{ productId: COWBOY_PRODUCT_ID, priceString: '£1.99' }])).toBeNull();
-    expect(cosmeticPriceString(COWBOY_PRODUCT_ID, [{ productId: COWBOY_PRODUCT_ID, priceString: '£1.99' }])).toBe('£1.99');
+    expect(cosmeticPriceString('kickole_pack_heroes_space', [])).toBeNull();
+    expect(cosmeticPriceString('kickole_pack_heroes_space', [{ productId: 'kickole_pack_heroes_space', priceString: '  ' }])).toBeNull();
+    expect(cosmeticPriceString('kickole_pack_party', [{ productId: 'kickole_pack_party', priceString: '€1,99' }])).toBe('€1,99');
+    expect(cosmeticPriceString(null, [{ productId: 'kickole_pack_party', priceString: '£1.99' }])).toBeNull();
+    expect(cosmeticPriceString('kickole_pack_party', [{ productId: 'kickole_pack_party', priceString: '£1.99' }])).toBe('£1.99');
   });
 
   it('refuses coins, dev_sim, and the launch collection for themed looks', () => {
@@ -106,9 +116,23 @@ describe('themed outfits', () => {
       }
       expect(allOutfitSpecs(body).some((spec) => /shorts|crop|bust/.test(spec.name))).toBe(false);
     }
-    const maleCape = outfitSpecs('street-hero', 'male').find((spec) => spec.slot === 'cape');
-    const femaleCape = outfitSpecs('street-hero', 'female').find((spec) => spec.slot === 'cape');
-    expect(femaleCape && maleCape && femaleCape.size[0] < maleCape.size[0]).toBe(true);
+    for (const id of ['street-hero', 'night-glider'] as const) {
+      for (const body of ['male', 'female'] as const) {
+        const specs = outfitSpecs(id, body);
+        const names = specs.map((spec) => spec.name).join(' ');
+        expect(specs.some((spec) => spec.slot === 'cape' || spec.slot === 'chest'), names).toBe(false);
+        expect(names).not.toMatch(/cowl|badge|emblem|bat|cape/i);
+      }
+    }
+    const agent = outfitSpecs('secret-agent', 'male').map((spec) => spec.name);
+    expect(agent).toContain('agent-glasses');
+    expect(agent).toContain('agent-tie');
+    expect(agent.join(' ')).not.toMatch(/mask|sack|beanie|domino/i);
+    for (const body of ['male', 'female'] as const) {
+      const zombie = outfitSpecs('grey-ghoul', body).map((spec) => `${spec.name} ${spec.slot}`).join(' ');
+      expect(zombie).not.toMatch(/blood|gore|wound/i);
+    }
+    expect(outfitSpecs('ring-mask', 'male').some((spec) => spec.slot === 'cape')).toBe(true);
     const maleBoot = cowboyBootSpecs('male').find((spec) => spec.name === 'cowboy-shaft');
     const femaleBoot = cowboyBootSpecs('female').find((spec) => spec.name === 'cowboy-shaft');
     expect(femaleBoot && maleBoot && femaleBoot.size[0] > maleBoot.size[0]).toBe(true);
@@ -137,5 +161,61 @@ describe('themed outfits', () => {
     expect(dressed.cosmeticSource).toBe('none');
     const saved = normalizeLocker({ ownedOutfits: ['spaceman'], equippedOutfit: 'spaceman', cosmeticSource: 'none' });
     expect(saved.equippedOutfit).toBe('spaceman');
+  });
+
+  it('sells themed looks only as packs, with milestones kept out of the store', () => {
+    expect(SHOP_PACKS.map((pack) => pack.productId)).toEqual([
+      'kickole_pack_heroes_space',
+      'kickole_pack_adventure',
+      'kickole_pack_party',
+      'kickole_pack_spooky',
+      'kickole_pack_everything',
+    ]);
+    expect(packsGrantedBy('everything')).toEqual([...CONTENT_PACK_IDS, 'everything']);
+    expect(EARNED_OUTFIT_IDS).toEqual([
+      'kitchen-whites',
+      'match-official',
+      'keep-guard',
+      'snow-friend',
+      'spike-hood',
+      'gold-legend',
+    ]);
+    for (const pack of SHOP_PACKS) {
+      for (const id of pack.outfitIds) expect(earnedOutfit(id)).toBe(false);
+      for (const id of pack.bootIds) expect(id).toBe(COWBOY_BOOT_ID);
+    }
+    expect(SHOP_PACKS.find((pack) => pack.id === 'party')?.bootIds).toEqual([COWBOY_BOOT_ID]);
+    const fresh = normalizeLocker(null);
+    expect(grantShopPack(fresh, 'heroes-space', 'dev_sim').ownedPacks).toEqual([]);
+    expect(grantShopPack(fresh, 'heroes-space', 'none').ownedOutfits).toEqual([]);
+    const heroes = grantShopPack(fresh, 'heroes-space', 'apple');
+    expect(heroes.ownedPacks).toEqual(['heroes-space']);
+    expect(heroes.ownedOutfits).toEqual(['street-hero', 'night-glider', 'alien', 'spaceman']);
+    for (const id of EARNED_OUTFIT_IDS) expect(heroes.ownedOutfits).not.toContain(id);
+    const all = grantShopPack(fresh, 'everything', 'google');
+    expect(all.ownedPacks).toEqual([...CONTENT_PACK_IDS, 'everything']);
+    expect(all.ownedBoots).toContain(COWBOY_BOOT_ID);
+    expect(all.ownedOutfits).toContain('secret-agent');
+    expect(all.ownedOutfits).not.toContain('gold-legend');
+    const launched = grantLaunchCollection(fresh, 'apple', 'apple:launch');
+    expect(launched.ownedPacks).toEqual([]);
+    expect(launched.ownedOutfits).toEqual([]);
+    const worn = { ...all, equippedBoot: COWBOY_BOOT_ID, equippedOutfit: 'alien' as const };
+    const refunded = applyOwnedPackProducts(worn, [], 'google');
+    expect(refunded.ownedPacks).toEqual([]);
+    expect(refunded.ownedBoots).not.toContain(COWBOY_BOOT_ID);
+    expect(refunded.equippedBoot).toBe('boot-street-classic');
+    expect(refunded.equippedOutfit).toBeNull();
+    const kept = applyOwnedPackProducts(
+      { ...worn, bestStreak: GOLD_LEGEND_STREAK, equippedOutfit: 'gold-legend' },
+      ['kickole_pack_everything'],
+      'apple',
+    );
+    expect(kept.equippedOutfit).toBe('gold-legend');
+    expect(kept.ownedPacks).toContain('everything');
+    const scoring = readFileSync(new URL('../engine/scoring.ts', import.meta.url), 'utf8');
+    const engine = readFileSync(new URL('../engine/engine.ts', import.meta.url), 'utf8');
+    expect(scoring).not.toMatch(/outfit/);
+    expect(engine).not.toMatch(/outfit/);
   });
 });

@@ -793,6 +793,15 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .coin-earn { margin: 0; font-size: 12px; letter-spacing: 1px; color: #f5c94d; font-weight: 800; }
 .wardrobe .wardrobe-card { width: min(100%, 420px); max-height: min(92vh, 760px); overflow: auto; }
 .shop-lead { margin: 0; font-size: 12px; line-height: 1.45; color: #f7e9c5; opacity: .9; }
+.shop-packs { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.shop-section { display: flex; flex-direction: column; gap: 8px; }
+.shop-section h3 { margin: 0; font-size: 12px; letter-spacing: 1.4px; color: #f5c94d; text-align: left; }
+.pack-swatch { background: #1f8a8a; }
+.pack-swatch.pack-adventure { background: #6b1d1d; }
+.pack-swatch.pack-party { background: #e07a3d; }
+.pack-swatch.pack-spooky { background: #8e9089; }
+.pack-swatch.pack-everything { background: #e3b341; }
+.pack-price { letter-spacing: 0.4px; }
 .shop-note { margin: 0; font-size: 11px; line-height: 1.4; color: #f7e9c5; opacity: .75; }
 .economy-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .best-pill.ghost { background: transparent; border-style: dashed; }

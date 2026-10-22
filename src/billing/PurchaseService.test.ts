@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeLocker } from '../game/shop';
 import { grantLaunchCollection } from './entitlement';
 import { PurchaseService, shouldIgnoreStaleRevoke, shouldKeepRecentGrant } from './PurchaseService';
-import type { BillingAdapter, EntitlementSnapshot, PurchaseResult, StoreProduct } from './types';
+import type { BillingAdapter, EntitlementSnapshot, PackPurchaseResult, PurchaseResult, StoreProduct } from './types';
 
 class FakeAdapter implements BillingAdapter {
   platform: 'web' | 'ios' | 'android' = 'ios';
@@ -16,6 +16,10 @@ class FakeAdapter implements BillingAdapter {
     currencyCode: 'GBP',
   };
   lastOutcome: PurchaseResult['outcome'] = 'purchased';
+  packOutcome: PackPurchaseResult['outcome'] = 'unavailable';
+  packSource: PackPurchaseResult['source'] = 'none';
+  ownedProductIdList: string[] = [];
+  throwOwned = false;
   failRefresh = false;
   refreshSnapshot: EntitlementSnapshot | null = null;
   private listener: ((snapshot: EntitlementSnapshot) => void) | null = null;
@@ -53,6 +57,17 @@ class FakeAdapter implements BillingAdapter {
         transactionRef: this.owned ? 'apple:abc' : null,
       },
     };
+  }
+  async getProducts() { return []; }
+  async purchaseProduct(productId: string): Promise<PackPurchaseResult> {
+    const source = this.packOutcome === 'purchased' || this.packOutcome === 'restored' || this.packOutcome === 'already_owned'
+      ? this.packSource
+      : 'none';
+    return { outcome: this.packOutcome, productId, source };
+  }
+  async ownedProductIds() {
+    if (this.throwOwned) throw new Error('billing_query_failed');
+    return this.ownedProductIdList;
   }
   async refreshEntitlements(): Promise<EntitlementSnapshot> {
     if (this.failRefresh) throw new Error('billing_unavailable');
@@ -203,5 +218,37 @@ describe('PurchaseService', () => {
     adapter.emit({ owned: false, source: 'none', verifiedAt: Date.now(), transactionRef: null });
     expect(locker.launchCollectionOwned).toBe(true);
     expect(locker.ownedBoots.length).toBeGreaterThan(1);
+  });
+
+  it('grants a pack from the store and leaves it alone when the query fails', async () => {
+    const adapter = new FakeAdapter();
+    adapter.packOutcome = 'purchased';
+    adapter.packSource = 'apple';
+    const service = new PurchaseService(adapter);
+    const bought = await service.purchasePack(normalizeLocker(null), 'kickole_pack_adventure');
+    expect(bought.result.outcome).toBe('purchased');
+    expect(bought.locker.ownedPacks).toEqual(['adventure']);
+    expect(bought.locker.ownedOutfits).toContain('secret-agent');
+    expect(bought.locker.launchCollectionOwned).toBe(false);
+
+    adapter.throwOwned = true;
+    const kept = await service.syncPacks(bought.locker);
+    expect(kept.ownedPacks).toEqual(['adventure']);
+
+    adapter.platform = 'web';
+    adapter.throwOwned = false;
+    adapter.ownedProductIdList = [];
+    const preview = await service.syncPacks(bought.locker);
+    expect(preview.ownedOutfits).toContain('secret-agent');
+  });
+
+  it('does not grant a pack from a dev_sim purchase result', async () => {
+    const adapter = new FakeAdapter();
+    adapter.packOutcome = 'purchased';
+    adapter.packSource = 'dev_sim';
+    const service = new PurchaseService(adapter);
+    const bought = await service.purchasePack(normalizeLocker(null), 'kickole_pack_party');
+    expect(bought.locker.ownedPacks).toEqual([]);
+    expect(bought.locker.ownedBoots).not.toContain('boot-cowboy');
   });
 });

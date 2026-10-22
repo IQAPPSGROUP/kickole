@@ -151,10 +151,6 @@ function backpack(m: BodyMeasures, color: string): MeshSpec {
   return box('spine2', 'back', 'backpack', [0, 0.04, m.chestBack - 0.045], [m.chestHalf * 0.85, 0.16, 0.07], color, 0.5);
 }
 
-function domino(m: BodyMeasures, color: string): MeshSpec {
-  return box('head', 'face', 'domino', [0, m.browY, m.faceZ + 0.008], [m.headHalf * 1.5, 0.022, 0.01], color);
-}
-
 function moustache(m: BodyMeasures, scale: number): MeshSpec {
   return box('head', 'face', 'moustache', [0, 0.02, m.faceZ + 0.008], [m.headHalf * scale, 0.02, 0.012], '#3A2A22', 0.7);
 }
@@ -227,21 +223,13 @@ export function outfitSpecs(id: OutfitId, body: PlayerBody): MeshSpec[] {
         backpack(m, '#F4F7F8'),
       ];
     case 'street-hero':
-      return [
-        cape(m, '#1B2A4A', 'hero-cape'),
-        box('spine2', 'chest', 'hero-badge', [0, 0.08, m.chestFront + 0.01], [0.07, 0.07, 0.012], '#F4C430', 0.4, 0.2),
-      ];
+      return [...armTape('#F26B5B'), ...headband(m, '#1F8A8A', 'hero-band')];
     case 'night-glider':
+      return [...armTape('#8B939C'), ...headband(m, '#3A3F45', 'glider-band')];
+    case 'secret-agent':
       return [
-        cape(m, '#1A1D21', 'glider-cape'),
-        box('spine2', 'chest', 'wing-left', [-0.02, 0.095, m.chestFront + 0.01], [0.042, 0.012, 0.008], '#C5CCD4', 0.4, 0.25, [0, 0, 0.55]),
-        box('spine2', 'chest', 'wing-right', [0.02, 0.095, m.chestFront + 0.01], [0.042, 0.012, 0.008], '#C5CCD4', 0.4, 0.25, [0, 0, -0.55]),
-      ];
-    case 'stripe-bandit':
-      return [
-        box('head', 'crown', 'beanie', [0, m.hairTop + 0.02, 0], [m.headHalf * 1.7, 0.06, m.headHalf * 1.5], '#1A1A1A', 0.7),
-        domino(m, '#111111'),
-        box('spine2', 'back', 'swag-sack', [0, -0.02, m.chestBack - 0.04], [0.1, 0.12, 0.07], '#C4A574', 0.75),
+        box('head', 'face', 'agent-glasses', [0, m.browY, m.faceZ + 0.008], [m.headHalf * 1.35, 0.016, 0.01], '#1A1A1A', 0.3, 0.35),
+        box('neck', 'neck', 'agent-tie', [0, -0.01, 0.03], [0.016, 0.05, 0.012], '#6B1D1D', 0.55),
       ];
     case 'night-wrap':
       return [...headband(m, '#C0392B', 'ninja-band'), ...armTape('#1A1A1A')];

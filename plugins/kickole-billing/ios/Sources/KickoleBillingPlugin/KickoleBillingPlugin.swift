@@ -16,6 +16,9 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "purchaseLaunchCollection", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "restorePurchases", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "refreshEntitlements", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getProducts", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "purchaseProduct", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "ownedProductIds", returnType: CAPPluginReturnPromise),
     ]
 
     private let productId = "kickole_launch_collection"
@@ -130,6 +133,88 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    /// Store rows for placeholder pack ids. Omits anything the store does not list.
+    @objc func getProducts(_ call: CAPPluginCall) {
+        let ids = call.getArray("productIds", String.self) ?? []
+        Task {
+            do {
+                let storeProducts = try await Product.products(for: ids)
+                for product in storeProducts where !self.products.contains(where: { $0.id == product.id }) {
+                    self.products.append(product)
+                }
+                let rows: [[String: Any]] = storeProducts.map { product in
+                    [
+                        "productId": product.id,
+                        "title": product.displayName,
+                        "description": product.description,
+                        "priceString": product.displayPrice,
+                        "priceMicros": NSDecimalNumber(decimal: product.price * 1_000_000).intValue,
+                        "currencyCode": product.priceFormatStyle.currencyCode ?? "",
+                    ]
+                }
+                call.resolve(["products": rows])
+            } catch {
+                call.resolve(["products": []])
+            }
+        }
+    }
+
+    /// Non-consumable pack purchase. Does not touch the Launch Collection entitlement.
+    @objc func purchaseProduct(_ call: CAPPluginCall) {
+        let requested = call.getString("productId") ?? ""
+        Task {
+            if purchaseInFlight {
+                call.resolve(self.packPayload(outcome: "busy", productId: requested, source: "none", message: "Purchase already in progress."))
+                return
+            }
+            guard !requested.isEmpty else {
+                call.resolve(self.packPayload(outcome: "unavailable", productId: requested, source: "none", message: "Product is not available in App Store Connect for this build."))
+                return
+            }
+            purchaseInFlight = true
+            defer { purchaseInFlight = false }
+            do {
+                if self.products.first(where: { $0.id == requested }) == nil {
+                    let fetched = try await Product.products(for: [requested])
+                    self.products.append(contentsOf: fetched)
+                }
+                guard let product = self.products.first(where: { $0.id == requested }) else {
+                    call.resolve(self.packPayload(outcome: "unavailable", productId: requested, source: "none", message: "Product is not available in App Store Connect for this build."))
+                    return
+                }
+                let result = try await product.purchase()
+                switch result {
+                case .success(let verification):
+                    let transaction = try self.checkVerified(verification)
+                    await transaction.finish()
+                    call.resolve(self.packPayload(outcome: "purchased", productId: product.id, source: "apple", message: nil))
+                case .userCancelled:
+                    call.resolve(self.packPayload(outcome: "cancelled", productId: requested, source: "none", message: "Purchase cancelled."))
+                case .pending:
+                    call.resolve(self.packPayload(outcome: "pending", productId: requested, source: "none", message: "Purchase is pending approval. Content unlocks after it completes."))
+                @unknown default:
+                    call.resolve(self.packPayload(outcome: "failed", productId: requested, source: "none", message: "Purchase could not be completed."))
+                }
+            } catch {
+                call.resolve(self.packPayload(outcome: "failed", productId: requested, source: "none", message: "Purchase could not be completed."))
+            }
+        }
+    }
+
+    /// Every non-revoked entitlement id. The JS layer keeps only known pack ids.
+    @objc func ownedProductIds(_ call: CAPPluginCall) {
+        Task {
+            var ids: [String] = []
+            for await result in Transaction.currentEntitlements {
+                guard case .verified(let transaction) = result else { continue }
+                if transaction.revocationDate == nil {
+                    ids.append(transaction.productID)
+                }
+            }
+            call.resolve(["productIds": ids])
+        }
+    }
+
     @objc func refreshEntitlements(_ call: CAPPluginCall) {
         Task {
             if let entitlement = await self.currentEntitlement() {
@@ -207,6 +292,16 @@ public class KickoleBillingPlugin: CAPPlugin, CAPBridgedPlugin {
             "verifiedAt": Date().timeIntervalSince1970 * 1000,
             "transactionRef": ref as Any,
         ])
+    }
+
+    private func packPayload(outcome: String, productId: String, source: String, message: String?) -> [String: Any] {
+        var payload: [String: Any] = [
+            "outcome": outcome,
+            "productId": productId,
+            "source": source,
+        ]
+        if let message { payload["message"] = message }
+        return payload
     }
 
     private func resultPayload(outcome: String, owned: Bool, source: String, ref: String?, message: String?) -> [String: Any] {

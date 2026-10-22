@@ -105,6 +105,7 @@ export interface Snapshot {
   skin: Skin;
   result: Result | null;
   launchProduct: StoreProduct | null;
+  cosmeticProducts: StoreProduct[];
   billingPlatform: BillingPlatform;
   billingMessage: string | null;
   billingBusy: boolean;
@@ -178,7 +179,8 @@ export class GameController {
     if (shouldKeepRecentGrant(this.save.launchCollectionOwned, next.launchCollectionOwned, this.grantGuardUntil, Date.now())) {
       return;
     }
-    this.save = { ...this.save, ...next };
+    const packed = await this.billing.syncPacks(next);
+    this.save = { ...this.save, ...packed };
     persistSave(this.save);
     this.publish();
   }
@@ -252,6 +254,7 @@ export class GameController {
       skin: this.liveSkin(preview),
       result: this.result,
       launchProduct: this.billing.launchProduct,
+      cosmeticProducts: this.billing.cosmeticProducts,
       billingPlatform: this.billing.platform,
       billingMessage: this.billingMessage,
       billingBusy: this.billingBusy,
@@ -801,6 +804,39 @@ export class GameController {
     }
   }
 
+  async purchasePack(productId: string): Promise<PurchaseResult> {
+    try {
+      await this.billingReady;
+    } catch {
+      return this.failedBilling();
+    }
+    if (this.billingBusy) {
+      return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Purchase already in progress.' };
+    }
+    this.billingBusy = true;
+    this.billingMessage = null;
+    this.publish();
+    try {
+      const { result, locker } = await this.billing.purchasePack(this.save, productId);
+      this.save = { ...this.save, ...locker };
+      if (result.outcome === 'purchased' || result.outcome === 'restored' || result.outcome === 'already_owned') {
+        persistSave(this.save);
+      }
+      this.billingMessage = result.message
+        ?? (result.outcome === 'failed' || result.outcome === 'unavailable' ? STORE_UNAVAILABLE_MESSAGE : null);
+      return {
+        outcome: result.outcome,
+        entitlement: { owned: false, source: result.source, verifiedAt: 0, transactionRef: null },
+        message: result.message,
+      };
+    } catch {
+      return this.failedBilling();
+    } finally {
+      this.billingBusy = false;
+      this.publish();
+    }
+  }
+
   async restorePurchases(): Promise<PurchaseResult> {
     try {
       await this.billingReady;
@@ -814,8 +850,10 @@ export class GameController {
     this.billingMessage = null;
     this.publish();
     try {
-      const { result, locker } = await this.billing.restore(this.save);
-      this.save = { ...this.save, ...locker };
+      const restored = await this.billing.restore(this.save);
+      const packed = await this.billing.syncPacks(restored.locker);
+      const result = restored.result;
+      this.save = { ...this.save, ...packed };
       if (this.save.launchCollectionOwned) this.grantGuardUntil = Date.now() + 10_000;
       persistSave(this.save);
       this.billingMessage = result.message

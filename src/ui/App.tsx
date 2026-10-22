@@ -457,7 +457,9 @@ export function App() {
           onBuyKit={(id) => controller.buyKit(id)}
           onWearOutfit={(id) => controller.wearOutfit(id)}
           onEquipDance={(id) => controller.equipDance(id)}
+          cosmeticProducts={snap.cosmeticProducts}
           onPurchaseLaunch={() => { void controller.purchaseLaunchCollection(); }}
+          onPurchasePack={(productId) => { void controller.purchasePack(productId); }}
           onRestorePurchases={() => { void controller.restorePurchases(); }}
           onPreview={(opts) => controller.previewEquipment(opts)}
           onClose={closeOverlay}

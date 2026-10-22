@@ -3,7 +3,9 @@ import type { WardrobeLocker } from '../game/shop';
 import { BrowserBillingAdapter } from './adapters/browser';
 import { NativeBillingAdapter, detectNativePlatform } from './adapters/native';
 import { grantLaunchCollection, revokeLaunchCollection } from './entitlement';
-import type { BillingAdapter, BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct } from './types';
+import { SHOP_PACKS, shopPackForProduct } from '../game/outfits';
+import { applyOwnedPackProducts, grantShopPack } from '../game/shop';
+import type { BillingAdapter, BillingPlatform, EntitlementSnapshot, PackPurchaseResult, PurchaseResult, StoreProduct } from './types';
 
 /** Ignore a not-owned event that races a grant which just landed. */
 export function shouldIgnoreStaleRevoke(
@@ -83,6 +85,7 @@ export function applyEntitlementSnapshot(
 export class PurchaseService {
   private adapter: BillingAdapter;
   private product: StoreProduct | null = null;
+  private packProducts: StoreProduct[] = [];
   private ready = false;
   private initPromise: Promise<void> | null = null;
   private entitlementListener: ((snapshot: EntitlementSnapshot) => void) | null = null;
@@ -104,6 +107,10 @@ export class PurchaseService {
 
   get launchProduct() {
     return this.product;
+  }
+
+  get cosmeticProducts() {
+    return this.packProducts;
   }
 
   setEntitlementListener(listener: ((snapshot: EntitlementSnapshot) => void) | null) {
@@ -132,6 +139,11 @@ export class PurchaseService {
       this.product = await this.adapter.getLaunchProduct();
     } catch {
       this.product = null;
+    }
+    try {
+      this.packProducts = await this.adapter.getProducts(SHOP_PACKS.map((pack) => pack.productId));
+    } catch {
+      this.packProducts = [];
     }
     this.ready = true;
   }
@@ -164,6 +176,35 @@ export class PurchaseService {
     await this.init();
     const result = await this.adapter.purchaseLaunchCollection();
     return { result, locker: this.applyResult(locker, result) };
+  }
+
+  async purchasePack(
+    locker: WardrobeLocker,
+    productId: string,
+  ): Promise<{ result: PackPurchaseResult; locker: WardrobeLocker }> {
+    await this.init();
+    const result = await this.adapter.purchaseProduct(productId);
+    const pack = shopPackForProduct(result.productId);
+    const granted = pack && (result.outcome === 'purchased' || result.outcome === 'restored' || result.outcome === 'already_owned')
+      ? grantShopPack(locker, pack.id, result.source)
+      : locker;
+    return { result, locker: granted };
+  }
+
+  /**
+   * Apply a successful native pack query. A thrown query leaves the locker as it was.
+   * Web is ignored so a browser cannot wipe a hand-checked dev preview.
+   */
+  async syncPacks(locker: WardrobeLocker): Promise<WardrobeLocker> {
+    await this.init();
+    if (this.adapter.platform === 'web') return locker;
+    try {
+      const productIds = await this.adapter.ownedProductIds();
+      const source = this.adapter.platform === 'ios' ? 'apple' : 'google';
+      return applyOwnedPackProducts(locker, productIds, source);
+    } catch {
+      return locker;
+    }
   }
 
   async restore(locker: WardrobeLocker): Promise<{ result: PurchaseResult; locker: WardrobeLocker }> {

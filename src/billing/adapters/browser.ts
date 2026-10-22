@@ -1,6 +1,6 @@
 import { LAUNCH_COLLECTION_DISPLAY_NAME, LAUNCH_COLLECTION_PRODUCT_ID } from '../config';
 import { EMPTY_ENTITLEMENT } from '../entitlement';
-import type { BillingAdapter, EntitlementSnapshot, PurchaseResult, StoreProduct } from '../types';
+import type { BillingAdapter, EntitlementSnapshot, PackPurchaseResult, PurchaseResult, StoreProduct } from '../types';
 
 /**
  * Web / Cloudflare Pages adapter.
@@ -42,6 +42,24 @@ export class BrowserBillingAdapter implements BillingAdapter {
   async refreshEntitlements(): Promise<EntitlementSnapshot> {
     // Never treat a localStorage boolean as payment proof on web.
     return EMPTY_ENTITLEMENT;
+  }
+
+  async getProducts(): Promise<StoreProduct[]> {
+    return [];
+  }
+
+  async purchaseProduct(productId: string): Promise<PackPurchaseResult> {
+    return {
+      outcome: 'unavailable',
+      productId,
+      source: 'none',
+      message: 'Packs can be bought in the iOS App Store or Google Play app — not in the browser.',
+    };
+  }
+
+  async ownedProductIds(): Promise<string[]> {
+    // Web has no store account. An empty list here is not a refund.
+    return [];
   }
 
   dispose() { /* no-op */ }

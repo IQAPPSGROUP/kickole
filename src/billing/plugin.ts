@@ -33,6 +33,23 @@ export interface KickoleBillingPlugin {
     verifiedAt: number;
     transactionRef: string | null;
   }>;
+  getProducts(options: { productIds: string[] }): Promise<{
+    products: Array<{
+      productId: string;
+      title: string;
+      description: string;
+      priceString: string;
+      priceMicros: number;
+      currencyCode: string;
+    }>;
+  }>;
+  purchaseProduct(options: { productId: string }): Promise<{
+    outcome: string;
+    productId?: string;
+    source: string;
+    message?: string;
+  }>;
+  ownedProductIds(): Promise<{ productIds: string[] }>;
   addListener(
     eventName: 'entitlementChanged',
     listenerFunc: (event: {

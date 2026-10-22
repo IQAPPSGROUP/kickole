@@ -41,4 +41,21 @@ export class KickoleBillingWeb extends WebPlugin implements KickoleBillingPlugin
       transactionRef: null,
     };
   }
+
+  async getProducts() {
+    return { products: [] };
+  }
+
+  async purchaseProduct(options: { productId: string }) {
+    return {
+      outcome: 'unavailable',
+      productId: options.productId,
+      source: 'none',
+      message: 'In-app purchases are available in the iOS and Android apps only.',
+    };
+  }
+
+  async ownedProductIds() {
+    return { productIds: [] };
+  }
 }

@@ -5,6 +5,7 @@ import {
   launchCollectionBlurb,
   launchPurchaseLabel,
   launchStoreNote,
+  packButtonLabel,
   shouldRefreshEntitlementsOnResume,
   STORE_UNAVAILABLE_MESSAGE,
 } from './storeCopy';
@@ -28,6 +29,16 @@ describe('store copy', () => {
     expect(launchPurchaseLabel('web', null, false)).toBe('UNLOCK ON iOS / ANDROID');
     expect(launchStoreNote('android', true)).toBeNull();
     expect(launchPurchaseLabel('android', '£2.99', false)).toBe('UNLOCK · £2.99');
+  });
+
+  it('shows a pack price only as the store priceString', () => {
+    expect(packButtonLabel('android', '£1.99', false, false)).toBe('£1.99');
+    expect(packButtonLabel('ios', '£4.99', false, false)).toBe('£4.99');
+    expect(packButtonLabel('web', null, false, false)).toBe('UNLOCK ON iOS / ANDROID');
+    expect(packButtonLabel('ios', null, false, false)).toBe('STORE UNAVAILABLE');
+    expect(packButtonLabel('android', null, false, false)).toBe('STORE UNAVAILABLE');
+    expect(packButtonLabel('android', '£1.99', true, false)).toBe('PLEASE WAIT…');
+    expect(packButtonLabel('ios', '£1.99', true, true)).toBe('OWNED');
   });
 
   it('refreshes entitlements when a native app returns to the foreground', () => {

@@ -8,6 +8,7 @@ import type {
   BillingPlatform,
   EntitlementSnapshot,
   EntitlementSource,
+  PackPurchaseResult,
   PurchaseOutcome,
   PurchaseResult,
   StoreProduct,
@@ -173,6 +174,56 @@ export class NativeBillingAdapter implements BillingAdapter {
       // Unknown, not "not owned". Callers must not revoke on this snapshot.
       return EMPTY_ENTITLEMENT;
     }
+  }
+
+  async getProducts(productIds: readonly string[]): Promise<StoreProduct[]> {
+    try {
+      const raw = await withTimeout(
+        KickoleBilling.getProducts({ productIds: [...productIds] }),
+        BILLING_CALL_TIMEOUT_MS,
+      );
+      return raw.products.flatMap((product) => {
+        if (!product.priceString || product.priceString.trim().length === 0) return [];
+        return [{
+          productId: product.productId,
+          title: product.title,
+          description: product.description,
+          priceString: product.priceString,
+          priceMicros: product.priceMicros,
+          currencyCode: product.currencyCode,
+        }];
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  async purchaseProduct(productId: string): Promise<PackPurchaseResult> {
+    if (this.busy) {
+      return { outcome: 'busy', productId, source: 'none', message: 'Purchase already in progress.' };
+    }
+    this.busy = true;
+    try {
+      const raw = await withTimeout(
+        KickoleBilling.purchaseProduct({ productId }),
+        PURCHASE_CALL_TIMEOUT_MS,
+      );
+      return {
+        outcome: mapOutcome(raw.outcome),
+        productId: raw.productId || productId,
+        source: mapSource(raw.source),
+        message: raw.message,
+      };
+    } catch {
+      return { outcome: 'failed', productId, source: 'none', message: STORE_UNAVAILABLE_MESSAGE };
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  async ownedProductIds(): Promise<string[]> {
+    const raw = await withTimeout(KickoleBilling.ownedProductIds(), BILLING_CALL_TIMEOUT_MS);
+    return Array.isArray(raw.productIds) ? raw.productIds.filter((id) => typeof id === 'string') : [];
   }
 
   dispose() {

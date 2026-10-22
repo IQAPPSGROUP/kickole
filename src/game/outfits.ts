@@ -3,19 +3,22 @@ import type { ClothingColors, PlayerBody } from './appearance';
 
 /**
  * Themed cosmetics. They never change kick timing or scoring.
- * Prices come only from a store product's priceString. These IDs are not part
- * of LAUNCH_COLLECTION_ITEM_IDS, and simPurchase / dev_sim never grants them.
- * Gold Legend is a streak reward, not a product.
+ * Paid looks are sold only inside non-consumable packs. The product IDs are
+ * placeholders for a later store listing — this build does not create them.
+ * A price is shown only when the store returns priceString. Earned looks are
+ * play milestones, not products. simPurchase / dev_sim never grants a pack.
  */
+
+export const COSMETIC_SHOP_LINE = 'Items are cosmetic only and stay on your account';
 
 export const OUTFIT_IDS = [
   'alien',
   'spaceman',
   'street-hero',
   'night-glider',
-  'stripe-bandit',
   'night-wrap',
   'deck-hand',
+  'secret-agent',
   'grey-ghoul',
   'keep-guard',
   'kitchen-whites',
@@ -32,18 +35,46 @@ export const OUTFIT_IDS = [
 export type OutfitId = (typeof OUTFIT_IDS)[number];
 
 export const COWBOY_BOOT_ID = 'boot-cowboy';
-export const COWBOY_PRODUCT_ID = 'kickole_boot_cowboy';
 
 /** Lifetime best combo required. Not a purchase. */
 export const GOLD_LEGEND_STREAK = 50;
+
+export const SHOP_PACK_IDS = [
+  'heroes-space',
+  'adventure',
+  'party',
+  'spooky',
+  'everything',
+] as const;
+
+export type ShopPackId = (typeof SHOP_PACK_IDS)[number];
+
+/** The four packs an Everything purchase grants. Everything is not in this list. */
+export const CONTENT_PACK_IDS = ['heroes-space', 'adventure', 'party', 'spooky'] as const satisfies readonly ShopPackId[];
+
+export type PlayStat = 'stall' | 'alternateFoot' | 'perfectTouch' | 'bestStreak';
+
+export interface PlayMilestone {
+  kind: PlayStat;
+  target: number;
+  /** Progress noun. No clock and no price. */
+  label: string;
+}
+
+export interface MilestoneStats {
+  stalls: number;
+  alternateFoot: number;
+  perfectTouch: number;
+  bestStreak: number;
+}
 
 export type OutfitPattern = 'weave' | 'stripes' | 'chain' | 'torn' | 'gold' | 'leather' | 'snow' | 'night';
 
 export interface OutfitDesign {
   id: OutfitId;
   name: string;
-  /** Null for the streak reward. Never a made-up price. */
-  productId: string | null;
+  /** Set for looks earned in play. Pack looks stay null and are not sold alone. */
+  milestone: PlayMilestone | null;
   clothing: ClothingColors;
   pattern: OutfitPattern;
   /** Pale costume tint on the skin map. Null keeps the footballer's own skin. */
@@ -51,15 +82,28 @@ export interface OutfitDesign {
   note: string;
 }
 
+export interface ShopPack {
+  id: ShopPackId;
+  name: string;
+  /** Placeholder store id. Not registered with Apple or Google by this change. */
+  productId: string;
+  outfitIds: readonly OutfitId[];
+  /** Boots included with the pack. Cowboy boots are not their own product. */
+  bootIds: readonly string[];
+  blurb: string;
+}
+
 const cloth = (shirt: string, shirtTrim: string, shorts: string, socks: string): ClothingColors => ({
   shirt, shirtTrim, shorts, socks,
 });
+
+const earned = (kind: PlayStat, target: number, label: string): PlayMilestone => ({ kind, target, label });
 
 export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'alien',
     name: 'Alien',
-    productId: 'kickole_outfit_alien',
+    milestone: null,
     clothing: cloth('#6FBF8A', '#1F6B45', '#2F8F5B', '#D5E8D4'),
     pattern: 'weave',
     skinTint: null,
@@ -68,7 +112,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'spaceman',
     name: 'Spaceman',
-    productId: 'kickole_outfit_spaceman',
+    milestone: null,
     clothing: cloth('#F4F7F8', '#C5D0D6', '#E7EEF2', '#F7F5ED'),
     pattern: 'weave',
     skinTint: null,
@@ -76,35 +120,26 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'street-hero',
-    name: 'Street Hero',
-    productId: 'kickole_outfit_street_hero',
-    clothing: cloth('#2F6FED', '#F4C430', '#1B2A4A', '#F4C430'),
+    name: 'Superhero',
+    milestone: null,
+    clothing: cloth('#1F8A8A', '#F26B5B', '#163E3E', '#F4C7A8'),
     pattern: 'weave',
     skinTint: null,
-    note: 'Original cape and a round ball badge. No borrowed hero marks.',
+    note: 'Teal kit and plain wristbands. No cape, cowl or chest emblem.',
   },
   {
     id: 'night-glider',
     name: 'Night Glider',
-    productId: 'kickole_outfit_night_glider',
+    milestone: null,
     clothing: cloth('#2A2E33', '#8B939C', '#1A1D21', '#3A3F45'),
     pattern: 'night',
     skinTint: null,
-    note: 'Dark cape and a plain wing chevron. No cowl and no bat emblem.',
-  },
-  {
-    id: 'stripe-bandit',
-    name: 'Stripe Bandit',
-    productId: 'kickole_outfit_stripe_bandit',
-    clothing: cloth('#F7F5ED', '#1A1A1A', '#22262C', '#F7F5ED'),
-    pattern: 'stripes',
-    skinTint: null,
-    note: 'Striped top, domino mask, beanie, and a small swag sack.',
+    note: 'Charcoal kit and a plain brow band. No cape, cowl, bat mark or chest emblem.',
   },
   {
     id: 'night-wrap',
-    name: 'Ninja Wrap',
-    productId: 'kickole_outfit_night_wrap',
+    name: 'Ninja',
+    milestone: null,
     clothing: cloth('#1C1C1C', '#C0392B', '#111111', '#2A2A2A'),
     pattern: 'night',
     skinTint: null,
@@ -112,53 +147,62 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'deck-hand',
-    name: 'Deck Hand',
-    productId: 'kickole_outfit_deck_hand',
+    name: 'Pirate',
+    milestone: null,
     clothing: cloth('#F4F1EA', '#6B1D1D', '#1E3A5F', '#F4F1EA'),
     pattern: 'stripes',
     skinTint: null,
     note: 'Striped shirt, waistcoat, bandana, and an eyepatch.',
   },
   {
+    id: 'secret-agent',
+    name: 'Secret Agent',
+    milestone: null,
+    clothing: cloth('#1E2430', '#F4F1EA', '#141820', '#2A3140'),
+    pattern: 'night',
+    skinTint: null,
+    note: 'Dark suit, glasses and a narrow tie. No mask and no sack.',
+  },
+  {
     id: 'grey-ghoul',
-    name: 'Grey Ghoul',
-    productId: 'kickole_outfit_grey_ghoul',
+    name: 'Zombie',
+    milestone: null,
     clothing: cloth('#8E9089', '#5C5E58', '#6A6C66', '#B7B8B2'),
     pattern: 'torn',
     skinTint: '#C5C6C0',
-    note: 'Pale grey costume and cloth bandages. No blood or wounds.',
+    note: 'Pale grey costume and cloth bandages. A cartoon costume.',
   },
   {
     id: 'keep-guard',
-    name: 'Keep Guard',
-    productId: 'kickole_outfit_keep_guard',
+    name: 'Knight',
+    milestone: earned('perfectTouch', 40, 'perfect touches'),
     clothing: cloth('#C0C4C8', '#7A1F2B', '#4A4E55', '#D9DDE2'),
     pattern: 'chain',
     skinTint: null,
-    note: 'Chainmail-look top and a tabard with an original crest.',
+    note: 'Chainmail-look top and a tabard with an original crest. Earned in play.',
   },
   {
     id: 'kitchen-whites',
-    name: 'Kitchen Whites',
-    productId: 'kickole_outfit_kitchen_whites',
+    name: 'Chef',
+    milestone: earned('stall', 20, 'stalls'),
     clothing: cloth('#F7F5ED', '#E7E2D6', '#F4F1EA', '#F7F5ED'),
     pattern: 'weave',
     skinTint: null,
-    note: 'Whites, a full apron, and a tall hat.',
+    note: 'Whites, a full apron, and a tall hat. Earned in play.',
   },
   {
     id: 'spike-hood',
-    name: 'Spike Hood',
-    productId: 'kickole_outfit_spike_hood',
+    name: 'Dino Onesie',
+    milestone: earned('perfectTouch', 15, 'perfect touches'),
     clothing: cloth('#3E7D4F', '#E7A317', '#2C5A38', '#6FA37A'),
     pattern: 'weave',
     skinTint: null,
-    note: 'Dino onesie hood with three spikes. The face stays open.',
+    note: 'Dino onesie hood with three spikes. The face stays open. Earned in play.',
   },
   {
     id: 'stage-jacket',
-    name: 'Stage Jacket',
-    productId: 'kickole_outfit_stage_jacket',
+    name: 'Rockstar',
+    milestone: null,
     clothing: cloth('#2B241C', '#C4A574', '#1A1612', '#3A3128'),
     pattern: 'leather',
     skinTint: null,
@@ -166,8 +210,8 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'ring-mask',
-    name: 'Ring Mask',
-    productId: 'kickole_outfit_ring_mask',
+    name: 'Lucha',
+    milestone: null,
     clothing: cloth('#E23B4A', '#F2C14E', '#1F6B8A', '#F2C14E'),
     pattern: 'weave',
     skinTint: null,
@@ -175,17 +219,17 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'match-official',
-    name: 'Match Official',
-    productId: 'kickole_outfit_match_official',
+    name: 'Referee',
+    milestone: earned('alternateFoot', 40, 'alternating touches'),
     clothing: cloth('#1A1A1A', '#F7F5ED', '#141414', '#1A1A1A'),
     pattern: 'night',
     skinTint: null,
-    note: 'All black, a whistle, and cards in a pocket.',
+    note: 'All black, a whistle, and cards in a pocket. Earned in play.',
   },
   {
     id: 'seventies',
-    name: 'Seventies',
-    productId: 'kickole_outfit_seventies',
+    name: 'Retro 70s',
+    milestone: null,
     clothing: cloth('#E07A3D', '#F4F1EA', '#F2C14E', '#F7F5ED'),
     pattern: 'weave',
     skinTint: null,
@@ -193,8 +237,8 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'north-pole',
-    name: 'North Pole',
-    productId: 'kickole_outfit_north_pole',
+    name: 'Santa',
+    milestone: null,
     clothing: cloth('#B4232A', '#F4F1EA', '#8E1C22', '#F7F5ED'),
     pattern: 'weave',
     skinTint: null,
@@ -202,21 +246,73 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'snow-friend',
-    name: 'Snow Friend',
-    productId: 'kickole_outfit_snow_friend',
+    name: 'Snowman',
+    milestone: earned('stall', 40, 'stalls'),
     clothing: cloth('#F7FBFF', '#E24B4B', '#F4F7FA', '#F7FBFF'),
     pattern: 'snow',
     skinTint: null,
-    note: 'White kit, scarf, buttons, and a carrot nose. Same covered kit on every body.',
+    note: 'White kit, scarf, buttons, and a carrot nose. Earned in play.',
   },
   {
     id: 'gold-legend',
     name: 'Gold Legend',
-    productId: null,
+    milestone: earned('bestStreak', GOLD_LEGEND_STREAK, 'combo'),
     clothing: cloth('#E3B341', '#8A6A1F', '#C4922A', '#F0D78C'),
     pattern: 'gold',
     skinTint: null,
     note: `Shiny gold kit. Unlocks at a ${GOLD_LEGEND_STREAK} combo, not from the store.`,
+  },
+];
+
+export const EARNED_OUTFIT_IDS = [
+  'kitchen-whites',
+  'match-official',
+  'keep-guard',
+  'snow-friend',
+  'spike-hood',
+  'gold-legend',
+] as const satisfies readonly OutfitId[];
+
+export const SHOP_PACKS: readonly ShopPack[] = [
+  {
+    id: 'heroes-space',
+    name: 'Heroes & Space',
+    productId: 'kickole_pack_heroes_space',
+    outfitIds: ['street-hero', 'night-glider', 'alien', 'spaceman'],
+    bootIds: [],
+    blurb: 'Superhero, Night Glider, Alien and Spaceman.',
+  },
+  {
+    id: 'adventure',
+    name: 'Adventure',
+    productId: 'kickole_pack_adventure',
+    outfitIds: ['night-wrap', 'deck-hand', 'secret-agent', 'ring-mask'],
+    bootIds: [],
+    blurb: 'Ninja, Pirate, Secret Agent and Lucha.',
+  },
+  {
+    id: 'party',
+    name: 'Party',
+    productId: 'kickole_pack_party',
+    outfitIds: ['stage-jacket', 'seventies', 'north-pole'],
+    bootIds: [COWBOY_BOOT_ID],
+    blurb: 'Rockstar, Retro 70s, Cowboy Boots and Santa.',
+  },
+  {
+    id: 'spooky',
+    name: 'Spooky',
+    productId: 'kickole_pack_spooky',
+    outfitIds: ['grey-ghoul'],
+    bootIds: [],
+    blurb: 'A cartoon zombie.',
+  },
+  {
+    id: 'everything',
+    name: 'Everything',
+    productId: 'kickole_pack_everything',
+    outfitIds: [],
+    bootIds: [],
+    blurb: 'All four packs: Heroes & Space, Adventure, Party and Spooky.',
   },
 ];
 
@@ -229,8 +325,49 @@ export function getOutfit(id: string | null | undefined): OutfitDesign | null {
   return OUTFITS.find((outfit) => outfit.id === id) ?? null;
 }
 
-export function outfitProductId(id: string): string | null {
-  return getOutfit(id)?.productId ?? (id === COWBOY_BOOT_ID ? COWBOY_PRODUCT_ID : null);
+export function isShopPackId(id: string): id is ShopPackId {
+  return (SHOP_PACK_IDS as readonly string[]).includes(id);
+}
+
+export function getShopPack(id: string | null | undefined): ShopPack | null {
+  if (!id || !isShopPackId(id)) return null;
+  return SHOP_PACKS.find((pack) => pack.id === id) ?? null;
+}
+
+export function shopPackForProduct(productId: string): ShopPack | null {
+  return SHOP_PACKS.find((pack) => pack.productId === productId) ?? null;
+}
+
+/** Content packs a purchase delivers. Everything expands to the other four. */
+export function packsGrantedBy(id: ShopPackId): ShopPackId[] {
+  if (id === 'everything') return [...CONTENT_PACK_IDS, 'everything'];
+  return [id];
+}
+
+export function milestoneMet(stats: MilestoneStats, milestone: PlayMilestone): boolean {
+  const current = milestoneCurrent(stats, milestone);
+  return Number.isFinite(current) && current >= milestone.target;
+}
+
+export function milestoneCurrent(stats: MilestoneStats, milestone: PlayMilestone): number {
+  switch (milestone.kind) {
+    case 'stall':
+      return stats.stalls;
+    case 'alternateFoot':
+      return stats.alternateFoot;
+    case 'perfectTouch':
+      return stats.perfectTouch;
+    case 'bestStreak':
+      return stats.bestStreak;
+    default: {
+      const neverKind: never = milestone.kind;
+      return neverKind;
+    }
+  }
+}
+
+export function earnedOutfit(id: string): boolean {
+  return getOutfit(id)?.milestone != null;
 }
 
 /**

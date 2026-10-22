@@ -23,6 +23,29 @@ export function launchPurchaseLabel(
   }
 }
 
+/** Pack button. A price is the store priceString alone. Owned and busy never show a price. */
+export function packButtonLabel(
+  platform: BillingPlatform,
+  priceString: string | null,
+  busy: boolean,
+  owned: boolean,
+): string {
+  if (owned) return 'OWNED';
+  if (busy) return 'PLEASE WAIT…';
+  if (priceString) return priceString;
+  switch (platform) {
+    case 'web':
+      return 'UNLOCK ON iOS / ANDROID';
+    case 'ios':
+    case 'android':
+      return 'STORE UNAVAILABLE';
+    default: {
+      const exhaustive: never = platform;
+      return exhaustive;
+    }
+  }
+}
+
 export function launchStoreNote(platform: BillingPlatform, hasPrice: boolean): string | null {
   if (hasPrice) return null;
   switch (platform) {

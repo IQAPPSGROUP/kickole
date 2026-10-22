@@ -413,6 +413,10 @@ export function SettingsScreen({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
   const [doneNotice, setDoneNotice] = useState(false);
+  const closeDelete = () => {
+    setConfirmDelete(false);
+    setDeleteNote(null);
+  };
   const blocked = readBlockedNames(localStorage);
   void blockedTick;
   const choices: GraphicsChoice[] = ['auto', 'low', 'medium', 'high'];
@@ -556,38 +560,37 @@ export function SettingsScreen({
         </div>
         </div>
         <div className="settings-dock">
-          {!confirmDelete && (
-            <button type="button" className="btn ghost" onClick={() => { setConfirmDelete(true); setDeleteNote(null); }}>
-              Delete my leaderboard data
-            </button>
-          )}
-          {confirmDelete && (
-            <>
-              <p className="shop-note">This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => {
-                  void onDelete().then((message) => {
-                    if (message) setDeleteNote(message);
-                    else {
-                      setConfirmDelete(false);
-                      setDeleteNote(null);
-                      setDoneNotice(true);
-                    }
-                  });
-                }}
-              >
-                Delete my leaderboard data
-              </button>
-              <button type="button" className="btn ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-            </>
-          )}
-          {deleteNote && <p className="nick-error" role="alert">{deleteNote}</p>}
+          <button type="button" className="btn ghost" onClick={() => { setConfirmDelete(true); setDeleteNote(null); }}>
+            Delete my leaderboard data
+          </button>
           <button className="btn primary" onClick={onClose}>DONE</button>
         </div>
       </div>
     </div>
+    {confirmDelete && (
+      <ScreenModal label="Delete my leaderboard data" onBackdrop={closeDelete}>
+        <div className="centre-notice">
+          <p>This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
+          {deleteNote && <p className="nick-error" role="alert">{deleteNote}</p>}
+          <button
+            type="button"
+            className="btn primary"
+            onClick={() => {
+              void onDelete().then((message) => {
+                if (message) setDeleteNote(message);
+                else {
+                  closeDelete();
+                  setDoneNotice(true);
+                }
+              });
+            }}
+          >
+            Delete my leaderboard data
+          </button>
+          <button type="button" className="btn ghost" onClick={closeDelete}>Cancel</button>
+        </div>
+      </ScreenModal>
+    )}
     {doneNotice && (
       <ScreenModal label="Done">
         <div className="centre-notice">

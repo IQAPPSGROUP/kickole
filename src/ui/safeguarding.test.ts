@@ -29,6 +29,25 @@ describe('report and country safeguarding', () => {
     expect(contrast('#3b1024', '#ffd0e4')).toBeGreaterThanOrEqual(4.5);
     expect(contrast('#24180c', '#f7e9c5')).toBeGreaterThanOrEqual(4.5);
     expect(contrast('#1E2A5A', '#FFD93D')).toBeGreaterThanOrEqual(4.5);
+    expect(contrast('#ffe14a', '#1E2A5A')).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('asks before deleting leaderboard data in the centred confirmation modal', () => {
+    const screens = readFileSync(new URL('./Screens.tsx', import.meta.url), 'utf8');
+    const dockStart = screens.indexOf('className="settings-dock"');
+    const dockEnd = screens.indexOf('DONE</button>', dockStart);
+    const dock = screens.slice(dockStart, dockEnd);
+    expect(dock).toContain('Delete my leaderboard data');
+    expect(dock).not.toContain('shop-note');
+    expect(dock).not.toContain('confirmDelete');
+    const modalStart = screens.indexOf('{confirmDelete && (');
+    const modalEnd = screens.indexOf('{doneNotice && (');
+    const modal = screens.slice(modalStart, modalEnd);
+    expect(modal).toContain('<ScreenModal');
+    expect(modal).toContain('centre-notice');
+    expect(modal).toContain('This removes your nickname and scores.');
+    expect(modal).toContain('Cancel');
+    expect(modal).toContain('onBackdrop={closeDelete}');
   });
 
   it('keeps the country hint as a plain text link with a 44px target', () => {

@@ -35,7 +35,7 @@ function hex(color) {
 
 const GREEN = hex('#3CB44A');
 const BELLY = hex('#E4E7A4');
-const SPIKE = hex('#163318');
+const SPIKE = hex('#2F7A38');
 const DINO_BOOT = hex('#217A32');
 const SOLE = hex('#141414');
 const PLATE_COLOR = hex('#C8CCD1');
@@ -366,9 +366,9 @@ function highest(mesh) {
 function spikes(hood, joint) {
   const top = highest(hood);
   const specs = [
-    { at: [top[0], top[1] + 0.012, top[2] + 0.045], height: 0.16, radius: 0.032 },
-    { at: [top[0] + 0.055, top[1], top[2] - 0.005], height: 0.12, radius: 0.028 },
-    { at: [top[0] - 0.055, top[1], top[2] - 0.005], height: 0.12, radius: 0.028 },
+    { at: [top[0], top[1] + 0.04, top[2] + 0.02], height: 0.24, radius: 0.046 },
+    { at: [top[0] + 0.075, top[1] + 0.015, top[2]], height: 0.16, radius: 0.038 },
+    { at: [top[0] - 0.075, top[1] + 0.015, top[2]], height: 0.16, radius: 0.038 },
   ];
   return mergeGeoms(specs.map((spec) => cone(spec.at, spec.height, spec.radius, 7, joint)));
 }
@@ -814,8 +814,8 @@ function recipes(body) {
   const tabardShell = shell(body.prims, ['shirt', 'shorts'], 0.028);
   const tabard = splitTriangles(tabardShell, (c, n) => n.z > 0.35 && Math.abs(c.x) < 0.09 && c.y > face.minY - 0.55).yes;
   const brow = splitTriangles(shell(body.prims, ['head'], 0.02), (c, n) => inWindow(c, n, face, face.browMinY, face.browMaxY)).yes;
-  const belly = splitTriangles(suit, (c, n) => n.z > 0.4 && Math.abs(c.x) < 0.07 && c.y > -0.02 && c.y < 0.42).yes;
-  const cloth = splitTriangles(suit, (c, n) => n.z > 0.4 && Math.abs(c.x) < 0.07 && c.y > -0.02 && c.y < 0.42).no;
+  const belly = splitTriangles(suit, (c, n) => n.z > 0.22 && Math.abs(c.x) < 0.12 && c.y > 0.02 && c.y < 0.52).yes;
+  const cloth = splitTriangles(suit, (c, n) => n.z > 0.22 && Math.abs(c.x) < 0.12 && c.y > 0.02 && c.y < 0.52).no;
   const eyes = body.prims.find((prim) => prim.kind === 'eyes');
   const eyeY = (eyes.bounds.min[1] + eyes.bounds.max[1]) / 2;
   const eyeZ = eyes.bounds.max[2] + 0.015;

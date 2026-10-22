@@ -36,8 +36,20 @@ export type OutfitId = (typeof OUTFIT_IDS)[number];
 
 export const COWBOY_BOOT_ID = 'boot-cowboy';
 
-/** Lifetime best combo required. Not a purchase. */
-export const GOLD_LEGEND_STREAK = 50;
+/**
+ * Best score in a single run. Not a lifetime total and not a purchase.
+ * Chef 1000, Referee 2500, Knight 4000, Snowman 5500, Dino Onesie 7000, Gold Legend 10000.
+ */
+export const EARNED_BEST_SCORE = {
+  'kitchen-whites': 1000,
+  'match-official': 2500,
+  'keep-guard': 4000,
+  'snow-friend': 5500,
+  'spike-hood': 7000,
+  'gold-legend': 10000,
+} as const;
+
+export const GOLD_LEGEND_SCORE = EARNED_BEST_SCORE['gold-legend'];
 
 export const SHOP_PACK_IDS = [
   'heroes-space',
@@ -52,7 +64,7 @@ export type ShopPackId = (typeof SHOP_PACK_IDS)[number];
 /** The four packs an Everything purchase grants. Everything is not in this list. */
 export const CONTENT_PACK_IDS = ['heroes-space', 'adventure', 'party', 'spooky'] as const satisfies readonly ShopPackId[];
 
-export type PlayStat = 'stall' | 'alternateFoot' | 'perfectTouch' | 'bestStreak';
+export type PlayStat = 'bestScore';
 
 export interface PlayMilestone {
   kind: PlayStat;
@@ -62,10 +74,8 @@ export interface PlayMilestone {
 }
 
 export interface MilestoneStats {
-  stalls: number;
-  alternateFoot: number;
-  perfectTouch: number;
-  bestStreak: number;
+  /** Highest score from one run. Runs are not added together. */
+  bestScore: number;
 }
 
 export type OutfitPattern = 'weave' | 'stripes' | 'chain' | 'torn' | 'gold' | 'leather' | 'snow' | 'night';
@@ -97,7 +107,7 @@ const cloth = (shirt: string, shirtTrim: string, shorts: string, socks: string):
   shirt, shirtTrim, shorts, socks,
 });
 
-const earned = (kind: PlayStat, target: number, label: string): PlayMilestone => ({ kind, target, label });
+const earned = (target: number): PlayMilestone => ({ kind: 'bestScore', target, label: 'best score' });
 
 export const OUTFITS: readonly OutfitDesign[] = [
   {
@@ -129,12 +139,12 @@ export const OUTFITS: readonly OutfitDesign[] = [
   },
   {
     id: 'night-glider',
-    name: 'Night Glider',
+    name: 'Shadow Hero',
     milestone: null,
     clothing: cloth('#2A2E33', '#8B939C', '#1A1D21', '#3A3F45'),
     pattern: 'night',
     skinTint: null,
-    note: 'Charcoal kit and a plain brow band. No cape, cowl, bat mark or chest emblem.',
+    note: 'Charcoal kit and a plain brow band. No cape, cowl or chest emblem.',
   },
   {
     id: 'night-wrap',
@@ -175,7 +185,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'keep-guard',
     name: 'Knight',
-    milestone: earned('perfectTouch', 40, 'perfect touches'),
+    milestone: earned(EARNED_BEST_SCORE['keep-guard']),
     clothing: cloth('#C0C4C8', '#7A1F2B', '#4A4E55', '#D9DDE2'),
     pattern: 'chain',
     skinTint: null,
@@ -184,7 +194,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'kitchen-whites',
     name: 'Chef',
-    milestone: earned('stall', 20, 'stalls'),
+    milestone: earned(EARNED_BEST_SCORE['kitchen-whites']),
     clothing: cloth('#F7F5ED', '#E7E2D6', '#F4F1EA', '#F7F5ED'),
     pattern: 'weave',
     skinTint: null,
@@ -193,7 +203,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'spike-hood',
     name: 'Dino Onesie',
-    milestone: earned('perfectTouch', 15, 'perfect touches'),
+    milestone: earned(EARNED_BEST_SCORE['spike-hood']),
     clothing: cloth('#3E7D4F', '#E7A317', '#2C5A38', '#6FA37A'),
     pattern: 'weave',
     skinTint: null,
@@ -220,7 +230,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'match-official',
     name: 'Referee',
-    milestone: earned('alternateFoot', 40, 'alternating touches'),
+    milestone: earned(EARNED_BEST_SCORE['match-official']),
     clothing: cloth('#1A1A1A', '#F7F5ED', '#141414', '#1A1A1A'),
     pattern: 'night',
     skinTint: null,
@@ -247,7 +257,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'snow-friend',
     name: 'Snowman',
-    milestone: earned('stall', 40, 'stalls'),
+    milestone: earned(EARNED_BEST_SCORE['snow-friend']),
     clothing: cloth('#F7FBFF', '#E24B4B', '#F4F7FA', '#F7FBFF'),
     pattern: 'snow',
     skinTint: null,
@@ -256,11 +266,11 @@ export const OUTFITS: readonly OutfitDesign[] = [
   {
     id: 'gold-legend',
     name: 'Gold Legend',
-    milestone: earned('bestStreak', GOLD_LEGEND_STREAK, 'combo'),
+    milestone: earned(GOLD_LEGEND_SCORE),
     clothing: cloth('#E3B341', '#8A6A1F', '#C4922A', '#F0D78C'),
     pattern: 'gold',
     skinTint: null,
-    note: `Shiny gold kit. Unlocks at a ${GOLD_LEGEND_STREAK} combo, not from the store.`,
+    note: `Shiny gold kit. Unlocks at a best score of ${GOLD_LEGEND_SCORE} in one run, not from the store.`,
   },
 ];
 
@@ -280,7 +290,7 @@ export const SHOP_PACKS: readonly ShopPack[] = [
     productId: 'kickole_pack_heroes_space',
     outfitIds: ['street-hero', 'night-glider', 'alien', 'spaceman'],
     bootIds: [],
-    blurb: 'Superhero, Night Glider, Alien and Spaceman.',
+    blurb: 'Superhero, Shadow Hero, Alien and Spaceman.',
   },
   {
     id: 'adventure',
@@ -402,14 +412,8 @@ export function milestoneMet(stats: MilestoneStats, milestone: PlayMilestone): b
 
 export function milestoneCurrent(stats: MilestoneStats, milestone: PlayMilestone): number {
   switch (milestone.kind) {
-    case 'stall':
-      return stats.stalls;
-    case 'alternateFoot':
-      return stats.alternateFoot;
-    case 'perfectTouch':
-      return stats.perfectTouch;
-    case 'bestStreak':
-      return stats.bestStreak;
+    case 'bestScore':
+      return stats.bestScore;
     default: {
       const neverKind: never = milestone.kind;
       return neverKind;
@@ -435,8 +439,8 @@ export function cosmeticPriceString(
   return price;
 }
 
-export function goldLegendUnlocked(bestStreak: number): boolean {
-  return Number.isFinite(bestStreak) && bestStreak >= GOLD_LEGEND_STREAK;
+export function goldLegendUnlocked(bestScore: number): boolean {
+  return Number.isFinite(bestScore) && bestScore >= GOLD_LEGEND_SCORE;
 }
 
 /**

@@ -15,7 +15,8 @@ import {
   COWBOY_BOOT_ID,
   CONTENT_PACK_IDS,
   EARNED_OUTFIT_IDS,
-  GOLD_LEGEND_STREAK,
+  EARNED_BEST_SCORE,
+  GOLD_LEGEND_SCORE,
   OUTFIT_IDS,
   OUTFITS,
   SHOP_PACKS,
@@ -55,7 +56,20 @@ describe('themed outfits', () => {
       expect(outfit.milestone === null || earnedOutfit(outfit.id)).toBe(true);
     }
     expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(COWBOY_BOOT_ID);
-    expect(OUTFITS.find((outfit) => outfit.id === 'gold-legend')?.milestone?.kind).toBe('bestStreak');
+    expect(OUTFITS.find((outfit) => outfit.id === 'gold-legend')?.milestone?.kind).toBe('bestScore');
+    expect(OUTFITS.find((outfit) => outfit.id === 'night-glider')?.name).toBe('Shadow Hero');
+    expect(OUTFITS.map((outfit) => `${outfit.name} ${outfit.note}`).join('\n')).not.toMatch(/bat-style|night glider/i);
+    expect(EARNED_BEST_SCORE).toEqual({
+      'kitchen-whites': 1000,
+      'match-official': 2500,
+      'keep-guard': 4000,
+      'snow-friend': 5500,
+      'spike-hood': 7000,
+      'gold-legend': 10000,
+    });
+    for (const id of EARNED_OUTFIT_IDS) {
+      expect(getOutfit(id)?.milestone).toEqual({ kind: 'bestScore', target: EARNED_BEST_SCORE[id], label: 'best score' });
+    }
     expect((OUTFIT_IDS as readonly string[]).includes('stripe-bandit')).toBe(false);
     expect((OUTFIT_IDS as readonly string[]).includes('secret-agent')).toBe(true);
     expect(OUTFITS.some((outfit) => /robber|bandit/i.test(outfit.name))).toBe(false);
@@ -95,11 +109,23 @@ describe('themed outfits', () => {
     expect(keepStoreCosmetic('none', false, false)).toBe(true);
   });
 
-  it('unlocks Gold Legend from a 50 combo and equips only owned looks', () => {
-    const start = normalizeLocker({ bestStreak: GOLD_LEGEND_STREAK - 1 });
+  it('unlocks earned looks from the best score in one run', () => {
+    const comboOnly = normalizeLocker({ bestStreak: 50, best: 0 });
+    expect(outfitOwned(comboOnly, 'gold-legend')).toBe(false);
+    expect(outfitOwned(normalizeLocker({ best: 999 }), 'kitchen-whites')).toBe(false);
+    expect(outfitOwned(normalizeLocker({ best: 1000 }), 'kitchen-whites')).toBe(true);
+    expect(outfitOwned(normalizeLocker({ best: 2499 }), 'match-official')).toBe(false);
+    expect(outfitOwned(normalizeLocker({ best: 2500 }), 'match-official')).toBe(true);
+    expect(outfitOwned(normalizeLocker({ best: 3999 }), 'keep-guard')).toBe(false);
+    expect(outfitOwned(normalizeLocker({ best: 4000 }), 'keep-guard')).toBe(true);
+    expect(outfitOwned(normalizeLocker({ best: 5499 }), 'snow-friend')).toBe(false);
+    expect(outfitOwned(normalizeLocker({ best: 5500 }), 'snow-friend')).toBe(true);
+    expect(outfitOwned(normalizeLocker({ best: 6999 }), 'spike-hood')).toBe(false);
+    expect(outfitOwned(normalizeLocker({ best: 7000 }), 'spike-hood')).toBe(true);
+    const start = normalizeLocker({ best: GOLD_LEGEND_SCORE - 1 });
     expect(outfitOwned(start, 'gold-legend')).toBe(false);
     expect(equipOutfit(start, 'gold-legend').ok).toBe(false);
-    const ready = normalizeLocker({ bestStreak: GOLD_LEGEND_STREAK });
+    const ready = normalizeLocker({ best: GOLD_LEGEND_SCORE });
     expect(outfitOwned(ready, 'gold-legend')).toBe(true);
     const worn = equipOutfit(ready, 'gold-legend');
     expect(worn.ok).toBe(true);
@@ -231,7 +257,7 @@ describe('themed outfits', () => {
     expect(refunded.equippedBoot).toBe('boot-street-classic');
     expect(refunded.equippedOutfit).toBeNull();
     const kept = applyOwnedPackProducts(
-      { ...worn, bestStreak: GOLD_LEGEND_STREAK, equippedOutfit: 'gold-legend' },
+      { ...worn, best: GOLD_LEGEND_SCORE, equippedOutfit: 'gold-legend' },
       ['kickole_pack_everything'],
       'apple',
     );

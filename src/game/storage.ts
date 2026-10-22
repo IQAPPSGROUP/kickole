@@ -50,7 +50,6 @@ export interface Settings {
 }
 
 export interface SaveData extends WardrobeLocker {
-  best: number;
   leaderboard: RunRecord[];
   /** Trick lessons the player has already been taught. */
   learnedTricks: LessonId[];
@@ -117,19 +116,21 @@ export function loadSave(): SaveData {
       .filter((r) => r && typeof r.score === 'number' && typeof r.kickUps === 'number' && typeof r.date === 'number')
       .slice(0, 5)
     : [];
-  const best = typeof d?.best === 'number' ? d.best : 0;
+  const stated = typeof d?.best === 'number' && Number.isFinite(d.best) ? d.best : 0;
+  const best = Math.max(0, stated, ...lb.map((r) => r.score));
   const storedVersion = typeof d?.wardrobeVersion === 'number' ? d.wardrobeVersion : 0;
   const locker = normalizeLocker({
     ...d,
+    best,
     hadSave: d != null,
     legacySkinId: storedVersion < 2 && typeof settings?.skinId === 'string'
       ? settings.skinId
       : null,
   }, { trustStoreCache: trustNativeStoreCache() });
   const save: SaveData = {
-    best: Math.max(best, ...lb.map((r) => r.score), 0),
-    leaderboard: lb,
     ...locker,
+    best: locker.best,
+    leaderboard: lb,
     learnedTricks: normalizeLearned(d?.learnedTricks),
   };
   // Persist migrated shape when an older save existed (keep empty installs unwritten).

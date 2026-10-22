@@ -34,5 +34,7 @@ describe('shop packs screen', () => {
     expect(packs).not.toMatch(/>\s*Saving\s*</);
     expect(packs).not.toMatch(/\b(coins|gems|loot|popular|gifting|timer|limited)\b|£|€|\$\d/i);
     expect(packs).not.toMatch(/stripe-bandit|bank robber/i);
+    expect(outfits).toContain("name: 'Shadow Hero'");
+    expect(outfits).not.toMatch(/Bat-style hero|Night Glider/);
   });
 });

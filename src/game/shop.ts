@@ -15,7 +15,7 @@ import {
 } from './catalogue';
 import {
   COWBOY_BOOT_ID,
-  GOLD_LEGEND_STREAK,
+  GOLD_LEGEND_SCORE,
   cosmeticGrantAllowed,
   earnedOutfit,
   getOutfit,
@@ -70,8 +70,10 @@ export interface WardrobeLocker {
   danceRank: number;
   ownedDances: DanceId[];
   equippedDance: DanceId;
-  /** Lifetime best combo. Gold Legend unlocks from this, not from a purchase. */
+  /** Lifetime best combo. Dance ranks use this. Outfit unlocks use `best`. */
   bestStreak: number;
+  /** Highest score from a single run. Earned outfits unlock from this. */
+  best: number;
   /** Themed outfits granted by the store. Gold Legend is not stored here. */
   ownedOutfits: OutfitId[];
   /** Null wears the equipped kit. */
@@ -231,6 +233,7 @@ export interface RawSaveFields {
   ownedDances?: unknown;
   equippedDance?: unknown;
   bestStreak?: unknown;
+  best?: unknown;
   ownedOutfits?: unknown;
   equippedOutfit?: unknown;
   ownedPacks?: unknown;
@@ -336,6 +339,9 @@ export function normalizeLocker(
   const bestStreak = typeof raw?.bestStreak === 'number' && Number.isFinite(raw.bestStreak) && raw.bestStreak > 0
     ? Math.floor(raw.bestStreak)
     : 0;
+  const best = typeof raw?.best === 'number' && Number.isFinite(raw.best) && raw.best > 0
+    ? Math.floor(raw.best)
+    : 0;
   const cosmeticSource = parseEntitlementSource(raw?.cosmeticSource);
   const keepCosmetic = keepStoreCosmetic(cosmeticSource, options?.trustStoreCache === true, import.meta.env.PROD);
   const ownedOutfits = keepCosmetic && Array.isArray(raw?.ownedOutfits)
@@ -344,12 +350,7 @@ export function normalizeLocker(
   const ownedPacks = keepCosmetic && Array.isArray(raw?.ownedPacks)
     ? raw.ownedPacks.filter((id): id is ShopPackId => typeof id === 'string' && isShopPackId(id))
     : [];
-  const milestoneStats = {
-    stalls: challenges.stalls,
-    alternateFoot: challenges.alternateFoot,
-    perfectTouch: challenges.perfectTouch,
-    bestStreak,
-  };
+  const milestoneStats = { bestScore: best };
   const equippedCandidate = getOutfit(typeof raw?.equippedOutfit === 'string' ? raw.equippedOutfit : null);
   const equippedOutfit = equippedCandidate && (
     equippedCandidate.milestone
@@ -392,6 +393,7 @@ export function normalizeLocker(
     ownedDances: dances.ownedDances,
     equippedDance: dances.equippedDance,
     bestStreak,
+    best,
     ownedOutfits,
     equippedOutfit,
     cosmeticSource: keepCosmetic ? cosmeticSource : 'none',
@@ -415,12 +417,7 @@ export function normalizeLocker(
 }
 
 export function milestoneStatsOf(locker: WardrobeLocker) {
-  return {
-    stalls: locker.challenges.stalls,
-    alternateFoot: locker.challenges.alternateFoot,
-    perfectTouch: locker.challenges.perfectTouch,
-    bestStreak: locker.bestStreak,
-  };
+  return { bestScore: locker.best };
 }
 
 export function outfitOwned(locker: WardrobeLocker, id: string): boolean {
@@ -549,7 +546,7 @@ export function rememberDevCosmetic(locker: WardrobeLocker, id: string | null): 
   }
   if (!isOutfitId(id)) return locker;
   if (id === 'gold-legend') {
-    return { ...locker, bestStreak: Math.max(locker.bestStreak, GOLD_LEGEND_STREAK), equippedOutfit: id };
+    return { ...locker, best: Math.max(locker.best, GOLD_LEGEND_SCORE), equippedOutfit: id };
   }
   const ownedOutfits = locker.ownedOutfits.includes(id) ? locker.ownedOutfits : [...locker.ownedOutfits, id];
   return { ...locker, ownedOutfits, equippedOutfit: id, cosmeticSource: 'none' };
@@ -581,5 +578,5 @@ export function bumpChallenges(
   };
 }
 
-export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID, COWBOY_BOOT_ID, GOLD_LEGEND_STREAK };
+export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID, COWBOY_BOOT_ID, GOLD_LEGEND_SCORE };
 export type { DanceId, DanceLocker };

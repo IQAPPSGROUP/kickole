@@ -5,7 +5,7 @@ import type { Side } from '../engine/config';
 import { streakMultiplier } from '../engine/scoring';
 import { trickRepeatText } from '../engine/trickRepeat';
 import { beatClock, subscribeNowPlaying } from '../game/audio';
-import { trackTitle } from '../game/tracks';
+import { MENU_TRACK_ID, trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
 import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
 import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
@@ -168,10 +168,16 @@ export function ClueMark({ gesture }: { gesture: PromptGesture }) {
   );
 }
 
-function SongChip({ controller, playing }: { controller: GameController; playing: boolean }) {
+/**
+ * The whole pill is the control. WKWebView drops click on a child of a
+ * pointer-events: none overlay, and a tap on the title used to miss the
+ * 44px skip glyph. pointerup runs inside the gesture that resumes audio.
+ */
+export function SongChip({ controller }: { controller: GameController }) {
   const [notice, setNotice] = useState<{ id: number; name: string } | null>(null);
   const [quietId, setQuietId] = useState<number | null>(null);
   const noticeSerial = useRef(0);
+  const lastSkip = useRef(0);
   useEffect(() => subscribeNowPlaying((name) => {
     if (!name) {
       setNotice(null);
@@ -185,28 +191,35 @@ function SongChip({ controller, playing }: { controller: GameController; playing
     const timer = window.setTimeout(() => setQuietId(notice.id), 3000);
     return () => window.clearTimeout(timer);
   }, [notice]);
-  if (!playing || !notice) return null;
-  const title = trackTitle(notice.name);
-  const quiet = quietId === notice.id;
+  const title = trackTitle(notice?.name ?? MENU_TRACK_ID);
+  const quiet = notice != null && quietId === notice.id;
+  const skip = (event: { preventDefault(): void; stopPropagation(): void }) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = performance.now();
+    if (now - lastSkip.current < 350) return;
+    lastSkip.current = now;
+    controller.changeSong();
+  };
   return (
-    <div className={`now-playing${quiet ? ' is-quiet' : ''}`} role="status">
-      <p className="now-playing-label">
+    <button
+      type="button"
+      className={`now-playing${quiet ? ' is-quiet' : ''}`}
+      aria-label={`Change song. ${title}`}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* the pointer already ended */ }
+      }}
+      onPointerUp={skip}
+      onClick={skip}
+    >
+      <span className="now-playing-label">
         <span className="now-playing-note" aria-hidden="true">♪</span>
         <span className="now-playing-name">{title}</span>
-      </p>
-      <button
-        type="button"
-        className="now-playing-skip"
-        aria-label="Next song"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          controller.changeSong();
-        }}
-      >
-        <span aria-hidden="true">⏭</span>
-      </button>
-    </div>
+      </span>
+      <span className="now-playing-skip" aria-hidden="true">⏭</span>
+    </button>
   );
 }
 
@@ -565,7 +578,6 @@ export function TouchZones({ controller, onPause }: { controller: GameController
       >
         <span className="pause-bars" aria-hidden="true" />
       </button>
-      <SongChip controller={controller} playing={playing} />
       <p className="trick-help">H header · N neck · T thigh · F flick · W atw · G groove · Esc cancel</p>
       <div className="fan fan-left" role="group" aria-label="Left foot and tricks">
         {LEFT_FAN.map(trickButton)}

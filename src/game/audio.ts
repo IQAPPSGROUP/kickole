@@ -357,10 +357,17 @@ export function setEnabledTracks(ids: readonly GameTrackId[]) {
   if (songChoice !== SHUFFLE_SONG && !enabledSongs.includes(songChoice)) songChoice = SHUFFLE_SONG;
 }
 
-/** Crossfade to the next gameplay track. Returns the choice to persist. */
+/**
+ * Skip to the next track now. Returns the choice to persist.
+ * Resume the context in this turn, before any decode await, so a later
+ * AudioBufferSource.start is allowed after the WKWebView gesture ends.
+ */
 export function skipTrack(): SongChoice {
-  const c = ctx;
-  if (c) ensureRob(c);
+  const c = audioContext();
+  if (c) {
+    ensureRob(c);
+    if ((c.state as string) !== 'running') void c.resume();
+  }
   const next = rob?.skip() ?? songChoice;
   songChoice = normalizeSongChoice(next);
   return songChoice;

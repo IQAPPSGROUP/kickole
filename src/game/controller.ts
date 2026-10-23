@@ -599,8 +599,14 @@ export class GameController {
     this.publish();
   }
 
-  /** Crossfade to the next gameplay song. A pinned song moves to the next title. */
+  /**
+   * Skip to the next track immediately, on the menu or mid-run.
+   * Shuffle stays the saved choice. A pinned song moves to the next title.
+   * unlockAudio runs in this gesture so WKWebView can resume the context
+   * before the next buffer is decoded.
+   */
   changeSong() {
+    unlockAudio();
     const next = skipTrack();
     if (next === this.settings.song) return;
     this.settings = { ...this.settings, song: next };

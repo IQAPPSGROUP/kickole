@@ -18,6 +18,21 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(pointerOpensTheCourt(target('.world-rank') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.screen') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.screen-modal') as never)).toBe(false);
+    expect(pointerOpensTheCourt(target('.now-playing') as never)).toBe(false);
+    expect(pointerOpensTheCourt(target('.pause-btn') as never)).toBe(false);
+  });
+
+  it('puts the song pill above the court so a tap is not a kick', () => {
+    const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('./App.tsx', import.meta.url), 'utf8');
+    const hud = readFileSync(new URL('./Hud.tsx', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.now-playing \{[^}]*pointer-events: auto;/s);
+    expect(css).toMatch(/\.now-playing \{[^}]*touch-action: manipulation;/s);
+    expect(css).toMatch(/\.now-playing \{[^}]*z-index: 12;/s);
+    expect(app).toContain('<SongChip controller={controller} />');
+    expect(hud).toContain('onPointerUp={skip}');
+    expect(hud).toContain('Change song.');
+    expect(hud).not.toContain('<SongChip controller={controller} playing={playing} />');
   });
 
   it('gives the sheet its own touch scroll and a sticky rank row', () => {

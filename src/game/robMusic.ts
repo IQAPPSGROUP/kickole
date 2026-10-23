@@ -362,8 +362,10 @@ export class RobPlayer {
   setSongChoice(choice: SongChoice) {
     if (choice === this.songChoice) return;
     this.songChoice = choice;
-    this.skipSerial += 1;
     if (choice === SHUFFLE_SONG) {
+      this.generation += 1;
+      this.skipSerial += 1;
+      this.pending = null;
       if (this.playhead && this.order) {
         const index = this.order.indexOf(this.playhead.name);
         if (index >= 0) this.cursor = index;
@@ -374,25 +376,31 @@ export class RobPlayer {
     this.ensureOrder();
     const index = this.order?.indexOf(choice) ?? -1;
     if (index >= 0) this.cursor = index;
-    if (this.mode === 'play') void this.jumpTo(choice, this.generation, this.skipSerial);
+    this.onTrack(choice);
+    if (this.mode === 'play' || this.mode === 'menu') {
+      const armed = this.armSkip();
+      void this.jumpTo(choice, armed.generation, armed.serial, true);
+    }
   }
 
   /**
-   * Crossfade to the next track when a run is live.
-   * On the menu, remember that track for the next run.
+   * Skip to the next track immediately, on the menu or mid-run.
+   * The label updates before the next file decodes, and the previous
+   * buffer is stopped instead of fading for the playlist overlap.
    * Returns the choice to persist.
    */
   skip(): SongChoice {
     this.ensureOrder();
-    const plan = choiceAfterSkip(this.songChoice, this.order ?? GAMEPLAY_TRACKS, this.upcomingName(), this.unavailable());
+    const plan = choiceAfterSkip(this.songChoice, this.order ?? GAMEPLAY_TRACKS, this.currentName(), this.unavailable());
     if (!plan.track) return this.songChoice;
     this.songChoice = plan.choice;
     const index = (this.order ?? []).indexOf(plan.track.name);
     if (index >= 0) this.cursor = index;
     this.playhead = { name: plan.track.name, offset: trackLeadIn(plan.track.name) };
-    if (this.mode === 'play') {
-      const serial = ++this.skipSerial;
-      void this.jumpTo(plan.track.name, this.generation, serial);
+    this.onTrack(plan.track.name);
+    if (this.mode === 'play' || this.mode === 'menu') {
+      const armed = this.armSkip();
+      void this.jumpTo(plan.track.name, armed.generation, armed.serial, true);
     }
     return this.songChoice;
   }
@@ -451,7 +459,7 @@ export class RobPlayer {
     this.menuBuffer = buffer;
     this.beginMenu(this.ctx.currentTime, MODE_CROSSFADE_SEC);
     if (this.cache && this.cache.buffer !== buffer) this.cache = null;
-    this.onTrack(null);
+    this.onTrack(ROB_MENU_NAME);
     return true;
   }
 
@@ -640,12 +648,30 @@ export class RobPlayer {
     return true;
   }
 
-  private upcomingName(): string | null {
-    if (this.mode === 'play' && this.playhead) return this.playhead.name;
-    if (this.songChoice !== SHUFFLE_SONG) return this.songChoice;
+  /** The buffer that is audible, or the playhead when a skip is already in flight. */
+  private currentName(): string | null {
+    const now = this.ctx.currentTime;
+    const voice = [...this.voices].reverse().find((item) => item.stopAt > now);
+    if (voice) return voice.track;
     if (this.playhead && !this.unavailable().has(this.playhead.name)) return this.playhead.name;
-    const order = this.order ?? GAMEPLAY_TRACKS;
-    return pickTrack(order, this.cursor, this.unavailable(), null)?.name ?? null;
+    if (this.songChoice !== SHUFFLE_SONG) return this.songChoice;
+    return null;
+  }
+
+  /**
+   * Cancel a menu bed or a run opener that is still decoding, and cancel
+   * the previous skip. The new jump carries the returned generation.
+   */
+  private armSkip(): { generation: number; serial: number } {
+    this.generation += 1;
+    this.pending = null;
+    const serial = ++this.skipSerial;
+    return { generation: this.generation, serial };
+  }
+
+  private acceptsJump(immediate: boolean): boolean {
+    if (this.mode === 'play') return true;
+    return immediate && this.mode === 'menu';
   }
 
   private unavailable(): Set<string> {
@@ -662,29 +688,32 @@ export class RobPlayer {
     return this.order;
   }
 
-  private async jumpTo(name: string, generation: number, serial: number) {
+  private async jumpTo(name: string, generation: number, serial: number, immediate = false) {
     this.jumping = true;
+    if (immediate) this.stopVoicesNow();
     let target = name;
     let buffer = await this.song(target, generation);
-    if (generation !== this.generation || serial !== this.skipSerial || this.mode !== 'play') {
+    if (generation !== this.generation || serial !== this.skipSerial || !this.acceptsJump(immediate)) {
       if (serial === this.skipSerial) this.jumping = false;
       return;
     }
     if (!buffer || !(buffer.duration > trackLeadIn(target) + 0.05)) {
       this.failed.add(target);
       const taken = await this.takeNext(this.ensureOrder().indexOf(target) + 1, target, generation);
-      if (generation !== this.generation || serial !== this.skipSerial || this.mode !== 'play' || !taken) {
+      if (generation !== this.generation || serial !== this.skipSerial || !this.acceptsJump(immediate) || !taken) {
         if (serial === this.skipSerial) this.jumping = false;
         return;
       }
       target = taken.name;
       buffer = taken.buffer;
+      this.onTrack(target);
     }
     if (serial !== this.skipSerial) return;
     const index = this.ensureOrder().indexOf(target);
     if (index >= 0) this.cursor = index;
-    this.fadeOutAll(TRACK_CROSSFADE_SEC);
-    this.spawnTrack(buffer, target, trackWindow(buffer.duration, undefined, target).offset, this.ctx.currentTime, TRACK_CROSSFADE_SEC);
+    const fade = immediate ? 0 : TRACK_CROSSFADE_SEC;
+    if (!immediate) this.fadeOutAll(TRACK_CROSSFADE_SEC);
+    this.spawnTrack(buffer, target, trackWindow(buffer.duration, undefined, target).offset, this.ctx.currentTime, fade);
     this.jumping = false;
   }
 
@@ -819,8 +848,9 @@ export class RobPlayer {
       gain.gain.linearRampToValueAtTime(0.0001, end);
     }
     source.connect(gain).connect(this.destination);
+    // duration ends the buffer on its own. An earlier stop() would throw
+    // on a user skip, and WKWebView would keep the previous song audible.
     source.start(start, Math.max(0, offset), duration);
-    try { source.stop(end + 0.03); } catch { /* already scheduled */ }
     const voice: Voice = { source, gain, stopAt: end, role, track, fileStart: Math.max(0, offset), startedAt: start };
     this.voices.push(voice);
     this.heldSources.push(source);
@@ -829,6 +859,22 @@ export class RobPlayer {
       this.heldSources = this.heldSources.filter((item) => item !== source);
       try { source.buffer = null; } catch { /* the node has already released it */ }
     };
+  }
+
+  /** Cut every buffer now. A user skip must not leave the previous song running. */
+  private stopVoicesNow() {
+    const now = this.ctx.currentTime;
+    for (const voice of this.voices) {
+      try {
+        voice.gain.gain.cancelScheduledValues(now);
+        voice.gain.gain.setValueAtTime(0.0001, now);
+        voice.source.stop(now);
+        voice.stopAt = now;
+      } catch {
+        /* the buffer already ended */
+      }
+    }
+    this.clearSchedule();
   }
 
   private fadeOutAll(seconds: number) {
@@ -846,6 +892,10 @@ export class RobPlayer {
         /* the buffer already ended */
       }
     }
+    this.clearSchedule();
+  }
+
+  private clearSchedule() {
     this.voices = [];
     this.loop = null;
     this.handoffAt = 0;

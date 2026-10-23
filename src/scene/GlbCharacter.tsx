@@ -431,6 +431,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   const deltaQ = useMemo(() => new Quaternion(), []);
   const footPos = useMemo(() => new Vector3(), []);
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
+  const idleSettled = useRef(false);
 
   useEffect(() => () => {
     motionRig.restore();
@@ -465,6 +466,25 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       // Sample every clip from simulation time, keeping paused frames and different render rates consistent.
       const act = current.state ? actions.get(current.state) : undefined;
       if (act) { act.paused = true; act.time = animationSampleTime(engine, next.state, act.getClip().duration); }
+      const atMenu = engine.phase === 'menu' || engine.phase === 'ready';
+      if (atMenu) {
+        // A crossfade started mid-kick keeps the crouched clip alive. Drop it
+        // so the menu samples Idle at full weight instead of a bent blend.
+        for (const [name, action] of actions) {
+          if (name !== 'Idle') action.stop();
+        }
+        const idle = actions.get('Idle');
+        if (idle && (!idle.isRunning() || idle.getEffectiveWeight() < 0.999)) {
+          idle.enabled = true;
+          idle.reset().setEffectiveWeight(1).play();
+          idle.paused = true;
+          idle.time = animationSampleTime(engine, 'Idle', idle.getClip().duration);
+        }
+        if (!idleSettled.current) freestyle.reset();
+        idleSettled.current = true;
+      } else {
+        idleSettled.current = false;
+      }
       // Quaternius bones keep UE local axes. Tricks that are not one of the five clips
       // (around the world, header, neck stall, thigh, high flick) reuse the procedural pose
       // so the head — and the skinned hair — still follow the ball.

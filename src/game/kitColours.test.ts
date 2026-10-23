@@ -119,6 +119,7 @@ describe('kit colours', () => {
     vi.stubGlobal('navigator', { vibrate: vi.fn() });
     const { GameController } = await import('./controller');
     const colours = await import('./kitColours');
+    data['kicky.country.v1'] = 'GB';
     const c = new GameController();
     expect(c.getSnapshot().save.appearance.kitColourId).toBe(colours.NEUTRAL_KIT_ID);
     expect(c.getSnapshot().skin.clothing).toEqual(colours.clothingFor(colours.getKitColour('neutral')!));
@@ -135,6 +136,7 @@ describe('kit colours', () => {
     expect(c.getSnapshot().skin.clothing).toEqual(colours.clothingFor(sweden));
     expect(c.getSnapshot().skin.kitPaint).toEqual({ pattern: 'plain', main: sweden.shirt, secondary: sweden.secondary });
     expect(c.getSnapshot().skin.boots.main).toBe(KIT_BOOT);
+    expect(data['kicky.country.v1']).toBe('GB');
     expect(JSON.parse(data['kicky.save.v1']).appearance.kitColourId).toBe('sweden');
     c.setKitColour('missing');
     expect(c.getSnapshot().save.appearance.kitColourId).toBe('sweden');

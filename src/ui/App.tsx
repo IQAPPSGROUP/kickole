@@ -1,7 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { installAudioLifecycle } from '../game/audio';
 import { GameController, type Result } from '../game/controller';
+import { countryByCode } from '../game/countries';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
+import { parseNickname } from '../game/nickname';
 import { mockBoardFromSearch } from '../game/mockBoard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
@@ -17,7 +19,7 @@ import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
-import { NicknameScreen, OptInCard } from './NicknameScreen';
+import { CountryScreen, NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
 import { KitColoursScreen } from './KitColours';
@@ -161,7 +163,8 @@ export function App() {
   const needsBody = !snap.save.bodyChosen && !mockBoard;
   const needsOpt = optIn === 'unknown' && !mockBoard;
   const needsNick = leaderboardOn && nickname == null && !mockBoard;
-  const blocking = overlay !== 'none' || needsBody || needsOpt || needsNick;
+  const needsCountry = leaderboardOn && nickname != null && !countryChoice.chosen && !mockBoard;
+  const blocking = overlay !== 'none' || needsBody || needsOpt || needsNick || needsCountry;
 
   useEffect(() => {
     let spaceDown = false;
@@ -270,7 +273,8 @@ export function App() {
     setOverlay(kitReturn);
   };
 
-  const lockNickname = async (adjective: string, noun: string, country: string | null): Promise<string | void> => {
+  const lockNickname = async (adjective: string, noun: string): Promise<string | void> => {
+    const country = countryChoice.chosen ? countryChoice.country : null;
     const deviceId = await hydrateDeviceId();
     let finalName = `${adjective} ${noun}`;
     if (!mockBoard) {
@@ -284,10 +288,26 @@ export function App() {
       if (result.nickname) finalName = result.nickname;
     }
     saveNickname(finalName);
-    saveCountry(country);
+    if (countryChoice.chosen) saveCountry(country);
     setNickname(finalName);
-    setCountryChoice({ chosen: true, country });
     setDeviceReady(true);
+  };
+
+  const saveCountryChoice = async (country: string | null): Promise<string | void> => {
+    const parsed = parseNickname(nickname ?? '');
+    if (!mockBoard) {
+      if (!parsed) return 'Pick a nickname before choosing a country.';
+      const deviceId = await hydrateDeviceId();
+      const result = await registerPlayer({
+        deviceId: deviceId || loadDeviceId(),
+        adjective: parsed.adjective,
+        noun: parsed.noun,
+        country,
+      });
+      if (!result.ok) return serverNicknameMessage(result.reason);
+    }
+    if (!saveCountry(country)) return 'Pick a country from the list.';
+    setCountryChoice({ chosen: true, country: countryByCode(country)?.code ?? null });
   };
 
   const peekTag = async (adjective: string, noun: string) => {
@@ -337,7 +357,7 @@ export function App() {
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
-      {intro.active && !mockBoard && !needsBody && !needsOpt && !needsNick && <OpeningSkip onSkip={skipOpeningIntro} />}
+      {intro.active && !mockBoard && !needsBody && !needsOpt && !needsNick && !needsCountry && <OpeningSkip onSkip={skipOpeningIntro} />}
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
@@ -347,7 +367,10 @@ export function App() {
       {!needsBody && !needsOpt && needsNick && phase === 'menu' && overlay === 'none' && (
         <NicknameScreen onSave={lockNickname} onPeek={mockBoard ? undefined : peekTag} onSuggest={mockBoard ? undefined : suggestTags} />
       )}
-      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !(reviewOpen && board) && (
+      {!needsBody && !needsOpt && !needsNick && needsCountry && phase === 'menu' && overlay === 'none' && (
+        <CountryScreen onSave={saveCountryChoice} />
+      )}
+      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !needsCountry && !(reviewOpen && board) && (
         <Home
           best={snap.save.best}
           onPlay={startGame}
@@ -425,6 +448,7 @@ export function App() {
           leaderboardOn={leaderboardOn}
           blockedTick={blockedTick}
           onNickname={lockNickname}
+          onCountry={saveCountryChoice}
           onLeaderboard={setLeaderboard}
           onUnblock={() => setBlockedTick((value) => value + 1)}
           onDelete={deleteBoardData}

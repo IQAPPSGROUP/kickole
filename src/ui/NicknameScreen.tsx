@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { countryByCode, searchCountries, suggestedCountry } from '../game/countries';
+import { COUNTRY_BOARD_MIN } from '../game/leaderboard';
 import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
 import { composeNickname, isBlockedPair, parseNickname, pickFreePair, unblockIndex, wordIndex, type FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
@@ -19,7 +20,7 @@ export function OptInCard({
       <div className="card nick-card">
         <p className="court-label">LEADERBOARD</p>
         <h2 className="nick-title">JOIN IN?</h2>
-        <p className="shop-lead">The leaderboard is off until you join. Other players would see a nickname picked from our word lists, your score, and a country if you choose one. The game works either way.</p>
+        <p className="shop-lead">The leaderboard is off until you join. Other players would see a nickname picked from our word lists and your score. Country is a separate optional question, and it is not shown next to your name. The game works either way.</p>
         <button type="button" className="btn primary" onClick={onJoin}>Join leaderboard</button>
         <button type="button" className="btn ghost" onClick={onNotNow}>Not now</button>
         <button type="button" className="btn ghost" onClick={onData}>How it works</button>
@@ -30,26 +31,20 @@ export function OptInCard({
 
 export function NicknameForm({
   initial = '',
-  initialCountry = null,
-  suggestion = null,
   submitLabel,
   onSubmit,
   onPeek,
   onSuggest,
 }: {
   initial?: string;
-  initialCountry?: string | null;
-  /** Locale hint. Shown as a one-tap chip only while no country is selected. */
-  suggestion?: string | null;
   submitLabel: string;
-  onSubmit: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
+  onSubmit: (adjective: string, noun: string) => void | string | Promise<void | string | undefined>;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
   onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
 }) {
   const parsed = parseNickname(initial);
   const [adj, setAdj] = useState(() => wordIndex(ADJECTIVES, parsed?.adjective ?? ADJECTIVES[0] ?? 'Turbo'));
   const [noun, setNoun] = useState(() => wordIndex(NOUNS, parsed?.noun ?? NOUNS[0] ?? 'Striker'));
-  const [country, setCountry] = useState<string | null>(() => countryByCode(initialCountry)?.code ?? null);
   const [preview, setPreview] = useState(() => parsed?.nickname ?? composeNickname(ADJECTIVES[0] ?? 'Turbo', NOUNS[0] ?? 'Striker') ?? '');
   const [taken, setTaken] = useState<string | null>(null);
   const [acked, setAcked] = useState(false);
@@ -190,7 +185,7 @@ export function NicknameForm({
               return;
             }
           }
-          const message = await onSubmit(adjective, nounWord, country);
+          const message = await onSubmit(adjective, nounWord);
           if (message) setServerIssue(message);
           setBusy(false);
         })();
@@ -245,7 +240,6 @@ export function NicknameForm({
       >
         <span aria-hidden="true">🎲</span> Pick one for me
       </button>
-      <CountryPicker country={country} suggestion={suggestion} onChange={setCountry} />
       <button type="submit" className="btn primary" disabled={busy}>{busy ? 'SAVING' : submitLabel}</button>
     </form>
   );
@@ -411,18 +405,80 @@ export function NicknameScreen({
   onPeek,
   onSuggest,
 }: {
-  onSave: (adjective: string, noun: string, country: string | null) => void | string | Promise<void | string | undefined>;
+  onSave: (adjective: string, noun: string) => void | string | Promise<void | string | undefined>;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
   onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
 }) {
-  const [suggestion] = useState(() => suggestedCountry());
   return (
     <div className="screen settings nick-screen">
       <div className="card nick-card">
         <p className="court-label">WORLD BOARD</p>
         <h2 className="nick-title">YOUR TAG</h2>
-        <p className="shop-lead">Pick two words from the lists. That nickname goes on the board. Country is your choice, not your location. Prefer not to say and you stay off country boards.</p>
-        <NicknameForm initialCountry={null} suggestion={suggestion} submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} onSuggest={onSuggest} />
+        <p className="shop-lead">Pick two words from the lists. That nickname goes on the board. Your kit does not choose a country.</p>
+        <NicknameForm submitLabel="LOCK IT IN" onSubmit={onSave} onPeek={onPeek} onSuggest={onSuggest} />
+      </div>
+    </div>
+  );
+}
+
+/** Optional country step. Prefer not to say is the selection until the player picks one. */
+export function CountryChoice({
+  initialCountry = null,
+  suggestion = null,
+  submitLabel,
+  onSubmit,
+}: {
+  initialCountry?: string | null;
+  /** Locale hint. Shown as a one-tap chip only while no country is selected. */
+  suggestion?: string | null;
+  /** Settings uses a fixed label. The first question names the current choice. */
+  submitLabel?: string;
+  onSubmit: (country: string | null) => void | string | Promise<void | string | undefined>;
+}) {
+  const [country, setCountry] = useState<string | null>(() => countryByCode(initialCountry)?.code ?? null);
+  const [busy, setBusy] = useState(false);
+  const [issue, setIssue] = useState<string | null>(null);
+  const selected = countryByCode(country);
+  const label = submitLabel ?? (selected ? `Use ${selected.name}` : 'Prefer not to say');
+  return (
+    <form
+      className="nick-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (busy) return;
+        setBusy(true);
+        setIssue(null);
+        void (async () => {
+          const message = await onSubmit(country);
+          if (message) setIssue(message);
+          setBusy(false);
+        })();
+      }}
+    >
+      <CountryPicker country={country} suggestion={suggestion} onChange={setCountry} />
+      {issue && <p className="nick-error" role="alert">{issue}</p>}
+      <button type="submit" className="btn primary" disabled={busy}>{busy ? 'SAVING' : label}</button>
+    </form>
+  );
+}
+
+export function CountryScreen({
+  onSave,
+}: {
+  onSave: (country: string | null) => void | string | Promise<void | string | undefined>;
+}) {
+  const [suggestion] = useState(() => suggestedCountry());
+  return (
+    <div className="screen settings nick-screen">
+      <div className="card nick-card">
+        <p className="court-label">OPTIONAL</p>
+        <h2 className="nick-title">COUNTRY?</h2>
+        <p className="shop-lead">
+          Prefer not to say is the default. This only places you on that country&apos;s board.
+          It is not shown next to your name. A country board appears once {COUNTRY_BOARD_MIN} players have joined.
+          Your kit does not choose a country. You can change or remove this later.
+        </p>
+        <CountryChoice suggestion={suggestion} onSubmit={onSave} />
       </div>
     </div>
   );

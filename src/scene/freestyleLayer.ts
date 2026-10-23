@@ -615,9 +615,17 @@ export function createFreestyleRig() {
       shift * 0.03 * amp,
       -shift * 0.045 * amp + balance * 0.012 * amp,
     )));
-    // The contract rig's bind pose is a T. poseArm hangs from that bind, so calling
-    // it here puts the arms straight back out after the Idle clip has lowered them.
-    // Menu, the pre-run alley, and the standing idle keep the clip's arms.
+    // The Idle clip holds the arms about 35° off the body. A local Z tuck brings
+    // the hands down beside the hips. Tricks still pose the arms themselves.
+    const tuck = 0.5;
+    if (bones.armLeft) {
+      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0, 0, tuck)));
+      bones.armLeft.updateMatrix();
+    }
+    if (bones.armRight) {
+      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0, 0, -tuck)));
+      bones.armRight.updateMatrix();
+    }
     pin('left', anchors.left.plant, true);
     pin('right', anchors.right.plant, true);
   }

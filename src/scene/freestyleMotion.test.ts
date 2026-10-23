@@ -493,14 +493,16 @@ describe('menu idle arms', () => {
     menu.time = 0.4;
     rig.apply(menu, 'Idle', computePose(menu), 1 / 60);
     gltf.scene.updateMatrixWorld(true);
+    const leftShoulder = bone(gltf.scene, 'UpperArm_L').getWorldPosition(new Vector3());
+    const rightShoulder = bone(gltf.scene, 'UpperArm_R').getWorldPosition(new Vector3());
     const left = bone(gltf.scene, 'Hand_L').getWorldPosition(new Vector3());
     const right = bone(gltf.scene, 'Hand_R').getWorldPosition(new Vector3());
-    expect(Math.abs(left.x)).toBeGreaterThan(0.15);
-    expect(Math.abs(right.x)).toBeGreaterThan(0.15);
-    expect(Math.abs(left.x)).toBeLessThan(0.6);
-    expect(Math.abs(right.x)).toBeLessThan(0.6);
-    expect(left.y).toBeLessThan(1.35);
-    expect(right.y).toBeLessThan(1.35);
+    expect(Math.abs(left.x - leftShoulder.x), 'left hand hangs beside the shoulder').toBeLessThan(0.08);
+    expect(Math.abs(right.x - rightShoulder.x), 'right hand hangs beside the shoulder').toBeLessThan(0.08);
+    expect(left.y).toBeLessThan(leftShoulder.y - 0.3);
+    expect(right.y).toBeLessThan(rightShoulder.y - 0.3);
+    expect(left.x).toBeLessThan(-0.08);
+    expect(right.x).toBeGreaterThan(0.08);
   });
 });
 

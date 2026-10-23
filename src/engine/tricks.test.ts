@@ -241,7 +241,7 @@ describe('around the world', () => {
 });
 
 describe('thigh touch', () => {
-  it('uses thigh height and awards +2 once', () => {
+  it('uses thigh height and awards +1 once', () => {
     const e = started();
     e.setTrick('thigh');
     fallThrough(e, e.config.contacts.thigh.y, e.config.contacts.thigh.z, 8);

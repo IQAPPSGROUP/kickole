@@ -130,7 +130,7 @@ export const DEFAULT_CONFIG: GameConfig = {
     alternateBonus: 2,
     footStall: 10,
     header: 3,
-    thigh: 2,
+    thigh: 1,
     neckStall: 10,
     aroundTheWorld: 20,
     varietyBonus: 5,

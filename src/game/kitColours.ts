@@ -1,22 +1,26 @@
 import type { ClothingColors } from './appearance';
 
 /**
- * Free kits. Graham can replace `pattern` and `colours` without touching the picker.
+ * Graham's kit sheet. Replace `pattern` and the four colour fields to restyle a kit.
  * Nation labels stay "Name colours". These are flag colours in simple original
  * patterns, not federation kits: no crests, badges, flags, sponsors or brand marks.
  */
-export type KitPattern = 'plain' | 'stripes' | 'hoops' | 'halves' | 'sash';
+export type KitPattern = 'plain' | 'stripes' | 'hoops' | 'halves' | 'sash' | 'chevron' | 'sleeves';
 
 export type KitKind = 'neutral' | 'nation';
 
 export interface KitColour {
   id: string;
-  /** Player-facing name. Nation rows use "Name colours". Never "official". */
+  /** Full name. Nation rows use "Name colours". Read out by the preview and the screen reader. */
   label: string;
+  /** Short tile text. Omitted tiles show `label`. */
+  tile?: string;
   kind: KitKind;
   pattern: KitPattern;
-  /** Flag colours, first to last. */
-  colours: readonly string[];
+  shirt: string;
+  secondary: string;
+  shorts: string;
+  socks: string;
 }
 
 /** Worn until the player picks something else. */
@@ -24,6 +28,9 @@ export const NEUTRAL_KIT_ID = 'neutral';
 
 /** Legacy swatches that do not match a listed kit. Not shown in the picker. */
 export const CUSTOM_KIT_ID = 'custom';
+
+/** Every kit boot is this plain colour. */
+export const KIT_BOOT = '#2B2B2B';
 
 /** The yellow and navy kit from before this picker. Migrates to Neutral when no id was saved. */
 export const HISTORICAL_KIT: ClothingColors = {
@@ -33,7 +40,7 @@ export const HISTORICAL_KIT: ClothingColors = {
   socks: '#F8F9FB',
 };
 
-const PATTERNS: readonly KitPattern[] = ['plain', 'stripes', 'hoops', 'halves', 'sash'];
+const PATTERNS: readonly KitPattern[] = ['plain', 'stripes', 'hoops', 'halves', 'sash', 'chevron', 'sleeves'];
 
 export function isKitPattern(value: string): value is KitPattern {
   return (PATTERNS as readonly string[]).includes(value);
@@ -44,33 +51,34 @@ function kit(
   label: string,
   kind: KitKind,
   pattern: KitPattern,
-  colours: readonly string[],
+  shirt: string,
+  secondary: string,
+  shorts: string,
+  socks: string,
+  tile?: string,
 ): KitColour {
-  return { id, label, kind, pattern, colours };
+  return { id, label, tile, kind, pattern, shirt, secondary, shorts, socks };
 }
 
 export const KIT_COLOURS: readonly KitColour[] = [
-  kit('neutral', 'Neutral', 'neutral', 'plain', ['#E4E0D8', '#5C6570', '#3A4148']),
-  kit('classic', 'Classic colours', 'neutral', 'plain', ['#FFD93D', '#1E2A5A', '#1E2A5A', '#F8F9FB']),
-  kit('night', 'Night colours', 'neutral', 'plain', ['#1C2430', '#12BFA6', '#141A22']),
-  kit('street', 'Street colours', 'neutral', 'plain', ['#12BFA6', '#F7F5ED', '#142D35', '#12BFA6']),
+  kit('neutral', 'Neutral', 'neutral', 'plain', '#E4E0D8', '#5C6570', '#3A4148', '#E4E0D8'),
 
-  kit('england', 'England colours', 'nation', 'hoops', ['#FFFFFF', '#CF081F']),
-  kit('scotland', 'Scotland colours', 'nation', 'plain', ['#0065BF', '#FFFFFF']),
-  kit('wales', 'Wales colours', 'nation', 'halves', ['#C8102E', '#FFFFFF', '#00AB39']),
-  kit('ireland', 'Ireland colours', 'nation', 'stripes', ['#169B62', '#FFFFFF', '#FF883E']),
-  kit('france', 'France colours', 'nation', 'stripes', ['#0055A4', '#FFFFFF', '#EF4135']),
-  kit('germany', 'Germany colours', 'nation', 'hoops', ['#1A1A1A', '#DD0000', '#FFCE00']),
-  kit('spain', 'Spain colours', 'nation', 'hoops', ['#AA151B', '#F1BF00']),
-  kit('italy', 'Italy colours', 'nation', 'stripes', ['#009246', '#FFFFFF', '#CE2B37']),
-  kit('netherlands', 'Netherlands colours', 'nation', 'sash', ['#FF6600', '#FFFFFF', '#21468B']),
-  kit('brazil', 'Brazil colours', 'nation', 'sash', ['#009739', '#FEDD00', '#002776']),
-  kit('argentina', 'Argentina colours', 'nation', 'hoops', ['#74ACDF', '#FFFFFF']),
-  kit('mexico', 'Mexico colours', 'nation', 'stripes', ['#006847', '#FFFFFF', '#CE1126']),
-  kit('japan', 'Japan colours', 'nation', 'plain', ['#FFFFFF', '#BC002D']),
-  kit('nigeria', 'Nigeria colours', 'nation', 'stripes', ['#008751', '#FFFFFF']),
-  kit('australia', 'Australia colours', 'nation', 'sash', ['#00843D', '#FFCD00']),
-  kit('united-states', 'United States colours', 'nation', 'stripes', ['#002868', '#FFFFFF', '#BF0A30']),
+  kit('england', 'England colours', 'nation', 'halves', '#FFFFFF', '#C8102E', '#C8102E', '#FFFFFF'),
+  kit('scotland', 'Scotland colours', 'nation', 'hoops', '#0B2A5B', '#FFFFFF', '#FFFFFF', '#0B2A5B'),
+  kit('wales', 'Wales colours', 'nation', 'halves', '#C8102E', '#00843D', '#FFFFFF', '#00843D'),
+  kit('northern-ireland', 'Northern Ireland colours', 'nation', 'sash', '#FFFFFF', '#C8102E', '#FFFFFF', '#C8102E', 'N. Ireland'),
+  kit('ireland', 'Ireland colours', 'nation', 'chevron', '#FFFFFF', '#169B62', '#FF883E', '#169B62'),
+  kit('france', 'France colours', 'nation', 'sleeves', '#ED2939', '#002395', '#FFFFFF', '#002395'),
+  kit('spain', 'Spain colours', 'nation', 'sash', '#F1BF00', '#AA151B', '#AA151B', '#F1BF00'),
+  kit('portugal', 'Portugal colours', 'nation', 'hoops', '#006600', '#FF0000', '#006600', '#FF0000'),
+  kit('germany', 'Germany colours', 'nation', 'chevron', '#FFCE00', '#000000', '#DD0000', '#000000'),
+  kit('italy', 'Italy colours', 'nation', 'sleeves', '#009246', '#FFFFFF', '#CE2B37', '#009246'),
+  kit('netherlands', 'Netherlands colours', 'nation', 'hoops', '#FF6F00', '#FFFFFF', '#21468B', '#FF6F00'),
+  kit('brazil', 'Brazil colours', 'nation', 'halves', '#009C3B', '#FFDF00', '#002776', '#FFDF00'),
+  kit('argentina', 'Argentina colours', 'nation', 'chevron', '#FFFFFF', '#74ACDF', '#74ACDF', '#FFFFFF'),
+  kit('usa', 'USA colours', 'nation', 'sash', '#0A3161', '#B31942', '#FFFFFF', '#B31942'),
+  kit('nigeria', 'Nigeria colours', 'nation', 'stripes', '#008751', '#FFFFFF', '#008751', '#FFFFFF'),
+  kit('japan', 'Japan colours', 'nation', 'sleeves', '#BC002D', '#FFFFFF', '#FFFFFF', '#BC002D'),
 ];
 
 const BY_ID = new Map(KIT_COLOURS.map((option) => [option.id, option]));
@@ -79,13 +87,18 @@ export function getKitColour(id: string): KitColour | null {
   return BY_ID.get(id) ?? null;
 }
 
-/** Solid shirt, collar, shorts and socks derived from the sheet. Patterned shirts still use these as the base. */
+export function kitTileLabel(option: KitColour): string {
+  return option.tile ?? option.label;
+}
+
+/** Shirt, collar, shorts and socks from the sheet. The shirt pattern uses shirt and secondary. */
 export function clothingFor(option: KitColour): ClothingColors {
-  const shirt = option.colours[0] ?? '#E4E0D8';
-  const second = option.colours[1] ?? shirt;
-  const third = option.colours[2] ?? second;
-  const socks = option.colours[3] ?? (option.colours.length > 2 ? shirt : second);
-  return { shirt, shirtTrim: second, shorts: third, socks };
+  return {
+    shirt: option.shirt,
+    shirtTrim: option.secondary,
+    shorts: option.shorts,
+    socks: option.socks,
+  };
 }
 
 export function clothingEquals(a: ClothingColors, b: ClothingColors): boolean {

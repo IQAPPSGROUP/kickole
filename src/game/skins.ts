@@ -1,6 +1,6 @@
 import type { Appearance, PlayerBody } from './appearance';
 import { getBoot, getKit, STARTER_BOOT_ID, STARTER_KIT_ID, type BootDesign, type KitDesign, type SurfacePattern } from './catalogue';
-import { clothingFor, getKitColour, type KitPattern } from './kitColours';
+import { clothingFor, getKitColour, KIT_BOOT, type KitPattern } from './kitColours';
 import { COWBOY_BOOT_ID, getOutfit, type OutfitPattern } from './outfits';
 
 export interface Skin {
@@ -21,7 +21,7 @@ export interface Skin {
   skinTint?: string | null;
   patternPaint?: OutfitPattern | null;
   /** Free kit sheet. Null when a costume replaces the football kit. */
-  kitPaint?: { pattern: KitPattern; colours: readonly string[] } | null;
+  kitPaint?: { pattern: KitPattern; main: string; secondary: string } | null;
   bootStyle?: 'studs' | 'cowboy';
 }
 
@@ -99,11 +99,16 @@ export function composePlayerSkin(
     id: `live:${outfit?.id ?? kit.id}:${boot.id}:${appearance.body}`,
     name: outfit ? `${outfit.name} · ${boot.name}` : `${kit.name} · ${boot.name}`,
     clothing,
-    boots: {
+    boots: outfit ? {
       main: boot.main,
       sole: boot.sole,
       lace: boot.lace,
       trim: boot.trim,
+    } : {
+      main: KIT_BOOT,
+      sole: KIT_BOOT,
+      lace: KIT_BOOT,
+      trim: KIT_BOOT,
     },
     body: {
       skin: outfit?.skinTint ?? appearance.skinTone,
@@ -118,7 +123,7 @@ export function composePlayerSkin(
     outfitId: outfit?.id ?? null,
     skinTint: outfit?.skinTint ?? null,
     patternPaint: outfit?.pattern ?? null,
-    kitPaint: outfit || !look ? null : { pattern: look.pattern, colours: look.colours },
-    bootStyle: cowboy ? 'cowboy' : 'studs',
+    kitPaint: outfit || !look ? null : { pattern: look.pattern, main: look.shirt, secondary: look.secondary },
+    bootStyle: outfit && cowboy ? 'cowboy' : 'studs',
   };
 }

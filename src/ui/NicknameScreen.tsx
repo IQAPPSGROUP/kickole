@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { countryByCode, countryFlag, searchCountries, suggestedCountry } from '../game/countries';
+import { countryByCode, searchCountries, suggestedCountry } from '../game/countries';
 import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
 import { composeNickname, isBlockedPair, parseNickname, pickFreePair, unblockIndex, wordIndex, type FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
@@ -354,14 +354,11 @@ function CountryPicker({
         aria-controls="country-list"
         onClick={() => setOpen((value) => !value)}
       >
-        {selected && <span className="country-flag" aria-hidden="true">{countryFlag(selected.code)}</span>}
         <span id="country-value">{selected ? selected.name : 'Prefer not to say'}</span>
       </button>
       {hinted && (
         <button type="button" className="country-suggest" onClick={() => onChange(hinted.code)}>
-          Suggested: <span className="country-flag" aria-hidden="true">{countryFlag(hinted.code)}</span>
-          {' '}
-          {hinted.name}
+          Suggested: {hinted.name}
         </button>
       )}
       {open && (
@@ -397,7 +394,6 @@ function CountryPicker({
                   aria-selected={item.code === country}
                   onClick={() => choose(item.code)}
                 >
-                  <span className="country-flag" aria-hidden="true">{countryFlag(item.code)}</span>
                   {item.name}
                 </button>
               </li>

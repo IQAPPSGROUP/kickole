@@ -868,6 +868,74 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   cursor: pointer;
 }
 .kit-row.on { border-color: #f5c94d; box-shadow: inset 0 0 0 1px #f5c94d; }
+.screen.kit-picker { background: #0F1A14; backdrop-filter: none; }
+.kit-picker .kit-card {
+  background: #0F1A14;
+  border: 0;
+  box-shadow: none;
+  color: #FFFFFF;
+}
+.kit-picker .kit-card h2 { color: #FFFFFF; letter-spacing: 0.5px; }
+.kit-picker .player-preview { background: #0F1A14; border-color: #1C2B22; }
+.kit-preview-name { margin: 0; color: #FFFFFF; font-weight: 800; font-size: 16px; }
+.kit-preview-note { margin: 0; color: #D8E2DC; font-size: 12px; }
+.kit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  text-align: left;
+}
+.kit-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 8px 28px 8px 8px;
+  background: #1C2B22;
+  color: #FFFFFF;
+  border: 4px solid transparent;
+  border-radius: 12px;
+  font: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.kit-tile.on { border-color: #FFD54A; }
+.kit-swatch {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: block;
+}
+.kit-tick {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFD54A;
+  color: #111111;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  font-weight: 800;
+}
+.kit-use {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: #FFD54A;
+  color: #111111;
+  font: inherit;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
 .kit-chips { display: flex; gap: 3px; flex-shrink: 0; }
 .kit-chips i { width: 16px; height: 26px; border-radius: 4px; display: block; border: 1px solid rgba(255, 255, 255, .35); }
 .swatch {
@@ -1133,13 +1201,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   -webkit-text-stroke: 1px #140814;
   paint-order: stroke fill;
 }
-.world-rank-country .country-flag {
-  font-size: 12px;
-  margin-right: 3px;
-  -webkit-text-stroke: 0;
-  paint-order: normal;
-}
-.world-rank-country span:not(.country-flag) { color: #ff4f9a; }
+.world-rank-country span { color: #ff4f9a; }
 .world-rank-country .is-first { color: #ffe14a; }
 .world-rank-delta {
   display: block;

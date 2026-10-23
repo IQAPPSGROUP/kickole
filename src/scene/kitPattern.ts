@@ -1,67 +1,42 @@
-import { CanvasTexture, SRGBColorSpace, type Texture } from 'three';
 import type { KitPattern } from '../game/kitColours';
 
-function canvas(): CanvasRenderingContext2D | null {
-  if (typeof document === 'undefined') return null;
-  const el = document.createElement('canvas');
-  el.width = 256;
-  el.height = 256;
-  return el.getContext('2d');
+/** Bind-pose shirt extents on kickole_player_v4. The shader uses the same numbers. */
+export const KIT_SLEEVE_X = 0.2;
+export const KIT_HOOP_ORIGIN = 0.05;
+export const KIT_HOOP_PERIOD = 0.16;
+export const KIT_STRIPE_PERIOD = 0.12;
+export const KIT_SASH_Y = 0.4;
+export const KIT_SASH_SLOPE = 1.5;
+export const KIT_SASH_WIDTH = 0.08;
+export const KIT_CHEVRON_Y = 0.28;
+export const KIT_CHEVRON_SLOPE = 1.1;
+export const KIT_CHEVRON_WIDTH = 0.07;
+
+function frac(value: number): number {
+  const wrapped = value % 1;
+  return wrapped < 0 ? wrapped + 1 : wrapped;
 }
 
-/**
- * All-over cloth from the kit sheet. Original blocks only: no crest, badge, flag or logo.
- * Plain kits return null and use the material tint.
- */
-export function paintKitPattern(pattern: KitPattern, colours: readonly string[]): Texture | null {
-  if (pattern === 'plain') return null;
-  const g = canvas();
-  if (!g) return null;
-  const list = colours.length > 0 ? colours : ['#E4E0D8'];
+/** 1 picks the secondary shirt colour. 0 keeps the main colour. */
+export function kitShirtMask(pattern: KitPattern, x: number, y: number): 0 | 1 {
   switch (pattern) {
-    case 'stripes': {
-      const width = 256 / list.length;
-      list.forEach((colour, index) => {
-        g.fillStyle = colour;
-        g.fillRect(Math.floor(index * width), 0, Math.ceil(width) + 1, 256);
-      });
-      break;
-    }
-    case 'hoops': {
-      const height = 256 / list.length;
-      list.forEach((colour, index) => {
-        g.fillStyle = colour;
-        g.fillRect(0, Math.floor(index * height), 256, Math.ceil(height) + 1);
-      });
-      break;
-    }
-    case 'halves': {
-      g.fillStyle = list[0];
-      g.fillRect(0, 0, 128, 256);
-      g.fillStyle = list[1] ?? list[0];
-      g.fillRect(128, 0, 128, 256);
-      break;
-    }
-    case 'sash': {
-      g.fillStyle = list[0];
-      g.fillRect(0, 0, 256, 256);
-      g.fillStyle = list[1] ?? list[0];
-      g.beginPath();
-      g.moveTo(0, 20);
-      g.lineTo(256, 150);
-      g.lineTo(256, 210);
-      g.lineTo(0, 80);
-      g.closePath();
-      g.fill();
-      break;
-    }
+    case 'plain':
+      return 0;
+    case 'halves':
+      return x >= 0 ? 1 : 0;
+    case 'hoops':
+      return frac((y - KIT_HOOP_ORIGIN) / KIT_HOOP_PERIOD) >= 0.5 ? 1 : 0;
+    case 'sash':
+      return Math.abs(y - KIT_SASH_Y + KIT_SASH_SLOPE * x) <= KIT_SASH_WIDTH ? 1 : 0;
+    case 'chevron':
+      return Math.abs(y - KIT_CHEVRON_Y - KIT_CHEVRON_SLOPE * Math.abs(x)) <= KIT_CHEVRON_WIDTH ? 1 : 0;
+    case 'sleeves':
+      return Math.abs(x) >= KIT_SLEEVE_X ? 1 : 0;
+    case 'stripes':
+      return frac(x / KIT_STRIPE_PERIOD + 0.5) >= 0.5 ? 1 : 0;
     default: {
       const neverPattern: never = pattern;
       return neverPattern;
     }
   }
-  const map = new CanvasTexture(g.canvas);
-  map.colorSpace = SRGBColorSpace;
-  map.needsUpdate = true;
-  return map;
 }

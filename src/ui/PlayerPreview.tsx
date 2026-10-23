@@ -1,18 +1,41 @@
-import { Suspense, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Group } from 'three';
+import { Suspense, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Group, type PerspectiveCamera } from 'three';
 import { GameEngine } from '../engine/engine';
 import { GAMEPLAY_BPM } from '../game/beat';
 import type { DanceId } from '../game/dances';
 import type { Skin } from '../game/skins';
+import type { Quality } from '../game/storage';
 import { CharacterSwitch } from '../scene/CharacterSwitch';
+import { getRunningTier, subscribeRunningTier } from '../scene/qualityTier';
 
-function Turntable({ skin, yaw, dance }: { skin: Skin; yaw: number; dance: DanceId | null }) {
+/** Picker tile colour. The canvas used to clear to the app violet, which read as an empty box. */
+const PREVIEW_BACKDROP = '#1C2B22';
+
+function useRunningQuality(): Quality {
+  return useSyncExternalStore(
+    subscribeRunningTier,
+    () => getRunningTier() ?? 'high',
+    () => 'high',
+  );
+}
+
+function PreviewCamera() {
+  const camera = useThree((state) => state.camera);
+  useFrame(() => {
+    (camera as PerspectiveCamera).lookAt(0, 0.2, 0);
+  });
+  return null;
+}
+
+function Turntable({ skin, yaw, dance, quality }: { skin: Skin; yaw: number; dance: DanceId | null; quality: Quality }) {
   const engine = useRef(new GameEngine()).current;
   const group = useRef<Group>(null);
   if (engine.phase === 'menu') {
     engine.prepare('ready');
     engine.phase = 'ready';
+    // Idle frame 0 is still the bind pose. Start in the standing part of the clip.
+    if (engine.time < 0.4) engine.time = 0.4;
   }
   useFrame((_, dt) => {
     if (dance) {
@@ -28,16 +51,17 @@ function Turntable({ skin, yaw, dance }: { skin: Skin; yaw: number; dance: Dance
         awarded: true, revolution: 0, held: 0,
       };
       engine.beatPhase = ((engine.time * GAMEPLAY_BPM) / 60) % 1;
-    } else if (engine.trick?.kind === 'groove') {
-      engine.trick = null;
+    } else {
+      if (engine.trick?.kind === 'groove') engine.trick = null;
       engine.phase = 'ready';
+      engine.time += dt;
     }
     if (group.current) group.current.rotation.y = yaw;
   });
   return (
     <group ref={group} position={[0, -0.95, 0]}>
       <Suspense fallback={null}>
-        <CharacterSwitch engine={engine} skin={skin} />
+        <CharacterSwitch engine={engine} skin={skin} quality={quality} />
       </Suspense>
     </group>
   );
@@ -56,6 +80,7 @@ export function PlayerPreview({
   dance?: DanceId | null;
 }) {
   const [yaw, setYaw] = useState(0.35);
+  const quality = useRunningQuality();
   const drag = useRef<{ x: number; yaw: number } | null>(null);
 
   const onDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -80,14 +105,15 @@ export function PlayerPreview({
     >
       <Canvas
         key={skin.playerBody}
-        camera={{ position: closeUp ? [0.55, 1.55, 1.35] : [1.1, 1.35, 2.4], fov: 35 }}
+        camera={{ position: closeUp ? [0.55, 1.45, 1.35] : [0.95, 1.2, 2.15], fov: 32 }}
         dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: false }}
       >
-        <color attach="background" args={['#6C5CE7']} />
-        <hemisphereLight args={['#FF8A5B', '#1E2A5A', 0.85]} />
+        <color attach="background" args={[PREVIEW_BACKDROP]} />
+        <PreviewCamera />
+        <hemisphereLight args={['#D8E2DC', '#1C2B22', 0.9]} />
         <directionalLight position={[2, 4, 3]} intensity={2.2} color="#FFF6E8" />
-        <Turntable skin={skin} yaw={yaw} dance={dance ?? null} />
+        <Turntable skin={skin} yaw={yaw} dance={dance ?? null} quality={quality} />
       </Canvas>
       <span className="preview-hint">Drag to rotate</span>
     </div>

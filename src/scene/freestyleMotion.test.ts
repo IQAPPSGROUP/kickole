@@ -475,6 +475,35 @@ function kneeFlex(scene: Group, side: 'L' | 'R'): number {
   return Math.acos(Math.min(1, Math.max(-1, upper.dot(lower))));
 }
 
+describe('menu idle arms', () => {
+  it('keeps the Idle clip arms down instead of the bind T-pose', async () => {
+    const gltf = await load(MODEL);
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
+    const idle = gltf.animations.find((clip) => clip.name === 'Idle');
+    if (!idle) throw new Error('missing Idle');
+    const mixer = new AnimationMixer(gltf.scene);
+    const action = mixer.clipAction(idle);
+    action.play();
+    action.paused = true;
+    action.time = 0.4;
+    mixer.update(0);
+    const menu = new GameEngine();
+    menu.phase = 'menu';
+    menu.time = 0.4;
+    rig.apply(menu, 'Idle', computePose(menu), 1 / 60);
+    gltf.scene.updateMatrixWorld(true);
+    const left = bone(gltf.scene, 'Hand_L').getWorldPosition(new Vector3());
+    const right = bone(gltf.scene, 'Hand_R').getWorldPosition(new Vector3());
+    expect(Math.abs(left.x)).toBeGreaterThan(0.15);
+    expect(Math.abs(right.x)).toBeGreaterThan(0.15);
+    expect(Math.abs(left.x)).toBeLessThan(0.6);
+    expect(Math.abs(right.x)).toBeLessThan(0.6);
+    expect(left.y).toBeLessThan(1.35);
+    expect(right.y).toBeLessThan(1.35);
+  });
+});
+
 describe('menu idle after a crouch', () => {
   it('stands the model back up after a kick leaves the knees folded', async () => {
     const gltf = await load(MODEL);

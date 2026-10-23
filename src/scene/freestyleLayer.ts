@@ -615,9 +615,9 @@ export function createFreestyleRig() {
       shift * 0.03 * amp,
       -shift * 0.045 * amp + balance * 0.012 * amp,
     )));
-    const ready = 0.32 + load * 0.08;
-    poseArm('left', ready, 0.06 * shift * amp, 0.5);
-    poseArm('right', ready, -0.06 * shift * amp, 0.5);
+    // The contract rig's bind pose is a T. poseArm hangs from that bind, so calling
+    // it here puts the arms straight back out after the Idle clip has lowered them.
+    // Menu, the pre-run alley, and the standing idle keep the clip's arms.
     pin('left', anchors.left.plant, true);
     pin('right', anchors.right.plant, true);
   }

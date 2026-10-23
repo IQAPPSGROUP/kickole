@@ -413,6 +413,13 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   const footPos = useMemo(() => new Vector3(), []);
   const current = useMemo(() => ({ state: null as AnimationState | null, token: -1 }), []);
   const idleSettled = useRef(false);
+  const kitPoseKey = `${skin.clothing.shirt}|${skin.clothing.shorts}|${skin.clothing.socks}|${skin.kitPaint?.pattern ?? ''}|${skin.kitPaint?.main ?? ''}`;
+
+  useEffect(() => {
+    // A kit swap keeps the same skeleton. Settle Idle again so a leftover kick blend
+    // cannot stay on the body when the shirt changes or the menu returns.
+    idleSettled.current = false;
+  }, [kitPoseKey]);
 
   useEffect(() => () => {
     motionRig.restore();

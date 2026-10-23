@@ -51,13 +51,14 @@ export function Logo() {
 }
 
 export function Home({
-  best, coins, onPlay, onSettings, onCustomise, onShop, onLeaderboard,
+  best, coins, onPlay, onSettings, onCustomise, onKitColours, onShop, onLeaderboard,
 }: {
   best: number;
   coins: number;
   onPlay: () => void;
   onSettings: () => void;
   onCustomise: () => void;
+  onKitColours: () => void;
   onShop: () => void;
   onLeaderboard: () => void;
 }) {
@@ -78,6 +79,7 @@ export function Home({
           <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
           <button className="btn ghost" onClick={onShop}>SHOP</button>
         </div>
+        <button className="btn ghost" onClick={onKitColours}>KIT COLOURS</button>
         <button className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
         <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
         <p className="home-help">Tap to juggle · Hold L or R to kick higher · Hold through the ball to stall</p>
@@ -390,7 +392,7 @@ function graphicsLabel(choice: GraphicsChoice): string {
 }
 
 export function SettingsScreen({
-  settings, nickname, country, leaderboardOn, blockedTick,   onNickname, onLeaderboard, onUnblock, onDelete, onData, onPeek, onSuggest, board, onChange, onToggleSong, onClose,
+  settings, nickname, country, leaderboardOn, blockedTick,   onNickname, onLeaderboard, onUnblock, onDelete, onData, onKitColours, onPeek, onSuggest, board, onChange, onToggleSong, onClose,
 }: {
   settings: Settings;
   nickname: string;
@@ -402,6 +404,7 @@ export function SettingsScreen({
   onUnblock: () => void;
   onDelete: () => Promise<string | void>;
   onData: () => void;
+  onKitColours: () => void;
   onPeek?: (adjective: string, noun: string) => Promise<PeekOutcome>;
   onSuggest?: (request: { count: number; adjective: string | null; noun: string | null }) => Promise<FreePair[]>;
   board: LeaderboardService | null;
@@ -426,6 +429,11 @@ export function SettingsScreen({
       <div className="card settings-card">
         <div className="settings-body">
         <h2>SETTINGS</h2>
+        <div className="group">
+          <label>Kit colours</label>
+          <button type="button" className="btn ghost" onClick={onKitColours}>Choose kit colours</button>
+          <p className="shop-note">Free. Recolours the football kit and stays on this device.</p>
+        </div>
         <Toggle label="Leaderboard" value={leaderboardOn} onChange={onLeaderboard} />
         {blocked.length > 0 && (
           <div className="group">

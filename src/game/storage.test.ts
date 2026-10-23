@@ -100,7 +100,7 @@ describe('storage', () => {
       hairColor: '#C9822B',
       clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
     };
-    const kept = { ...appearance, body: 'male' as const };
+    const kept = { ...appearance, body: 'male' as const, kitColourId: 'custom' };
     const stored = { ...appearance, hairStyle: 'short' };
     const raw = JSON.stringify({
       wardrobeVersion: 2,

@@ -1,8 +1,16 @@
 /**
- * Free player customisation — skin tone, hair colour and basic clothing colours.
+ * Free player customisation — skin tone, hair colour and kit colours.
  * Shop kits/boots never overwrite these when equipped; composeAppearance merges them.
  * Saved hairstyle ids from older builds are ignored; the purchased model hair is the only silhouette.
  */
+import {
+  CUSTOM_KIT_ID,
+  HISTORICAL_KIT,
+  NEUTRAL_KIT_ID,
+  clothingEquals,
+  getKitColour,
+  matchKitColour,
+} from './kitColours';
 
 /** Free body choice. Not a shop item. Existing saves migrate to male. */
 export type PlayerBody = 'male' | 'female';
@@ -19,7 +27,9 @@ export interface Appearance {
   body: PlayerBody;
   skinTone: string;
   hairColor: string;
-  /** Free colour picks used when no purchasable kit is equipped. */
+  /** Free kit-colour id. `custom` keeps clothing that is not in the list. */
+  kitColourId: string;
+  /** Shirt, trim, shorts and socks. A listed kit colour overwrites these. */
   clothing: ClothingColors;
 }
 
@@ -31,10 +41,6 @@ export const HAIR_COLORS: readonly string[] = [
   '#16100E', '#2A1E1A', '#4A3428', '#C9822B', '#8B5A2B', '#F5E6C8', '#1A1A2E', '#6B2D5C',
 ];
 
-export const CLOTHING_SWATCHES: readonly string[] = [
-  '#FFD93D', '#1E2A5A', '#FF4F9A', '#00B8A9', '#FF8A5B', '#6C5CE7', '#F8F9FB', '#222831',
-];
-
 export function isPlayerBody(id: string): id is PlayerBody {
   return id === 'male' || id === 'female';
 }
@@ -43,26 +49,49 @@ export const DEFAULT_APPEARANCE: Appearance = {
   body: 'male',
   skinTone: '#E8B48F',
   hairColor: '#2A1E1A',
-  clothing: {
-    shirt: '#FFD93D',
-    shirtTrim: '#1E2A5A',
-    shorts: '#1E2A5A',
-    socks: '#F8F9FB',
-  },
+  kitColourId: NEUTRAL_KIT_ID,
+  clothing: { ...getKitColour(NEUTRAL_KIT_ID)!.clothing },
 };
 
-export function normalizeAppearance(raw: Partial<Appearance> | null | undefined): Appearance {
-  const clothing = raw?.clothing;
-  // Older saves stored hairStyle (afro, braids, bald, …). Rebuild the object so that field is dropped.
+function filledClothing(raw: Partial<ClothingColors> | undefined): ClothingColors {
+  const fallback = DEFAULT_APPEARANCE.clothing;
   return {
-    body: typeof raw?.body === 'string' && isPlayerBody(raw.body) ? raw.body : DEFAULT_APPEARANCE.body,
-    skinTone: typeof raw?.skinTone === 'string' ? raw.skinTone : DEFAULT_APPEARANCE.skinTone,
-    hairColor: typeof raw?.hairColor === 'string' ? raw.hairColor : DEFAULT_APPEARANCE.hairColor,
-    clothing: {
-      shirt: typeof clothing?.shirt === 'string' ? clothing.shirt : DEFAULT_APPEARANCE.clothing.shirt,
-      shirtTrim: typeof clothing?.shirtTrim === 'string' ? clothing.shirtTrim : DEFAULT_APPEARANCE.clothing.shirtTrim,
-      shorts: typeof clothing?.shorts === 'string' ? clothing.shorts : DEFAULT_APPEARANCE.clothing.shorts,
-      socks: typeof clothing?.socks === 'string' ? clothing.socks : DEFAULT_APPEARANCE.clothing.socks,
-    },
+    shirt: typeof raw?.shirt === 'string' ? raw.shirt : fallback.shirt,
+    shirtTrim: typeof raw?.shirtTrim === 'string' ? raw.shirtTrim : fallback.shirtTrim,
+    shorts: typeof raw?.shorts === 'string' ? raw.shorts : fallback.shorts,
+    socks: typeof raw?.socks === 'string' ? raw.socks : fallback.socks,
   };
+}
+
+function hasClothing(raw: Partial<ClothingColors> | undefined): boolean {
+  return typeof raw?.shirt === 'string'
+    || typeof raw?.shirtTrim === 'string'
+    || typeof raw?.shorts === 'string'
+    || typeof raw?.socks === 'string';
+}
+
+export function normalizeAppearance(raw: Partial<Appearance> | null | undefined): Appearance {
+  // Older saves stored hairStyle (afro, braids, bald, …). Rebuild the object so that field is dropped.
+  const body = typeof raw?.body === 'string' && isPlayerBody(raw.body) ? raw.body : DEFAULT_APPEARANCE.body;
+  const skinTone = typeof raw?.skinTone === 'string' ? raw.skinTone : DEFAULT_APPEARANCE.skinTone;
+  const hairColor = typeof raw?.hairColor === 'string' ? raw.hairColor : DEFAULT_APPEARANCE.hairColor;
+  const base = { body, skinTone, hairColor };
+  const requested = typeof raw?.kitColourId === 'string' ? raw.kitColourId : '';
+  const preset = getKitColour(requested);
+  if (preset) {
+    return { ...base, kitColourId: preset.id, clothing: { ...preset.clothing } };
+  }
+  if (!hasClothing(raw?.clothing)) {
+    return { ...base, kitColourId: NEUTRAL_KIT_ID, clothing: { ...DEFAULT_APPEARANCE.clothing } };
+  }
+  const clothing = filledClothing(raw?.clothing);
+  if (requested === CUSTOM_KIT_ID) {
+    return { ...base, kitColourId: CUSTOM_KIT_ID, clothing };
+  }
+  if (clothingEquals(clothing, HISTORICAL_KIT)) {
+    return { ...base, kitColourId: NEUTRAL_KIT_ID, clothing: { ...DEFAULT_APPEARANCE.clothing } };
+  }
+  const matched = matchKitColour(clothing);
+  if (matched) return { ...base, kitColourId: matched.id, clothing: { ...matched.clothing } };
+  return { ...base, kitColourId: CUSTOM_KIT_ID, clothing };
 }

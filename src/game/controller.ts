@@ -14,6 +14,7 @@ import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../eng
 import { trickRepeatLeft } from '../engine/trickRepeat';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
+import { getKitColour } from './kitColours';
 import { beatClock, cheer, setBed, setEnabledTracks, setSongChoice, sfx, skipTrack, unlockAudio } from './audio';
 import {
   applyPromptAction,
@@ -749,6 +750,17 @@ export class GameController {
   setAppearance(appearance: Appearance) {
     this.save = updateAppearance(this.save, appearance);
     this.publish();
+  }
+
+  /** Free country or neutral kit colour. Saved on this device. Unknown ids are ignored. */
+  setKitColour(id: string) {
+    const option = getKitColour(id);
+    if (!option) return;
+    this.setAppearance({
+      ...this.save.appearance,
+      kitColourId: option.id,
+      clothing: { ...option.clothing },
+    });
   }
 
   /** Free body choice from the first-launch picker or the wardrobe. */

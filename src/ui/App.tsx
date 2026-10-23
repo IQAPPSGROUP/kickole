@@ -20,12 +20,13 @@ import { OpeningSkip } from './OpeningSkip';
 import { NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
+import { KitColoursScreen } from './KitColours';
 import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
-type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'data' | 'how';
+type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'kit' | 'data' | 'how';
 
 const REVIEW_NICKNAME = 'Turbo Striker';
 const REVIEW_COUNTRY = 'GB';
@@ -46,6 +47,7 @@ export function App() {
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
   const [overlay, setOverlay] = useState<Overlay>('none');
+  const [kitReturn, setKitReturn] = useState<Overlay>('none');
   const [paused, setPaused] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
@@ -260,6 +262,15 @@ export function App() {
     setOverlay('none');
   };
 
+  const openKitColours = (from: Overlay) => {
+    setKitReturn(from);
+    setOverlay('kit');
+  };
+
+  const closeKitColours = () => {
+    setOverlay(kitReturn);
+  };
+
   const lockNickname = async (adjective: string, noun: string, country: string | null): Promise<string | void> => {
     const deviceId = await hydrateDeviceId();
     let finalName = `${adjective} ${noun}`;
@@ -344,6 +355,7 @@ export function App() {
           onPlay={startGame}
           onSettings={() => setOverlay('settings')}
           onCustomise={() => setOverlay('customise')}
+          onKitColours={() => openKitColours('none')}
           onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
@@ -424,6 +436,7 @@ export function App() {
           onUnblock={() => setBlockedTick((value) => value + 1)}
           onDelete={deleteBoardData}
           onData={() => setOverlay('data')}
+          onKitColours={() => openKitColours('settings')}
           onPeek={mockBoard ? undefined : peekTag}
           onSuggest={mockBoard ? undefined : suggestTags}
           board={board}
@@ -438,11 +451,19 @@ export function App() {
       {overlay === 'data' && (
         <LeaderboardDataScreen onClose={() => setOverlay('settings')} />
       )}
+      {overlay === 'kit' && (
+        <KitColoursScreen
+          save={snap.save}
+          onPick={(id) => controller.setKitColour(id)}
+          onClose={closeKitColours}
+        />
+      )}
       {overlay === 'customise' && (
         <CustomiseScreen
           save={snap.save}
           onChange={(a) => controller.setAppearance(a)}
           onBody={(body) => controller.chooseBody(body)}
+          onKitColours={() => openKitColours('customise')}
           onClose={closeOverlay}
         />
       )}

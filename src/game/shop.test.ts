@@ -171,6 +171,7 @@ describe('shop economy', () => {
       body: 'male' as const,
       skinTone: '#F2CDAA',
       hairColor: '#C9822B',
+      kitColourId: 'custom',
       clothing: { shirt: '#9B59B6', shirtTrim: '#111111', shorts: '#222222', socks: '#333333' },
     };
     const again = normalizeLocker({
@@ -191,7 +192,8 @@ describe('shop economy', () => {
     expect(migrated.bodyChosen).toBe(true);
     expect(migrated.appearance.skinTone).toBe('#C68642');
     expect(migrated.appearance.hairColor).toBe('#16100E');
-    expect(migrated.appearance.clothing.shirt).toBe('#FFD93D');
+    expect(migrated.appearance.kitColourId).toBe('neutral');
+    expect(migrated.appearance.clothing.shirt).toBe('#E4E0D8');
     expect('hairStyle' in migrated.appearance).toBe(false);
     const chosen = normalizeLocker({
       ...migrated,

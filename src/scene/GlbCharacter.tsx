@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, CanvasTexture, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, SRGBColorSpace, Vector3, type AnimationAction, type Bone, type Group, type Object3D, type Texture, type WebGLRenderer } from 'three';
+import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D, type Texture, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -87,14 +87,6 @@ const STUDS: ReadonlyArray<[number, number, number]> = [
   [0.022, 0.122, 0.054],
 ];
 
-const NUMBERS = [7, 9, 10, 11, 14, 17, 21, 23] as const;
-
-function shirtNumber(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 33 + id.charCodeAt(i)) >>> 0;
-  return NUMBERS[hash % NUMBERS.length];
-}
-
 const ktxRenderer: { gl: WebGLRenderer | null } = { gl: null };
 
 function extendCharacterLoader(loader: { setKTX2Loader: (ktx2: KTX2Loader) => void }) {
@@ -102,44 +94,6 @@ function extendCharacterLoader(loader: { setKTX2Loader: (ktx2: KTX2Loader) => vo
   ktx2.setTranscoderPath(KTX2_TRANSCODER_PATH);
   if (ktxRenderer.gl) ktx2.detectSupport(ktxRenderer.gl);
   loader.setKTX2Loader(ktx2);
-}
-
-function ShirtNumber({ bone, id }: { bone: Bone; id: string }) {
-  const group = useRef<Group>(null);
-  const texture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const g = canvas.getContext('2d');
-    if (g) {
-      g.clearRect(0, 0, 128, 128);
-      g.fillStyle = 'rgba(18, 22, 28, 0.82)';
-      g.fillRect(28, 34, 72, 60);
-      g.fillStyle = '#f4f1ea';
-      g.font = '700 54px sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText(String(shirtNumber(id)), 64, 66);
-    }
-    const map = new CanvasTexture(canvas);
-    map.colorSpace = SRGBColorSpace;
-    return map;
-  }, [id]);
-  useEffect(() => () => texture.dispose(), [texture]);
-  useLayoutEffect(() => {
-    const node = group.current;
-    if (!node) return;
-    bone.add(node);
-    return () => { bone.remove(node); };
-  }, [bone]);
-  return (
-    <group ref={group} position={[0, 0.02, 0.16]}>
-      <mesh>
-        <planeGeometry args={[0.16, 0.16]} />
-        <meshBasicMaterial map={texture} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
-      </mesh>
-    </group>
-  );
 }
 
 interface Props { engine: GameEngine; skin: Skin; onInvalid: () => void; expressive?: boolean; quality?: Quality }
@@ -153,7 +107,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   ktxRenderer.gl = gl;
   // drei types GLTFLoader from three-stdlib, which does not match three's KTX2Loader.
   const gltf = useGLTF(characterModelUrl(characterLod(quality), skin.playerBody), DRACO_DECODER_PATH, true, extendCharacterLoader as never);
-  const { scene, clips, report, bones, materials, kind, quaternius, pbr, chest } = useMemo(() => {
+  const { scene, clips, report, bones, materials, kind, quaternius, pbr } = useMemo(() => {
     const root = cloneSkinned(gltf.scene) as Object3D;
     const boneMap: Partial<Record<BoneKey, Bone>> = {};
     const byName = new Map<string, Bone>();
@@ -230,7 +184,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       kind: resolved,
       quaternius: boneNames.includes('Clavicle_L'),
       pbr: textured,
-      chest: byName.get('Spine2'),
       report: validateModel(boneNames, gltf.animations.map((a) => a.name), matNames),
     };
   }, [gltf]);
@@ -308,7 +261,10 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           standard.metalness = 0.18;
         }
       } else if (cloth) {
-        standard.map = standard.userData.baseMap;
+        // Solid kit tint. The shared albedo is a boot texture, so it stays off the shirt.
+        const tint = skinMaterialColors(skin)[material.name];
+        standard.map = null;
+        if (tint) standard.color.set(tint);
         standard.roughness = standard.userData.baseRough;
         standard.metalness = standard.userData.baseMetal;
       }
@@ -607,7 +563,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       {isMeshOutfit(skin.outfitId) && (
         <MountedOutfit url={outfitModelUrl(skin.outfitId, skin.playerBody)} host={scene} cover={OUTFIT_COVER[skin.outfitId]} />
       )}
-      {pbr && chest && !skin.outfitId && <ShirtNumber bone={chest} id={skin.id} />}
     </>
   );
 }

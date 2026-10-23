@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import {
-  CLOTHING_SWATCHES,
   HAIR_COLORS,
   SKIN_TONES,
   type Appearance,
   type PlayerBody,
 } from '../game/appearance';
+import { getKitColour } from '../game/kitColours';
 import {
   BOOTS,
   KITS,
@@ -75,11 +75,13 @@ export function CustomiseScreen({
   save,
   onChange,
   onBody,
+  onKitColours,
   onClose,
 }: {
   save: SaveData;
   onChange: (a: Appearance) => void;
   onBody: (body: PlayerBody) => void;
+  onKitColours: () => void;
   onClose: () => void;
 }) {
   const a = save.appearance;
@@ -121,9 +123,13 @@ export function CustomiseScreen({
         </div>
         <SwatchRow label="Skin tone" colours={SKIN_TONES} value={a.skinTone} onPick={(skinTone) => patch({ skinTone })} />
         <SwatchRow label="Hair colour" colours={HAIR_COLORS} value={a.hairColor} onPick={(hairColor) => patch({ hairColor })} />
-        <SwatchRow label="Shirt" colours={CLOTHING_SWATCHES} value={a.clothing.shirt} onPick={(shirt) => patch({ clothing: { ...a.clothing, shirt } })} />
-        <SwatchRow label="Shorts" colours={CLOTHING_SWATCHES} value={a.clothing.shorts} onPick={(shorts) => patch({ clothing: { ...a.clothing, shorts } })} />
-        <p className="shop-note">Clothing swatches colour the basic kit. Equipped shop kits override shirt, shorts and socks colours in play.</p>
+        <div className="group">
+          <label>Kit colours</label>
+          <button type="button" className="btn ghost" onClick={onKitColours}>
+            {getKitColour(a.kitColourId)?.name ?? 'Saved colours'}
+          </button>
+          <p className="shop-note">Plain shirt, shorts and socks on the basic football kit.</p>
+        </div>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>
     </div>

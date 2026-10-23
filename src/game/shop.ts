@@ -318,7 +318,12 @@ export function normalizeLocker(
 
   let appearance = normalizeAppearance(raw?.appearance as Partial<Appearance> | undefined);
   if (legacy?.appearance) {
-    appearance = normalizeAppearance({ ...appearance, ...legacy.appearance, clothing: { ...appearance.clothing, ...legacy.appearance.clothing } });
+    // Drop the default kit id so the legacy clothing is kept instead of the neutral preset.
+    appearance = normalizeAppearance({
+      ...legacy.appearance,
+      body: appearance.body,
+      clothing: { ...appearance.clothing, ...legacy.appearance.clothing },
+    });
   }
 
   const entitlementSource = parseEntitlementSource(raw?.entitlementSource);

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Bone, Euler, Object3D, Texture, Vector3, type AnimationClip, type Group } from 'three';
+import { AnimationMixer, Bone, Euler, Object3D, Quaternion, Texture, Vector3, type AnimationClip, type Group } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GameEngine } from '../engine/engine';
@@ -475,8 +475,74 @@ function kneeFlex(scene: Group, side: 'L' | 'R'): number {
   return Math.acos(Math.min(1, Math.max(-1, upper.dot(lower))));
 }
 
+const FEMALE_MODEL = new URL('../../public/models/kickole_player_v4_female.glb', import.meta.url);
+
+function armHang(scene: Group, side: 'L' | 'R'): number {
+  const shoulder = bone(scene, `UpperArm_${side}`).getWorldPosition(new Vector3());
+  const elbow = bone(scene, `LowerArm_${side}`).getWorldPosition(new Vector3());
+  const dir = elbow.sub(shoulder).normalize();
+  return Math.acos(Math.min(1, Math.max(-1, dir.dot(new Vector3(0, -1, 0)))));
+}
+
+function poseMenuIdle(scene: Group, animations: AnimationClip[], rig: ReturnType<typeof createFreestyleRig>) {
+  const idle = animations.find((clip) => clip.name === 'Idle');
+  if (!idle) throw new Error('missing Idle');
+  const mixer = new AnimationMixer(scene);
+  const action = mixer.clipAction(idle);
+  action.play();
+  action.paused = true;
+  action.time = 0.4;
+  mixer.update(0);
+  const menu = new GameEngine();
+  menu.phase = 'menu';
+  menu.time = 0.4;
+  rig.apply(menu, 'Idle', computePose(menu), 1 / 60);
+  scene.updateMatrixWorld(true);
+}
+
+function expectHandsByTheHips(scene: Group) {
+  for (const side of ['L', 'R'] as const) {
+    const shoulder = bone(scene, `UpperArm_${side}`).getWorldPosition(new Vector3());
+    const elbow = bone(scene, `LowerArm_${side}`).getWorldPosition(new Vector3());
+    const hand = bone(scene, `Hand_${side}`).getWorldPosition(new Vector3());
+    const hip = bone(scene, 'Hips').getWorldPosition(new Vector3());
+    const hang = armHang(scene, side);
+    const upper = shoulder.clone().sub(elbow).normalize();
+    const lower = hand.clone().sub(elbow).normalize();
+    const bend = Math.acos(Math.min(1, Math.max(-1, upper.dot(lower))));
+    expect(hang, `${side} upper arm down the side`).toBeGreaterThan(0.08);
+    expect(hang, `${side} upper arm down the side`).toBeLessThan(0.22);
+    expect(Math.abs(hand.y - hip.y), `${side} hand near hip height`).toBeLessThan(0.12);
+    expect(hand.y, `${side} hand below the shoulder`).toBeLessThan(shoulder.y - 0.3);
+    expect(Math.abs(elbow.x), `${side} elbow stays off the ribs`).toBeGreaterThan(Math.abs(shoulder.x) + 0.015);
+    expect(Math.abs(hand.x), `${side} hand stays outside the elbow`).toBeGreaterThan(Math.abs(elbow.x) + 0.02);
+    expect(bend, `${side} slight elbow bend`).toBeGreaterThan(2.0);
+    expect(bend, `${side} slight elbow bend`).toBeLessThan(2.9);
+  }
+  const left = bone(scene, 'Hand_L').getWorldPosition(new Vector3());
+  const right = bone(scene, 'Hand_R').getWorldPosition(new Vector3());
+  expect(left.x).toBeLessThan(-0.2);
+  expect(right.x).toBeGreaterThan(0.2);
+}
+
 describe('menu idle arms', () => {
-  it('keeps the Idle clip arms down instead of the bind T-pose', async () => {
+  it('hangs the hands by the hips, a few centimetres off the body', async () => {
+    const gltf = await load(MODEL);
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
+    poseMenuIdle(gltf.scene, gltf.animations, rig);
+    expectHandsByTheHips(gltf.scene);
+  });
+
+  it('keeps the same hip-height hang on the female body', async () => {
+    const gltf = await load(FEMALE_MODEL);
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
+    poseMenuIdle(gltf.scene, gltf.animations, rig);
+    expectHandsByTheHips(gltf.scene);
+  });
+
+  it('does not tuck the forearms through the torso when the motion layer already closed the arms', async () => {
     const gltf = await load(MODEL);
     const rig = createFreestyleRig();
     expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
@@ -488,21 +554,17 @@ describe('menu idle arms', () => {
     action.paused = true;
     action.time = 0.4;
     mixer.update(0);
+    const swing = new Quaternion();
+    const extra = new Euler(0, 0, 0.28);
+    bone(gltf.scene, 'UpperArm_L').quaternion.multiply(swing.setFromEuler(extra));
+    extra.z = -0.28;
+    bone(gltf.scene, 'UpperArm_R').quaternion.multiply(swing.setFromEuler(extra));
     const menu = new GameEngine();
     menu.phase = 'menu';
     menu.time = 0.4;
     rig.apply(menu, 'Idle', computePose(menu), 1 / 60);
     gltf.scene.updateMatrixWorld(true);
-    const leftShoulder = bone(gltf.scene, 'UpperArm_L').getWorldPosition(new Vector3());
-    const rightShoulder = bone(gltf.scene, 'UpperArm_R').getWorldPosition(new Vector3());
-    const left = bone(gltf.scene, 'Hand_L').getWorldPosition(new Vector3());
-    const right = bone(gltf.scene, 'Hand_R').getWorldPosition(new Vector3());
-    expect(Math.abs(left.x - leftShoulder.x), 'left hand hangs beside the shoulder').toBeLessThan(0.08);
-    expect(Math.abs(right.x - rightShoulder.x), 'right hand hangs beside the shoulder').toBeLessThan(0.08);
-    expect(left.y).toBeLessThan(leftShoulder.y - 0.3);
-    expect(right.y).toBeLessThan(rightShoulder.y - 0.3);
-    expect(left.x).toBeLessThan(-0.08);
-    expect(right.x).toBeGreaterThan(0.08);
+    expectHandsByTheHips(gltf.scene);
   });
 });
 

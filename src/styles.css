@@ -531,7 +531,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
   opacity: .55;
   pointer-events: none;
 }
-@media (hover: none), (pointer: coarse) {
+@media (hover: none), (pointer: coarse), (max-width: 768px) {
   .trick-help { display: none; }
 }
 .trick-armed {
@@ -704,11 +704,17 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .score .prompt-ink { transform: translate(0.03em, 0.04em); }
 .score .prompt-ink .prompt-ch { -webkit-text-stroke: 0.14em #140814; }
 .trick-repeat {
-  margin: 1px 0 0;
-  font-size: 11px;
+  position: relative;
+  z-index: 3;
+  display: inline-block;
+  margin: 8px 0 0;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(12, 16, 18, 0.82);
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: 0.2px;
-  line-height: 1.15;
+  line-height: 1.2;
   color: #f7e9c5;
   white-space: nowrap;
 }

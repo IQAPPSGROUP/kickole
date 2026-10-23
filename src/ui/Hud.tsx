@@ -7,25 +7,17 @@ import { trickRepeatText } from '../engine/trickRepeat';
 import { beatClock, subscribeNowPlaying } from '../game/audio';
 import { trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
-import type { LeaderboardService } from '../game/leaderboard';
 import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
 import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
-import { WorldRank } from './WorldRank';
 
 export function Hud({
   hud,
   controller,
   onSkipCelebration,
-  nickname,
-  board,
-  onOpenBoard,
 }: {
   hud: HudState;
   controller?: GameController;
   onSkipCelebration?: () => void;
-  nickname?: string | null;
-  board?: LeaderboardService | null;
-  onOpenBoard?: () => void;
 }) {
   const f = hud.feedback;
   const combo = streakMultiplier(hud.streak);
@@ -43,23 +35,20 @@ export function Hud({
         <div className="score" key={hud.score}>
           <GraffitiText text={String(hud.score)} className="graffiti score-num" />
         </div>
+        <div className="hud-sub">
+          <GraffitiText text={`KICK-UPS ${hud.kickUps}`} className="graffiti score-sub" />
+          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
+        </div>
         {hud.trickRepeat && (
           <p className={hud.trickRepeat.left <= 3 ? 'trick-repeat is-low' : 'trick-repeat'}>
             {trickRepeatText(hud.trickRepeat.kind, hud.trickRepeat.left)}
           </p>
         )}
-        <div className="hud-sub">
-          <GraffitiText text={`KICK-UPS ${hud.kickUps}`} className="graffiti score-sub" />
-          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
-        </div>
       </div>
       <div className="hud-coaching">
         {hud.hintTip && <div className="hint-tip">{hud.hintTip}</div>}
       </div>
       {hud.prompt && controller && <PromptBanner prompt={hud.prompt} controller={controller} />}
-      {nickname && board && (hud.phase === 'playing' || hud.phase === 'ready') && (
-        <WorldRank score={hud.score} nickname={nickname} service={board} onOpen={onOpenBoard} />
-      )}
       {f && hud.phase !== 'over' && (
         <div className={`feedback ${f.kind}`} key={f.id}>
           {f.text}

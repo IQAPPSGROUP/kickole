@@ -384,9 +384,6 @@ export function App() {
         <Hud
           hud={snap.hud}
           controller={controller}
-          nickname={nickname ?? (reviewing ? boardName : null)}
-          board={board}
-          onOpenBoard={openBoard}
           onSkipCelebration={() => controller.skipCelebration()}
         />
       )}

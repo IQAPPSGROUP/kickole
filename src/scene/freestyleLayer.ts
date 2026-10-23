@@ -593,6 +593,26 @@ export function createFreestyleRig() {
     hold(elbow);
   }
 
+  /**
+   * Upper arm a little off vertical. The Idle clip leaves it near 28°. Closing
+   * only until this angle puts the hands by the hips, about 5–10cm off the ribs,
+   * on both bodies. A fixed tuck stacked with the motion layer and hid the
+   * forearms behind the torso.
+   */
+  const IDLE_ARM_HANG = 8 * Math.PI / 180;
+
+  function hangUpperArm(arm: Object3D, elbowBone: Object3D, side: Side) {
+    arm.updateWorldMatrix(true, true);
+    const shoulder = arm.getWorldPosition(hipWorld);
+    const elbowPos = elbowBone.getWorldPosition(landmark);
+    const outward = side === 'left' ? shoulder.x - elbowPos.x : elbowPos.x - shoulder.x;
+    const drop = shoulder.y - elbowPos.y;
+    const angle = Math.atan2(outward, Math.max(0.05, drop));
+    const delta = angle - IDLE_ARM_HANG;
+    arm.quaternion.multiply(swing.setFromEuler(euler.set(0, 0, side === 'left' ? delta : -delta)));
+    arm.updateMatrix();
+  }
+
   function applyIdle(engine: GameEngine, pose: Pose) {
     if (!bones) return;
     const t = engine.time;
@@ -615,17 +635,9 @@ export function createFreestyleRig() {
       shift * 0.03 * amp,
       -shift * 0.045 * amp + balance * 0.012 * amp,
     )));
-    // The Idle clip holds the arms about 35° off the body. A local Z tuck brings
-    // the hands down beside the hips. Tricks still pose the arms themselves.
-    const tuck = 0.5;
-    if (bones.armLeft) {
-      bones.armLeft.quaternion.multiply(swing.setFromEuler(euler.set(0, 0, tuck)));
-      bones.armLeft.updateMatrix();
-    }
-    if (bones.armRight) {
-      bones.armRight.quaternion.multiply(swing.setFromEuler(euler.set(0, 0, -tuck)));
-      bones.armRight.updateMatrix();
-    }
+    // Keep the clip's slight elbow bend. More flexion lifts the hand back up.
+    if (bones.armLeft && bones.elbowLeft) hangUpperArm(bones.armLeft, bones.elbowLeft, 'left');
+    if (bones.armRight && bones.elbowRight) hangUpperArm(bones.armRight, bones.elbowRight, 'right');
     pin('left', anchors.left.plant, true);
     pin('right', anchors.right.plant, true);
   }

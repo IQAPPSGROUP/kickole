@@ -1,36 +1,13 @@
 import { normalizeAppearance, type Appearance } from './appearance';
 import {
-  BOOTS,
   STARTER_BOOT_ID,
   STARTER_KIT_ID,
-  getBoot,
-  getKit,
   isBootId,
   isKitId,
-  isLaunchCollectionId,
-  type ChallengeKind,
-  type UnlockRequirement,
 } from './catalogue';
-import {
-  COWBOY_BOOT_ID,
-  GOLD_LEGEND_SCORE,
-  cosmeticGrantAllowed,
-  earnedOutfit,
-  getOutfit,
-  getShopPack,
-  isOutfitId,
-  isShopPackId,
-  keepStoreCosmetic,
-  milestoneMet,
-  packsGrantedBy,
-  shopPackForProduct,
-  type EntitlementSource,
-  type OutfitId,
-  type ShopPackId,
-} from './outfits';
+import { COWBOY_BOOT_ID } from './outfits';
 import {
   STARTER_DANCE_ID,
-  equipDance,
   normalizeDances,
   type DanceId,
   type DanceLocker,
@@ -42,8 +19,8 @@ export interface ChallengeProgress {
   perfectTouch: number;
 }
 
+/** On-device look. Kits are free. Nothing here is bought. */
 export interface WardrobeLocker {
-  coins: number;
   ownedBoots: string[];
   equippedBoot: string;
   ownedKits: string[];
@@ -55,38 +32,20 @@ export interface WardrobeLocker {
    */
   bodyChosen: boolean;
   challenges: ChallengeProgress;
-  /**
-   * Cache of paid Launch Collection ownership. Never treat this alone as proof of payment
-   * on web — native adapters re-verify with the store. See docs/BILLING.md.
-   */
-  launchCollectionOwned: boolean;
-  /** Item IDs granted by the paid collection that can be revoked on refund (not coin-bought). */
-  launchGrantedItemIds: string[];
-  entitlementSource: EntitlementSource;
-  entitlementVerifiedAt: number;
-  entitlementTransactionRef: string | null;
   /** Lifetime milestone rank that unlocks cosmetic dances. */
   danceRank: number;
   ownedDances: DanceId[];
   equippedDance: DanceId;
-  /** Lifetime best combo. Dance ranks use this. Outfit unlocks use `best`. */
+  /** Lifetime best combo. Dance ranks use this. */
   bestStreak: number;
-  /** Highest score from a single run. Earned outfits unlock from this. */
+  /** Highest score from a single run. */
   best: number;
-  /** Themed outfits granted by the store. Gold Legend is not stored here. */
-  ownedOutfits: OutfitId[];
-  /** Null wears the equipped kit. */
-  equippedOutfit: OutfitId | null;
-  /** Source of ownedOutfits, ownedPacks and the cowboy boot. dev_sim is never accepted. */
-  cosmeticSource: EntitlementSource;
-  /** Non-consumable packs granted by the store. Everything also lists the four packs. */
-  ownedPacks: ShopPackId[];
   /** Save schema version for migrations. */
   wardrobeVersion: number;
 }
 
-/** v3 adds the free male/female body. Legacy kit seeds stay on versions older than 2. */
-export const WARDROBE_VERSION = 3;
+/** v4 drops the coin balance and every store grant. */
+export const WARDROBE_VERSION = 4;
 const LEGACY_SKIN_VERSION = 2;
 
 export const EMPTY_CHALLENGES: ChallengeProgress = {
@@ -95,100 +54,7 @@ export const EMPTY_CHALLENGES: ChallengeProgress = {
   perfectTouch: 0,
 };
 
-/** One spendable coin per scored point. Empty runs award nothing. */
-export function coinsForScore(score: number): number {
-  if (!Number.isFinite(score) || score <= 0) return 0;
-  return Math.floor(score);
-}
-
-export function challengeValue(progress: ChallengeProgress, kind: ChallengeKind): number {
-  switch (kind) {
-    case 'none': return 0;
-    case 'alternateFoot': return progress.alternateFoot;
-    case 'stall': return progress.stalls;
-    case 'perfectTouch': return progress.perfectTouch;
-    default: {
-      const _exhaustive: never = kind;
-      return _exhaustive;
-    }
-  }
-}
-
-export function meetsChallenge(progress: ChallengeProgress, unlock: UnlockRequirement): boolean {
-  if (unlock.challenge === 'none') return true;
-  return challengeValue(progress, unlock.challenge) >= unlock.challengeTarget;
-}
-
-export function canAfford(locker: WardrobeLocker, unlock: UnlockRequirement): boolean {
-  return locker.coins >= unlock.price;
-}
-
-function markCoinOwned(locker: WardrobeLocker, itemId: string): WardrobeLocker {
-  const granted = locker.launchGrantedItemIds.filter((id) => id !== itemId);
-  return { ...locker, launchGrantedItemIds: granted };
-}
-
-/** This build does not grant store items. A saved receipt stays unused. */
-export function applyLaunchCollection(locker: WardrobeLocker): WardrobeLocker {
-  return {
-    ...locker,
-    launchCollectionOwned: false,
-    launchGrantedItemIds: [],
-    entitlementSource: 'none',
-    entitlementVerifiedAt: 0,
-    entitlementTransactionRef: null,
-  };
-}
-
-export type ShopFailure = 'unknown' | 'broke' | 'locked' | 'billing_unavailable' | 'pending';
-
-export type ShopResult =
-  | { ok: true; locker: WardrobeLocker }
-  | { ok: false; locker: WardrobeLocker; reason: ShopFailure };
-
-export function buyOrEquipBoot(locker: WardrobeLocker, bootId: string, testerUnlock = false): ShopResult {
-  const boot = BOOTS.find((b) => b.id === bootId);
-  if (!boot) return { ok: false, locker, reason: 'unknown' };
-  if (locker.ownedBoots.includes(boot.id)) {
-    return { ok: true, locker: { ...locker, equippedBoot: boot.id } };
-  }
-  if (testerUnlock && boot.id === COWBOY_BOOT_ID) {
-    return { ok: true, locker: { ...locker, equippedBoot: boot.id } };
-  }
-  if (boot.id === COWBOY_BOOT_ID || boot.storeProductId) return { ok: false, locker, reason: 'billing_unavailable' };
-  if (!meetsChallenge(locker.challenges, boot.unlock)) {
-    return { ok: false, locker, reason: 'locked' };
-  }
-  if (locker.coins < boot.unlock.price) return { ok: false, locker, reason: 'broke' };
-  const next = markCoinOwned({
-    ...locker,
-    coins: locker.coins - boot.unlock.price,
-    ownedBoots: [...locker.ownedBoots, boot.id],
-    equippedBoot: boot.id,
-  }, boot.id);
-  return { ok: true, locker: next };
-}
-
-export function buyOrEquipKit(locker: WardrobeLocker, kitId: string): ShopResult {
-  if (!isKitId(kitId)) return { ok: false, locker, reason: 'unknown' };
-  const kit = getKit(kitId);
-  if (locker.ownedKits.includes(kit.id)) {
-    return { ok: true, locker: { ...locker, equippedKit: kit.id } };
-  }
-  if (!meetsChallenge(locker.challenges, kit.unlock)) {
-    return { ok: false, locker, reason: 'locked' };
-  }
-  if (locker.coins < kit.unlock.price) return { ok: false, locker, reason: 'broke' };
-  const next = markCoinOwned({
-    ...locker,
-    coins: locker.coins - kit.unlock.price,
-    ownedKits: [...locker.ownedKits, kit.id],
-    equippedKit: kit.id,
-  }, kit.id);
-  return { ok: true, locker: next };
-}
-
-/** Map legacy boot IDs from the 350/800/1600 shop onto the launch catalogue. */
+/** Map legacy boot IDs from the old wardrobe onto the launch catalogue. */
 const LEGACY_BOOT_MAP: Record<string, string> = {
   street: STARTER_BOOT_ID,
   samba: 'boot-beach-wave',
@@ -218,27 +84,17 @@ const LEGACY_SKIN_MAP: Record<string, { kit: string; appearance?: Partial<Appear
 };
 
 export interface RawSaveFields {
-  coins?: unknown;
   ownedBoots?: unknown;
   equippedBoot?: unknown;
   ownedKits?: unknown;
   equippedKit?: unknown;
   appearance?: unknown;
   challenges?: unknown;
-  launchCollectionOwned?: unknown;
-  launchGrantedItemIds?: unknown;
-  entitlementSource?: unknown;
-  entitlementVerifiedAt?: unknown;
-  entitlementTransactionRef?: unknown;
   danceRank?: unknown;
   ownedDances?: unknown;
   equippedDance?: unknown;
   bestStreak?: unknown;
   best?: unknown;
-  ownedOutfits?: unknown;
-  equippedOutfit?: unknown;
-  ownedPacks?: unknown;
-  cosmeticSource?: unknown;
   wardrobeVersion?: unknown;
   bodyChosen?: unknown;
   /** Set by loadSave when a save object already existed. Not written back. */
@@ -247,12 +103,8 @@ export interface RawSaveFields {
   legacySkinId?: string | null;
 }
 
-function parseEntitlementSource(raw: unknown): EntitlementSource {
-  if (raw === 'apple' || raw === 'google' || raw === 'dev_sim' || raw === 'none') return raw;
-  return 'none';
-}
-
 function mapBootId(id: string): string | null {
+  if (id === COWBOY_BOOT_ID) return null;
   if (isBootId(id)) return id;
   const mapped = LEGACY_BOOT_MAP[id];
   return mapped && isBootId(mapped) ? mapped : null;
@@ -283,11 +135,8 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
   }
   if (!ownedKits.includes(STARTER_KIT_ID)) ownedKits.unshift(STARTER_KIT_ID);
 
-  const equippedBoot = typeof raw?.equippedBoot === 'string'
-    ? (mapBootId(raw.equippedBoot) && ownedBoots.includes(mapBootId(raw.equippedBoot)!)
-      ? mapBootId(raw.equippedBoot)!
-      : STARTER_BOOT_ID)
-    : STARTER_BOOT_ID;
+  const mappedBoot = typeof raw?.equippedBoot === 'string' ? mapBootId(raw.equippedBoot) : null;
+  const equippedBoot = mappedBoot && ownedBoots.includes(mappedBoot) ? mappedBoot : STARTER_BOOT_ID;
 
   let equippedKit = typeof raw?.equippedKit === 'string' && ownedKits.includes(raw.equippedKit)
     ? raw.equippedKit
@@ -295,10 +144,6 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
   if (legacy && ownedKits.includes(legacy.kit) && !(typeof raw?.equippedKit === 'string')) {
     equippedKit = legacy.kit;
   }
-
-  const coins = typeof raw?.coins === 'number' && Number.isFinite(raw.coins) && raw.coins > 0
-    ? Math.floor(raw.coins)
-    : 0;
 
   const ch = raw?.challenges as Partial<ChallengeProgress> | undefined;
   const challenges: ChallengeProgress = {
@@ -316,7 +161,6 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
 
   let appearance = normalizeAppearance(raw?.appearance as Partial<Appearance> | undefined);
   if (legacy?.appearance) {
-    // Drop the default kit id so the legacy clothing is kept instead of the neutral preset.
     appearance = normalizeAppearance({
       ...legacy.appearance,
       body: appearance.body,
@@ -335,23 +179,6 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
   const best = typeof raw?.best === 'number' && Number.isFinite(raw.best) && raw.best > 0
     ? Math.floor(raw.best)
     : 0;
-  const cosmeticSource = parseEntitlementSource(raw?.cosmeticSource);
-  const keepCosmetic = keepStoreCosmetic(cosmeticSource, false, import.meta.env.PROD);
-  const ownedOutfits = keepCosmetic && Array.isArray(raw?.ownedOutfits)
-    ? raw.ownedOutfits.filter((id): id is OutfitId => typeof id === 'string' && isOutfitId(id) && !earnedOutfit(id))
-    : [];
-  const ownedPacks = keepCosmetic && Array.isArray(raw?.ownedPacks)
-    ? raw.ownedPacks.filter((id): id is ShopPackId => typeof id === 'string' && isShopPackId(id))
-    : [];
-  const milestoneStats = { bestScore: best };
-  const equippedCandidate = getOutfit(typeof raw?.equippedOutfit === 'string' ? raw.equippedOutfit : null);
-  const equippedOutfit = equippedCandidate && (
-    equippedCandidate.milestone
-      ? milestoneMet(milestoneStats, equippedCandidate.milestone)
-      : ownedOutfits.includes(equippedCandidate.id)
-  )
-    ? equippedCandidate.id
-    : null;
 
   const bodyChosen = raw?.bodyChosen === true
     ? true
@@ -359,176 +186,21 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
       ? false
       : raw?.hadSave === true || storedVersion > 0;
 
-  const visibleBoots = keepCosmetic ? ownedBoots : ownedBoots.filter((id) => id !== COWBOY_BOOT_ID);
-  let locker: WardrobeLocker = {
-    coins,
-    ownedBoots: visibleBoots,
-    equippedBoot: visibleBoots.includes(equippedBoot) ? equippedBoot : STARTER_BOOT_ID,
+  return {
+    ownedBoots,
+    equippedBoot,
     ownedKits,
-    equippedKit: ownedKits.includes(equippedKit) ? equippedKit : STARTER_KIT_ID,
+    equippedKit,
     appearance,
     bodyChosen,
     challenges,
-    launchCollectionOwned: false,
-    launchGrantedItemIds: [],
-    entitlementSource: 'none',
-    entitlementVerifiedAt: 0,
-    entitlementTransactionRef: null,
     danceRank: dances.danceRank,
     ownedDances: dances.ownedDances,
     equippedDance: dances.equippedDance,
     bestStreak,
     best,
-    ownedOutfits,
-    equippedOutfit,
-    cosmeticSource: keepCosmetic ? cosmeticSource : 'none',
-    ownedPacks,
     wardrobeVersion: WARDROBE_VERSION,
   };
-  return locker;
-}
-
-export function milestoneStatsOf(locker: WardrobeLocker) {
-  return { bestScore: locker.best };
-}
-
-export function outfitOwned(locker: WardrobeLocker, id: string): boolean {
-  const outfit = getOutfit(id);
-  if (!outfit) return false;
-  if (outfit.milestone) return milestoneMet(milestoneStatsOf(locker), outfit.milestone);
-  return locker.ownedOutfits.includes(outfit.id);
-}
-
-export function packOwned(locker: WardrobeLocker, id: ShopPackId): boolean {
-  if (locker.ownedPacks.includes(id)) return true;
-  if (id === 'everything') return CONTENT_PACKS_OWNED(locker);
-  return false;
-}
-
-function CONTENT_PACKS_OWNED(locker: WardrobeLocker): boolean {
-  return locker.ownedPacks.includes('heroes-space')
-    && locker.ownedPacks.includes('adventure')
-    && locker.ownedPacks.includes('party')
-    && locker.ownedPacks.includes('spooky');
-}
-
-/** Equip a themed outfit the player already unlocked, or clear it with null. */
-export function equipOutfit(locker: WardrobeLocker, id: string | null, testerUnlock = false): ShopResult {
-  if (id === null) return { ok: true, locker: { ...locker, equippedOutfit: null } };
-  if (!isOutfitId(id)) return { ok: false, locker, reason: 'unknown' };
-  if (!testerUnlock && !outfitOwned(locker, id)) return { ok: false, locker, reason: 'locked' };
-  return { ok: true, locker: { ...locker, equippedOutfit: id } };
-}
-
-/** TestFlight can wear a costume without writing a store grant. */
-export function outfitSelectable(locker: WardrobeLocker, id: string, testerUnlock: boolean): boolean {
-  if (testerUnlock && isOutfitId(id)) return true;
-  return outfitOwned(locker, id);
-}
-
-/**
- * Put a TestFlight selection back after a store sync.
- * Does not add owned outfits, owned packs, or a purchase source.
- */
-export function keepTesterWear(
-  locker: WardrobeLocker,
-  outfitId: string | null,
-  bootId: string | null,
-): WardrobeLocker {
-  let next = locker;
-  if (outfitId && isOutfitId(outfitId)) next = { ...next, equippedOutfit: outfitId };
-  if (bootId === COWBOY_BOOT_ID) next = { ...next, equippedBoot: COWBOY_BOOT_ID };
-  return next;
-}
-
-/**
- * Record a store grant for one themed outfit or the cowboy boots.
- * dev_sim is refused. Launch Collection purchases do not call this.
- */
-export function grantStoreCosmetic(
-  locker: WardrobeLocker,
-  id: string,
-  source: EntitlementSource,
-): WardrobeLocker {
-  if (!cosmeticGrantAllowed(source)) return locker;
-  if (id === COWBOY_BOOT_ID) {
-    const ownedBoots = locker.ownedBoots.includes(COWBOY_BOOT_ID)
-      ? locker.ownedBoots
-      : [...locker.ownedBoots, COWBOY_BOOT_ID];
-    return { ...locker, ownedBoots, cosmeticSource: source };
-  }
-  if (!isOutfitId(id) || earnedOutfit(id)) return locker;
-  const ownedOutfits = locker.ownedOutfits.includes(id) ? locker.ownedOutfits : [...locker.ownedOutfits, id];
-  return { ...locker, ownedOutfits, cosmeticSource: source };
-}
-
-/**
- * Replace pack ownership with what the store currently entitles.
- * Call only after a successful native query. Web must not call this with an empty list.
- */
-export function applyOwnedPackProducts(
-  locker: WardrobeLocker,
-  productIds: readonly string[],
-  source: EntitlementSource,
-): WardrobeLocker {
-  if (!cosmeticGrantAllowed(source)) return locker;
-  const equipped = locker.equippedOutfit;
-  let next: WardrobeLocker = {
-    ...locker,
-    ownedPacks: [],
-    ownedOutfits: [],
-    ownedBoots: locker.ownedBoots.filter((id) => id !== COWBOY_BOOT_ID),
-    equippedBoot: locker.equippedBoot === COWBOY_BOOT_ID ? STARTER_BOOT_ID : locker.equippedBoot,
-    cosmeticSource: 'none',
-  };
-  for (const productId of productIds) {
-    const pack = shopPackForProduct(productId);
-    if (pack) next = grantShopPack(next, pack.id, source);
-  }
-  if (equipped && outfitOwned(next, equipped)) next = { ...next, equippedOutfit: equipped };
-  else if (equipped) next = { ...next, equippedOutfit: null };
-  return next;
-}
-
-/** Grant every look in a non-consumable pack. Everything also grants the other four. */
-export function grantShopPack(
-  locker: WardrobeLocker,
-  packId: string,
-  source: EntitlementSource,
-): WardrobeLocker {
-  if (!cosmeticGrantAllowed(source) || !isShopPackId(packId)) return locker;
-  let next = locker;
-  for (const id of packsGrantedBy(packId)) {
-    const pack = getShopPack(id);
-    if (!pack || next.ownedPacks.includes(id)) continue;
-    for (const outfitId of pack.outfitIds) next = grantStoreCosmetic(next, outfitId, source);
-    for (const bootId of pack.bootIds) next = grantStoreCosmetic(next, bootId, source);
-    next = { ...next, ownedPacks: next.ownedPacks.includes(id) ? next.ownedPacks : [...next.ownedPacks, id], cosmeticSource: source };
-  }
-  return next;
-}
-
-/** Development-only dress-up. Production builds leave the locker unchanged. */
-export function rememberDevCosmetic(locker: WardrobeLocker, id: string | null): WardrobeLocker {
-  if (import.meta.env.PROD) return locker;
-  if (id === null) return { ...locker, equippedOutfit: null };
-  if (id === COWBOY_BOOT_ID) {
-    const ownedBoots = locker.ownedBoots.includes(id) ? locker.ownedBoots : [...locker.ownedBoots, id];
-    return { ...locker, ownedBoots, equippedBoot: id, cosmeticSource: 'none' };
-  }
-  if (!isOutfitId(id)) return locker;
-  if (id === 'gold-legend') {
-    return { ...locker, best: Math.max(locker.best, GOLD_LEGEND_SCORE), equippedOutfit: id };
-  }
-  const ownedOutfits = locker.ownedOutfits.includes(id) ? locker.ownedOutfits : [...locker.ownedOutfits, id];
-  return { ...locker, ownedOutfits, equippedOutfit: id, cosmeticSource: 'none' };
-}
-
-/** Equip a dance the player already unlocked. Dances are not coin purchases. */
-export function equipOwnedDance(locker: WardrobeLocker, id: string): ShopResult {
-  const result = equipDance(locker, id);
-  if (!result.ok) return { ok: false, locker, reason: 'locked' };
-  return { ok: true, locker: { ...locker, ...result.locker } };
 }
 
 /** Challenge progress from saves that predate the dance locker. */
@@ -550,5 +222,5 @@ export function bumpChallenges(
   };
 }
 
-export { getBoot, getKit, isLaunchCollectionId, STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID, COWBOY_BOOT_ID, GOLD_LEGEND_SCORE };
+export { STARTER_BOOT_ID, STARTER_KIT_ID, STARTER_DANCE_ID };
 export type { DanceId, DanceLocker };

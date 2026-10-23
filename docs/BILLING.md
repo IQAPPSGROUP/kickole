@@ -1,7 +1,7 @@
 # Purchases
 
-This release of Kickolé is a paid app with **no in-app purchases**.
+Kickolé is a paid app. The price is set in App Store Connect and the Play Console. It is not a value in this repository.
 
-The app build does not include a StoreKit or Play Billing plugin, a shop, Restore Purchases, or purchase-token handling. Kit choice stays on the device and is not sent with a score.
+This build has no in-app purchases. There is no StoreKit or Play Billing plugin, no shop, no Restore Purchases, and no purchase-token handling. The Xcode project does not enable the In-App Purchase capability, and `capacitor.config.ts` has no billing plugin. Kit choice stays on the device and is not sent with a score.
 
-The earlier shop and billing plugin remain in git history only. Do not add store products for this release.
+Do not add store products, a billing plugin, or a purchase capability for this release.

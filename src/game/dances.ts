@@ -1,13 +1,6 @@
-interface PricedProduct {
-  productId: string;
-  priceString: string;
-}
-
 /**
  * Cosmetic dances. They never change timing windows or kick scoring.
- * `productId` is reserved so a later collection can sell a dance. Nothing in
- * this list is a store product. Prices, when a product exists, come from the
- * store's priceString — this module never invents one.
+ * A dance unlocks from a play milestone. None of them is a store product.
  */
 export const DANCE_IDS = ['sway', 'pendulum', 'shuffle', 'heelrock'] as const;
 export type DanceId = (typeof DANCE_IDS)[number];
@@ -27,8 +20,6 @@ export interface DanceDesign {
   name: string;
   /** Lifetime milestone rank required. 0 is free from the first run. */
   milestone: 0 | 10 | 25 | 50 | 100;
-  /** Future store product id. Null means the dance is not for sale. */
-  productId: string | null;
   note: string;
 }
 
@@ -37,28 +28,24 @@ export const DANCES: readonly DanceDesign[] = [
     id: 'sway',
     name: 'Soft Sway',
     milestone: 0,
-    productId: null,
     note: 'Starter dance. A low weight shift on the beat.',
   },
   {
     id: 'pendulum',
     name: 'Pendulum',
     milestone: 10,
-    productId: null,
     note: 'Unlocks when you cross a 10 combo, juggle or perfect milestone.',
   },
   {
     id: 'shuffle',
     name: 'Shuffle Step',
     milestone: 25,
-    productId: null,
     note: 'Unlocks at a 25 milestone.',
   },
   {
     id: 'heelrock',
     name: 'Heel Rock',
     milestone: 50,
-    productId: null,
     note: 'Unlocks at a 50 milestone.',
   },
 ];
@@ -91,17 +78,10 @@ export function dancesOwnedAt(rank: number): DanceId[] {
   return DANCES.filter((dance) => danceUnlocked(rank, dance)).map((dance) => dance.id);
 }
 
-/** Highest 10/25/50/100 mark in a cheer id. Tier unlocks sit on the same ladder. */
+/** Highest 10/25/50/100 mark in a play-milestone cheer id. */
 export function rankFromCheer(id: string): number {
   const mark = /:(10|25|50|100)$/.exec(id);
-  if (mark) return Number(mark[1]);
-  switch (id) {
-    case 'tier:club': return 10;
-    case 'tier:street': return 25;
-    case 'tier:freestyle': return 50;
-    case 'tier:legend': return 100;
-    default: return 0;
-  }
+  return mark ? Number(mark[1]) : 0;
 }
 
 export function rankFromCheers(ids: readonly string[]): number {
@@ -117,24 +97,8 @@ export function celebrationDance(reason: string, equipped: DanceId, owned: reado
   if (rank > 0) {
     const fresh = DANCES.find((dance) => dance.milestone === rank);
     if (fresh && owned.includes(fresh.id)) return fresh.id;
-    const tier = [...DANCES].reverse().find((dance) => dance.milestone > 0 && dance.milestone <= rank && owned.includes(dance.id));
-    if (tier && reason.startsWith('tier:')) return tier.id;
   }
   return owned.includes(equipped) ? equipped : STARTER_DANCE_ID;
-}
-
-/**
- * Localised store price, or null when the dance is not sold or the store has
- * not returned a priceString. Callers must not substitute a hardcoded price.
- */
-export function dancePriceString(
-  dance: DanceDesign,
-  products: readonly Pick<PricedProduct, 'productId' | 'priceString'>[],
-): string | null {
-  if (!dance.productId) return null;
-  const price = products.find((product) => product.productId === dance.productId)?.priceString;
-  if (typeof price !== 'string' || price.trim().length === 0) return null;
-  return price;
 }
 
 export function normalizeDances(raw: {

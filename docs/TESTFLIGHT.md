@@ -6,7 +6,7 @@ The signed workflow is `ios-testflight`. `ios-simulator` is an unsigned compile 
 
 ## What you do by hand
 
-1. In the Apple Developer portal, register the App ID `com.iqappsgroup.kickole` and enable the **In-App Purchase** capability.
+1. In the Apple Developer portal, register the App ID `com.iqappsgroup.kickole`. Do not enable In-App Purchase. The app is paid upfront. The price is set in App Store Connect, not in this repo.
 2. In App Store Connect, create the Kickolé app record for that bundle ID. Leave the production App Store version unpublished.
 3. In Codemagic, add the `IQAPPSGROUP/kickole` repository. Reuse the existing App Store Connect integration named **Amigos App Store Connect**. Make sure the team code-signing identities include an Apple Distribution certificate and an App Store provisioning profile for `com.iqappsgroup.kickole` (generate or fetch them with that integration). Do not commit the certificate or profile.
 4. In Codemagic, create the environment group `kickole_app_store` and add `APP_STORE_APPLE_ID`. The value is the numeric Apple ID under App Store Connect → Kickolé → General → App Information. Mark it secret. Do not commit it or print it in a build log.
@@ -20,7 +20,7 @@ The signed workflow is `ios-testflight`. `ios-simulator` is an unsigned compile 
 | Project / scheme | `ios/App/App.xcodeproj`, scheme `App` (no `App.xcworkspace`) |
 | Bundle ID | `com.iqappsgroup.kickole` |
 | Marketing version | `1.0` (`MARKETING_VERSION`; the workflow replaces the build number) |
-| In-App Purchase | Enabled on the App target |
+| In-App Purchase | Not used. The capability is off, and the entitlements file is empty. |
 | Privacy manifest | `ios/App/App/PrivacyInfo.xcprivacy` |
 | Export compliance | `ITSAppUsesNonExemptEncryption` is `false` |
 | App icon | Present (`AppIcon`, Kickolé wordmark) |
@@ -28,4 +28,4 @@ The signed workflow is `ios-testflight`. `ios-simulator` is an unsigned compile 
 
 The launch images in `ios/App/App/Assets.xcassets/Splash.imageset` are still the Capacitor placeholder (white field, Capacitor logo in the centre). Replace them before an external TestFlight looks finished. The app icon is not a placeholder.
 
-`?simPurchase=1` / `dev_sim` can grant the Launch Collection only in a Vite development serve. `npm run ios:sync` uses the production web build, and that build ignores the query and any saved `dev_sim` locker. The same store build fails if `VITE_ALLOW_MOCK` is set, so `?mockBoard=1` stays off TestFlight.
+`npm run ios:sync` uses the production web build. That store build fails if `VITE_ALLOW_MOCK` is set, so `?mockBoard=1` stays off TestFlight.

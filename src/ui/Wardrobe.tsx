@@ -46,7 +46,7 @@ export function BodySelect({ onChoose }: { onChoose: (body: PlayerBody) => void 
     <div className="screen settings body-select">
       <div className="card">
         <h2>YOUR FOOTBALLER</h2>
-        <p className="shop-lead">Pick a male or female player. You can change this later in Customise.</p>
+        <p className="panel-lead">Pick a male or female player. You can change this later in Customise.</p>
         <button type="button" className="btn primary big" onClick={() => onChoose('male')}>MALE</button>
         <button type="button" className="btn ghost" onClick={() => onChoose('female')}>FEMALE</button>
       </div>
@@ -82,7 +82,7 @@ export function CustomiseScreen({
     <div className="screen settings wardrobe">
       <div className="card wardrobe-card">
         <h2>CUSTOMISE</h2>
-        <p className="shop-lead">Pick a footballer, then skin and hair. Your kit stays on this device.</p>
+        <p className="panel-lead">Pick a footballer, then skin and hair. Your kit stays on this device.</p>
         <PlayerPreview skin={skin} closeUp label="Customise preview" />
         <div className="group">
           <label>Footballer</label>
@@ -99,7 +99,7 @@ export function CustomiseScreen({
               </button>
             ))}
           </div>
-          <p className="shop-note">Hair colours work on either player.</p>
+          <p className="panel-note">Hair colours work on either player.</p>
         </div>
         <SwatchRow label="Skin tone" colours={SKIN_TONES} value={a.skinTone} onPick={(skinTone) => patch({ skinTone })} />
         <SwatchRow label="Hair colour" colours={HAIR_COLORS} value={a.hairColor} onPick={(hairColor) => patch({ hairColor })} />
@@ -108,7 +108,7 @@ export function CustomiseScreen({
           <button type="button" className="btn ghost" onClick={onKitColours}>
             {getKitColour(a.kitColourId)?.label ?? 'Choose your kit'}
           </button>
-          <p className="shop-note">A plain shirt in the colour fans recognise, with thin flag-colour bands. Saved on this device.</p>
+          <p className="panel-note">A plain shirt in the colour fans recognise, with thin flag-colour bands. Saved on this device.</p>
         </div>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>

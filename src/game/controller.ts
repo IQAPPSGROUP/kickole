@@ -15,7 +15,7 @@ import {
   type PromptClock,
 } from './prompts';
 import { beatErrorMs, beatsToSeconds, GAMEPLAY_BPM, gradeBeat } from './beat';
-import { crowdLevel, loudestCheer, milestoneHits, newlyOpenedTiers, type AudioProgress } from './audioPolicy';
+import { crowdLevel, loudestCheer, milestoneHits, type AudioProgress } from './audioPolicy';
 import {
   celebrationDance,
   getDance,
@@ -81,7 +81,6 @@ export interface Result {
   kickTimesMs: number[];
   newBest: boolean;
   rank: number;
-  coinsEarned: number;
 }
 
 export interface Snapshot {
@@ -236,7 +235,7 @@ export class GameController {
     this.engine.startCelebration(dance, reason, beatsToSeconds(beats, GAMEPLAY_BPM));
     fx.flash = reduced ? 0.25 : 1;
     fx.confetti = reduced ? 0 : 1;
-    const big = reason.endsWith(':50') || reason.endsWith(':100') || reason.startsWith('tier:') || reason === 'best';
+    const big = reason.endsWith(':50') || reason.endsWith(':100') || reason === 'best';
     if (big) fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, big ? 5 : 0, reduced));
   }
 
@@ -331,7 +330,6 @@ export class GameController {
         break;
       case 'over': {
         const s = this.engine.stats;
-        const beforeLocker = { coins: this.save.coins, challenges: this.save.challenges };
         const streak = Math.max(this.save.bestStreak, s.bestStreak);
         const r = s.score > 0
           ? saveRun(
@@ -344,11 +342,9 @@ export class GameController {
             save: streak === this.save.bestStreak ? this.save : { ...this.save, bestStreak: streak },
             newBest: false,
             rank: -1,
-            coinsEarned: 0,
           };
         if (s.score <= 0 && streak !== this.save.bestStreak) persistSave(r.save);
         if (r.newBest) this.pendingCheers.push('best');
-        for (const tier of newlyOpenedTiers(beforeLocker, r.save)) this.pendingCheers.push(`tier:${tier}`);
         this.save = r.save;
         this.result = {
           score: s.score,
@@ -359,7 +355,6 @@ export class GameController {
           kickTimesMs: this.kickTimesMs,
           newBest: r.newBest,
           rank: r.rank,
-          coinsEarned: r.coinsEarned,
         };
         this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
         this.publish();

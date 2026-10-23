@@ -27,12 +27,12 @@ describe('storage', () => {
     const save = loadSave();
     expect(save.best).toBe(0);
     expect(save.leaderboard).toEqual([]);
-    expect(save.coins).toBe(0);
+    expect('coins' in save).toBe(false);
     expect(save.ownedBoots).toEqual([STARTER_BOOT_ID]);
     expect(save.ownedKits).toEqual([STARTER_KIT_ID]);
     expect(save.equippedBoot).toBe(STARTER_BOOT_ID);
     expect(save.equippedKit).toBe(STARTER_KIT_ID);
-    expect(save.launchCollectionOwned).toBe(false);
+    expect('launchCollectionOwned' in save).toBe(false);
     expect(save.bodyChosen).toBe(false);
     expect(save.appearance.body).toBe('male');
   });
@@ -49,7 +49,7 @@ describe('storage', () => {
     expect(loadSave().leaderboard).toHaveLength(1);
   });
 
-  it('records runs, awards coins, keeps the best five and persists them', async () => {
+  it('records runs, keeps the best five and persists them', async () => {
     const { loadSave, saveRun, ls } = await load();
     let save = loadSave();
     for (let i = 1; i <= 7; i++) {
@@ -57,18 +57,20 @@ describe('storage', () => {
     }
     expect(save.leaderboard.map((r) => r.score)).toEqual([70, 60, 50, 40, 30]);
     expect(save.best).toBe(70);
-    expect(save.coins).toBe(10 + 20 + 30 + 40 + 50 + 60 + 70);
-    expect(JSON.parse(ls.data['kicky.save.v1']).best).toBe(70);
+    expect('coins' in save).toBe(false);
+    const stored = JSON.parse(ls.data['kicky.save.v1']);
+    expect(stored.best).toBe(70);
+    expect(stored.coins).toBeUndefined();
   });
 
-  it('accumulates challenge progress across runs without double-writing score coins oddly', async () => {
+  it('accumulates challenge progress across runs', async () => {
     const { loadSave, saveRun } = await load();
     const first = saveRun(loadSave(), { score: 20, kickUps: 4, date: 1 }, { alternateFoot: 3, stalls: 1, perfectTouch: 2 });
-    expect(first.coinsEarned).toBe(20);
+    expect('coinsEarned' in first).toBe(false);
     expect(first.save.challenges).toEqual({ alternateFoot: 3, stalls: 1, perfectTouch: 2 });
     const second = saveRun(first.save, { score: 10, kickUps: 2, date: 2 }, { alternateFoot: 2, stalls: 0, perfectTouch: 4 });
     expect(second.save.challenges).toEqual({ alternateFoot: 5, stalls: 1, perfectTouch: 6 });
-    expect(second.save.coins).toBe(30);
+    expect('coins' in second.save).toBe(false);
   });
 
   it('migrates legacy boot locker and free skin into kits', async () => {
@@ -84,7 +86,7 @@ describe('storage', () => {
       'kicky.settings.v1': JSON.stringify({ skinId: 'coral-flash', sound: true, vibration: true, quality: 'high' }),
     });
     const save = loadSave();
-    expect(save.coins).toBe(1200);
+    expect('coins' in save).toBe(false);
     expect(save.ownedBoots).toContain(STARTER_BOOT_ID);
     expect(save.ownedBoots).toContain('boot-beach-wave');
     expect(save.equippedBoot).toBe('boot-beach-wave');

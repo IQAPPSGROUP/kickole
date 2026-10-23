@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { LAUNCH_COLLECTION_ITEM_IDS } from './catalogue';
 import {
   DANCES,
   STARTER_DANCE_ID,
   celebrationDance,
-  dancePriceString,
   dancesOwnedAt,
   equipDance,
   normalizeDances,
@@ -12,7 +10,7 @@ import {
   rankFromCheers,
   withDanceRank,
 } from './dances';
-import { normalizeLocker } from './shop';
+import { WARDROBE_VERSION, normalizeLocker } from './shop';
 
 describe('dance unlocks', () => {
   it('starts with soft sway and nothing else', () => {
@@ -38,7 +36,6 @@ describe('dance unlocks', () => {
     expect(rankFromCheer('streak:10')).toBe(10);
     expect(rankFromCheer('juggle:25')).toBe(25);
     expect(rankFromCheer('perfect:100')).toBe(100);
-    expect(rankFromCheer('tier:freestyle')).toBe(50);
     expect(rankFromCheer('best')).toBe(0);
     expect(rankFromCheers(['streak:10', 'perfect:25'])).toBe(25);
   });
@@ -72,63 +69,46 @@ describe('dance unlocks', () => {
     expect(celebrationDance('juggle:25', 'sway', owned)).toBe('shuffle');
     expect(celebrationDance('perfect:50', 'pendulum', owned)).toBe('heelrock');
     expect(celebrationDance('best', 'pendulum', owned)).toBe('pendulum');
-    expect(celebrationDance('tier:legend', 'sway', dancesOwnedAt(100))).toBe('heelrock');
     expect(celebrationDance('streak:10', 'heelrock', ['sway'])).toBe('sway');
   });
 });
 
-describe('dance shop boundaries', () => {
-  it('has no paid product ids and never invents a price', () => {
-    for (const dance of DANCES) expect(dance.productId).toBeNull();
-    expect(dancePriceString(DANCES[1], [])).toBeNull();
-    expect(dancePriceString(
-      { ...DANCES[1], productId: 'future_dance' },
-      [{ productId: 'future_dance', priceString: '€1,99' }],
-    )).toBe('€1,99');
-    expect(dancePriceString(
-      { ...DANCES[1], productId: 'future_dance' },
-      [{ productId: 'other', priceString: '£2.99' }],
-    )).toBeNull();
+describe('dance milestones', () => {
+  it('has no store product field', () => {
+    for (const dance of DANCES) expect('productId' in dance).toBe(false);
   });
 
-  it('keeps dances out of the Launch Collection', () => {
-    for (const dance of DANCES) {
-      expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(dance.id);
-    }
-    const start = normalizeLocker({ coins: 40, danceRank: 10, equippedDance: 'robot' });
+  it('keeps a milestone dance after a rename', () => {
+    const start = normalizeLocker({ danceRank: 10, equippedDance: 'robot' });
     expect(start.ownedDances).toEqual(['sway', 'pendulum']);
     expect(start.equippedDance).toBe('pendulum');
-    for (const id of LAUNCH_COLLECTION_ITEM_IDS) {
-      expect(id.startsWith('dance')).toBe(false);
-    }
   });
 
-  it('migrates a v2 locker without wiping coins, and a simulated purchase cannot add dances', () => {
+  it('migrates a v2 locker onto the free dance ladder and ignores a simulated grant', () => {
     const migrated = normalizeLocker({
       wardrobeVersion: 2,
-      coins: 1800,
       challenges: { alternateFoot: 40, stalls: 0, perfectTouch: 3 },
       ownedBoots: ['boot-street-classic'],
       ownedKits: ['kit-street-classic'],
+      ...{ coins: 1800 },
     });
-    expect(migrated.wardrobeVersion).toBe(3);
-    expect(migrated.coins).toBe(1800);
+    expect(migrated.wardrobeVersion).toBe(WARDROBE_VERSION);
+    expect('coins' in migrated).toBe(false);
     expect(migrated.danceRank).toBe(10);
     expect(migrated.ownedDances).toContain('pendulum');
     expect(migrated.equippedDance).toBe('sway');
 
-    const forged = normalizeLocker({
+    const forgedRaw = {
       launchCollectionOwned: true,
       entitlementSource: 'dev_sim',
-      entitlementVerifiedAt: 5,
       danceRank: 0,
       ownedDances: ['spin', 'griddy'],
       coins: 20,
-    });
-    expect(forged.ownedDances).toEqual(['sway']);
-    expect(forged.coins).toBe(20);
-    expect(forged.launchGrantedItemIds.some((id) => id.startsWith('dance'))).toBe(false);
+    };
+    const forged = normalizeLocker(forgedRaw);
     expect(forged.ownedDances).toEqual(['sway']);
     expect(forged.equippedDance).toBe('sway');
+    expect('coins' in forged).toBe(false);
+    expect('launchCollectionOwned' in forged).toBe(false);
   });
 });

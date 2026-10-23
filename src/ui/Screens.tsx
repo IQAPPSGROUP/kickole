@@ -267,7 +267,7 @@ export function LeaderboardSheet({
       </div>
       {!board && (
         <div className="leaderboard-scroll" data-board-scroll>
-          <p className="shop-note">The leaderboard is off until you join. A nickname from our word lists and your score are sent for the board. Country is optional and is not shown next to your name.</p>
+          <p className="panel-note">The leaderboard is off until you join. A nickname from our word lists and your score are sent for the board. Country is optional and is not shown next to your name.</p>
           {onJoin && <button type="button" className="btn primary" onClick={onJoin}>TURN IT ON</button>}
         </div>
       )}
@@ -279,8 +279,8 @@ export function LeaderboardSheet({
             <em>{board.nickname}</em>
             <strong>{mine?.score ?? score}</strong>
           </div>
-          {optedOut && <p className="shop-note">You chose not to appear on a country board.</p>}
-          {!optedOut && page.hidden && <p className="shop-note">Not enough players in your country yet. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>}
+          {optedOut && <p className="panel-note">You chose not to appear on a country board.</p>}
+          {!optedOut && page.hidden && <p className="panel-note">Not enough players in your country yet. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>}
           {!optedOut && !page.hidden && (
             <ol className="board">
               {rows.map((row) => (
@@ -419,7 +419,7 @@ export function SettingsScreen({
         <div className="group">
           <label>Kit</label>
           <button type="button" className="btn ghost" onClick={onKitColours}>Choose your kit</button>
-          <p className="shop-note">Free. Saved on this device. It is not sent with your score.</p>
+          <p className="panel-note">Free. Saved on this device. It is not sent with your score.</p>
         </div>
         <Toggle label="Leaderboard" value={leaderboardOn} onChange={onLeaderboard} />
         {blocked.length > 0 && (
@@ -449,9 +449,9 @@ export function SettingsScreen({
           <div className="group">
             <label>Change nickname</label>
             <NicknameForm initial={nickname} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
-            <p className="shop-note">Your nickname is picked from our word lists. You can change it once every 7 days.</p>
+            <p className="panel-note">Your nickname is picked from our word lists. You can change it once every 7 days.</p>
             <label>Country</label>
-            <p className="shop-note">Optional. Prefer not to say is the default. This only places you on that country&apos;s board and is not shown next to your name. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
+            <p className="panel-note">Optional. Prefer not to say is the default. This only places you on that country&apos;s board and is not shown next to your name. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
             <CountryChoice initialCountry={country} suggestion={countrySuggestion} submitLabel="SAVE" onSubmit={onCountry} />
           </div>
         )}
@@ -552,7 +552,7 @@ export function SettingsScreen({
           )}
           {confirmDelete && (
             <>
-              <p className="shop-note">This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
+              <p className="panel-note">This removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days.</p>
               <button
                 type="button"
                 className="btn primary"

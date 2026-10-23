@@ -1,6 +1,6 @@
 /**
- * Kickolé wardrobe catalogue — cosmetic boots & kits only.
- * Prices are accumulated coin costs across runs (not single-run scores).
+ * Kickolé wardrobe catalogue — cosmetic boots and kits.
+ * Nothing in this list is sold. National kit colours are free and live in kitColours.ts.
  * Boots never alter timing windows or scoring.
  */
 
@@ -31,10 +31,8 @@ export type DesignTheme =
 
 export interface UnlockRequirement {
   tier: UnlockTier;
-  /** Soft-currency price. Starter items are 0. */
-  price: number;
   challenge: ChallengeKind;
-  /** Lifetime challenge count required when challenge !== 'none'. */
+  /** Lifetime challenge count recorded on older saves. Nothing is sold against it. */
   challengeTarget: number;
 }
 
@@ -48,8 +46,6 @@ export interface BootDesign {
   lace: string;
   trim: string;
   pattern: SurfacePattern;
-  /** Set when the boot is sold by the store instead of coins. */
-  storeProductId?: string | null;
   note: string;
 }
 
@@ -63,45 +59,23 @@ export interface KitDesign {
   note: string;
 }
 
-/** Configurable initial unlock tiers (accumulated coins across completed runs). */
+/** Visual groupings for the old launch looks. They are not prices and they are not sold. */
 export const UNLOCK_TIERS: Record<Exclude<UnlockTier, 'starter'>, UnlockRequirement> = {
-  club: { tier: 'club', price: 2500, challenge: 'none', challengeTarget: 0 },
-  street: { tier: 'street', price: 7500, challenge: 'alternateFoot', challengeTarget: 40 },
-  freestyle: { tier: 'freestyle', price: 15000, challenge: 'stall', challengeTarget: 25 },
-  legend: { tier: 'legend', price: 30000, challenge: 'perfectTouch', challengeTarget: 80 },
+  club: { tier: 'club', challenge: 'none', challengeTarget: 0 },
+  street: { tier: 'street', challenge: 'alternateFoot', challengeTarget: 40 },
+  freestyle: { tier: 'freestyle', challenge: 'stall', challengeTarget: 25 },
+  legend: { tier: 'legend', challenge: 'perfectTouch', challengeTarget: 80 },
 };
 
 export const STARTER_BOOT_ID = 'boot-street-classic';
 export const STARTER_KIT_ID = 'kit-street-classic';
-
-/**
- * Historical launch-collection item IDs. This build does not sell or grant them.
- */
-export const LAUNCH_COLLECTION_ITEM_IDS: readonly string[] = [
-  // Boots (8)
-  'boot-street-classic',
-  'boot-beach-wave',
-  'boot-carnival',
-  'boot-midnight',
-  'boot-mosaic',
-  'boot-gold',
-  'boot-street-runner',
-  'boot-legend-spike',
-  // Kits (6)
-  'kit-street-classic',
-  'kit-beach-wave',
-  'kit-carnival',
-  'kit-midnight',
-  'kit-mosaic',
-  'kit-gold',
-] as const;
 
 export const BOOTS: readonly BootDesign[] = [
   {
     id: STARTER_BOOT_ID,
     name: 'Street Classic',
     theme: 'Street Classic',
-    unlock: { tier: 'starter', price: 0, challenge: 'none', challengeTarget: 0 },
+    unlock: { tier: 'starter', challenge: 'none', challengeTarget: 0 },
     main: '#FF4F9A',
     sole: '#222831',
     lace: '#F8F9FB',
@@ -197,13 +171,13 @@ export const BOOTS: readonly BootDesign[] = [
     id: 'boot-cowboy',
     name: 'Cowboy Boots',
     theme: 'Cowboy',
-    unlock: { tier: 'starter', price: 0, challenge: 'none', challengeTarget: 0 },
+    unlock: { tier: 'starter', challenge: 'none', challengeTarget: 0 },
     main: '#8A5A32',
     sole: '#4A3424',
     lace: '#E7D3A1',
     trim: '#C4A574',
     pattern: 'cowboy',
-    note: 'Tan leather, stitching, a pointed toe and a block heel. Comes with the Party pack, not on its own.',
+    note: 'Tan leather, stitching, a pointed toe and a block heel.',
   },
 ];
 
@@ -212,7 +186,7 @@ export const KITS: readonly KitDesign[] = [
     id: STARTER_KIT_ID,
     name: 'Street Classic',
     theme: 'Street Classic',
-    unlock: { tier: 'starter', price: 0, challenge: 'none', challengeTarget: 0 },
+    unlock: { tier: 'starter', challenge: 'none', challengeTarget: 0 },
     clothing: { shirt: '#FFD93D', shirtTrim: '#1E2A5A', shorts: '#1E2A5A', socks: '#F8F9FB' },
     pattern: 'plain',
     note: 'Starter kit. Included from the first run.',
@@ -278,10 +252,6 @@ export function getBoot(id: string): BootDesign {
 
 export function getKit(id: string): KitDesign {
   return KITS.find((k) => k.id === id) ?? KITS[0];
-}
-
-export function isLaunchCollectionId(id: string): boolean {
-  return (LAUNCH_COLLECTION_ITEM_IDS as readonly string[]).includes(id);
 }
 
 export function challengeLabel(kind: ChallengeKind): string {

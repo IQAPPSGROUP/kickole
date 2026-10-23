@@ -1,6 +1,6 @@
 import { contrastRatio } from './menuContrast';
 
-/** Home CUSTOMISE / SHOP / SETTINGS. Cream on a solid navy fill. */
+/** Home CUSTOMISE / SETTINGS. Cream on a solid navy fill. */
 export const MENU_BUTTON_TEXT = '#F7F5ED';
 export const MENU_BUTTON_FILL = '#102830';
 export const MENU_BUTTON_BORDER = '#F7F5ED';

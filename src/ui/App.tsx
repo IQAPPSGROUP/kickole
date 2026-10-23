@@ -41,7 +41,6 @@ const REVIEW_RESULT: Result = {
   kickTimesMs: [800, 1600, 2400],
   newBest: false,
   rank: 40,
-  coinsEarned: 4,
 };
 
 export function App() {

@@ -1,151 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { BOOTS, KITS, STARTER_BOOT_ID, STARTER_KIT_ID, UNLOCK_TIERS } from './catalogue';
-import {
-  buyOrEquipBoot,
-  buyOrEquipKit,
-  coinsForScore,
-  meetsChallenge,
-  normalizeLocker,
-} from './shop';
+import { BOOTS, KITS, STARTER_BOOT_ID, STARTER_KIT_ID } from './catalogue';
+import { COWBOY_BOOT_ID } from './outfits';
+import { WARDROBE_VERSION, normalizeLocker } from './shop';
 
-describe('shop economy', () => {
-  it('awards one coin per point and nothing for an empty run', () => {
-    expect(coinsForScore(0)).toBe(0);
-    expect(coinsForScore(-4)).toBe(0);
-    expect(coinsForScore(12.9)).toBe(12);
-  });
-
-  it('refuses a purchase the balance cannot cover and equips owned items free', () => {
+describe('wardrobe locker', () => {
+  it('starts with the free starter boot and kit', () => {
     const start = normalizeLocker(null);
     expect(start.equippedBoot).toBe(STARTER_BOOT_ID);
     expect(start.ownedBoots).toEqual([STARTER_BOOT_ID]);
     expect(start.ownedKits).toEqual([STARTER_KIT_ID]);
-
-    const club = BOOTS.find((b) => b.unlock.tier === 'club')!;
-    const broke = buyOrEquipBoot(start, club.id);
-    expect(broke.ok).toBe(false);
-    if (!broke.ok) expect(broke.reason).toBe('broke');
-
-    const paid = buyOrEquipBoot({ ...start, coins: club.unlock.price }, club.id);
-    expect(paid.ok).toBe(true);
-    if (paid.ok) {
-      expect(paid.locker.coins).toBe(0);
-      expect(paid.locker.ownedBoots).toContain(club.id);
-      expect(paid.locker.equippedBoot).toBe(club.id);
-      const back = buyOrEquipBoot(paid.locker, STARTER_BOOT_ID);
-      expect(back.ok).toBe(true);
-      if (back.ok) {
-        expect(back.locker.equippedBoot).toBe(STARTER_BOOT_ID);
-        expect(back.locker.coins).toBe(0);
-      }
-    }
+    expect(start.wardrobeVersion).toBe(WARDROBE_VERSION);
+    expect('coins' in start).toBe(false);
+    expect('ownedOutfits' in start).toBe(false);
+    expect('launchCollectionOwned' in start).toBe(false);
   });
 
-  it('locks street-tier items until the alternating-foot challenge is met', () => {
-    const street = BOOTS.find((b) => b.unlock.tier === 'street')!;
-    const rich = normalizeLocker({ coins: street.unlock.price + 10 });
-    expect(meetsChallenge(rich.challenges, street.unlock)).toBe(false);
-    const locked = buyOrEquipBoot(rich, street.id);
-    expect(locked.ok).toBe(false);
-    if (!locked.ok) expect(locked.reason).toBe('locked');
-
-    const ready = {
-      ...rich,
-      challenges: { ...rich.challenges, alternateFoot: UNLOCK_TIERS.street.challengeTarget },
-    };
-    const bought = buyOrEquipBoot(ready, street.id);
-    expect(bought.ok).toBe(true);
-  });
-
-  it('buys kits independently from boots without changing appearance', () => {
-    const kit = KITS.find((k) => k.unlock.tier === 'club')!;
-    const start = normalizeLocker({
-      coins: kit.unlock.price,
-      appearance: { skinTone: '#5C3A2A', hairColor: '#C9822B', hairStyle: 'afro', clothing: startClothing() },
-    });
-    const skinBefore = start.appearance.skinTone;
-    const hairBefore = start.appearance.hairColor;
-    const result = buyOrEquipKit(start, kit.id);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.locker.equippedKit).toBe(kit.id);
-      expect(result.locker.appearance.skinTone).toBe(skinBefore);
-      expect(result.locker.appearance.hairColor).toBe(hairBefore);
-      expect('hairStyle' in result.locker.appearance).toBe(false);
-      expect(result.locker.equippedBoot).toBe(STARTER_BOOT_ID);
-    }
-  });
-
-  it('does not double-award coins or duplicate owned ids on re-equip', () => {
-    const start = normalizeLocker({ coins: 5000, ownedBoots: [STARTER_BOOT_ID, 'boot-carnival'] });
-    const again = buyOrEquipBoot(start, 'boot-carnival');
-    expect(again.ok).toBe(true);
-    if (again.ok) {
-      expect(again.locker.coins).toBe(5000);
-      expect(again.locker.ownedBoots.filter((id) => id === 'boot-carnival')).toHaveLength(1);
-    }
-  });
-
-  it('maps legacy boot ids during migration and keeps coins', () => {
+  it('maps legacy boot ids and drops a cowboy boot', () => {
     const migrated = normalizeLocker({
-      coins: 900,
-      ownedBoots: ['street', 'samba', 'carnival', 'ole'],
-      equippedBoot: 'ole',
+      ownedBoots: ['street', 'samba', 'carnival', 'ole', COWBOY_BOOT_ID],
+      equippedBoot: COWBOY_BOOT_ID,
     });
-    expect(migrated.coins).toBe(900);
     expect(migrated.ownedBoots).toContain(STARTER_BOOT_ID);
     expect(migrated.ownedBoots).toContain('boot-beach-wave');
     expect(migrated.ownedBoots).toContain('boot-carnival');
     expect(migrated.ownedBoots).toContain('boot-gold');
-    expect(migrated.equippedBoot).toBe('boot-gold');
+    expect(migrated.ownedBoots).not.toContain(COWBOY_BOOT_ID);
+    expect(migrated.equippedBoot).toBe(STARTER_BOOT_ID);
+    expect('coins' in migrated).toBe(false);
   });
 
-  it('does not unlock launch boots from a saved store receipt', () => {
-    const legend = BOOTS.find((b) => b.id === 'boot-legend-spike')!;
-    const saved = normalizeLocker({
+  it('ignores a saved receipt, coin balance, and dev grant', () => {
+    const raw = {
+      wardrobeVersion: 3,
+      coins: 900,
       launchCollectionOwned: true,
-      entitlementSource: 'apple',
+      entitlementSource: 'dev_sim',
       entitlementTransactionRef: 'apple:test',
-      launchGrantedItemIds: [legend.id],
-    });
-    expect(saved.launchCollectionOwned).toBe(false);
-    expect(saved.entitlementSource).toBe('none');
-    expect(meetsChallenge(saved.challenges, legend.unlock)).toBe(false);
-    const equip = buyOrEquipBoot(saved, legend.id);
-    expect(equip.ok).toBe(false);
-  });
-
-  it('ignores a hand-edited launchCollectionOwned boolean without store source', () => {
-    const forged = normalizeLocker({ launchCollectionOwned: true, coins: 0 });
-    expect(forged.launchCollectionOwned).toBe(false);
-    expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
-  });
-
-  it('does not restore a saved apple or google entitlement', () => {
-    const forged = normalizeLocker({
-      launchCollectionOwned: true,
-      entitlementSource: 'apple',
-      entitlementVerifiedAt: 50,
-    });
-    expect(forged.launchCollectionOwned).toBe(false);
-    expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
-
-    const cached = normalizeLocker({
-      launchCollectionOwned: true,
-      entitlementSource: 'google',
-      entitlementVerifiedAt: 40,
-      launchGrantedItemIds: ['boot-gold'],
-    });
-    expect(cached.launchCollectionOwned).toBe(false);
-    expect(cached.entitlementSource).toBe('none');
-    expect(cached.ownedBoots).not.toContain('boot-gold');
+      launchGrantedItemIds: ['boot-legend-spike', 'boot-gold'],
+      ownedOutfits: ['alien'],
+      equippedOutfit: 'alien',
+      ownedPacks: ['party'],
+    };
+    const saved = normalizeLocker(raw);
+    expect(saved.ownedBoots).toEqual([STARTER_BOOT_ID]);
+    expect(saved.equippedBoot).toBe(STARTER_BOOT_ID);
+    expect(saved.wardrobeVersion).toBe(WARDROBE_VERSION);
+    expect('coins' in saved).toBe(false);
+    expect('entitlementSource' in saved).toBe(false);
+    expect('ownedOutfits' in saved).toBe(false);
+    expect('ownedPacks' in saved).toBe(false);
   });
 
   it('applies a legacy skin once and then keeps a customised look', () => {
     const migrated = normalizeLocker({ legacySkinId: 'coral-flash' });
     expect(migrated.appearance.skinTone).toBe('#8D5A3C');
     expect(migrated.appearance.clothing.shirt).toBe('#FF805D');
-    expect(migrated.wardrobeVersion).toBe(3);
+    expect(migrated.wardrobeVersion).toBe(WARDROBE_VERSION);
     expect(migrated.appearance.body).toBe('male');
     expect(migrated.bodyChosen).toBe(false);
     const custom = {
@@ -168,7 +78,15 @@ describe('shop economy', () => {
   });
 
   it('defaults an existing save to the male footballer and keeps a chosen female', () => {
-    const migrated = normalizeLocker({ wardrobeVersion: 2, coins: 12, appearance: { skinTone: '#C68642', hairColor: '#16100E', hairStyle: 'braids', clothing: { shirt: '#FFD93D', shirtTrim: '#1E2A5A', shorts: '#1E2A5A', socks: '#F8F9FB' } } });
+    const migrated = normalizeLocker({
+      wardrobeVersion: 2,
+      appearance: {
+        skinTone: '#C68642',
+        hairColor: '#16100E',
+        hairStyle: 'braids',
+        clothing: { shirt: '#FFD93D', shirtTrim: '#1E2A5A', shorts: '#1E2A5A', socks: '#F8F9FB' },
+      },
+    });
     expect(migrated.appearance.body).toBe('male');
     expect(migrated.bodyChosen).toBe(true);
     expect(migrated.appearance.skinTone).toBe('#C68642');
@@ -186,15 +104,12 @@ describe('shop economy', () => {
     expect(chosen.appearance.skinTone).toBe('#C68642');
   });
 
-  it('catalogue has ~8 boots and ~6 kits including starters', () => {
+  it('keeps the starter catalogue and no coin prices', () => {
     expect(BOOTS.length).toBeGreaterThanOrEqual(8);
     expect(KITS.length).toBeGreaterThanOrEqual(6);
-    expect(BOOTS.some((b) => b.unlock.price === 0)).toBe(true);
-    expect(KITS.some((k) => k.unlock.price === 0)).toBe(true);
-    expect(BOOTS.every((b) => !('perfectExtra' in b))).toBe(true);
+    expect(BOOTS.every((boot) => !('price' in boot.unlock))).toBe(true);
+    expect(KITS.every((kit) => !('price' in kit.unlock))).toBe(true);
+    expect(BOOTS.every((boot) => !('storeProductId' in boot))).toBe(true);
+    expect(BOOTS.every((boot) => !('perfectExtra' in boot))).toBe(true);
   });
 });
-
-function startClothing() {
-  return { shirt: '#12BFA6', shirtTrim: '#F7F5ED', shorts: '#142D35', socks: '#12BFA6' };
-}

@@ -67,7 +67,7 @@ function Turntable({ skin, yaw, dance, quality }: { skin: Skin; yaw: number; dan
   );
 }
 
-/** Compact rotatable player preview for Customise / Shop. */
+/** Compact rotatable player preview for Customise. */
 export function PlayerPreview({
   skin,
   closeUp = false,

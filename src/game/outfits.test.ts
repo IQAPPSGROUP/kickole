@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { LAUNCH_COLLECTION_ITEM_IDS } from './catalogue';
+import { STARTER_BOOT_ID } from './catalogue';
 import {
   allOutfitSpecs,
   cowboyBootSpecs,
@@ -12,52 +11,32 @@ import {
 import {
   getOutfit,
   COWBOY_BOOT_ID,
-  CONTENT_PACK_IDS,
   EARNED_OUTFIT_IDS,
   EARNED_BEST_SCORE,
   GOLD_LEGEND_SCORE,
   OUTFIT_IDS,
   OUTFITS,
-  SHOP_PACKS,
-  cosmeticGrantAllowed,
-  cosmeticPriceString,
   earnedOutfit,
-  everythingIncludesLine,
-  everythingOwnedLine,
-  everythingSavingLabel,
-  keepStoreCosmetic,
+  goldLegendUnlocked,
   outfitCoversBody,
-  packsGrantedBy,
 } from './outfits';
-import {
-  applyOwnedPackProducts,
-  buyOrEquipBoot,
-  equipOutfit,
-  grantShopPack,
-  grantStoreCosmetic,
-  keepTesterWear,
-  normalizeLocker,
-  outfitOwned,
-  outfitSelectable,
-  rememberDevCosmetic,
-} from './shop';
+import { normalizeLocker } from './shop';
 
 describe('themed outfits', () => {
-  it('keeps every look off the launch collection and fully clothed', () => {
+  it('keeps every look fully clothed and off any product id', () => {
     const ids = new Set<string>();
     for (const outfit of OUTFITS) {
       expect(ids.has(outfit.id)).toBe(false);
       ids.add(outfit.id);
-      expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(outfit.id);
       expect(outfitCoversBody(outfit)).toBe(true);
       expect(familySafeName(outfit.name)).toBe(true);
       expect(outfit.note.toLowerCase()).not.toContain('batman');
       expect(outfit.milestone === null || earnedOutfit(outfit.id)).toBe(true);
+      expect('productId' in outfit).toBe(false);
     }
-    expect(LAUNCH_COLLECTION_ITEM_IDS).not.toContain(COWBOY_BOOT_ID);
     expect(OUTFITS.find((outfit) => outfit.id === 'gold-legend')?.milestone?.kind).toBe('bestScore');
     expect(OUTFITS.find((outfit) => outfit.id === 'night-glider')?.name).toBe('Shadow Hero');
-    expect(OUTFITS.map((outfit) => `${outfit.name} ${outfit.note}`).join('\n')).not.toMatch(/bat-style|night glider/i);
+    expect(OUTFITS.map((outfit) => `${outfit.name} ${outfit.note}`).join('\n')).not.toMatch(/bat-style|night glider|party pack|store/i);
     expect(EARNED_BEST_SCORE).toEqual({
       'kitchen-whites': 1000,
       'match-official': 2500,
@@ -69,66 +48,27 @@ describe('themed outfits', () => {
     for (const id of EARNED_OUTFIT_IDS) {
       expect(getOutfit(id)?.milestone).toEqual({ kind: 'bestScore', target: EARNED_BEST_SCORE[id], label: 'best score' });
     }
+    expect(goldLegendUnlocked(GOLD_LEGEND_SCORE - 1)).toBe(false);
+    expect(goldLegendUnlocked(GOLD_LEGEND_SCORE)).toBe(true);
     expect((OUTFIT_IDS as readonly string[]).includes('stripe-bandit')).toBe(false);
     expect((OUTFIT_IDS as readonly string[]).includes('secret-agent')).toBe(true);
     expect(OUTFITS.some((outfit) => /robber|bandit/i.test(outfit.name))).toBe(false);
   });
 
-  it('shows a store priceString and never invents one', () => {
-    expect(cosmeticPriceString('kickole_pack_heroes_space', [])).toBeNull();
-    expect(cosmeticPriceString('kickole_pack_heroes_space', [{ productId: 'kickole_pack_heroes_space', priceString: '  ' }])).toBeNull();
-    expect(cosmeticPriceString('kickole_pack_party', [{ productId: 'kickole_pack_party', priceString: '€1,99' }])).toBe('€1,99');
-    expect(cosmeticPriceString(null, [{ productId: 'kickole_pack_party', priceString: '£1.99' }])).toBeNull();
-    expect(cosmeticPriceString('kickole_pack_party', [{ productId: 'kickole_pack_party', priceString: '£1.99' }])).toBe('£1.99');
-  });
-
-  it('refuses coins, dev_sim, and the launch collection for themed looks', () => {
-    const rich = normalizeLocker({ coins: 100000 });
-    const bought = buyOrEquipBoot(rich, COWBOY_BOOT_ID);
-    expect(bought.ok).toBe(false);
-    if (!bought.ok) expect(bought.reason).toBe('billing_unavailable');
-    expect(rich.ownedBoots).not.toContain(COWBOY_BOOT_ID);
-
-    expect(cosmeticGrantAllowed('dev_sim')).toBe(false);
-    expect(cosmeticGrantAllowed('none')).toBe(false);
-    expect(cosmeticGrantAllowed('apple')).toBe(true);
-    const simulated = grantStoreCosmetic(rich, 'alien', 'dev_sim');
-    expect(simulated.ownedOutfits).toEqual([]);
-    const apple = grantStoreCosmetic(rich, 'alien', 'apple');
-    expect(apple.ownedOutfits).toEqual(['alien']);
-    expect(grantStoreCosmetic(apple, 'gold-legend', 'apple').ownedOutfits).toEqual(['alien']);
-
-    expect(keepStoreCosmetic('dev_sim', true, false)).toBe(false);
-    expect(keepStoreCosmetic('apple', false, true)).toBe(false);
-    expect(keepStoreCosmetic('apple', true, true)).toBe(true);
-    expect(keepStoreCosmetic('none', false, true)).toBe(false);
-    expect(keepStoreCosmetic('none', false, false)).toBe(true);
-  });
-
-  it('unlocks earned looks from the best score in one run', () => {
-    const comboOnly = normalizeLocker({ bestStreak: 50, best: 0 });
-    expect(outfitOwned(comboOnly, 'gold-legend')).toBe(false);
-    expect(outfitOwned(normalizeLocker({ best: 999 }), 'kitchen-whites')).toBe(false);
-    expect(outfitOwned(normalizeLocker({ best: 1000 }), 'kitchen-whites')).toBe(true);
-    expect(outfitOwned(normalizeLocker({ best: 2499 }), 'match-official')).toBe(false);
-    expect(outfitOwned(normalizeLocker({ best: 2500 }), 'match-official')).toBe(true);
-    expect(outfitOwned(normalizeLocker({ best: 3999 }), 'keep-guard')).toBe(false);
-    expect(outfitOwned(normalizeLocker({ best: 4000 }), 'keep-guard')).toBe(true);
-    expect(outfitOwned(normalizeLocker({ best: 5499 }), 'snow-friend')).toBe(false);
-    expect(outfitOwned(normalizeLocker({ best: 5500 }), 'snow-friend')).toBe(true);
-    expect(outfitOwned(normalizeLocker({ best: 6999 }), 'spike-hood')).toBe(false);
-    expect(outfitOwned(normalizeLocker({ best: 7000 }), 'spike-hood')).toBe(true);
-    const start = normalizeLocker({ best: GOLD_LEGEND_SCORE - 1 });
-    expect(outfitOwned(start, 'gold-legend')).toBe(false);
-    expect(equipOutfit(start, 'gold-legend').ok).toBe(false);
-    const ready = normalizeLocker({ best: GOLD_LEGEND_SCORE });
-    expect(outfitOwned(ready, 'gold-legend')).toBe(true);
-    const worn = equipOutfit(ready, 'gold-legend');
-    expect(worn.ok).toBe(true);
-    if (worn.ok) expect(worn.locker.equippedOutfit).toBe('gold-legend');
-    const forged = normalizeLocker({ ownedOutfits: ['gold-legend', 'alien'], bestStreak: 0, cosmeticSource: 'dev_sim' });
-    expect(forged.ownedOutfits).toEqual([]);
-    expect(forged.equippedOutfit).toBeNull();
+  it('drops a saved cowboy boot and does not equip a costume from the save', () => {
+    const raw = {
+      ownedBoots: [STARTER_BOOT_ID, COWBOY_BOOT_ID],
+      equippedBoot: COWBOY_BOOT_ID,
+      ownedOutfits: ['alien', 'gold-legend'],
+      equippedOutfit: 'alien',
+      cosmeticSource: 'dev_sim',
+    };
+    const saved = normalizeLocker(raw);
+    expect(saved.ownedBoots).toEqual([STARTER_BOOT_ID]);
+    expect(saved.equippedBoot).toBe(STARTER_BOOT_ID);
+    expect('ownedOutfits' in saved).toBe(false);
+    expect('equippedOutfit' in saved).toBe(false);
+    expect('cosmeticSource' in saved).toBe(false);
   });
 
   it('fits every accessory to both bodies without a revealing extra mesh', () => {
@@ -198,122 +138,5 @@ describe('themed outfits', () => {
     expect(seventies.some((name) => name.includes('sweatband'))).toBe(true);
     expect(seventies.some((name) => name.includes('moustache'))).toBe(true);
     expect(seventies.some((name) => name.includes('short'))).toBe(false);
-  });
-
-  it('lets a development save preview a look without a dev_sim grant', () => {
-    const dressed = rememberDevCosmetic(normalizeLocker(null), 'alien');
-    expect(dressed.ownedOutfits).toEqual(['alien']);
-    expect(dressed.equippedOutfit).toBe('alien');
-    expect(dressed.cosmeticSource).toBe('none');
-    const saved = normalizeLocker({ ownedOutfits: ['spaceman'], equippedOutfit: 'spaceman', cosmeticSource: 'none' });
-    expect(saved.equippedOutfit).toBe('spaceman');
-  });
-
-  it('sells themed looks only as packs, with milestones kept out of the store', () => {
-    expect(SHOP_PACKS.map((pack) => pack.productId)).toEqual([
-      'kickole_pack_heroes_space',
-      'kickole_pack_adventure',
-      'kickole_pack_party',
-      'kickole_pack_spooky',
-      'kickole_pack_everything',
-    ]);
-    expect(packsGrantedBy('everything')).toEqual([...CONTENT_PACK_IDS, 'everything']);
-    expect(EARNED_OUTFIT_IDS).toEqual([
-      'kitchen-whites',
-      'match-official',
-      'keep-guard',
-      'snow-friend',
-      'spike-hood',
-      'gold-legend',
-    ]);
-    for (const pack of SHOP_PACKS) {
-      for (const id of pack.outfitIds) expect(earnedOutfit(id)).toBe(false);
-      for (const id of pack.bootIds) expect(id).toBe(COWBOY_BOOT_ID);
-    }
-    expect(SHOP_PACKS.find((pack) => pack.id === 'party')?.bootIds).toEqual([COWBOY_BOOT_ID]);
-    const fresh = normalizeLocker(null);
-    expect(grantShopPack(fresh, 'heroes-space', 'dev_sim').ownedPacks).toEqual([]);
-    expect(grantShopPack(fresh, 'heroes-space', 'none').ownedOutfits).toEqual([]);
-    const heroes = grantShopPack(fresh, 'heroes-space', 'apple');
-    expect(heroes.ownedPacks).toEqual(['heroes-space']);
-    expect(heroes.ownedOutfits).toEqual(['street-hero', 'night-glider', 'alien', 'spaceman']);
-    for (const id of EARNED_OUTFIT_IDS) expect(heroes.ownedOutfits).not.toContain(id);
-    const all = grantShopPack(fresh, 'everything', 'google');
-    expect(all.ownedPacks).toEqual([...CONTENT_PACK_IDS, 'everything']);
-    expect(all.ownedBoots).toContain(COWBOY_BOOT_ID);
-    expect(all.ownedOutfits).toContain('secret-agent');
-    expect(all.ownedOutfits).not.toContain('gold-legend');
-    const worn = { ...all, equippedBoot: COWBOY_BOOT_ID, equippedOutfit: 'alien' as const };
-    const refunded = applyOwnedPackProducts(worn, [], 'google');
-    expect(refunded.ownedPacks).toEqual([]);
-    expect(refunded.ownedBoots).not.toContain(COWBOY_BOOT_ID);
-    expect(refunded.equippedBoot).toBe('boot-street-classic');
-    expect(refunded.equippedOutfit).toBeNull();
-    const kept = applyOwnedPackProducts(
-      { ...worn, best: GOLD_LEGEND_SCORE, equippedOutfit: 'gold-legend' },
-      ['kickole_pack_everything'],
-      'apple',
-    );
-    expect(kept.equippedOutfit).toBe('gold-legend');
-    expect(kept.ownedPacks).toContain('everything');
-    const scoring = readFileSync(new URL('../engine/scoring.ts', import.meta.url), 'utf8');
-    const engine = readFileSync(new URL('../engine/engine.ts', import.meta.url), 'utf8');
-    expect(scoring).not.toMatch(/outfit/);
-    expect(engine).not.toMatch(/outfit/);
-  });
-
-  it('lists the packs inside Everything and says Saving only when the bundle costs less', () => {
-    const includes = everythingIncludesLine();
-    expect(includes).toBe('Includes Heroes & Space, Adventure, Party and Spooky.');
-    expect(everythingOwnedLine([])).toBeNull();
-    expect(everythingOwnedLine(['heroes-space'])).toBe('Already owned: Heroes & Space.');
-    expect(everythingOwnedLine(['party', 'spooky', 'heroes-space'])).toBe('Already owned: Heroes & Space, Party and Spooky.');
-    expect(everythingOwnedLine(['everything'])).toBe('Already owned: Heroes & Space, Adventure, Party and Spooky.');
-
-    const row = (productId: string, priceMicros: number, currencyCode = 'GBP') => ({ productId, priceMicros, currencyCode });
-    const packs = [
-      row('kickole_pack_heroes_space', 199),
-      row('kickole_pack_adventure', 199),
-      row('kickole_pack_party', 199),
-      row('kickole_pack_spooky', 99),
-    ];
-    expect(everythingSavingLabel([])).toBeNull();
-    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 800)])).toBeNull();
-    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 696)])).toBeNull();
-    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 695)])).toBe('Saving');
-    expect(everythingSavingLabel([...packs, row('kickole_pack_everything', 100, 'EUR')])).toBeNull();
-    expect(everythingSavingLabel([
-      ...packs.slice(0, 3),
-      row('kickole_pack_spooky', 0),
-      row('kickole_pack_everything', 100),
-    ])).toBeNull();
-    expect(includes.toLowerCase()).not.toContain('saving');
-  });
-
-  it('wears any costume on TestFlight without a store grant or dev_sim', () => {
-    const start = normalizeLocker(null);
-    expect(outfitSelectable(start, 'alien', false)).toBe(false);
-    expect(outfitSelectable(start, 'gold-legend', true)).toBe(true);
-    const worn = equipOutfit(start, 'alien', true);
-    expect(worn.ok).toBe(true);
-    if (worn.ok) {
-      expect(worn.locker.equippedOutfit).toBe('alien');
-      expect(worn.locker.ownedOutfits).toEqual([]);
-      expect(worn.locker.cosmeticSource).toBe('none');
-      expect(worn.locker.ownedPacks).toEqual([]);
-    }
-    expect(equipOutfit(start, 'alien').ok).toBe(false);
-    const boots = buyOrEquipBoot(start, COWBOY_BOOT_ID, true);
-    expect(boots.ok).toBe(true);
-    if (boots.ok) {
-      expect(boots.locker.equippedBoot).toBe(COWBOY_BOOT_ID);
-      expect(boots.locker.ownedBoots).not.toContain(COWBOY_BOOT_ID);
-    }
-    expect(buyOrEquipBoot(start, COWBOY_BOOT_ID).ok).toBe(false);
-    const kept = keepTesterWear(start, 'gold-legend', COWBOY_BOOT_ID);
-    expect(kept.equippedOutfit).toBe('gold-legend');
-    expect(kept.equippedBoot).toBe(COWBOY_BOOT_ID);
-    expect(kept.ownedOutfits).toEqual([]);
-    expect(grantStoreCosmetic(kept, 'alien', 'dev_sim').ownedOutfits).toEqual([]);
   });
 });

@@ -4,7 +4,6 @@ import { normalizeAppearance } from './appearance';
 import { normalizeLearned, type LessonId } from './prompts';
 import {
   bumpChallenges,
-  coinsForScore,
   normalizeLocker,
   type ChallengeProgress,
   type WardrobeLocker,
@@ -89,15 +88,6 @@ function write(key: string, value: unknown) {
   }
 }
 
-/** Equipped ids as stored, before a locker normalise drops unowned costumes. */
-export function peekEquippedCosmetics(): { outfit: string | null; boot: string | null } {
-  const saved = read<{ equippedOutfit?: unknown; equippedBoot?: unknown }>(SAVE_KEY);
-  return {
-    outfit: typeof saved?.equippedOutfit === 'string' ? saved.equippedOutfit : null,
-    boot: typeof saved?.equippedBoot === 'string' ? saved.equippedBoot : null,
-  };
-}
-
 export function loadSave(): SaveData {
   const d = read<SaveData & { ownedBoots?: string[] }>(SAVE_KEY);
   const settings = read<Settings>(SETTINGS_KEY);
@@ -130,28 +120,26 @@ export function loadSave(): SaveData {
   return save;
 }
 
-/** Records a run; awards coins and lifetime challenge tallies from the run result. */
+/** Records a run and lifetime challenge tallies from the run result. */
 export function saveRun(
   save: SaveData,
   run: RunRecord,
   challengeDelta: Partial<ChallengeProgress> = {},
   bestStreak = 0,
-): { save: SaveData; newBest: boolean; rank: number; coinsEarned: number } {
+): { save: SaveData; newBest: boolean; rank: number } {
   const newBest = run.score > save.best;
   const all = [...save.leaderboard, run].sort((a, b) => b.score - a.score || b.date - a.date);
   const leaderboard = all.slice(0, 5);
   const rank = leaderboard.indexOf(run);
-  const coinsEarned = coinsForScore(run.score);
   const next: SaveData = {
     ...save,
     best: Math.max(save.best, run.score),
     leaderboard,
-    coins: save.coins + coinsEarned,
     challenges: bumpChallenges(save.challenges, challengeDelta),
     bestStreak: Math.max(save.bestStreak, Number.isFinite(bestStreak) ? Math.floor(bestStreak) : 0),
   };
   write(SAVE_KEY, next);
-  return { save: next, newBest, rank, coinsEarned };
+  return { save: next, newBest, rank };
 }
 
 export function persistSave(save: SaveData) {

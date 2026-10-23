@@ -14,7 +14,6 @@ export interface Skin {
   kitPattern: SurfacePattern;
   bootPattern: SurfacePattern;
   unlocked: boolean;
-  productId: string | null;
   /** Themed costume. Null keeps the equipped kit colours. */
   outfitId?: string | null;
   /** Pale multiply on the skin photograph. Null leaves the face alone. */
@@ -41,7 +40,6 @@ export const SKINS: Skin[] = [
     kitPattern: 'plain',
     bootPattern: 'panels',
     unlocked: true,
-    productId: null,
   },
   {
     id: 'coral-flash',
@@ -54,7 +52,6 @@ export const SKINS: Skin[] = [
     kitPattern: 'carnival',
     bootPattern: 'plain',
     unlocked: true,
-    productId: null,
   },
   {
     id: 'lime-night',
@@ -67,7 +64,6 @@ export const SKINS: Skin[] = [
     kitPattern: 'midnight',
     bootPattern: 'plain',
     unlocked: true,
-    productId: null,
   },
 ];
 
@@ -92,7 +88,7 @@ export function composePlayerSkin(
   const boot = preview?.boot ?? getBoot(bootId);
   const outfit = getOutfit(preview?.outfitId);
   const look = getKitColour(appearance.kitColourId);
-  // A costume replaces the football kit. Otherwise the free kit sheet wins, including over a saved shop kit.
+  // A costume replaces the football kit. Otherwise the free kit sheet wins.
   const clothing = outfit ? { ...outfit.clothing } : look ? clothingFor(look) : { ...appearance.clothing };
   const cowboy = boot.id === COWBOY_BOOT_ID;
   return {
@@ -119,7 +115,6 @@ export function composePlayerSkin(
     kitPattern: outfit ? 'plain' : kit.pattern,
     bootPattern: boot.pattern,
     unlocked: true,
-    productId: null,
     outfitId: outfit?.id ?? null,
     skinTint: outfit?.skinTint ?? null,
     patternPaint: outfit?.pattern ?? null,

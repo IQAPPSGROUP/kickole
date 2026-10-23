@@ -1,24 +1,9 @@
 import type { ClothingColors, PlayerBody } from './appearance';
 
-/** Old save field. This build never grants from apple, google, or dev_sim. */
-export type EntitlementSource = 'none' | 'apple' | 'google' | 'dev_sim';
-
-interface PricedProduct {
-  productId: string;
-  priceString: string;
-  priceMicros: number;
-  currencyCode: string;
-}
-
 /**
- * Themed cosmetics. They never change kick timing or scoring.
- * Paid looks are sold only inside non-consumable packs. The product IDs are
- * placeholders for a later store listing — this build does not create them.
- * A price is shown only when the store returns priceString. Earned looks are
- * play milestones, not products. simPurchase / dev_sim never grants a pack.
+ * Themed cosmetics kept for the character renderer. They never change kick
+ * timing or scoring, and this build does not sell them.
  */
-
-export const COSMETIC_SHOP_LINE = 'Items are cosmetic only and stay on your account';
 
 export const OUTFIT_IDS = [
   'alien',
@@ -60,19 +45,6 @@ export const EARNED_BEST_SCORE = {
 
 export const GOLD_LEGEND_SCORE = EARNED_BEST_SCORE['gold-legend'];
 
-export const SHOP_PACK_IDS = [
-  'heroes-space',
-  'adventure',
-  'party',
-  'spooky',
-  'everything',
-] as const;
-
-export type ShopPackId = (typeof SHOP_PACK_IDS)[number];
-
-/** The four packs an Everything purchase grants. Everything is not in this list. */
-export const CONTENT_PACK_IDS = ['heroes-space', 'adventure', 'party', 'spooky'] as const satisfies readonly ShopPackId[];
-
 export type PlayStat = 'bestScore';
 
 export interface PlayMilestone {
@@ -92,24 +64,13 @@ export type OutfitPattern = 'weave' | 'stripes' | 'chain' | 'torn' | 'gold' | 'l
 export interface OutfitDesign {
   id: OutfitId;
   name: string;
-  /** Set for looks earned in play. Pack looks stay null and are not sold alone. */
+  /** Set for looks earned in play. Other looks stay on the renderer and are not equipped from a save. */
   milestone: PlayMilestone | null;
   clothing: ClothingColors;
   pattern: OutfitPattern;
   /** Pale costume tint on the skin map. Null keeps the footballer's own skin. */
   skinTint: string | null;
   note: string;
-}
-
-export interface ShopPack {
-  id: ShopPackId;
-  name: string;
-  /** Placeholder store id. Not registered with Apple or Google by this change. */
-  productId: string;
-  outfitIds: readonly OutfitId[];
-  /** Boots included with the pack. Cowboy boots are not their own product. */
-  bootIds: readonly string[];
-  blurb: string;
 }
 
 const cloth = (shirt: string, shirtTrim: string, shorts: string, socks: string): ClothingColors => ({
@@ -279,7 +240,7 @@ export const OUTFITS: readonly OutfitDesign[] = [
     clothing: cloth('#E3B341', '#8A6A1F', '#C4922A', '#F0D78C'),
     pattern: 'gold',
     skinTint: null,
-    note: `Shiny gold kit. Unlocks at a best score of ${GOLD_LEGEND_SCORE} in one run, not from the store.`,
+    note: `Shiny gold kit. Unlocks at a best score of ${GOLD_LEGEND_SCORE} in one run.`,
   },
 ];
 
@@ -292,49 +253,6 @@ export const EARNED_OUTFIT_IDS = [
   'gold-legend',
 ] as const satisfies readonly OutfitId[];
 
-export const SHOP_PACKS: readonly ShopPack[] = [
-  {
-    id: 'heroes-space',
-    name: 'Heroes & Space',
-    productId: 'kickole_pack_heroes_space',
-    outfitIds: ['street-hero', 'night-glider', 'alien', 'spaceman'],
-    bootIds: [],
-    blurb: 'Superhero, Shadow Hero, Alien and Spaceman.',
-  },
-  {
-    id: 'adventure',
-    name: 'Adventure',
-    productId: 'kickole_pack_adventure',
-    outfitIds: ['night-wrap', 'deck-hand', 'secret-agent', 'ring-mask'],
-    bootIds: [],
-    blurb: 'Ninja, Pirate, Secret Agent and Lucha.',
-  },
-  {
-    id: 'party',
-    name: 'Party',
-    productId: 'kickole_pack_party',
-    outfitIds: ['stage-jacket', 'seventies', 'north-pole'],
-    bootIds: [COWBOY_BOOT_ID],
-    blurb: 'Rockstar, Retro 70s, Cowboy Boots and Santa.',
-  },
-  {
-    id: 'spooky',
-    name: 'Spooky',
-    productId: 'kickole_pack_spooky',
-    outfitIds: ['grey-ghoul'],
-    bootIds: [],
-    blurb: 'A cartoon zombie.',
-  },
-  {
-    id: 'everything',
-    name: 'Everything',
-    productId: 'kickole_pack_everything',
-    outfitIds: [],
-    bootIds: [],
-    blurb: 'Includes Heroes & Space, Adventure, Party and Spooky.',
-  },
-];
-
 export function isOutfitId(id: string): id is OutfitId {
   return (OUTFIT_IDS as readonly string[]).includes(id);
 }
@@ -342,76 +260,6 @@ export function isOutfitId(id: string): id is OutfitId {
 export function getOutfit(id: string | null | undefined): OutfitDesign | null {
   if (!id || !isOutfitId(id)) return null;
   return OUTFITS.find((outfit) => outfit.id === id) ?? null;
-}
-
-export function isShopPackId(id: string): id is ShopPackId {
-  return (SHOP_PACK_IDS as readonly string[]).includes(id);
-}
-
-export function getShopPack(id: string | null | undefined): ShopPack | null {
-  if (!id || !isShopPackId(id)) return null;
-  return SHOP_PACKS.find((pack) => pack.id === id) ?? null;
-}
-
-export function shopPackForProduct(productId: string): ShopPack | null {
-  return SHOP_PACKS.find((pack) => pack.productId === productId) ?? null;
-}
-
-/** Content packs a purchase delivers. Everything expands to the other four. */
-export function packsGrantedBy(id: ShopPackId): ShopPackId[] {
-  if (id === 'everything') return [...CONTENT_PACK_IDS, 'everything'];
-  return [id];
-}
-
-function packList(names: readonly string[]): string {
-  if (names.length === 0) return '';
-  if (names.length === 1) return names[0];
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
-function contentPackNames(ids: readonly ShopPackId[]): string[] {
-  const names: string[] = [];
-  for (const id of ids) {
-    const pack = getShopPack(id);
-    if (pack) names.push(pack.name);
-  }
-  return names;
-}
-
-/** Names the four packs inside Everything. The card always shows this list. */
-export function everythingIncludesLine(): string {
-  return `Includes ${packList(contentPackNames([...CONTENT_PACK_IDS]))}.`;
-}
-
-/** Packs the player already has, named on the Everything card. Null when they have none. */
-export function everythingOwnedLine(ownedIds: readonly string[]): string | null {
-  const hasBundle = ownedIds.includes('everything');
-  const owned = CONTENT_PACK_IDS.filter((id) => hasBundle || ownedIds.includes(id));
-  if (owned.length === 0) return null;
-  return `Already owned: ${packList(contentPackNames(owned))}.`;
-}
-
-/**
- * The word Saving only when every pack has a store price in one currency and
- * the bundle priceMicros is strictly below the sum of the four packs.
- * Missing prices, mixed currencies, and a bundle that costs the same or more
- * produce no label. Price strings are not parsed or invented.
- */
-export function everythingSavingLabel(
-  products: readonly Pick<PricedProduct, 'productId' | 'priceMicros' | 'currencyCode'>[],
-): 'Saving' | null {
-  const rows = SHOP_PACKS.map((pack) => products.find((product) => product.productId === pack.productId));
-  if (rows.some((row) => !row)) return null;
-  const priced = rows.filter((row): row is NonNullable<typeof row> => row != null);
-  const currency = priced[0]?.currencyCode ?? '';
-  if (!currency || priced.some((row) => row.currencyCode !== currency)) return null;
-  if (priced.some((row) => !Number.isFinite(row.priceMicros) || row.priceMicros <= 0)) return null;
-  const bundle = priced.find((row) => row.productId === getShopPack('everything')?.productId);
-  const parts = priced.filter((row) => row.productId !== bundle?.productId);
-  if (!bundle || parts.length !== CONTENT_PACK_IDS.length) return null;
-  const sum = parts.reduce((total, row) => total + row.priceMicros, 0);
-  if (bundle.priceMicros < sum) return 'Saving';
-  return null;
 }
 
 export function milestoneMet(stats: MilestoneStats, milestone: PlayMilestone): boolean {
@@ -434,45 +282,8 @@ export function earnedOutfit(id: string): boolean {
   return getOutfit(id)?.milestone != null;
 }
 
-/**
- * Localised store price, or null when this cosmetic is not sold or the store
- * has not returned a priceString. Callers must not invent a number.
- */
-export function cosmeticPriceString(
-  productId: string | null,
-  products: readonly Pick<PricedProduct, 'productId' | 'priceString'>[],
-): string | null {
-  if (!productId) return null;
-  const price = products.find((product) => product.productId === productId)?.priceString;
-  if (typeof price !== 'string' || price.trim().length === 0) return null;
-  return price;
-}
-
 export function goldLegendUnlocked(bestScore: number): boolean {
   return Number.isFinite(bestScore) && bestScore >= GOLD_LEGEND_SCORE;
-}
-
-/**
- * Store grants are apple/google only.
- * dev_sim is refused in every build so ?simPurchase=1 cannot unlock a themed look.
- */
-export function cosmeticGrantAllowed(source: EntitlementSource): boolean {
-  return source === 'apple' || source === 'google';
-}
-
-/**
- * Whether a saved store-cosmetic list may be trusted.
- * Production web drops a hand-edited list. Development may keep a source-none
- * list so a local preview can dress the model. dev_sim is never trusted.
- */
-export function keepStoreCosmetic(
-  source: EntitlementSource,
-  trustStoreCache: boolean,
-  prod: boolean,
-): boolean {
-  if (source === 'dev_sim') return false;
-  if (source === 'apple' || source === 'google') return trustStoreCache;
-  return !prod;
 }
 
 /** Both bodies wear the same full kit. Accessories are fitted separately. */

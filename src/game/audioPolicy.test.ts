@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { crowdLevel, loudestCheer, milestoneHits, newlyOpenedTiers, type AudioProgress } from './audioPolicy';
-import type { ChallengeProgress } from './shop';
+import { crowdLevel, loudestCheer, milestoneHits, type AudioProgress } from './audioPolicy';
 
 const emptyProgress = (): AudioProgress => ({ streak: 0, kickUps: 0, perfects: 0 });
-const emptyChallenges = (): ChallengeProgress => ({ alternateFoot: 0, stalls: 0, perfectTouch: 0 });
 
 describe('audio milestones and crowd', () => {
   it('swells the crowd with the streak and stays inside 0..1', () => {
@@ -28,20 +26,6 @@ describe('audio milestones and crowd', () => {
     expect(loudestCheer([])).toBeNull();
     expect(loudestCheer(['streak:10', 'juggle:10'])).toBe('streak:10');
     expect(loudestCheer(['perfect:10', 'streak:50', 'best'])).toBe('best');
-    expect(loudestCheer(['best', 'tier:street'])).toBe('tier:street');
-  });
-
-  it('reports a shop tier only when coins and its challenge are both newly met', () => {
-    const before = { coins: 0, challenges: emptyChallenges() };
-    expect(newlyOpenedTiers(before, { coins: 2499, challenges: emptyChallenges() })).toEqual([]);
-    expect(newlyOpenedTiers(before, { coins: 2500, challenges: emptyChallenges() })).toEqual(['club']);
-    expect(newlyOpenedTiers(
-      { coins: 7500, challenges: emptyChallenges() },
-      { coins: 7500, challenges: { ...emptyChallenges(), alternateFoot: 40 } },
-    )).toEqual(['street']);
-    expect(newlyOpenedTiers(
-      { coins: 2500, challenges: emptyChallenges() },
-      { coins: 8000, challenges: { ...emptyChallenges(), alternateFoot: 40 } },
-    )).toEqual(['street']);
+    expect(loudestCheer(['streak:50', 'juggle:100'])).toBe('streak:50');
   });
 });

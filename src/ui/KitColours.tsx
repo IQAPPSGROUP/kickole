@@ -121,7 +121,9 @@ export function KitColoursScreen({
               );
             })}
           </div>
-          {options.length === 0 && <p className="kit-preview-note">No kit matches.</p>}
+          {options.length === 0 && (
+            <p className="kit-preview-note">{query.trim() ? 'No kit matches.' : 'No kits in this list yet.'}</p>
+          )}
         </div>
         <button
           type="button"

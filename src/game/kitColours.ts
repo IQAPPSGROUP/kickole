@@ -2,10 +2,18 @@ import type { ClothingColors } from './appearance';
 import nationalKitSpec from '../../docs/design-refs/national-kits/spec.json';
 
 /**
- * National kits. Graham edits `docs/design-refs/national-kits/spec.json`.
+ * National kits. Graham adds further countries to
+ * `docs/design-refs/national-kits/spec.json`. The sheet currently holds the
+ * approved seventeen. A new row needs no code change to show up in search and
+ * its region tab.
+ *
+ * `name` is the FIFA member-list name, the name on that association's FIFA
+ * page, not the federation's legal title. England, Republic of Ireland and USA
+ * are those names. The label is that name plus " colours".
+ *
  * A shirt is the colour fans recognise. Vertical stripes are only for an iconic
  * striped shirt. Trim bands are flag colours on the collar, cuffs and sock tops.
- * Labels stay "Name colours". Boots are the plain dark pair, not a brand mark.
+ * Boots are the plain dark pair, not a brand mark.
  */
 export type KitPattern = 'plain' | 'stripes';
 
@@ -58,7 +66,7 @@ export const POPULAR_KIT_IDS = [
   'scotland',
   'wales',
   'northern-ireland',
-  'ireland',
+  'republic-of-ireland',
   'france',
   'spain',
   'portugal',
@@ -116,7 +124,7 @@ function specPattern(value: string): KitPattern {
 
 function nationFromSpec(row: SpecRow): KitColour {
   if (!isRegion(row.region)) throw new Error(`Unknown kit region ${row.region}`);
-  if (!row.label.endsWith(' colours')) throw new Error(`Kit label must end with colours: ${row.label}`);
+  if (row.label !== `${row.name} colours`) throw new Error(`Kit label must be the FIFA name plus colours: ${row.name}`);
   if (row.boots.toUpperCase() !== KIT_BOOT) throw new Error(`Kit boots must be ${KIT_BOOT}: ${row.name}`);
   if (row.trimBands.length < 2) throw new Error(`Kit needs trim bands: ${row.name}`);
   const pattern = specPattern(row.pattern);
@@ -148,9 +156,15 @@ const NEUTRAL: KitColour = {
   trimBands: ['#5C6570', '#3A4148'],
 };
 
+const NATIONS = (nationalKitSpec as SpecRow[]).map(nationFromSpec);
+const NATION_IDS = NATIONS.map((option) => option.id);
+if (new Set(NATION_IDS).size !== NATION_IDS.length) {
+  throw new Error('Kit sheet has a duplicate FIFA member name');
+}
+
 export const KIT_COLOURS: readonly KitColour[] = [
   NEUTRAL,
-  ...(nationalKitSpec as SpecRow[]).map(nationFromSpec),
+  ...NATIONS,
 ];
 
 const BY_ID = new Map(KIT_COLOURS.map((option) => [option.id, option]));

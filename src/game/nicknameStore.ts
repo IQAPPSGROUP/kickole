@@ -8,13 +8,13 @@ export const OPT_IN_KEY = 'kicky.board.optin.v1';
 
 export type BoardOptIn = 'unknown' | 'in' | 'out';
 
-/** Stored when the player chooses "Prefer not to say". Missing key means they have not chosen yet. */
+/** Stored when the player chooses International. Missing key means they have not chosen yet. */
 const COUNTRY_NONE = 'none';
 
 export interface StoredCountry {
-  /** True after a save, including prefer-not-to-say. */
+  /** True after a save, including International. */
   chosen: boolean;
-  /** ISO alpha-2, or null when unset or prefer-not-to-say. */
+  /** ISO alpha-2, or null when unset or International. */
   country: string | null;
 }
 
@@ -211,7 +211,7 @@ export function loadStoredCountry(storage: Storage = localStorage): StoredCountr
   }
 }
 
-/** `null` stores prefer-not-to-say. A locale guess is not written until the player saves. */
+/** `null` stores International. A locale guess is not written until the player saves. */
 export function saveCountry(country: string | null, storage: Storage = localStorage): boolean {
   const stored = country == null ? COUNTRY_NONE : countryByCode(country)?.code;
   if (!stored) return false;

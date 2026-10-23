@@ -451,7 +451,7 @@ export function SettingsScreen({
             <NicknameForm initial={nickname} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
             <p className="panel-note">Your nickname is picked from our word lists. You can change it once every 7 days.</p>
             <label>Country</label>
-            <p className="panel-note">Optional. Prefer not to say is the default. This only places you on that country&apos;s board and is not shown next to your name. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
+            <p className="panel-note">Optional. International is the default. This only places you on that country&apos;s board and is not shown next to your name. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
             <CountryChoice initialCountry={country} suggestion={countrySuggestion} submitLabel="SAVE" onSubmit={onCountry} />
           </div>
         )}
@@ -634,7 +634,7 @@ export function DataScreen({ onClose }: { onClose: () => void }) {
         <ul>
           <li>It&apos;s off unless you turn it on.</li>
           <li>Build a nickname from our word lists, or tap Pick one for me. You can&apos;t type your own, so your real name stays private.</li>
-          <li>Country is optional and separate from your kit. Prefer not to say is the default, and you can change or remove it later. It only places you on that country&apos;s board and is not shown next to your name.</li>
+          <li>Country is optional and separate from your kit. International is the default, and you can change or remove it later. It only places you on that country&apos;s board and is not shown next to your name.</li>
           <li>Boards: Today, Week, Month, Year and All time, for the world and for your country. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</li>
           <li>Your best scores stay until 2 years after you last play. Other runs go after 12 months.</li>
           <li>Tap &apos;Delete my leaderboard data&apos; any time to remove your nickname and scores straight away. If someone has reported you, we keep that report for up to 90 days so we can check it.</li>

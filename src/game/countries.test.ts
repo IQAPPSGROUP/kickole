@@ -42,7 +42,7 @@ describe('countries', () => {
     expect(searchCountries('turkey').map((country) => country.code)).toContain('TR');
   });
 
-  it('stores a chosen country and prefer-not-to-say separately from a missing key', () => {
+  it('stores a chosen country and International separately from a missing key', () => {
     const storage = memory();
     expect(loadStoredCountry(storage)).toEqual({ chosen: false, country: null });
     expect(saveCountry('gb', storage)).toBe(true);

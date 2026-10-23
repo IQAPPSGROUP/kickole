@@ -13,14 +13,14 @@ Checked against Supabase’s current API security docs: grants and row level sec
 | Field | Role |
 | --- | --- |
 | `nickname` | Public label, 3–16 chars, `[A-Za-z0-9_]`, passed through the same filter as `checkNickname`. |
-| `country` | Optional ISO 3166-1 alpha-2 the player picked, or null. Null means “Prefer not to say” and that row is left off every country board. |
+| `country` | Optional ISO 3166-1 alpha-2 the player picked, or null. Null means International and that row is left off every country board. |
 | `score` | One integer for the run. |
 | `deviceId` | Random UUID from Capacitor Preferences / local storage (`kicky.device.v1`). It is an install key, not an account, not shown, and not linked to Apple ID, Google account, email or phone. |
 | `at` | Client clock, used only as a hint. The server stores its own timestamp. |
 
 ## Data minimisation
 
-The board stores a nickname and an optional self-chosen country only. Nothing else about the person. The country is the alpha-2 code they confirm in the picker, stored on device as `kicky.country.v1` (`none` when they prefer not to say). The picker may suggest a code from the device locale region (`Intl.Locale.region`, or a trailing region subtag such as `en-GB`). It does not read GPS, IP address, timezone, or a network geolocation lookup, and the server must not fill `country` from the request IP. No precise location is collected or sent. A missing choice is not uploaded as a guess: the locale suggestion is only a default until the player saves.
+The board stores a nickname and an optional self-chosen country only. Nothing else about the person. The country is the alpha-2 code they confirm in the picker, stored on device as `kicky.country.v1` (`none` when they choose International). The picker may suggest a code from the device locale region (`Intl.Locale.region`, or a trailing region subtag such as `en-GB`). It does not read GPS, IP address, timezone, or a network geolocation lookup, and the server must not fill `country` from the request IP. No precise location is collected or sent. A missing choice is not uploaded as a guess: the locale suggestion is only a default until the player saves.
 
 No other personal data. Reinstalling the app mints a new device id. Renaming the nickname does not create an account.
 
@@ -78,7 +78,7 @@ alter table private.blocks enable row level security;
 alter table private.submit_log enable row level security;
 ```
 
-`device_best.country` is null when the player prefers not to say. Those rows are excluded from country boards. Do not add a latitude, longitude, city, IP, or any other location column. The audit table `private.scores` does not store a location either.
+`device_best.country` is null when the player chooses International. Those rows are excluded from country boards. Do not add a latitude, longitude, city, IP, or any other location column. The audit table `private.scores` does not store a location either.
 
 Do not add a policy that treats a client-supplied device id as `auth.uid()`. Anyone could send someone else’s id. There is no Supabase Auth user for this board.
 
@@ -130,6 +130,6 @@ The local mock already filters, and Report hides the name on this device. It doe
 
 Settings and `docs/STORE_DATA_SAFETY.md` describe the live board. Use the same wording in the App Store / Play Data safety forms. Proposed wording:
 
-> The leaderboard is off until you tap Join leaderboard. If you join, Kickolé stores a nickname picked from our word lists and a random device id on this device. You can also choose a country, or prefer not to say. We send that nickname, your score, the device id, and the country you chose (if any) to our scoreboard so other players can see your tag, flag and score. We do not use GPS or a network lookup to pick your country. A hashed IP address may be kept for 30 days to limit cheating. Choosing “Prefer not to say” keeps you off country boards. You can change the nickname once every 7 days. Delete my leaderboard data removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days. We do not use the board for advertising.
+> The leaderboard is off until you tap Join leaderboard. If you join, Kickolé stores a nickname picked from our word lists and a random device id on this device. You can also choose a country, or International. We send that nickname, your score, the device id, and the country you chose (if any) to our scoreboard so other players can see your tag and score. We do not use GPS or a network lookup to pick your country. A hashed IP address may be kept for 30 days to limit cheating. Choosing International keeps you off country boards. You can change the nickname once every 7 days. Delete my leaderboard data removes your nickname and scores. If someone has reported you, we keep that report for up to 90 days. We do not use the board for advertising.
 
 Also declare, when it ships: gameplay scores transmitted for app functionality, not tracking; no account; nickname is user-generated content.

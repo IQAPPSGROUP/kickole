@@ -19,7 +19,7 @@ export interface BoardEntry {
   rank: number;
   nickname: string;
   score: number;
-  /** ISO alpha-2 on a country board. Null on every world row, and when the player chose not to say. */
+  /** ISO alpha-2 on a country board. Null on every world row, and when the player chose International. */
   country: string | null;
   mine: boolean;
 }
@@ -35,7 +35,7 @@ export interface RankSnapshot {
   total: number;
   nickname: string;
   score: number;
-  /** Null when the player prefers not to say, or has not chosen. */
+  /** Null when the player chose International, or has not chosen. */
   country: string | null;
   /** Null when they are excluded from country boards, or that board is hidden. */
   countryRank: number | null;

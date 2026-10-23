@@ -348,7 +348,7 @@ function CountryPicker({
         aria-controls="country-list"
         onClick={() => setOpen((value) => !value)}
       >
-        <span id="country-value">{selected ? selected.name : 'Prefer not to say'}</span>
+        <span id="country-value">{selected ? selected.name : 'International'}</span>
       </button>
       {hinted && (
         <button type="button" className="country-suggest" onClick={() => onChange(hinted.code)}>
@@ -376,7 +376,7 @@ function CountryPicker({
             aria-pressed={country == null}
             onClick={() => choose(null)}
           >
-            Prefer not to say
+            International
           </button>
           <ul id="country-list" ref={listRef} className="country-list" role="listbox" aria-label="Countries">
             {matches.map((item) => (
@@ -421,7 +421,7 @@ export function NicknameScreen({
   );
 }
 
-/** Optional country step. Prefer not to say is the selection until the player picks one. */
+/** Optional country step. International is the selection until the player picks one. */
 export function CountryChoice({
   initialCountry = null,
   suggestion = null,
@@ -439,7 +439,7 @@ export function CountryChoice({
   const [busy, setBusy] = useState(false);
   const [issue, setIssue] = useState<string | null>(null);
   const selected = countryByCode(country);
-  const label = submitLabel ?? (selected ? `Use ${selected.name}` : 'Prefer not to say');
+  const label = submitLabel ?? (selected ? `Use ${selected.name}` : 'International');
   return (
     <form
       className="nick-form"
@@ -474,7 +474,7 @@ export function CountryScreen({
         <p className="court-label">OPTIONAL</p>
         <h2 className="nick-title">COUNTRY?</h2>
         <p className="panel-lead">
-          Prefer not to say is the default. This only places you on that country&apos;s board.
+          International is the default. This only places you on that country&apos;s board.
           It is not shown next to your name. A country board appears once {COUNTRY_BOARD_MIN} players have joined.
           Your kit does not choose a country. You can change or remove this later.
         </p>

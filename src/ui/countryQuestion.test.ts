@@ -15,9 +15,14 @@ describe('optional country question', () => {
   const kit = source('./KitColours.tsx');
   const controller = source('../game/controller.ts');
 
-  it('asks for a country separately from the kit, with prefer not to say as the default', () => {
+  it('asks for a country separately from the kit, with International as the default', () => {
     expect(COUNTRY_BOARD_MIN).toBe(20);
-    expect(nick).toContain('Prefer not to say is the default');
+    expect(nick).toContain('International is the default');
+    expect(nick).toContain("selected ? selected.name : 'International'");
+    expect(nick).toContain('International\n');
+    expect(nick).not.toContain('Prefer not to say');
+    expect(screens).toContain('International is the default');
+    expect(screens).not.toContain('Prefer not to say');
     expect(nick).toContain('Your kit does not choose a country');
     expect(nick).toContain('export function CountryScreen');
     expect(nick).not.toContain('country-flag');
@@ -41,7 +46,7 @@ describe('optional country question', () => {
     expect(screens).toContain('A country board appears once {COUNTRY_BOARD_MIN} players have joined.');
   });
 
-  it('stores prefer not to say as the saved skip and can clear a country later', () => {
+  it('stores International as no country and can clear a country later', () => {
     const memory = new Map<string, string>();
     const storage = {
       getItem: (key: string) => memory.get(key) ?? null,

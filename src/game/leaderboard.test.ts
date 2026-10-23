@@ -81,7 +81,7 @@ describe('mock leaderboard', () => {
     expect(entry && 'deviceId' in entry).toBe(false);
   });
 
-  it('ranks a chosen country separately and leaves prefer-not-to-say off that board', () => {
+  it('ranks a chosen country separately and leaves International off that board', () => {
     const hidden = createMockLeaderboard({ nickname: 'StreetKick42', country: null, storage: memory(), now: NOW });
     expect(hidden.rankFor(23, NOW).countryRank).toBeNull();
     expect(hidden.top('country', 23, 10, 'all', NOW)).toEqual([]);

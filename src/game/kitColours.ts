@@ -1,9 +1,13 @@
 import type { ClothingColors } from './appearance';
 
 /**
- * Graham's kit sheet. Replace `pattern` and the four colour fields to restyle a kit.
- * Nation labels stay "Name colours". These are flag colours in simple original
- * patterns, not federation kits: no crests, badges, flags, sponsors or brand marks.
+ * Data-driven kits. `pattern` picks the shirt mask. `plain` is a solid shirt.
+ * `stripes` are vertical. Nation labels stay "Name colours".
+ *
+ * Colour values are on hold. Rob wants recognisable traditional football colours
+ * rather than flag patterns (solid orange Netherlands, light blue Italy, blue
+ * France). Replace `pattern` and the four colour fields when Graham's revised
+ * sheet is approved. The hexes below are placeholders, not a final sheet.
  */
 export type KitPattern = 'plain' | 'stripes' | 'hoops' | 'halves' | 'sash' | 'chevron' | 'sleeves';
 
@@ -79,6 +83,8 @@ export const KIT_COLOURS: readonly KitColour[] = [
   kit('usa', 'USA colours', 'nation', 'sash', '#0A3161', '#B31942', '#FFFFFF', '#B31942'),
   kit('nigeria', 'Nigeria colours', 'nation', 'stripes', '#008751', '#FFFFFF', '#008751', '#FFFFFF'),
   kit('japan', 'Japan colours', 'nation', 'sleeves', '#BC002D', '#FFFFFF', '#FFFFFF', '#BC002D'),
+  // Provisional solid yellow and blue so the 17th row can render. Not an approved hex.
+  kit('sweden', 'Sweden colours', 'nation', 'plain', '#FECC02', '#006AA7', '#006AA7', '#FECC02'),
 ];
 
 const BY_ID = new Map(KIT_COLOURS.map((option) => [option.id, option]));

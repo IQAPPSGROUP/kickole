@@ -33,6 +33,7 @@ export function kitShirtMask(pattern: KitPattern, x: number, y: number): 0 | 1 {
     case 'sleeves':
       return Math.abs(x) >= KIT_SLEEVE_X ? 1 : 0;
     case 'stripes':
+      // Vertical bars. A change in x flips the mask; y does not.
       return frac(x / KIT_STRIPE_PERIOD + 0.5) >= 0.5 ? 1 : 0;
     default: {
       const neverPattern: never = pattern;

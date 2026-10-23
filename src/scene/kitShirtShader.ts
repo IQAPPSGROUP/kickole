@@ -46,6 +46,7 @@ if (uKitPattern > 0.5 && uKitPattern < 1.5) {
 } else if (uKitPattern < 5.5) {
   kitMask = step(${KIT_SLEEVE_X}, abs(kx));
 } else if (uKitPattern < 6.5) {
+  // Vertical stripes. Hoops use y; this mask uses x.
   kitMask = step(0.5, fract(kx / ${KIT_STRIPE_PERIOD} + 0.5));
 }
 if (uKitPattern > 0.5) diffuseColor.rgb = mix(uKitMain, uKitSecond, kitMask);

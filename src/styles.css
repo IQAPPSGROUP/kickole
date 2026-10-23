@@ -1073,24 +1073,6 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   width: 100%;
 }
 .country-toggle { border-color: #ff4f9a; }
-.country-suggest {
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  color: #f7e9c5;
-  background: transparent;
-  border: 0;
-  border-radius: 12px;
-  min-height: 44px;
-  padding: 8px 4px;
-  text-align: left;
-  cursor: pointer;
-  width: 100%;
-}
 .country-option[aria-selected="true"],
 .country-option[aria-pressed="true"] { border-color: #ff4f9a; background: rgba(255, 79, 154, .15); }
 .country-panel { display: flex; flex-direction: column; gap: 6px; }

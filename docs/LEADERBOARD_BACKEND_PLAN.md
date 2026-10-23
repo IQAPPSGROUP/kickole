@@ -20,7 +20,7 @@ Checked against Supabase’s current API security docs: grants and row level sec
 
 ## Data minimisation
 
-The board stores a nickname and an optional self-chosen country only. Nothing else about the person. The country is the alpha-2 code they confirm in the picker, stored on device as `kicky.country.v1` (`none` when they choose International). The picker may suggest a code from the device locale region (`Intl.Locale.region`, or a trailing region subtag such as `en-GB`). It does not read GPS, IP address, timezone, or a network geolocation lookup, and the server must not fill `country` from the request IP. No precise location is collected or sent. A missing choice is not uploaded as a guess: the locale suggestion is only a default until the player saves.
+The board stores a nickname and an optional self-chosen country only. Nothing else about the person. The country is the alpha-2 code they confirm in the picker, stored on device as `kicky.country.v1` (`none` when they choose International). The app does not suggest a country and does not read the device locale, timezone, GPS, IP address, or a network geolocation lookup. The server must not fill `country` from the request IP. No precise location is collected or sent. A missing choice is not uploaded as a guess.
 
 No other personal data. Reinstalling the app mints a new device id. Renaming the nickname does not create an account.
 

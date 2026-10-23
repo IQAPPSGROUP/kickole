@@ -31,10 +31,11 @@ describe('report and country safeguarding', () => {
     expect(contrast('#1E2A5A', '#FFD93D')).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps the country hint as a plain text link with a 44px target', () => {
-    expect(css).toMatch(/\.country-suggest \{[^}]*background: transparent;/s);
-    expect(css).toMatch(/\.country-suggest \{[^}]*min-height: 44px;/s);
-    expect(css).not.toMatch(/\.country-suggest \{[^}]*background: #ff4f9a;/s);
+  it('does not offer a locale country suggestion', () => {
+    expect(css).not.toContain('.country-suggest');
+    const nick = readFileSync(new URL('./NicknameScreen.tsx', import.meta.url), 'utf8');
+    expect(nick).not.toContain('Suggested:');
+    expect(nick).toContain("submitLabel ?? 'Continue'");
     expect(contrast('#f7e9c5', '#1E2A5A')).toBeGreaterThanOrEqual(4.5);
   });
 });

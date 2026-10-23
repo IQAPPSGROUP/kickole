@@ -211,7 +211,7 @@ export function loadStoredCountry(storage: Storage = localStorage): StoredCountr
   }
 }
 
-/** `null` stores International. A locale guess is not written until the player saves. */
+/** `null` stores International. The app does not guess a country from the device. */
 export function saveCountry(country: string | null, storage: Storage = localStorage): boolean {
   const stored = country == null ? COUNTRY_NONE : countryByCode(country)?.code;
   if (!stored) return false;

@@ -1,7 +1,6 @@
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Result } from '../game/controller';
-import { suggestedCountry } from '../game/countries';
 import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
 import {
@@ -399,7 +398,6 @@ export function SettingsScreen({
   onToggleSong: (id: GameTrackId) => void;
   onClose: () => void;
 }) {
-  const [countrySuggestion] = useState(() => suggestedCountry());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteNote, setDeleteNote] = useState<string | null>(null);
   const [doneNotice, setDoneNotice] = useState(false);
@@ -452,7 +450,7 @@ export function SettingsScreen({
             <p className="panel-note">Your nickname is picked from our word lists. You can change it once every 7 days.</p>
             <label>Country</label>
             <p className="panel-note">Optional. International is the default. This only places you on that country&apos;s board and is not shown next to your name. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
-            <CountryChoice initialCountry={country} suggestion={countrySuggestion} submitLabel="SAVE" onSubmit={onCountry} />
+            <CountryChoice initialCountry={country} submitLabel="SAVE" onSubmit={onCountry} />
           </div>
         )}
         <div className="group">

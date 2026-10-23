@@ -300,25 +300,3 @@ export function searchCountries(query: string): Country[] {
   });
 }
 
-/**
- * Suggest a country from a locale region subtag only.
- * `en-GB` -> GB, `en` and `en-ZZ` -> null. No GPS, IP, or timezone.
- */
-export function suggestedCountry(locale?: string): string | null {
-  const raw = (locale ?? (typeof navigator !== 'undefined' ? navigator.language : '')).trim();
-  if (!raw) return null;
-  const tag = raw.replace(/_/g, '-');
-  let region: string | undefined;
-  try {
-    region = new Intl.Locale(tag).region;
-  } catch {
-    region = undefined;
-  }
-  if (!region || !/^[A-Za-z]{2}$/.test(region)) {
-    const match = /-([A-Za-z]{2})$/.exec(tag);
-    region = match?.[1];
-  }
-  if (!region || !/^[A-Za-z]{2}$/.test(region)) return null;
-  return countryByCode(region)?.code ?? null;
-}
-

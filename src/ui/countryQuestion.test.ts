@@ -21,8 +21,14 @@ describe('optional country question', () => {
     expect(nick).toContain("selected ? selected.name : 'International'");
     expect(nick).toContain('International\n');
     expect(nick).not.toContain('Prefer not to say');
+    expect(nick).toContain("submitLabel ?? 'Continue'");
+    expect(nick).not.toContain('Suggested:');
+    expect(nick).not.toContain('suggestedCountry');
+    expect(nick).not.toContain('navigator.language');
     expect(screens).toContain('International is the default');
+    expect(screens).toContain('submitLabel="SAVE"');
     expect(screens).not.toContain('Prefer not to say');
+    expect(screens).not.toContain('suggestedCountry');
     expect(nick).toContain('Your kit does not choose a country');
     expect(nick).toContain('export function CountryScreen');
     expect(nick).not.toContain('country-flag');

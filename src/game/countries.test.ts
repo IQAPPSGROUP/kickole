@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { COUNTRIES, countryByCode, countryFlag, searchCountries, suggestedCountry } from './countries';
+import { COUNTRIES, countryByCode, countryFlag, searchCountries } from './countries';
 import { COUNTRY_KEY, loadStoredCountry, saveCountry } from './nicknameStore';
 
 function memory() {
@@ -24,15 +25,13 @@ describe('countries', () => {
     expect(countryByCode('gb')?.name).toBe('United Kingdom');
   });
 
-  it('suggests a country from the locale region only', () => {
-    expect(suggestedCountry('en-GB')).toBe('GB');
-    expect(suggestedCountry('en_GB')).toBe('GB');
-    expect(suggestedCountry('pt-BR')).toBe('BR');
-    expect(suggestedCountry('zh-Hans-CN')).toBe('CN');
-    expect(suggestedCountry('en')).toBeNull();
-    expect(suggestedCountry('en-ZZ')).toBeNull();
-    expect(suggestedCountry('es-419')).toBeNull();
-    expect(suggestedCountry('')).toBeNull();
+  it('does not guess a country from the device', () => {
+    const source = readFileSync(new URL('./countries.ts', import.meta.url), 'utf8');
+    expect(source).not.toContain('suggestedCountry');
+    expect(source).not.toContain('navigator');
+    expect(source).not.toContain('Intl.Locale');
+    expect(source).not.toContain('timeZone');
+    expect(source).not.toContain('geolocation');
   });
 
   it('builds a flag and a searchable list', () => {

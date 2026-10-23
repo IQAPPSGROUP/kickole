@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { countryByCode, searchCountries, suggestedCountry } from '../game/countries';
+import { countryByCode, searchCountries } from '../game/countries';
 import { COUNTRY_BOARD_MIN } from '../game/leaderboard';
 import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
 import { composeNickname, isBlockedPair, parseNickname, pickFreePair, unblockIndex, wordIndex, type FreePair } from '../game/nickname';
@@ -314,18 +314,15 @@ function WordWheel({
 
 function CountryPicker({
   country,
-  suggestion = null,
   onChange,
 }: {
   country: string | null;
-  suggestion?: string | null;
   onChange: (country: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const listRef = useRef<HTMLUListElement>(null);
   const selected = countryByCode(country);
-  const hinted = country == null ? countryByCode(suggestion) : null;
   const matches = searchCountries(query);
   useEffect(() => {
     if (!open) return;
@@ -350,11 +347,6 @@ function CountryPicker({
       >
         <span id="country-value">{selected ? selected.name : 'International'}</span>
       </button>
-      {hinted && (
-        <button type="button" className="country-suggest" onClick={() => onChange(hinted.code)}>
-          Suggested: {hinted.name}
-        </button>
-      )}
       {open && (
         <div className="country-panel">
           <input
@@ -424,22 +416,18 @@ export function NicknameScreen({
 /** Optional country step. International is the selection until the player picks one. */
 export function CountryChoice({
   initialCountry = null,
-  suggestion = null,
   submitLabel,
   onSubmit,
 }: {
   initialCountry?: string | null;
-  /** Locale hint. Shown as a one-tap chip only while no country is selected. */
-  suggestion?: string | null;
-  /** Settings uses a fixed label. The first question names the current choice. */
+  /** Settings uses SAVE. The country question uses Continue. */
   submitLabel?: string;
   onSubmit: (country: string | null) => void | string | Promise<void | string | undefined>;
 }) {
   const [country, setCountry] = useState<string | null>(() => countryByCode(initialCountry)?.code ?? null);
   const [busy, setBusy] = useState(false);
   const [issue, setIssue] = useState<string | null>(null);
-  const selected = countryByCode(country);
-  const label = submitLabel ?? (selected ? `Use ${selected.name}` : 'International');
+  const label = submitLabel ?? 'Continue';
   return (
     <form
       className="nick-form"
@@ -455,7 +443,7 @@ export function CountryChoice({
         })();
       }}
     >
-      <CountryPicker country={country} suggestion={suggestion} onChange={setCountry} />
+      <CountryPicker country={country} onChange={setCountry} />
       {issue && <p className="nick-error" role="alert">{issue}</p>}
       <button type="submit" className="btn primary" disabled={busy}>{busy ? 'SAVING' : label}</button>
     </form>
@@ -467,7 +455,6 @@ export function CountryScreen({
 }: {
   onSave: (country: string | null) => void | string | Promise<void | string | undefined>;
 }) {
-  const [suggestion] = useState(() => suggestedCountry());
   return (
     <div className="screen settings nick-screen">
       <div className="card nick-card">
@@ -478,7 +465,7 @@ export function CountryScreen({
           It is not shown next to your name. A country board appears once {COUNTRY_BOARD_MIN} players have joined.
           Your kit does not choose a country. You can change or remove this later.
         </p>
-        <CountryChoice suggestion={suggestion} onSubmit={onSave} />
+        <CountryChoice onSubmit={onSave} />
       </div>
     </div>
   );

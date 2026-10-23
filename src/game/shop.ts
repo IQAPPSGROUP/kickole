@@ -1,5 +1,3 @@
-import type { EntitlementSource } from '../billing/types';
-import { grantLaunchCollection, markCoinOwned } from '../billing/entitlement';
 import { normalizeAppearance, type Appearance } from './appearance';
 import {
   BOOTS,
@@ -26,6 +24,7 @@ import {
   milestoneMet,
   packsGrantedBy,
   shopPackForProduct,
+  type EntitlementSource,
   type OutfitId,
   type ShopPackId,
 } from './outfits';
@@ -90,14 +89,6 @@ export interface WardrobeLocker {
 export const WARDROBE_VERSION = 3;
 const LEGACY_SKIN_VERSION = 2;
 
-export interface NormalizeLockerOptions {
-  /**
-   * Native builds may trust an apple/google cache until the store answers.
-   * Web must not: a hand-edited source string is not a receipt.
-   */
-  trustStoreCache?: boolean;
-}
-
 export const EMPTY_CHALLENGES: ChallengeProgress = {
   alternateFoot: 0,
   stalls: 0,
@@ -132,11 +123,21 @@ export function canAfford(locker: WardrobeLocker, unlock: UnlockRequirement): bo
   return locker.coins >= unlock.price;
 }
 
-/** @deprecated Prefer grantLaunchCollection from billing/entitlement after store verification. */
+function markCoinOwned(locker: WardrobeLocker, itemId: string): WardrobeLocker {
+  const granted = locker.launchGrantedItemIds.filter((id) => id !== itemId);
+  return { ...locker, launchGrantedItemIds: granted };
+}
+
+/** This build does not grant store items. A saved receipt stays unused. */
 export function applyLaunchCollection(locker: WardrobeLocker): WardrobeLocker {
-  // Development helper only. Production / TestFlight bundles must not grant dev_sim.
-  if (import.meta.env.PROD) return locker;
-  return grantLaunchCollection(locker, 'dev_sim', null);
+  return {
+    ...locker,
+    launchCollectionOwned: false,
+    launchGrantedItemIds: [],
+    entitlementSource: 'none',
+    entitlementVerifiedAt: 0,
+    entitlementTransactionRef: null,
+  };
 }
 
 export type ShopFailure = 'unknown' | 'broke' | 'locked' | 'billing_unavailable' | 'pending';
@@ -257,10 +258,7 @@ function mapBootId(id: string): string | null {
   return mapped && isBootId(mapped) ? mapped : null;
 }
 
-export function normalizeLocker(
-  raw: RawSaveFields | null | undefined,
-  options?: NormalizeLockerOptions,
-): WardrobeLocker {
+export function normalizeLocker(raw: RawSaveFields | null | undefined): WardrobeLocker {
   const storedVersion = typeof raw?.wardrobeVersion === 'number' && Number.isFinite(raw.wardrobeVersion)
     ? Math.floor(raw.wardrobeVersion)
     : 0;
@@ -326,16 +324,6 @@ export function normalizeLocker(
     });
   }
 
-  const entitlementSource = parseEntitlementSource(raw?.entitlementSource);
-  const entitlementVerifiedAt = typeof raw?.entitlementVerifiedAt === 'number' && raw.entitlementVerifiedAt > 0
-    ? Math.floor(raw.entitlementVerifiedAt)
-    : 0;
-  const entitlementTransactionRef = typeof raw?.entitlementTransactionRef === 'string'
-    ? raw.entitlementTransactionRef
-    : null;
-  const launchGrantedItemIds = Array.isArray(raw?.launchGrantedItemIds)
-    ? raw.launchGrantedItemIds.filter((id): id is string => typeof id === 'string')
-    : [];
   const dances = normalizeDances({
     danceRank,
     ownedDances: raw?.ownedDances,
@@ -348,7 +336,7 @@ export function normalizeLocker(
     ? Math.floor(raw.best)
     : 0;
   const cosmeticSource = parseEntitlementSource(raw?.cosmeticSource);
-  const keepCosmetic = keepStoreCosmetic(cosmeticSource, options?.trustStoreCache === true, import.meta.env.PROD);
+  const keepCosmetic = keepStoreCosmetic(cosmeticSource, false, import.meta.env.PROD);
   const ownedOutfits = keepCosmetic && Array.isArray(raw?.ownedOutfits)
     ? raw.ownedOutfits.filter((id): id is OutfitId => typeof id === 'string' && isOutfitId(id) && !earnedOutfit(id))
     : [];
@@ -364,14 +352,6 @@ export function normalizeLocker(
   )
     ? equippedCandidate.id
     : null;
-
-  // A bare boolean is not proof. On web, apple/google strings are not proof either.
-  // Native builds may keep that cache and re-check it with the store.
-  const trustStoreCache = options?.trustStoreCache === true;
-  const cachedOwned = raw?.launchCollectionOwned === true && (
-    entitlementSource === 'dev_sim'
-    || (trustStoreCache && (entitlementSource === 'apple' || entitlementSource === 'google'))
-  );
 
   const bodyChosen = raw?.bodyChosen === true
     ? true
@@ -405,19 +385,6 @@ export function normalizeLocker(
     ownedPacks,
     wardrobeVersion: WARDROBE_VERSION,
   };
-
-  if (cachedOwned) {
-    // In production web builds, ignore dev_sim caches.
-    if (entitlementSource === 'dev_sim' && import.meta.env.PROD) {
-      return locker;
-    }
-    locker = grantLaunchCollection(
-      { ...locker, launchGrantedItemIds },
-      entitlementSource as 'apple' | 'google' | 'dev_sim',
-      entitlementTransactionRef,
-      entitlementVerifiedAt || Date.now(),
-    );
-  }
   return locker;
 }
 

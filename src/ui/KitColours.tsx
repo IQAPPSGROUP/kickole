@@ -3,32 +3,27 @@ import {
   KIT_COLOURS,
   getKitColour,
   type KitColour,
-  type KitColourGroup,
+  type KitKind,
 } from '../game/kitColours';
 import type { SaveData } from '../game/storage';
 
-function groupLabel(group: KitColourGroup): string {
-  switch (group) {
+function groupLabel(kind: KitKind): string {
+  switch (kind) {
     case 'neutral':
       return 'Neutral';
-    case 'country':
-      return 'Countries';
+    case 'nation':
+      return 'Kits';
     default: {
-      const neverGroup: never = group;
-      return neverGroup;
+      const neverKind: never = kind;
+      return neverKind;
     }
   }
 }
 
 function ColourChips({ option }: { option: KitColour }) {
-  const chips = [
-    ['shirt', option.clothing.shirt],
-    ['shorts', option.clothing.shorts],
-    ['socks', option.clothing.socks],
-  ] as const;
   return (
     <span className="kit-chips" aria-hidden="true">
-      {chips.map(([part, colour]) => <i key={part} style={{ background: colour }} />)}
+      {option.colours.map((colour, index) => <i key={`${option.id}-${index}`} style={{ background: colour }} />)}
     </span>
   );
 }
@@ -47,38 +42,35 @@ export function KitColoursScreen({
   const current = getKitColour(selected);
   const needle = query.trim().toLowerCase();
   const visible = useMemo(
-    () => KIT_COLOURS.filter((option) => option.name.toLowerCase().includes(needle)),
+    () => KIT_COLOURS.filter((option) => option.label.toLowerCase().includes(needle)),
     [needle],
   );
-  const groups: KitColourGroup[] = ['neutral', 'country'];
+  const kinds: KitKind[] = ['neutral', 'nation'];
 
   return (
     <div className="screen settings wardrobe">
       <div className="card wardrobe-card kit-card">
-        <h2>KIT COLOURS</h2>
+        <h2>Choose your kit</h2>
         <p className="shop-lead">
-          Plain shirt, shorts and socks. Pick a country or a neutral kit. No crests, badges, flags or sponsors.
+          Plain blocks, stripes, hoops, halves or a sash. Flag colours only. No crests, badges or sponsors.
         </p>
-        <p className="shop-note">Saved on this device. Neutral is the default. The basic football kit uses these colours.</p>
-        {save.equippedOutfit && (
-          <p className="shop-note">A costume is covering the kit. These colours show when the football kit is on.</p>
-        )}
+        <p className="shop-note">Saved on this device. Neutral is the default.</p>
         {!current && <p className="shop-note">Saved colours stay on the kit until you pick one from the list.</p>}
         <label className="kit-search-label" htmlFor="kit-colour-search">Find a kit</label>
         <input
           id="kit-colour-search"
           className="kit-search"
           value={query}
-          placeholder="Country or neutral"
+          placeholder="Name"
           onChange={(event) => setQuery(event.target.value)}
         />
-        <div className="kit-list" role="listbox" aria-label="Kit colours">
-          {groups.map((group) => {
-            const rows = visible.filter((option) => option.group === group);
+        <div className="kit-list" role="listbox" aria-label="Choose your kit">
+          {kinds.map((kind) => {
+            const rows = visible.filter((option) => option.kind === kind);
             if (rows.length === 0) return null;
             return (
-              <div key={group} className="kit-group">
-                <h3>{groupLabel(group)}</h3>
+              <div key={kind} className="kit-group">
+                <h3>{groupLabel(kind)}</h3>
                 {rows.map((option) => {
                   const on = option.id === selected;
                   return (
@@ -91,7 +83,7 @@ export function KitColoursScreen({
                       onClick={() => onPick(option.id)}
                     >
                       <ColourChips option={option} />
-                      <span>{option.name}</span>
+                      <span>{option.label}</span>
                     </button>
                   );
                 })}

@@ -1,20 +1,8 @@
-import {
-  createDefaultPurchaseService,
-  PurchaseService,
-  shouldIgnoreStaleRevoke,
-  shouldKeepRecentGrant,
-} from '../billing/PurchaseService';
-import { restoreBillingMessage } from '../billing/restoreMessage';
-import {
-  shouldRefreshEntitlementsOnResume,
-  STORE_UNAVAILABLE_MESSAGE,
-} from '../billing/storeCopy';
-import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct } from '../billing/types';
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
 import { trickRepeatLeft } from '../engine/trickRepeat';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
-import { getKitColour } from './kitColours';
+import { clothingFor, getKitColour } from './kitColours';
 import { beatClock, cheer, setBed, setEnabledTracks, setSongChoice, sfx, skipTrack, unlockAudio } from './audio';
 import {
   applyPromptAction,
@@ -39,21 +27,12 @@ import { playHaptic, type HapticCue } from './haptics';
 import { prefersReducedMotion, swoopStrength } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
 import { normalizeEnabledTracks, SHUFFLE_SONG, toggleEnabled, type GameTrackId } from './tracks';
-import {
-  buyOrEquipBoot,
-  buyOrEquipKit,
-  equipOutfit,
-  equipOwnedDance,
-  keepTesterWear,
-  rememberDevCosmetic,
-  type ChallengeProgress,
-} from './shop';
+import { type ChallengeProgress } from './shop';
 import {
   choosePlayerBody,
   applyGraphicsPatch,
   loadSave,
   loadSettings,
-  peekEquippedCosmetics,
   persistSave,
   saveRun,
   saveSettings,
@@ -111,13 +90,6 @@ export interface Snapshot {
   settings: Settings;
   skin: Skin;
   result: Result | null;
-  launchProduct: StoreProduct | null;
-  cosmeticProducts: StoreProduct[];
-  billingPlatform: BillingPlatform;
-  billingMessage: string | null;
-  billingBusy: boolean;
-  /** True only while the iOS receipt is the TestFlight sandbox receipt. */
-  testerUnlock: boolean;
 }
 
 /** Glues the engine to storage, audio, haptics and React (via subscribe/getSnapshot). */
@@ -142,100 +114,16 @@ export class GameController {
   private prompts: PromptClock = freshClock([], true);
   /** The thigh and rainbow finish events are followed by a kick in the same turn. */
   private suppressKickPrompt = false;
-  private readonly billing: PurchaseService = createDefaultPurchaseService();
-  private billingMessage: string | null = null;
-  private billingBusy = false;
-  private billingReady: Promise<void>;
-  /** Bumped when a live store event lands, so an older refresh cannot overwrite it. */
-  private entitlementEpoch = 0;
-  /** Drops a stale not-owned event that arrives just after a grant. */
-  private grantGuardUntil = 0;
-  /** Runtime receipt check. Never set from dev_sim or a build flag. */
-  private testerUnlock = false;
-  /** Costume the tester picked. Restored after a store sync without granting ownership. */
-  private testerWorn = { outfit: null as string | null, boot: null as string | null };
   /** Pause menu is open, so the ball stays where it is. */
   private playHeld = false;
-  private readonly onVisibility = () => {
-    if (!shouldRefreshEntitlementsOnResume(this.billing.platform, document.visibilityState)) return;
-    void this.pullEntitlements();
-  };
 
   constructor() {
     this.engine.prepare('menu');
     this.prompts = beginRun(this.save.learnedTricks, this.settings.hints);
     this.engine.on((e) => this.onEvent(e));
-    this.billing.setEntitlementListener((snapshot) => this.applyBillingSnapshot(snapshot));
     setEnabledTracks(this.settings.enabledSongs);
     setSongChoice(this.settings.song);
     this.snapshot = this.build();
-    this.billingReady = this.initBilling();
-    if (this.billing.platform !== 'web' && typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', this.onVisibility);
-    }
-  }
-
-  private async initBilling() {
-    this.testerWorn = peekEquippedCosmetics();
-    try {
-      await this.billing.init();
-      this.testerUnlock = this.billing.testerUnlock;
-    } catch {
-      this.testerUnlock = false;
-      this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
-    }
-    try {
-      await this.pullEntitlements();
-    } catch {
-      this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
-    }
-    if (this.testerUnlock) {
-      this.save = { ...this.save, ...keepTesterWear(this.save, this.testerWorn.outfit, this.testerWorn.boot) };
-      persistSave(this.save);
-    }
-    this.publish();
-  }
-
-  private async pullEntitlements() {
-    const epoch = this.entitlementEpoch;
-    const next = await this.billing.syncEntitlements(this.save) as SaveData;
-    if (epoch !== this.entitlementEpoch) return;
-    if (shouldKeepRecentGrant(this.save.launchCollectionOwned, next.launchCollectionOwned, this.grantGuardUntil, Date.now())) {
-      return;
-    }
-    const packed = await this.billing.syncPacks(next);
-    let save = { ...this.save, ...packed.locker } as SaveData;
-    if (this.testerUnlock) save = { ...save, ...keepTesterWear(save, this.testerWorn.outfit, this.testerWorn.boot) };
-    this.save = save;
-    persistSave(this.save);
-    this.publish();
-  }
-
-  private applyBillingSnapshot(snapshot: EntitlementSnapshot) {
-    if (shouldIgnoreStaleRevoke(snapshot, this.grantGuardUntil, Date.now())) return;
-    if (snapshot.owned && (snapshot.source === 'apple' || snapshot.source === 'google')) {
-      this.grantGuardUntil = Date.now() + 10_000;
-    }
-    this.entitlementEpoch += 1;
-    const before = this.save.launchCollectionOwned;
-    const next = this.billing.applyStoreSnapshot(this.save, snapshot);
-    this.save = { ...this.save, ...next };
-    if (before !== next.launchCollectionOwned) {
-      this.billingMessage = next.launchCollectionOwned
-        ? 'Launch Collection unlocked.'
-        : 'Launch Collection is no longer on this store account.';
-    }
-    persistSave(this.save);
-    this.publish();
-  }
-
-  private failedBilling(): PurchaseResult {
-    this.billingMessage = STORE_UNAVAILABLE_MESSAGE;
-    return {
-      outcome: 'failed',
-      entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null },
-      message: STORE_UNAVAILABLE_MESSAGE,
-    };
   }
 
   subscribe = (fn: () => void) => {
@@ -245,17 +133,11 @@ export class GameController {
 
   getSnapshot = () => this.snapshot;
 
-  private liveSkin(preview?: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }): Skin {
-    const outfitId = preview && 'outfitId' in preview ? preview.outfitId : this.save.equippedOutfit;
-    return composePlayerSkin(
-      this.save.appearance,
-      preview?.kitId ?? this.save.equippedKit,
-      preview?.bootId ?? this.save.equippedBoot,
-      { outfitId },
-    );
+  private liveSkin(): Skin {
+    return composePlayerSkin(this.save.appearance);
   }
 
-  private build(preview?: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }): Snapshot {
+  private build(): Snapshot {
     const e = this.engine;
     const armed = e.selectedTrick;
     return {
@@ -280,20 +162,14 @@ export class GameController {
       },
       save: this.save,
       settings: this.settings,
-      skin: this.liveSkin(preview),
+      skin: this.liveSkin(),
       result: this.result,
-      launchProduct: this.billing.launchProduct,
-      cosmeticProducts: this.billing.cosmeticProducts,
-      billingPlatform: this.billing.platform,
-      billingMessage: this.billingMessage,
-      billingBusy: this.billingBusy,
-      testerUnlock: this.testerUnlock,
     };
   }
 
-  private publish(preview?: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }) {
+  private publish() {
     this.noteMilestones();
-    this.snapshot = this.build(preview);
+    this.snapshot = this.build();
     this.listeners.forEach((l) => l());
   }
 
@@ -654,16 +530,6 @@ export class GameController {
     this.publish();
   }
 
-  equipDance(id: string): boolean {
-    const result = equipOwnedDance(this.save, id);
-    if (!result.ok) return false;
-    this.save = { ...this.save, ...result.locker };
-    this.engine.equippedDance = this.save.equippedDance;
-    persistSave(this.save);
-    this.publish();
-    return true;
-  }
-
   play() {
     this.feedback = null;
     this.result = null;
@@ -752,14 +618,14 @@ export class GameController {
     this.publish();
   }
 
-  /** Free country or neutral kit colour. Saved on this device. Unknown ids are ignored. */
+  /** Free kit. Saved on this device. Unknown ids are ignored. */
   setKitColour(id: string) {
     const option = getKitColour(id);
     if (!option) return;
     this.setAppearance({
       ...this.save.appearance,
       kitColourId: option.id,
-      clothing: { ...option.clothing },
+      clothing: clothingFor(option),
     });
   }
 
@@ -767,155 +633,5 @@ export class GameController {
   chooseBody(body: Appearance['body']) {
     this.save = choosePlayerBody(this.save, body);
     this.publish();
-  }
-
-  /** Buy or equip a boot. Returns false when broke/locked/unknown. */
-  buyBoot(id: string): boolean {
-    const result = buyOrEquipBoot(this.save, id, this.testerUnlock);
-    this.save = { ...this.save, ...result.locker };
-    if (result.ok) {
-      if (this.testerUnlock) this.testerWorn = { ...this.testerWorn, boot: result.locker.equippedBoot };
-      persistSave(this.save);
-    }
-    this.publish();
-    return result.ok;
-  }
-
-  buyKit(id: string): boolean {
-    const result = buyOrEquipKit(this.save, id);
-    this.save = { ...this.save, ...result.locker };
-    if (result.ok) persistSave(this.save);
-    this.publish();
-    return result.ok;
-  }
-
-  /** Equip a themed outfit the player already owns, or pass null to wear the kit. */
-  wearOutfit(id: string | null): boolean {
-    const result = equipOutfit(this.save, id, this.testerUnlock);
-    this.save = { ...this.save, ...result.locker };
-    if (result.ok) {
-      if (this.testerUnlock) this.testerWorn = { ...this.testerWorn, outfit: result.locker.equippedOutfit };
-      persistSave(this.save);
-    }
-    this.publish();
-    return result.ok;
-  }
-
-  /**
-   * Development dress-up for local previews. Production builds do not grant
-   * the cosmetic and do not write it into the save.
-   */
-  debugWear(id: string | null) {
-    if (import.meta.env.PROD) return;
-    this.save = { ...this.save, ...rememberDevCosmetic(this.save, id) };
-    persistSave(this.save);
-    this.publish();
-  }
-
-  /** Preview a locked/unowned item without equipping it. */
-  previewEquipment(opts: { kitId?: string | null; bootId?: string | null; outfitId?: string | null }) {
-    this.publish(opts);
-  }
-
-  clearPreview() {
-    this.publish();
-  }
-
-  async purchaseLaunchCollection(): Promise<PurchaseResult> {
-    try {
-      await this.billingReady;
-    } catch {
-      return this.failedBilling();
-    }
-    if (this.billingBusy) {
-      return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Purchase already in progress.' };
-    }
-    this.billingBusy = true;
-    this.billingMessage = null;
-    this.publish();
-    try {
-      const { result, locker } = await this.billing.purchase(this.save);
-      this.save = { ...this.save, ...locker };
-      if (result.outcome === 'purchased' || result.outcome === 'restored' || result.outcome === 'already_owned') {
-        if (this.save.launchCollectionOwned) this.grantGuardUntil = Date.now() + 10_000;
-        persistSave(this.save);
-      }
-      this.billingMessage = result.message
-        ?? (result.outcome === 'failed' || result.outcome === 'unavailable' ? STORE_UNAVAILABLE_MESSAGE : null);
-      return result;
-    } catch {
-      return this.failedBilling();
-    } finally {
-      this.billingBusy = false;
-      this.publish();
-    }
-  }
-
-  async purchasePack(productId: string): Promise<PurchaseResult> {
-    try {
-      await this.billingReady;
-    } catch {
-      return this.failedBilling();
-    }
-    if (this.billingBusy) {
-      return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Purchase already in progress.' };
-    }
-    this.billingBusy = true;
-    this.billingMessage = null;
-    this.publish();
-    try {
-      const { result, locker } = await this.billing.purchasePack(this.save, productId);
-      this.save = { ...this.save, ...locker };
-      if (result.outcome === 'purchased' || result.outcome === 'restored' || result.outcome === 'already_owned') {
-        persistSave(this.save);
-      }
-      this.billingMessage = result.message
-        ?? (result.outcome === 'failed' || result.outcome === 'unavailable' ? STORE_UNAVAILABLE_MESSAGE : null);
-      return {
-        outcome: result.outcome,
-        entitlement: { owned: false, source: result.source, verifiedAt: 0, transactionRef: null },
-        message: result.message,
-      };
-    } catch {
-      return this.failedBilling();
-    } finally {
-      this.billingBusy = false;
-      this.publish();
-    }
-  }
-
-  async restorePurchases(): Promise<PurchaseResult> {
-    try {
-      await this.billingReady;
-    } catch {
-      return this.failedBilling();
-    }
-    if (this.billingBusy) {
-      return { outcome: 'busy', entitlement: { owned: false, source: 'none', verifiedAt: 0, transactionRef: null }, message: 'Please wait.' };
-    }
-    this.billingBusy = true;
-    this.billingMessage = null;
-    this.publish();
-    try {
-      const restored = await this.billing.restore(this.save);
-      const packed = await this.billing.syncPacks(restored.locker);
-      const result = restored.result;
-      this.save = { ...this.save, ...packed.locker };
-      if (this.save.launchCollectionOwned) this.grantGuardUntil = Date.now() + 10_000;
-      persistSave(this.save);
-      this.billingMessage = restoreBillingMessage({
-        outcome: result.outcome,
-        launchOwned: result.entitlement.owned,
-        launchMessage: result.message,
-        packsConfirmed: packed.confirmed,
-        ownedPacks: this.save.ownedPacks,
-      });
-      return result;
-    } catch {
-      return this.failedBilling();
-    } finally {
-      this.billingBusy = false;
-      this.publish();
-    }
   }
 }

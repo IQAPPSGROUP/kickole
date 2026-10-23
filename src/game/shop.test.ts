@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { grantLaunchCollection, revokeLaunchCollection } from '../billing/entitlement';
-import { BOOTS, KITS, LAUNCH_COLLECTION_ITEM_IDS, STARTER_BOOT_ID, STARTER_KIT_ID, UNLOCK_TIERS } from './catalogue';
+import { BOOTS, KITS, STARTER_BOOT_ID, STARTER_KIT_ID, UNLOCK_TIERS } from './catalogue';
 import {
   buyOrEquipBoot,
   buyOrEquipKit,
@@ -101,37 +100,19 @@ describe('shop economy', () => {
     expect(migrated.equippedBoot).toBe('boot-gold');
   });
 
-  it('Launch Collection ownership bypasses coin/challenge gates for launch items', () => {
+  it('does not unlock launch boots from a saved store receipt', () => {
     const legend = BOOTS.find((b) => b.id === 'boot-legend-spike')!;
-    const granted = grantLaunchCollection(normalizeLocker(null), 'apple', 'apple:test');
-    expect(granted.coins).toBe(0);
-    expect(meetsChallenge(granted.challenges, legend.unlock)).toBe(false);
-    const equip = buyOrEquipBoot(granted, legend.id);
-    expect(equip.ok).toBe(true);
-    if (equip.ok) {
-      expect(equip.locker.equippedBoot).toBe(legend.id);
-      expect(equip.locker.coins).toBe(0);
-    }
-  });
-
-  it('Launch Collection grant/revoke keeps coin-bought items', () => {
-    const start = normalizeLocker({ coins: 2500 });
-    const club = BOOTS.find((b) => b.id === 'boot-beach-wave')!;
-    const paid = buyOrEquipBoot(start, club.id);
-    expect(paid.ok).toBe(true);
-    const unlocked = grantLaunchCollection(paid.ok ? paid.locker : start, 'apple', 'apple:test');
-    expect(unlocked.launchCollectionOwned).toBe(true);
-    expect(unlocked.entitlementSource).toBe('apple');
-    for (const id of LAUNCH_COLLECTION_ITEM_IDS) {
-      if (id.startsWith('boot-')) expect(unlocked.ownedBoots).toContain(id);
-      if (id.startsWith('kit-')) expect(unlocked.ownedKits).toContain(id);
-    }
-    // Coin-bought beach wave is no longer in launchGranted after markCoinOwned.
-    expect(unlocked.launchGrantedItemIds).not.toContain('boot-beach-wave');
-    const revoked = revokeLaunchCollection(unlocked);
-    expect(revoked.launchCollectionOwned).toBe(false);
-    expect(revoked.ownedBoots).toContain('boot-beach-wave');
-    expect(revoked.ownedBoots).not.toContain('boot-legend-spike');
+    const saved = normalizeLocker({
+      launchCollectionOwned: true,
+      entitlementSource: 'apple',
+      entitlementTransactionRef: 'apple:test',
+      launchGrantedItemIds: [legend.id],
+    });
+    expect(saved.launchCollectionOwned).toBe(false);
+    expect(saved.entitlementSource).toBe('none');
+    expect(meetsChallenge(saved.challenges, legend.unlock)).toBe(false);
+    const equip = buyOrEquipBoot(saved, legend.id);
+    expect(equip.ok).toBe(false);
   });
 
   it('ignores a hand-edited launchCollectionOwned boolean without store source', () => {
@@ -140,7 +121,7 @@ describe('shop economy', () => {
     expect(forged.ownedBoots).toEqual([STARTER_BOOT_ID]);
   });
 
-  it('does not unlock a hand-edited apple or google entitlement unless the native cache is trusted', () => {
+  it('does not restore a saved apple or google entitlement', () => {
     const forged = normalizeLocker({
       launchCollectionOwned: true,
       entitlementSource: 'apple',
@@ -154,10 +135,10 @@ describe('shop economy', () => {
       entitlementSource: 'google',
       entitlementVerifiedAt: 40,
       launchGrantedItemIds: ['boot-gold'],
-    }, { trustStoreCache: true });
-    expect(cached.launchCollectionOwned).toBe(true);
-    expect(cached.entitlementSource).toBe('google');
-    expect(cached.ownedBoots).toContain('boot-gold');
+    });
+    expect(cached.launchCollectionOwned).toBe(false);
+    expect(cached.entitlementSource).toBe('none');
+    expect(cached.ownedBoots).not.toContain('boot-gold');
   });
 
   it('applies a legacy skin once and then keeps a customised look', () => {

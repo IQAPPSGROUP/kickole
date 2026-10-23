@@ -1,5 +1,6 @@
 import type { Appearance, PlayerBody } from './appearance';
 import { getBoot, getKit, STARTER_BOOT_ID, STARTER_KIT_ID, type BootDesign, type KitDesign, type SurfacePattern } from './catalogue';
+import { clothingFor, getKitColour, type KitPattern } from './kitColours';
 import { COWBOY_BOOT_ID, getOutfit, type OutfitPattern } from './outfits';
 
 export interface Skin {
@@ -19,6 +20,8 @@ export interface Skin {
   /** Pale multiply on the skin photograph. Null leaves the face alone. */
   skinTint?: string | null;
   patternPaint?: OutfitPattern | null;
+  /** Free kit sheet. Null when a costume replaces the football kit. */
+  kitPaint?: { pattern: KitPattern; colours: readonly string[] } | null;
   bootStyle?: 'studs' | 'cowboy';
 }
 
@@ -88,9 +91,9 @@ export function composePlayerSkin(
   const kit = preview?.kit ?? getKit(kitId);
   const boot = preview?.boot ?? getBoot(bootId);
   const outfit = getOutfit(preview?.outfitId);
-  // Starter kit defers to free clothing colours; purchased kits keep their authored palette.
-  // A themed outfit replaces the kit cloth and keeps the footballer's face unless it tints it.
-  const clothing = outfit ? { ...outfit.clothing } : kit.id === STARTER_KIT_ID ? { ...appearance.clothing } : { ...kit.clothing };
+  const look = getKitColour(appearance.kitColourId);
+  // A costume replaces the football kit. Otherwise the free kit sheet wins, including over a saved shop kit.
+  const clothing = outfit ? { ...outfit.clothing } : look ? clothingFor(look) : { ...appearance.clothing };
   const cowboy = boot.id === COWBOY_BOOT_ID;
   return {
     id: `live:${outfit?.id ?? kit.id}:${boot.id}:${appearance.body}`,
@@ -115,6 +118,7 @@ export function composePlayerSkin(
     outfitId: outfit?.id ?? null,
     skinTint: outfit?.skinTint ?? null,
     patternPaint: outfit?.pattern ?? null,
+    kitPaint: outfit || !look ? null : { pattern: look.pattern, colours: look.colours },
     bootStyle: cowboy ? 'cowboy' : 'studs',
   };
 }

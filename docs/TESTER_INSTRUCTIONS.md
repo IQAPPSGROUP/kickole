@@ -2,55 +2,14 @@
 
 Use these notes for **TestFlight** and **Google Play internal testing**. Public App Store / Play production must stay unpublished until the remaining blockers in [`RELEASE_VALIDATION.md`](./RELEASE_VALIDATION.md) are cleared.
 
-## What is free
+## What to check
 
-- **Customise** (skin tone, hair colour, hair silhouette, basic clothing colours) is always free.
-- Starter boots and kit (**Street Classic**) are free.
-- Coins are earned from play and spend only on shop boots/kits. Boots and kits are **cosmetic only** — they never change timing or scoring.
-
-## How to earn unlocks
-
-1. Complete scoring runs. Coins = floor(run score).
-2. Open **Shop**. Locked items show their **exact** coin price and any lifetime challenge (alternating feet, stalls, perfect touches).
-3. Buy when you meet the requirement, or **Equip** once owned.
-4. Challenge counters stay earned through play. Buying the Launch Collection unlocks the launch cosmetics, including ones that otherwise need those challenges. It does **not** mark the challenges complete.
-
-| Tier | Coins | Challenge |
-| --- | --- | --- |
-| Club | 2,500 | — |
-| Street | 7,500 | Alternating foot touches (lifetime) |
-| Freestyle | 15,000 | Foot stalls (lifetime) |
-| Legend | 30,000 | Perfect touches (lifetime) |
-
-## Kickolé Launch Collection (paid)
-
-- **One-time** non-consumable purchase on the **iOS App Store** or **Google Play** only.
-- Unlocks **this launch collection only** (all 14 launch boots and kits, including Street, Freestyle and Legend items that otherwise need challenge progress). Future collections are separate.
-- Price shown in the app is the **store’s localised price** (UK list target £2.99).
-- Free customise stays free. The purchase does not complete challenge counters.
-- **Restore Purchases** reloads entitlement for the **same store account**. Apple purchases do **not** transfer to Google Play (and vice versa).
-- Refunds may remove paid unlocks; items you bought with coins remain.
-
-### How to test purchases (sandbox / licence testers only)
-
-**Do not use real production payment instruments for automated or exploratory tests.**
-
-**iOS:** Sandbox Apple ID or StoreKit Configuration in Xcode; TestFlight uses sandbox for IAP. Cover success, cancel, Ask to Buy / pending, airplane mode during purchase, force-quit mid-flow, double-tap purchase, restore with/without ownership, reinstall, second device same Apple ID, refund via App Store Connect if available.
-
-**Android:** Add the Google account under Play Console → License testing. Buy packs with Google’s free test card (Test card, always approves). The app does not unlock outfits because the install is on a closed or internal track — Play cannot tell that apart from production. Cover PURCHASED vs PENDING, cancel, network loss, restore, reinstall, second device on the same Google account, and revoke. An internal-track tester who is not a license tester can still be charged.
-
-**Web / browser:** Purchases are unavailable. Development `?simPurchase=1` must **not** grant real ownership in production builds.
-
-## Restore after reinstall
-
-1. Install from TestFlight or Play internal track.
-2. Sign in with the **same** Apple / Google account used for the purchase.
-3. Open Shop → **Restore Purchases**.
-4. Launch boots and kits become owned when that account bought the Launch Collection. Shop packs become owned when that account bought them, including a Play license-tester purchase made with the free test card. Restore says the packs were restored even when the Launch Collection was not bought. Coin balance and earned items from a previous install are **local** — they do not sync across devices unless you still have the same device save.
+- **Choose your kit** on the menu, in Settings, and in Customise. Neutral is the default. The choice stays on the device.
+- There is no shop, no Restore Purchases, and no in-app purchase. Do not create store products for this build.
 
 ## Device checklist (testers)
 
-- Small and larger phones; portrait safe areas; Android system Back from Shop/Customise/Settings.
-- Scroll Shop lists; player preview updates; background/resume mid-run; Low/Medium/High graphics.
+- Small and larger phones; portrait safe areas; Android system Back from Customise/Settings.
+- Kit list scrolls; the player preview updates; background/resume mid-run; Low/Medium/High graphics.
 - Hair follows the head during kicks, stalls and freestyle tricks.
 - Environments, movement and opening camera still feel correct.

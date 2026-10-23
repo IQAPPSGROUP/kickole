@@ -28,6 +28,7 @@ import { ueMovementQuaternion } from './ue-motion';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { mountOutfitSpecs } from './outfitAttach';
 import { MountedOutfit } from './outfitSkin';
+import { paintKitPattern } from './kitPattern';
 import { paintOutfitTexture } from './outfitTexture';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
@@ -232,10 +233,14 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   }, [skin, materials]);
 
   useEffect(() => {
+    const kitTexture = !skin.patternPaint && skin.kitPaint && skin.kitPaint.pattern !== 'plain'
+      ? paintKitPattern(skin.kitPaint.pattern, skin.kitPaint.colours)
+      : null;
     const painted = skin.patternPaint
       ? paintOutfitTexture(skin.patternPaint, skin.clothing.shirt, skin.clothing.shirtTrim)
-      : null;
-    const mapHoldsColour = skin.patternPaint === 'stripes'
+      : kitTexture;
+    const mapHoldsColour = Boolean(kitTexture)
+      || skin.patternPaint === 'stripes'
       || skin.patternPaint === 'chain'
       || skin.patternPaint === 'torn'
       || skin.patternPaint === 'gold';
@@ -250,7 +255,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         || material.name === MATERIAL_NAMES.shorts
         || material.name === MATERIAL_NAMES.socks
         || material.name === MATERIAL_NAMES.shirtTrim;
-      if (cloth && painted) {
+      const kitCloth = Boolean(kitTexture) && (
+        material.name === MATERIAL_NAMES.shirt
+        || material.name === MATERIAL_NAMES.shorts
+        || material.name === MATERIAL_NAMES.socks
+      );
+      if (kitCloth && painted) {
+        standard.map = painted;
+        standard.color.set('#ffffff');
+      } else if (cloth && painted && !kitTexture) {
         standard.map = painted;
         if (mapHoldsColour) standard.color.set('#ffffff');
         if (skin.patternPaint === 'gold') {

@@ -26,7 +26,7 @@ Coins = floor(run score) per completed scoring run. Run score, spendable coins a
 
 ## Launch Collection
 
-`LAUNCH_COLLECTION_ITEM_IDS` lists every launch boot and kit (14). The one-time **Kickolé Launch Collection** purchase (StoreKit 2 / Play Billing 9) grants those IDs after store verification, including items that otherwise need challenge progress. It does not complete the challenges themselves. See [`BILLING.md`](./BILLING.md). Browser builds cannot take real payments.
+The shop and the Launch Collection purchase are not in this build. Saved store receipts do not unlock items. See [`BILLING.md`](./BILLING.md).
 
 Internal testers: [`TESTER_INSTRUCTIONS.md`](./TESTER_INSTRUCTIONS.md). Store Data Safety / privacy answers: [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md). Release matrix: [`RELEASE_VALIDATION.md`](./RELEASE_VALIDATION.md).
 

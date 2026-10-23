@@ -1,4 +1,7 @@
-import type { StoreProduct } from '../billing/types';
+interface PricedProduct {
+  productId: string;
+  priceString: string;
+}
 
 /**
  * Cosmetic dances. They never change timing windows or kick scoring.
@@ -126,7 +129,7 @@ export function celebrationDance(reason: string, equipped: DanceId, owned: reado
  */
 export function dancePriceString(
   dance: DanceDesign,
-  products: readonly Pick<StoreProduct, 'productId' | 'priceString'>[],
+  products: readonly Pick<PricedProduct, 'productId' | 'priceString'>[],
 ): string | null {
   if (!dance.productId) return null;
   const price = products.find((product) => product.productId === dance.productId)?.priceString;

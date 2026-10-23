@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Result } from '../game/controller';
-import { countryByCode, countryFlag, suggestedCountry } from '../game/countries';
+import { suggestedCountry } from '../game/countries';
 import { readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
 import {
@@ -51,15 +51,13 @@ export function Logo() {
 }
 
 export function Home({
-  best, coins, onPlay, onSettings, onCustomise, onKitColours, onShop, onLeaderboard,
+  best, onPlay, onSettings, onCustomise, onKitColours, onLeaderboard,
 }: {
   best: number;
-  coins: number;
   onPlay: () => void;
   onSettings: () => void;
   onCustomise: () => void;
   onKitColours: () => void;
-  onShop: () => void;
   onLeaderboard: () => void;
 }) {
   return (
@@ -72,14 +70,12 @@ export function Home({
       <div className="home-bottom">
         <div className="pill-row">
           <div className="best-pill">BEST <b>{best}</b></div>
-          <div className="best-pill">COINS <b>{coins}</b></div>
         </div>
         <button className="btn primary big" onClick={onPlay}>LET’S PLAY <span aria-hidden="true">↗</span></button>
         <div className="home-actions">
           <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
-          <button className="btn ghost" onClick={onShop}>SHOP</button>
         </div>
-        <button className="btn ghost" onClick={onKitColours}>KIT COLOURS</button>
+        <button className="btn ghost" onClick={onKitColours}>CHOOSE YOUR KIT</button>
         <button className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
         <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
         <p className="home-help">Tap to juggle · Hold L or R to kick higher · Hold through the ball to stall</p>
@@ -90,14 +86,12 @@ export function Home({
 }
 
 export function GameOver({
-  result, best, coins, onAgain, onHome, onShop, onLeaderboard,
+  result, best, onAgain, onHome, onLeaderboard,
 }: {
   result: Result;
   best: number;
-  coins: number;
   onAgain: () => void;
   onHome: () => void;
-  onShop: () => void;
   onLeaderboard: () => void;
 }) {
   return (
@@ -105,7 +99,6 @@ export function GameOver({
       <div className="card over-card">
         <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
         <div className="final">{result.score}</div>
-        <p className="coin-earn">+{result.coinsEarned} COINS · {coins} SAVED</p>
         <div className="stats">
           <div><b>{result.kickUps}</b><span>KICK-UPS</span></div>
           <div><b>{best}</b><span>BEST</span></div>
@@ -113,10 +106,7 @@ export function GameOver({
         </div>
         <button type="button" className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
         <button className="btn primary big" onClick={onAgain} autoFocus>PLAY AGAIN</button>
-        <div className="home-actions">
-          <button className="btn ghost" onClick={onShop}>SHOP</button>
-          <button className="btn ghost" onClick={onHome}>HOME</button>
-        </div>
+        <button className="btn ghost" onClick={onHome}>HOME</button>
       </div>
     </div>
   );
@@ -195,9 +185,8 @@ const PERIODS: readonly { id: BoardPeriod; label: string; title?: string }[] = [
   { id: 'all', label: 'All time' },
 ];
 
-function entryLabel(row: BoardEntry, scope: BoardScope): string {
-  const country = scope === 'country' && row.country ? countryByCode(row.country)?.name : null;
-  return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
+function entryLabel(row: BoardEntry): string {
+  return [String(row.rank), row.nickname, String(row.score)].join(' ');
 }
 
 const BOARD_ROW_LIMIT = 50;
@@ -295,11 +284,8 @@ export function LeaderboardSheet({
           {!optedOut && !page.hidden && (
             <ol className="board">
               {rows.map((row) => (
-                <li key={`${period}:${scope}:${row.rank}:${row.nickname}`} className={`${row.mine ? 'me' : ''}${row.rank === 1 ? ' is-first' : ''}`} aria-label={entryLabel(row, scope)}>
+                <li key={`${period}:${scope}:${row.rank}:${row.nickname}`} className={`${row.mine ? 'me' : ''}${row.rank === 1 ? ' is-first' : ''}`} aria-label={entryLabel(row)}>
                   <span className="board-rank">{row.rank > 0 ? row.rank.toLocaleString('en-US') : '—'}</span>
-                  {scope === 'country' && row.country && (
-                    <span className="country-flag" aria-hidden="true">{countryFlag(row.country)}</span>
-                  )}
                   <b>{row.nickname}</b>
                   <em>{row.score}</em>
                   {!row.mine && (
@@ -430,9 +416,9 @@ export function SettingsScreen({
         <div className="settings-body">
         <h2>SETTINGS</h2>
         <div className="group">
-          <label>Kit colours</label>
-          <button type="button" className="btn ghost" onClick={onKitColours}>Choose kit colours</button>
-          <p className="shop-note">Free. Recolours the football kit and stays on this device.</p>
+          <label>Kit</label>
+          <button type="button" className="btn ghost" onClick={onKitColours}>Choose your kit</button>
+          <p className="shop-note">Free. Saved on this device. It is not sent with your score.</p>
         </div>
         <Toggle label="Leaderboard" value={leaderboardOn} onChange={onLeaderboard} />
         {blocked.length > 0 && (
@@ -525,26 +511,17 @@ export function SettingsScreen({
           <p>Tap <b>left</b> or <b>right</b> of the screen to kick with that foot just as the ball drops to the foot. A perfect touch is worth more than switching feet (+2). Ten clean touches score x2, twenty-five score x3, and fifty score x4.</p>
           <p><b>High kick:</b> press L or R early and hold. A ring fills with power — release as the ball arrives to kick higher and buy time for tricks. A quick tap stays a normal kick.</p>
           <p><b>Foot stall:</b> hold through contact on a good kick, then release to flick for +10.</p>
-          <p><b>Coins</b> are earned from run score and spent in the Shop. Skin, hair and basic colours are included. Boots and kits never change timing.</p>
           <p>Keyboard: <b>A</b>/<b>D</b> feet · <b>H</b> header · <b>N</b> neck (hold) · <b>W</b> ATW · <b>T</b> thigh · <b>F</b> flick · <b>Esc</b> cancel · <b>Space</b> start.</p>
           <p>Tap <b>ATW</b>, <b>THIGH</b>, <b>FLICK</b> or <b>GROOVE</b> once — the trick plays on the next touch. <b>HEAD</b> taps immediately. <b>NECK</b> works on a tap; hold it to stall, then release to flick out. <b>GROOVE</b> is a high kick: your dance plays while the ball is up, then you catch it on the way down. Extra points when that tap is on the beat.</p>
           <p><b>Trick hints</b> call a move, glow the button, and show a tap or a hold. Finish it before the ring empties for bonus points. Turn hints off here once you know the tricks. Each lesson is remembered on this device.</p>
           <p><b>Combos +5:</b> flick→header · header→neck→release · stall→ATW · alternating foot↔thigh. Chains expire if you wait too long or miss.</p>
         </div>
         <div className="group help">
-          <label>Purchases &amp; privacy</label>
+          <label>Privacy</label>
           <p>
-            <b>Kickolé Launch Collection</b> is an optional one-time in-app purchase on the iOS App Store and Google Play.
-            It unlocks only the launch boots and kits. There are no subscriptions, loot boxes or consumable coin packs.
-            Skin tone, hair and basic colours stay included. Purchases are processed by Apple or Google;
-            IQ Apps Group does not receive your card details. Restore Purchases reloads entitlement for the same store account.
-            Apple and Google purchases do not transfer between stores. Refunds are handled by the store and may remove paid unlocks
-            without deleting items you earned with coins.
-          </p>
-          <p>
-            Coins, appearance and purchases stay on this device. The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and the country you choose are sent for the board.
+            Kickolé has no in-app purchases. Your kit, appearance and settings stay on this device and are not sent with your score.
+            The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and the country you choose are sent for the board.
             We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A scrambled version of your internet address is kept for up to 30 days to stop cheating.
-            Purchases are verified with Apple or Google on the device; we do not log purchase tokens, receipts or credentials.
             Tap Delete my leaderboard data to remove your nickname and scores. If someone has reported you, we keep that report for up to 90 days so we can check it.
           </p>
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>

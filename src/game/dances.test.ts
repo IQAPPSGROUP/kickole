@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { grantLaunchCollection } from '../billing/entitlement';
 import { LAUNCH_COLLECTION_ITEM_IDS } from './catalogue';
 import {
   DANCES,
@@ -98,9 +97,7 @@ describe('dance shop boundaries', () => {
     }
     const start = normalizeLocker({ coins: 40, danceRank: 10, equippedDance: 'robot' });
     expect(start.ownedDances).toEqual(['sway', 'pendulum']);
-    const granted = grantLaunchCollection(start, 'apple', 'apple:opaque');
-    expect(granted.ownedDances).toEqual(start.ownedDances);
-    expect(granted.equippedDance).toBe('pendulum');
+    expect(start.equippedDance).toBe('pendulum');
     for (const id of LAUNCH_COLLECTION_ITEM_IDS) {
       expect(id.startsWith('dance')).toBe(false);
     }
@@ -131,8 +128,7 @@ describe('dance shop boundaries', () => {
     expect(forged.ownedDances).toEqual(['sway']);
     expect(forged.coins).toBe(20);
     expect(forged.launchGrantedItemIds.some((id) => id.startsWith('dance'))).toBe(false);
-    const granted = grantLaunchCollection(forged, 'dev_sim', null);
-    expect(granted.ownedDances).toEqual(['sway']);
-    expect(granted.equippedDance).toBe('sway');
+    expect(forged.ownedDances).toEqual(['sway']);
+    expect(forged.equippedDance).toBe('sway');
   });
 });

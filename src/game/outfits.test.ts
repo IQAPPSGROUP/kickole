@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { LAUNCH_COLLECTION_ITEM_IDS } from './catalogue';
-import { grantLaunchCollection } from '../billing/entitlement';
 import {
   allOutfitSpecs,
   cowboyBootSpecs,
@@ -99,9 +98,6 @@ describe('themed outfits', () => {
     expect(apple.ownedOutfits).toEqual(['alien']);
     expect(grantStoreCosmetic(apple, 'gold-legend', 'apple').ownedOutfits).toEqual(['alien']);
 
-    const launched = grantLaunchCollection(rich, 'apple', 'apple:launch');
-    expect(launched.ownedOutfits).toEqual([]);
-    expect(launched.ownedBoots).not.toContain(COWBOY_BOOT_ID);
     expect(keepStoreCosmetic('dev_sim', true, false)).toBe(false);
     expect(keepStoreCosmetic('apple', false, true)).toBe(false);
     expect(keepStoreCosmetic('apple', true, true)).toBe(true);
@@ -247,9 +243,6 @@ describe('themed outfits', () => {
     expect(all.ownedBoots).toContain(COWBOY_BOOT_ID);
     expect(all.ownedOutfits).toContain('secret-agent');
     expect(all.ownedOutfits).not.toContain('gold-legend');
-    const launched = grantLaunchCollection(fresh, 'apple', 'apple:launch');
-    expect(launched.ownedPacks).toEqual([]);
-    expect(launched.ownedOutfits).toEqual([]);
     const worn = { ...all, equippedBoot: COWBOY_BOOT_ID, equippedOutfit: 'alien' as const };
     const refunded = applyOwnedPackProducts(worn, [], 'google');
     expect(refunded.ownedPacks).toEqual([]);

@@ -1,4 +1,3 @@
-import { Capacitor } from '@capacitor/core';
 import { GAME_TRACKS, normalizeEnabledTracks, normalizeSongChoice, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 import type { Appearance, PlayerBody } from './appearance';
 import { normalizeAppearance } from './appearance';
@@ -73,15 +72,6 @@ export const DEFAULT_SETTINGS: Settings = {
   skinId: 'kicky-teal',
 };
 
-function trustNativeStoreCache(): boolean {
-  try {
-    const platform = Capacitor.getPlatform();
-    return platform === 'ios' || platform === 'android';
-  } catch {
-    return false;
-  }
-}
-
 function read<T>(key: string): Partial<T> | null {
   try {
     const raw = localStorage.getItem(key);
@@ -126,7 +116,7 @@ export function loadSave(): SaveData {
     legacySkinId: storedVersion < 2 && typeof settings?.skinId === 'string'
       ? settings.skinId
       : null,
-  }, { trustStoreCache: trustNativeStoreCache() });
+  });
   const save: SaveData = {
     ...locker,
     best: locker.best,

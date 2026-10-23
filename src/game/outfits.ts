@@ -1,5 +1,14 @@
-import type { EntitlementSource, StoreProduct } from '../billing/types';
 import type { ClothingColors, PlayerBody } from './appearance';
+
+/** Old save field. This build never grants from apple, google, or dev_sim. */
+export type EntitlementSource = 'none' | 'apple' | 'google' | 'dev_sim';
+
+interface PricedProduct {
+  productId: string;
+  priceString: string;
+  priceMicros: number;
+  currencyCode: string;
+}
 
 /**
  * Themed cosmetics. They never change kick timing or scoring.
@@ -389,7 +398,7 @@ export function everythingOwnedLine(ownedIds: readonly string[]): string | null 
  * produce no label. Price strings are not parsed or invented.
  */
 export function everythingSavingLabel(
-  products: readonly Pick<StoreProduct, 'productId' | 'priceMicros' | 'currencyCode'>[],
+  products: readonly Pick<PricedProduct, 'productId' | 'priceMicros' | 'currencyCode'>[],
 ): 'Saving' | null {
   const rows = SHOP_PACKS.map((pack) => products.find((product) => product.productId === pack.productId));
   if (rows.some((row) => !row)) return null;
@@ -431,7 +440,7 @@ export function earnedOutfit(id: string): boolean {
  */
 export function cosmeticPriceString(
   productId: string | null,
-  products: readonly Pick<StoreProduct, 'productId' | 'priceString'>[],
+  products: readonly Pick<PricedProduct, 'productId' | 'priceString'>[],
 ): string | null {
   if (!productId) return null;
   const price = products.find((product) => product.productId === productId)?.priceString;

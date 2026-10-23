@@ -75,9 +75,7 @@ export const STARTER_BOOT_ID = 'boot-street-classic';
 export const STARTER_KIT_ID = 'kit-street-classic';
 
 /**
- * Explicit launch-collection item IDs.
- * The one-time Kickolé Launch Collection IAP unlocks ONLY these — never future SKUs.
- * Paid ownership is granted only after StoreKit 2 / Play Billing verification (see docs/BILLING.md).
+ * Historical launch-collection item IDs. This build does not sell or grant them.
  */
 export const LAUNCH_COLLECTION_ITEM_IDS: readonly string[] = [
   // Boots (8)

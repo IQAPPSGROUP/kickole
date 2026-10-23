@@ -11,12 +11,6 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
   },
-  plugins: {
-    KickoleBilling: {
-      // Product id configured in both store consoles (see docs/BILLING.md).
-      launchCollectionProductId: 'kickole_launch_collection',
-    },
-  },
 };
 
 export default config;

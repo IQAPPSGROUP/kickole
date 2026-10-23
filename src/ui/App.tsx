@@ -21,12 +21,12 @@ import { NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
 import { KitColoursScreen } from './KitColours';
-import { BodySelect, CustomiseScreen, ShopScreen } from './Wardrobe';
+import { BodySelect, CustomiseScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
-type Overlay = 'none' | 'settings' | 'customise' | 'shop' | 'kit' | 'data' | 'how';
+type Overlay = 'none' | 'settings' | 'customise' | 'kit' | 'data' | 'how';
 
 const REVIEW_NICKNAME = 'Turbo Striker';
 const REVIEW_COUNTRY = 'GB';
@@ -258,7 +258,6 @@ export function App() {
   };
 
   const closeOverlay = () => {
-    controller.clearPreview();
     setOverlay('none');
   };
 
@@ -351,12 +350,10 @@ export function App() {
       {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !(reviewOpen && board) && (
         <Home
           best={snap.save.best}
-          coins={snap.save.coins}
           onPlay={startGame}
           onSettings={() => setOverlay('settings')}
           onCustomise={() => setOverlay('customise')}
           onKitColours={() => openKitColours('none')}
-          onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
       )}
@@ -394,10 +391,8 @@ export function App() {
         <GameOver
           result={REVIEW_RESULT}
           best={Math.max(snap.save.best, REVIEW_RESULT.score)}
-          coins={snap.save.coins}
           onAgain={startGame}
           onHome={() => setReviewOpen(false)}
-          onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
       )}
@@ -405,10 +400,8 @@ export function App() {
         <GameOver
           result={snap.result}
           best={snap.save.best}
-          coins={snap.save.coins}
           onAgain={startGame}
           onHome={() => controller.home()}
-          onShop={() => setOverlay('shop')}
           onLeaderboard={openBoard}
         />
       )}
@@ -465,26 +458,6 @@ export function App() {
           onBody={(body) => controller.chooseBody(body)}
           onKitColours={() => openKitColours('customise')}
           onClose={closeOverlay}
-        />
-      )}
-      {overlay === 'shop' && (
-        <ShopScreen
-          save={snap.save}
-          launchProduct={snap.launchProduct}
-          billingPlatform={snap.billingPlatform}
-          billingMessage={snap.billingMessage}
-          billingBusy={snap.billingBusy}
-          onBuyBoot={(id) => controller.buyBoot(id)}
-          onBuyKit={(id) => controller.buyKit(id)}
-          onWearOutfit={(id) => controller.wearOutfit(id)}
-          onEquipDance={(id) => controller.equipDance(id)}
-          cosmeticProducts={snap.cosmeticProducts}
-          onPurchaseLaunch={() => { void controller.purchaseLaunchCollection(); }}
-          onPurchasePack={(productId) => { void controller.purchasePack(productId); }}
-          onRestorePurchases={() => { void controller.restorePurchases(); }}
-          onPreview={(opts) => controller.previewEquipment(opts)}
-          onClose={closeOverlay}
-          testerUnlock={snap.testerUnlock}
         />
       )}
     </div>

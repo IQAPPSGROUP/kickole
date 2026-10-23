@@ -8,6 +8,7 @@ import {
   HISTORICAL_KIT,
   NEUTRAL_KIT_ID,
   clothingEquals,
+  clothingFor,
   getKitColour,
   matchKitColour,
 } from './kitColours';
@@ -50,7 +51,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   skinTone: '#E8B48F',
   hairColor: '#2A1E1A',
   kitColourId: NEUTRAL_KIT_ID,
-  clothing: { ...getKitColour(NEUTRAL_KIT_ID)!.clothing },
+  clothing: clothingFor(getKitColour(NEUTRAL_KIT_ID)!),
 };
 
 function filledClothing(raw: Partial<ClothingColors> | undefined): ClothingColors {
@@ -79,7 +80,7 @@ export function normalizeAppearance(raw: Partial<Appearance> | null | undefined)
   const requested = typeof raw?.kitColourId === 'string' ? raw.kitColourId : '';
   const preset = getKitColour(requested);
   if (preset) {
-    return { ...base, kitColourId: preset.id, clothing: { ...preset.clothing } };
+    return { ...base, kitColourId: preset.id, clothing: clothingFor(preset) };
   }
   if (!hasClothing(raw?.clothing)) {
     return { ...base, kitColourId: NEUTRAL_KIT_ID, clothing: { ...DEFAULT_APPEARANCE.clothing } };
@@ -92,6 +93,6 @@ export function normalizeAppearance(raw: Partial<Appearance> | null | undefined)
     return { ...base, kitColourId: NEUTRAL_KIT_ID, clothing: { ...DEFAULT_APPEARANCE.clothing } };
   }
   const matched = matchKitColour(clothing);
-  if (matched) return { ...base, kitColourId: matched.id, clothing: { ...matched.clothing } };
+  if (matched) return { ...base, kitColourId: matched.id, clothing: clothingFor(matched) };
   return { ...base, kitColourId: CUSTOM_KIT_ID, clothing };
 }

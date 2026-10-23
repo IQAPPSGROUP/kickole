@@ -48,7 +48,7 @@ See `docs/PREVIEW_DEPLOY.md` for preview deployment and the device test checklis
 Working and checked (unit tests, TypeScript, production build, headless-browser run driven by a timing bot): home/game/game-over screens, ball launch, timed kicks, scoring, combo, foot stall, local best, character kick/stall poses.
 Implemented but only lightly checked: settings persistence, top-5 leaderboard UI, skins (3 free, cosmetic only), sound/vibration, WebGL error state.
 
-Native packaging: Capacitor (`com.iqappsgroup.kickole`) with StoreKit 2 / Play Billing for the Kickolé Launch Collection — see [`docs/BILLING.md`](docs/BILLING.md), [`docs/TESTER_INSTRUCTIONS.md`](docs/TESTER_INSTRUCTIONS.md) and [`docs/RELEASE_VALIDATION.md`](docs/RELEASE_VALIDATION.md). iOS TestFlight builds run on Codemagic; the hand steps are in [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md). Web build remains the Cloudflare Pages target. Keep production store tracks unpublished until signed TestFlight / Play internal uploads and device billing checks are done.
+Native packaging: Capacitor (`com.iqappsgroup.kickole`). This release has no in-app purchases — see [`docs/BILLING.md`](docs/BILLING.md) and [`docs/RELEASE_VALIDATION.md`](docs/RELEASE_VALIDATION.md). iOS TestFlight builds run on Codemagic; the hand steps are in [`docs/TESTFLIGHT.md`](docs/TESTFLIGHT.md). Web build remains the Cloudflare Pages target. Keep production store tracks unpublished until signed TestFlight / Play internal uploads are done.
 
 ## Brazilian environment kit
 

@@ -1,23 +1,28 @@
 import type { ClothingColors } from './appearance';
 
 /**
- * Free kit colours. Each option tints the existing shirt, collar, shorts and socks
- * in solid blocks. National entries use that country's widely known colours.
- * They are not federation kits: no crests, badges, flags, hoops, sponsors or brand marks.
+ * Free kits. Graham can replace `pattern` and `colours` without touching the picker.
+ * Nation labels stay "Name colours". These are flag colours in simple original
+ * patterns, not federation kits: no crests, badges, flags, sponsors or brand marks.
  */
-export type KitColourGroup = 'neutral' | 'country';
+export type KitPattern = 'plain' | 'stripes' | 'hoops' | 'halves' | 'sash';
+
+export type KitKind = 'neutral' | 'nation';
 
 export interface KitColour {
   id: string;
-  name: string;
-  group: KitColourGroup;
-  clothing: ClothingColors;
+  /** Player-facing name. Nation rows use "Name colours". Never "official". */
+  label: string;
+  kind: KitKind;
+  pattern: KitPattern;
+  /** Flag colours, first to last. */
+  colours: readonly string[];
 }
 
 /** Worn until the player picks something else. */
 export const NEUTRAL_KIT_ID = 'neutral';
 
-/** Legacy swatches that do not match a listed option. Not shown in the picker. */
+/** Legacy swatches that do not match a listed kit. Not shown in the picker. */
 export const CUSTOM_KIT_ID = 'custom';
 
 /** The yellow and navy kit from before this picker. Migrates to Neutral when no id was saved. */
@@ -28,80 +33,59 @@ export const HISTORICAL_KIT: ClothingColors = {
   socks: '#F8F9FB',
 };
 
+const PATTERNS: readonly KitPattern[] = ['plain', 'stripes', 'hoops', 'halves', 'sash'];
+
+export function isKitPattern(value: string): value is KitPattern {
+  return (PATTERNS as readonly string[]).includes(value);
+}
+
 function kit(
   id: string,
-  name: string,
-  group: KitColourGroup,
-  shirt: string,
-  shirtTrim: string,
-  shorts: string,
-  socks: string,
+  label: string,
+  kind: KitKind,
+  pattern: KitPattern,
+  colours: readonly string[],
 ): KitColour {
-  return { id, name, group, clothing: { shirt, shirtTrim, shorts, socks } };
+  return { id, label, kind, pattern, colours };
 }
 
 export const KIT_COLOURS: readonly KitColour[] = [
-  kit('neutral', 'Neutral', 'neutral', '#E4E0D8', '#5C6570', '#3A4148', '#E4E0D8'),
-  kit('classic', 'Classic', 'neutral', '#FFD93D', '#1E2A5A', '#1E2A5A', '#F8F9FB'),
-  kit('night', 'Night', 'neutral', '#1C2430', '#12BFA6', '#141A22', '#1C2430'),
-  kit('street', 'Street', 'neutral', '#12BFA6', '#F7F5ED', '#142D35', '#12BFA6'),
+  kit('neutral', 'Neutral', 'neutral', 'plain', ['#E4E0D8', '#5C6570', '#3A4148']),
+  kit('classic', 'Classic colours', 'neutral', 'plain', ['#FFD93D', '#1E2A5A', '#1E2A5A', '#F8F9FB']),
+  kit('night', 'Night colours', 'neutral', 'plain', ['#1C2430', '#12BFA6', '#141A22']),
+  kit('street', 'Street colours', 'neutral', 'plain', ['#12BFA6', '#F7F5ED', '#142D35', '#12BFA6']),
 
-  kit('algeria', 'Algeria', 'country', '#006233', '#FFFFFF', '#FFFFFF', '#D21034'),
-  kit('argentina', 'Argentina', 'country', '#74ACDF', '#FFFFFF', '#FFFFFF', '#74ACDF'),
-  kit('australia', 'Australia', 'country', '#00843D', '#FFCD00', '#FFCD00', '#00843D'),
-  kit('austria', 'Austria', 'country', '#ED2939', '#FFFFFF', '#FFFFFF', '#ED2939'),
-  kit('belgium', 'Belgium', 'country', '#2D2926', '#FDDA24', '#EF3340', '#FDDA24'),
-  kit('brazil', 'Brazil', 'country', '#009739', '#FEDD00', '#002776', '#FEDD00'),
-  kit('cameroon', 'Cameroon', 'country', '#007A5E', '#FCD116', '#CE1126', '#FCD116'),
-  kit('canada', 'Canada', 'country', '#C8102E', '#FFFFFF', '#FFFFFF', '#C8102E'),
-  kit('chile', 'Chile', 'country', '#FFFFFF', '#0039A6', '#D52B1E', '#0039A6'),
-  kit('china', 'China', 'country', '#DE2910', '#FFDE00', '#DE2910', '#FFDE00'),
-  kit('colombia', 'Colombia', 'country', '#FCD116', '#003893', '#003893', '#CE1126'),
-  kit('costa-rica', 'Costa Rica', 'country', '#002B7F', '#FFFFFF', '#CE1126', '#FFFFFF'),
-  kit('croatia', 'Croatia', 'country', '#FF0000', '#FFFFFF', '#171796', '#FFFFFF'),
-  kit('czechia', 'Czechia', 'country', '#D7141A', '#FFFFFF', '#11457E', '#FFFFFF'),
-  kit('denmark', 'Denmark', 'country', '#C60C30', '#FFFFFF', '#FFFFFF', '#C60C30'),
-  kit('egypt', 'Egypt', 'country', '#CE1126', '#FFFFFF', '#111111', '#FFFFFF'),
-  kit('england', 'England', 'country', '#1B2838', '#FFFFFF', '#FFFFFF', '#CF081F'),
-  kit('france', 'France', 'country', '#0055A4', '#FFFFFF', '#EF4135', '#FFFFFF'),
-  kit('germany', 'Germany', 'country', '#1A1A1A', '#FFCE00', '#DD0000', '#FFCE00'),
-  kit('ghana', 'Ghana', 'country', '#FCD116', '#006B3F', '#CE1126', '#006B3F'),
-  kit('greece', 'Greece', 'country', '#0D5EAF', '#FFFFFF', '#FFFFFF', '#0D5EAF'),
-  kit('india', 'India', 'country', '#FF9933', '#FFFFFF', '#138808', '#FFFFFF'),
-  kit('iran', 'Iran', 'country', '#239F40', '#FFFFFF', '#DA0000', '#FFFFFF'),
-  kit('ireland', 'Ireland', 'country', '#169B62', '#FFFFFF', '#FFFFFF', '#FF883E'),
-  kit('italy', 'Italy', 'country', '#FFFFFF', '#009246', '#CE2B37', '#009246'),
-  kit('jamaica', 'Jamaica', 'country', '#009B3A', '#FED100', '#111111', '#FED100'),
-  kit('japan', 'Japan', 'country', '#FFFFFF', '#BC002D', '#BC002D', '#BC002D'),
-  kit('kenya', 'Kenya', 'country', '#111111', '#BB0000', '#006600', '#BB0000'),
-  kit('mexico', 'Mexico', 'country', '#006847', '#FFFFFF', '#CE1126', '#FFFFFF'),
-  kit('morocco', 'Morocco', 'country', '#C1272D', '#006233', '#006233', '#C1272D'),
-  kit('netherlands', 'Netherlands', 'country', '#FF6600', '#FFFFFF', '#21468B', '#FFFFFF'),
-  kit('new-zealand', 'New Zealand', 'country', '#1A1A1A', '#FFFFFF', '#00247D', '#FFFFFF'),
-  kit('nigeria', 'Nigeria', 'country', '#008751', '#FFFFFF', '#FFFFFF', '#008751'),
-  kit('norway', 'Norway', 'country', '#BA0C2F', '#FFFFFF', '#00205B', '#FFFFFF'),
-  kit('peru', 'Peru', 'country', '#D91023', '#FFFFFF', '#FFFFFF', '#D91023'),
-  kit('poland', 'Poland', 'country', '#FFFFFF', '#DC143C', '#DC143C', '#FFFFFF'),
-  kit('portugal', 'Portugal', 'country', '#006600', '#FFCC00', '#CC0000', '#FFCC00'),
-  kit('scotland', 'Scotland', 'country', '#0065BF', '#FFFFFF', '#FFFFFF', '#0065BF'),
-  kit('senegal', 'Senegal', 'country', '#00853F', '#FDEF42', '#E31B23', '#FDEF42'),
-  kit('serbia', 'Serbia', 'country', '#C6363C', '#0C4076', '#FFFFFF', '#0C4076'),
-  kit('south-africa', 'South Africa', 'country', '#007A4D', '#FFB612', '#002395', '#DE3831'),
-  kit('south-korea', 'South Korea', 'country', '#FFFFFF', '#CD2E3A', '#0047A0', '#CD2E3A'),
-  kit('spain', 'Spain', 'country', '#AA151B', '#F1BF00', '#F1BF00', '#AA151B'),
-  kit('sweden', 'Sweden', 'country', '#006AA7', '#FECC00', '#FECC00', '#006AA7'),
-  kit('switzerland', 'Switzerland', 'country', '#D52B1E', '#FFFFFF', '#FFFFFF', '#D52B1E'),
-  kit('turkey', 'Turkey', 'country', '#E30A17', '#FFFFFF', '#FFFFFF', '#E30A17'),
-  kit('ukraine', 'Ukraine', 'country', '#005BBB', '#FFD500', '#FFD500', '#005BBB'),
-  kit('united-states', 'United States', 'country', '#FFFFFF', '#002868', '#BF0A30', '#002868'),
-  kit('uruguay', 'Uruguay', 'country', '#FFFFFF', '#5B9BD5', '#5B9BD5', '#FFFFFF'),
-  kit('wales', 'Wales', 'country', '#C8102E', '#FFFFFF', '#00AB39', '#FFFFFF'),
+  kit('england', 'England colours', 'nation', 'hoops', ['#FFFFFF', '#CF081F']),
+  kit('scotland', 'Scotland colours', 'nation', 'plain', ['#0065BF', '#FFFFFF']),
+  kit('wales', 'Wales colours', 'nation', 'halves', ['#C8102E', '#FFFFFF', '#00AB39']),
+  kit('ireland', 'Ireland colours', 'nation', 'stripes', ['#169B62', '#FFFFFF', '#FF883E']),
+  kit('france', 'France colours', 'nation', 'stripes', ['#0055A4', '#FFFFFF', '#EF4135']),
+  kit('germany', 'Germany colours', 'nation', 'hoops', ['#1A1A1A', '#DD0000', '#FFCE00']),
+  kit('spain', 'Spain colours', 'nation', 'hoops', ['#AA151B', '#F1BF00']),
+  kit('italy', 'Italy colours', 'nation', 'stripes', ['#009246', '#FFFFFF', '#CE2B37']),
+  kit('netherlands', 'Netherlands colours', 'nation', 'sash', ['#FF6600', '#FFFFFF', '#21468B']),
+  kit('brazil', 'Brazil colours', 'nation', 'sash', ['#009739', '#FEDD00', '#002776']),
+  kit('argentina', 'Argentina colours', 'nation', 'hoops', ['#74ACDF', '#FFFFFF']),
+  kit('mexico', 'Mexico colours', 'nation', 'stripes', ['#006847', '#FFFFFF', '#CE1126']),
+  kit('japan', 'Japan colours', 'nation', 'plain', ['#FFFFFF', '#BC002D']),
+  kit('nigeria', 'Nigeria colours', 'nation', 'stripes', ['#008751', '#FFFFFF']),
+  kit('australia', 'Australia colours', 'nation', 'sash', ['#00843D', '#FFCD00']),
+  kit('united-states', 'United States colours', 'nation', 'stripes', ['#002868', '#FFFFFF', '#BF0A30']),
 ];
 
 const BY_ID = new Map(KIT_COLOURS.map((option) => [option.id, option]));
 
 export function getKitColour(id: string): KitColour | null {
   return BY_ID.get(id) ?? null;
+}
+
+/** Solid shirt, collar, shorts and socks derived from the sheet. Patterned shirts still use these as the base. */
+export function clothingFor(option: KitColour): ClothingColors {
+  const shirt = option.colours[0] ?? '#E4E0D8';
+  const second = option.colours[1] ?? shirt;
+  const third = option.colours[2] ?? second;
+  const socks = option.colours[3] ?? (option.colours.length > 2 ? shirt : second);
+  return { shirt, shirtTrim: second, shorts: third, socks };
 }
 
 export function clothingEquals(a: ClothingColors, b: ClothingColors): boolean {
@@ -112,9 +96,9 @@ export function clothingEquals(a: ClothingColors, b: ClothingColors): boolean {
 }
 
 export function matchKitColour(clothing: ClothingColors): KitColour | null {
-  return KIT_COLOURS.find((option) => clothingEquals(option.clothing, clothing)) ?? null;
+  return KIT_COLOURS.find((option) => clothingEquals(clothingFor(option), clothing)) ?? null;
 }
 
-export function kitColoursInGroup(group: KitColourGroup): readonly KitColour[] {
-  return KIT_COLOURS.filter((option) => option.group === group);
+export function kitColoursInGroup(kind: KitKind): readonly KitColour[] {
+  return KIT_COLOURS.filter((option) => option.kind === kind);
 }

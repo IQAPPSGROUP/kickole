@@ -11,11 +11,10 @@ Internal TestFlight / Play internal-track preparation. **Production App Store an
 | Android `minSdk` | 24 |
 | Android `compileSdk` / `targetSdk` | **36** |
 | Android `versionCode` / `versionName` | **1** / **1.0** (first internal candidate) |
-| Play Billing Library | **9.1.0** (`plugins/kickole-billing`) |
+| In-app purchases | **None.** No StoreKit or Play Billing plugin in this build. |
 | iOS archive image | **macos-26** / Xcode 26 (required for App Store upload since 28 Apr 2026). No Codemagic config in repo |
 | iOS deployment target | **15.0** |
 | iOS `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` | **1.0** / **1** |
-| StoreKit | StoreKit 2 (Swift plugin) |
 | Bundle / application id | `com.iqappsgroup.kickole` |
 
 Confirm these match the **existing** App Store Connect and Play Console apps before upload. Do not create replacement listings.
@@ -89,11 +88,9 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 ## Remaining blockers before public release
 
 1. Confirm bundle/application id matches live listings.
-2. Create IAP `kickole_launch_collection` (£2.99 UK) in App Store Connect and Play Console; Paid Apps / merchant setup active.
+2. Do not create in-app products. This build has no shop and no Restore Purchases. See [`BILLING.md`](./BILLING.md).
 3. Codemagic TestFlight upload (`ios-testflight`). Hand steps, including the App Store profile for `com.iqappsgroup.kickole`, are in [`TESTFLIGHT.md`](./TESTFLIGHT.md).
-4. Play App Signing + upload keystore; build signed AAB; upload internal track. Add **license testers** and have them buy packs with Google’s free test card. There is no in-app Android unlock for closed tracks. An internal-track tester who is not a license tester may still be charged.
-5. Complete physical purchase matrix on small/large iPhone and Android phones.
-6. Publish privacy policy URL + ASC / Play Data safety from [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md).
-7. Optional: server-side App Store Server API / Play Developer API verification ([`BILLING.md`](./BILLING.md)).
+4. Play App Signing + upload keystore; build signed AAB; upload internal track.
+5. Publish privacy policy URL + ASC / Play Data safety from [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md).
 
-**Live billing and store uploads have not been verified here.**
+**Store uploads have not been verified here.**

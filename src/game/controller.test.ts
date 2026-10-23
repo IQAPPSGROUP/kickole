@@ -374,15 +374,4 @@ describe('GameController', () => {
     })).toBe('implausible');
   });
 
-  it('gives unlock and restore feedback instead of leaving the shop busy', async () => {
-    const { c } = await make(QUIET);
-    const purchase = await c.purchaseLaunchCollection();
-    expect(purchase.outcome).toBe('unavailable');
-    expect(c.getSnapshot().billingMessage).toMatch(/iOS|Android|browser/i);
-    expect(c.getSnapshot().billingBusy).toBe(false);
-    const restore = await c.restorePurchases();
-    expect(restore.outcome).toBe('unavailable');
-    expect(c.getSnapshot().billingMessage).toBeTruthy();
-    expect(c.getSnapshot().billingBusy).toBe(false);
-  });
 });

@@ -10,6 +10,7 @@ import {
 } from '../billing/storeCopy';
 import type { BillingPlatform, EntitlementSnapshot, PurchaseResult, StoreProduct } from '../billing/types';
 import { GameEngine, type EngineEvent, type Phase, type TrickKind } from '../engine/engine';
+import { trickRepeatLeft } from '../engine/trickRepeat';
 import type { Grade, Side } from '../engine/config';
 import type { Appearance } from './appearance';
 import { beatClock, cheer, setBed, setEnabledTracks, setSongChoice, sfx, skipTrack, unlockAudio } from './audio';
@@ -79,6 +80,8 @@ export interface Hud {
   celebrationLabel: string | null;
   prompt: ActivePrompt | null;
   hintTip: string | null;
+  /** Remaining paid uses of the current trick. Null before the first scored trick. */
+  trickRepeat: { kind: TrickKind; left: number } | null;
 }
 
 export interface Result {
@@ -242,6 +245,9 @@ export class GameController {
         celebrationLabel: e.celebration ? (getDance(e.celebration.danceId)?.name ?? 'Dance') : null,
         prompt: e.phase === 'playing' ? this.prompts.active : null,
         hintTip: e.phase === 'playing' ? this.prompts.tip : null,
+        trickRepeat: e.phase === 'playing' && e.trickRepeat.kind
+          ? { kind: e.trickRepeat.kind, left: trickRepeatLeft(e.trickRepeat) }
+          : null,
       },
       save: this.save,
       settings: this.settings,

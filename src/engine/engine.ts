@@ -11,6 +11,11 @@ import {
   type ComboId,
 } from './combos';
 import {
+  emptyTrickRepeat,
+  scoreTrickRepeat,
+  type TrickRepeatState,
+} from './trickRepeat';
+import {
   apexForKickPower,
   createTrickState,
   impulseForApex,
@@ -116,6 +121,11 @@ export class GameEngine {
   lastPerfectTime = -10;
   /** Last non-foot trick for animation (not a fake left/right kick). */
   lastTrick: { kind: TrickKind; time: number } | null = null;
+  /**
+   * Consecutive scored uses of one trick. The leaderboard reads `stats.score`,
+   * which already excludes repeats past the cap.
+   */
+  trickRepeat: TrickRepeatState = emptyTrickRepeat();
   contact: Contact | null = null;
   /**
    * Seconds left to hold a foot strike on the boot. Simulation time does not advance,
@@ -224,6 +234,7 @@ export class GameEngine {
     this.lastKick = { left: -10, right: -10 };
     this.lastContact = { left: -10, right: -10 };
     this.lastTrick = null;
+    this.trickRepeat = emptyTrickRepeat();
     this.gravityScale = 1;
     this.acc = 0;
     this.held = { left: false, right: false };
@@ -238,6 +249,17 @@ export class GameEngine {
     this.streak += 1;
     this.stats.bestStreak = Math.max(this.stats.bestStreak, this.streak);
     return base * streakMultiplier(this.streak);
+  }
+
+  /**
+   * Keep a trick's points only while it is inside the consecutive-use cap.
+   * The whole award for that use becomes 0 after the cap, including a kick-up
+   * that is part of the same thigh, flick, or around-the-world.
+   */
+  private scoreRepeatedTrick(kind: TrickKind, points: number): number {
+    const next = scoreTrickRepeat(this.trickRepeat, kind, points);
+    this.trickRepeat = next.state;
+    return next.points;
   }
 
   /** Record a successful scored event for variety combinations. */
@@ -590,6 +612,7 @@ export class GameEngine {
     points = this.touchPoints(points);
     if (!t.awarded) {
       t.awarded = true;
+      points = this.scoreRepeatedTrick('header', points);
       this.stats.headers++;
       this.stats.score += points;
     }
@@ -641,7 +664,7 @@ export class GameEngine {
     b.z = target.z;
     b.vx = b.vy = b.vz = 0;
     const trick = createTrickState('neckStall', null, this.time, 'contact');
-    const points = this.touchPoints(this.config.scoring.neckStall);
+    const points = this.scoreRepeatedTrick('neckStall', this.touchPoints(this.config.scoring.neckStall));
     trick.awarded = true;
     this.stats.neckStalls++;
     this.stats.score += points;
@@ -733,7 +756,7 @@ export class GameEngine {
     if (grade === 'perfect') points += scoring.perfectBonus;
     const alternate = this.lastSide !== null && this.lastSide !== side;
     if (alternate) points += scoring.alternateBonus;
-    points = this.touchPoints(points);
+    points = this.scoreRepeatedTrick('aroundTheWorld', this.touchPoints(points));
     existing.awarded = true;
     existing.revolution = 1;
     existing.phase = 'recover';
@@ -803,13 +826,14 @@ export class GameEngine {
     if (c.grade === 'perfect') points += scoring.perfectBonus;
     if (alternate) points += scoring.alternateBonus;
     if (stall) { points += scoring.footStall; this.stats.stalls++; }
+    let thighAward = false;
     if (c.thigh) {
       const tr = this.trick;
       if (tr && tr.kind === 'thigh' && !tr.awarded) {
         points += scoring.thigh;
         tr.awarded = true;
+        thighAward = true;
         this.stats.thighs++;
-        this.emit({ type: 'trick', kind: 'thigh', phase: 'execute', points: scoring.thigh, side: c.side });
       }
       this.trick = null;
       this.selectedTrick = null;
@@ -821,6 +845,11 @@ export class GameEngine {
     }
 
     points = this.touchPoints(points);
+    if (thighAward) points = this.scoreRepeatedTrick('thigh', points);
+    else if (lofty) points = this.scoreRepeatedTrick('highFlick', points);
+    if (thighAward) {
+      this.emit({ type: 'trick', kind: 'thigh', phase: 'execute', points: points === 0 ? 0 : scoring.thigh, side: c.side });
+    }
     this.stats.kickUps++;
     this.stats.score += points;
     this.lastSide = c.side;
@@ -870,7 +899,7 @@ export class GameEngine {
   /** High kick, on-beat score, and a dance that ends while the ball is still above the player. */
   private finishGrooveKick(c: Contact) {
     const { scoring } = this.config;
-    const points = this.touchPoints(groovePoints(scoring.groove, this.lastBeatGrade, scoring.grooveBeatPerfect, scoring.grooveBeatGood));
+    const points = this.scoreRepeatedTrick('groove', this.touchPoints(groovePoints(scoring.groove, this.lastBeatGrade, scoring.grooveBeatPerfect, scoring.grooveBeatGood)));
     this.stats.grooves++;
     this.stats.score += points;
     this.lastSide = c.side;

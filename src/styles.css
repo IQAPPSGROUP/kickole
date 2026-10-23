@@ -654,7 +654,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .hud-top {
   position: relative;
   width: max-content;
-  max-width: 158px;
+  max-width: 220px;
   margin: 12px auto 0;
   padding: 4px 8px 14px 4px;
   background: none;
@@ -703,6 +703,16 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 }
 .score .prompt-ink { transform: translate(0.03em, 0.04em); }
 .score .prompt-ink .prompt-ch { -webkit-text-stroke: 0.14em #140814; }
+.trick-repeat {
+  margin: 1px 0 0;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.15;
+  color: #f7e9c5;
+  white-space: nowrap;
+}
+.trick-repeat.is-low { color: #ff3355; }
 .hud-top .hud-sub { flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 2px; letter-spacing: 0; }
 .score-sub { font-size: 18px; line-height: 1.05; }
 .hud-sub { font-size: 10px; letter-spacing: 1px; }

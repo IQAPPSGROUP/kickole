@@ -3,6 +3,7 @@ import type { GameController, Hud as HudState, ArmedTrick } from '../game/contro
 import type { ActivePrompt, PromptGesture } from '../game/prompts';
 import type { Side } from '../engine/config';
 import { streakMultiplier } from '../engine/scoring';
+import { trickRepeatText } from '../engine/trickRepeat';
 import { beatClock, subscribeNowPlaying } from '../game/audio';
 import { trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
@@ -42,6 +43,11 @@ export function Hud({
         <div className="score" key={hud.score}>
           <GraffitiText text={String(hud.score)} className="graffiti score-num" />
         </div>
+        {hud.trickRepeat && (
+          <p className={hud.trickRepeat.left <= 3 ? 'trick-repeat is-low' : 'trick-repeat'}>
+            {trickRepeatText(hud.trickRepeat.kind, hud.trickRepeat.left)}
+          </p>
+        )}
         <div className="hud-sub">
           <GraffitiText text={`KICK-UPS ${hud.kickUps}`} className="graffiti score-sub" />
           {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}

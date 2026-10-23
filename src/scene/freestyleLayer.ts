@@ -10,7 +10,7 @@ import { DEFAULT_CONFIG, type Side } from '../engine/config';
 import type { GameEngine } from '../engine/engine';
 import type { TrickKind } from '../engine/tricks';
 import { atwFootOffset } from './atwOrbit';
-import { aimPoint, pinAnkle, solveTwoBone, forwardPole } from './footIk';
+import { aimPoint, pinAnkle, plantSole, solveTwoBone, forwardPole } from './footIk';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import {
   BOOT_MATERIALS,
@@ -236,9 +236,16 @@ export function createFreestyleRig() {
     mixer.uncacheRoot(scene);
   }
 
-  function pin(side: Side, at: Vector3) {
+  function pin(side: Side, at: Vector3, forcePole = false) {
     const limb = leg(side);
-    pinAnkle(limb.thigh, limb.shin, limb.foot, limb.toe, at);
+    if (!forcePole) {
+      pinAnkle(limb.thigh, limb.shin, limb.foot, limb.toe, at);
+      return;
+    }
+    // A kick blend can leave the knee folded. Idle plants ignore that hint.
+    limb.thigh.getWorldPosition(hipWorld);
+    solveTwoBone(limb.thigh, limb.shin, limb.foot, at, forwardPole(hipWorld, pole), true);
+    plantSole(limb.shin, limb.foot, limb.toe);
   }
 
   function ease(node: Object3D | undefined, dt: number, tau: number) {
@@ -595,6 +602,10 @@ export function createFreestyleRig() {
     const balance = Math.sin(t * 0.7 + 0.4);
     const falling = engine.phase === 'playing' && engine.ball.vy < 0;
     const load = approachWeight(engine.timeToContact(), falling) * amp;
+    // Tricks and kick blends leave the hips crouched. Idle always starts from
+    // the measured rest pose, then adds the small sway on top.
+    bones.hips.position.copy(hipRest);
+    bones.hips.quaternion.copy(hipRestQ);
     bones.hips.position.x += shift * 0.016 * amp;
     bones.hips.position.y += (-0.07 + breath * 0.007) * amp - load * 0.02;
     bones.hips.updateMatrix();
@@ -607,8 +618,8 @@ export function createFreestyleRig() {
     const ready = 0.32 + load * 0.08;
     poseArm('left', ready, 0.06 * shift * amp, 0.5);
     poseArm('right', ready, -0.06 * shift * amp, 0.5);
-    pin('left', anchors.left.plant);
-    pin('right', anchors.right.plant);
+    pin('left', anchors.left.plant, true);
+    pin('right', anchors.right.plant, true);
   }
 
   function applyStrike(engine: GameEngine, side: Side, since: number) {

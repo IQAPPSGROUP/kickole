@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Bone, Object3D, Texture, Vector3, type AnimationClip, type Group } from 'three';
+import { AnimationMixer, Bone, Euler, Object3D, Texture, Vector3, type AnimationClip, type Group } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GameEngine } from '../engine/engine';
@@ -463,6 +463,54 @@ describe('fab foot contact', () => {
     show(atw);
     const foot = bone(gltf.scene, 'Foot_L').getWorldPosition(new Vector3());
     expect(foot.y, `over ball ${atw.ball.y.toFixed(2)} foot ${foot.y.toFixed(2)}`).toBeGreaterThan(atw.ball.y + atw.config.ballRadius * 0.4);
+  });
+});
+
+function kneeFlex(scene: Group, side: 'L' | 'R'): number {
+  const hip = bone(scene, `UpperLeg_${side}`).getWorldPosition(new Vector3());
+  const knee = bone(scene, `LowerLeg_${side}`).getWorldPosition(new Vector3());
+  const ankle = bone(scene, `Foot_${side}`).getWorldPosition(new Vector3());
+  const upper = knee.clone().sub(hip).normalize();
+  const lower = ankle.clone().sub(knee).normalize();
+  return Math.acos(Math.min(1, Math.max(-1, upper.dot(lower))));
+}
+
+describe('menu idle after a crouch', () => {
+  it('stands the model back up after a kick leaves the knees folded', async () => {
+    const gltf = await load(MODEL);
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
+    const menu = new GameEngine();
+    menu.phase = 'menu';
+    menu.time = 1.25;
+    const stand = () => {
+      rig.apply(menu, 'Idle', computePose(menu), 1 / 60);
+      gltf.scene.updateMatrixWorld(true);
+    };
+    stand();
+    const hipY = bone(gltf.scene, 'Hips').getWorldPosition(new Vector3()).y;
+    const left = kneeFlex(gltf.scene, 'L');
+    const right = kneeFlex(gltf.scene, 'R');
+
+    for (let pass = 0; pass < 4; pass++) {
+      const side = pass % 2 === 0 ? 'right' : 'left';
+      const kick = playingKick(side, 0.04);
+      rig.apply(kick, side === 'right' ? 'KickRight' : 'KickLeft', computePose(kick), 1 / 60);
+      const hips = bone(gltf.scene, 'Hips');
+      hips.position.y -= 0.28;
+      const fold = new Euler(1.8, 0, 0);
+      bone(gltf.scene, 'LowerLeg_L').quaternion.setFromEuler(fold);
+      bone(gltf.scene, 'LowerLeg_R').quaternion.setFromEuler(fold);
+      gltf.scene.updateMatrixWorld(true);
+      const folded = Math.max(kneeFlex(gltf.scene, 'L'), kneeFlex(gltf.scene, 'R'));
+      expect(folded, 'the leftover pose is a real knee fold').toBeGreaterThan(Math.max(left, right) + 0.5);
+      menu.time = 1.25 + pass * 0.15;
+      stand();
+      const recoveredHip = bone(gltf.scene, 'Hips').getWorldPosition(new Vector3()).y;
+      expect(Math.abs(recoveredHip - hipY), 'hips return to the idle height').toBeLessThan(0.03);
+      expect(kneeFlex(gltf.scene, 'L'), 'left knee unfolds').toBeLessThan(left + 0.25);
+      expect(kneeFlex(gltf.scene, 'R'), 'right knee unfolds').toBeLessThan(right + 0.25);
+    }
   });
 });
 

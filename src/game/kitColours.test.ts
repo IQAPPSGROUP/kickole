@@ -27,7 +27,7 @@ const APPROVED = {
   france: { pattern: 'plain', shirt: '#1E3A8A', secondary: '#1E3A8A', shorts: '#FFFFFF', socks: '#ED2939', trimBands: ['#002395', '#FFFFFF', '#ED2939'] },
   spain: { pattern: 'plain', shirt: '#C8102E', secondary: '#C8102E', shorts: '#0B1F4B', socks: '#C8102E', trimBands: ['#F1BF00', '#AA151B'] },
   portugal: { pattern: 'plain', shirt: '#8B1A1A', secondary: '#8B1A1A', shorts: '#006600', socks: '#8B1A1A', trimBands: ['#006600', '#FFE000', '#FF0000'] },
-  germany: { pattern: 'plain', shirt: '#FFFFFF', secondary: '#FFFFFF', shorts: '#111111', socks: '#FFFFFF', trimBands: ['#000000', '#DD0000', '#FFCE00'] },
+  germany: { pattern: 'plain', shirt: '#FFFFFF', secondary: '#FFFFFF', shorts: '#111111', socks: '#FFFFFF', trimBands: ['#111111', '#DD0000', '#FFCE00'] },
   italy: { pattern: 'plain', shirt: '#2F7FD8', secondary: '#2F7FD8', shorts: '#FFFFFF', socks: '#2F7FD8', trimBands: ['#009246', '#FFFFFF', '#CE2B37'] },
   netherlands: { pattern: 'plain', shirt: '#FF6F00', secondary: '#FF6F00', shorts: '#FF6F00', socks: '#FF6F00', trimBands: ['#AE1C28', '#FFFFFF', '#21468B'] },
   sweden: { pattern: 'plain', shirt: '#FECC02', secondary: '#FECC02', shorts: '#006AA7', socks: '#FECC02', trimBands: ['#006AA7', '#FECC02'] },
@@ -41,20 +41,19 @@ const APPROVED = {
 describe('kit colours', () => {
   beforeEach(() => { vi.unstubAllGlobals(); });
 
-  it('loads the approved kits from the sheet Graham extends', () => {
+  it('loads Graham\'s kit sheet and groups it by confederation', () => {
     const nations = kitColoursInGroup('nation');
-    expect(nations).toHaveLength(17);
-    expect(nations.map((option) => option.id)).toEqual([...POPULAR_KIT_IDS]);
+    expect(nations).toHaveLength(211);
     expect(kitColoursInGroup('neutral').map((option) => option.id)).toEqual(['neutral']);
     expect(new Set(KIT_COLOURS.map((option) => option.id)).size).toBe(KIT_COLOURS.length);
-    const regions = { Europe: 0, Africa: 0, Asia: 0, Americas: 0, Oceania: 0 };
+    const confederations = { UEFA: 0, CONMEBOL: 0, CONCACAF: 0, CAF: 0, AFC: 0, OFC: 0 };
     const striped = nations.filter((option) => option.pattern === 'stripes').map((option) => option.id);
-    expect(striped).toEqual(['argentina']);
+    expect(striped).toEqual(['argentina', 'paraguay']);
     for (const option of nations) {
-      expect(option.label.endsWith(' colours')).toBe(true);
+      expect(option.label).toBe(`${option.name} colours`);
       expect(option.label.toLowerCase()).not.toMatch(/official|price|coin|crest|logo/);
-      expect(option.region && option.region in regions).toBe(true);
-      if (option.region) regions[option.region] += 1;
+      expect(option.confederation && option.confederation in confederations).toBe(true);
+      if (option.confederation) confederations[option.confederation] += 1;
       for (const hex of [option.shirt, option.secondary, option.shorts, option.socks, ...option.trimBands]) {
         expect(hex).toMatch(/^#[0-9A-F]{6}$/);
       }
@@ -67,24 +66,25 @@ describe('kit colours', () => {
         socks: option.socks,
       });
     }
-    expect(regions).toEqual({ Europe: 12, Africa: 1, Asia: 1, Americas: 3, Oceania: 0 });
+    expect(confederations).toEqual({ UEFA: 55, CONMEBOL: 10, CONCACAF: 35, CAF: 54, AFC: 46, OFC: 11 });
     for (const [id, expected] of Object.entries(APPROVED)) {
       expect(getKitColour(id)).toMatchObject(expected);
     }
     expect(getKitColour('republic-of-ireland')?.label).toBe('Republic of Ireland colours');
-    expect(kitTileLabel(getKitColour('republic-of-ireland')!)).toBe('Republic of Ireland');
+    expect(kitTileLabel(getKitColour('republic-of-ireland')!)).toBe('Rep. of Ireland');
     expect(getKitColour('usa')?.label).toBe('USA colours');
     expect(kitTileLabel(getKitColour('northern-ireland')!)).toBe('N. Ireland');
-    expect(getKitColour('northern-ireland')?.label).toBe('Northern Ireland colours');
-    expect(getKitColour('paraguay')).toBeNull();
+    expect(getKitColour('northern-ireland')?.trimBands).toEqual(['#FFFFFF', '#00843D']);
+    expect(getKitColour('paraguay')).toMatchObject({ pattern: 'stripes', secondary: '#D52B1E' });
     expect(filterKits('popular', '').map((option) => option.id)).toEqual(['neutral', ...POPULAR_KIT_IDS]);
-    expect(filterKits('Oceania', '')).toEqual([]);
-    const europe = filterKits('Europe', '');
-    expect(europe.every((option) => option.region === 'Europe')).toBe(true);
-    const europeLabels = europe.map((option) => kitTileLabel(option));
-    expect(europeLabels).toEqual([...europeLabels].sort((a, b) => a.localeCompare(b, 'en')));
-    expect(filterKits('Asia', 'japan').map((option) => option.id)).toEqual(['japan']);
-    expect(filterKits('Europe', 'japan').map((option) => option.id)).toEqual(['japan']);
+    const uefa = filterKits('UEFA', '');
+    expect(uefa.every((option) => option.confederation === 'UEFA')).toBe(true);
+    expect(uefa).toHaveLength(55);
+    const uefaLabels = uefa.map((option) => kitTileLabel(option));
+    expect(uefaLabels).toEqual([...uefaLabels].sort((a, b) => a.localeCompare(b, 'en')));
+    expect(filterKits('AFC', 'japan').map((option) => option.id)).toEqual(['japan']);
+    expect(filterKits('UEFA', 'japan').map((option) => option.id)).toEqual(['japan']);
+    expect(filterKits('UEFA', 'IR Iran').map((option) => option.id)).toEqual(['ir-iran']);
     expect(kitShirtMask('plain', 0.2, 0.4)).toBe(0);
     expect(kitShirtMask('plain', -0.3, 0.1)).toBe(0);
     expect(kitShirtMask('stripes', 0, 0.2)).toBe(kitShirtMask('stripes', 0, 0.55));
@@ -98,6 +98,8 @@ describe('kit colours', () => {
     expect(picker).toContain('Use this kit');
     expect(picker).toContain('Search kits');
     expect(picker).toContain('Popular');
+    expect(picker).toContain('KIT_CONFEDERATIONS');
+    expect(picker).toContain('Kit confederations');
     expect(picker).toContain('No kits in this list yet.');
     expect(picker).toContain('kitTileLabel(option)');
     expect(picker).toContain('aria-label={option.label}');
@@ -117,12 +119,12 @@ describe('kit colours', () => {
     expect(submit).toContain('run_token');
     expect(submit).toContain('country');
     const sheet = readFileSync(new URL('../../docs/design-refs/national-kits/spec.json', import.meta.url), 'utf8');
-    const rows = JSON.parse(sheet) as { name: string }[];
-    expect(rows).toHaveLength(17);
+    const rows = JSON.parse(sheet) as { name: string; boots: string }[];
+    expect(rows).toHaveLength(211);
+    expect(rows.every((row) => row.boots === '#2B2B2B')).toBe(true);
     expect(rows.map((row) => row.name)).toContain('Republic of Ireland');
     expect(rows.map((row) => row.name)).toContain('USA');
-    expect(rows.map((row) => row.name)).not.toContain('Paraguay');
-    expect(rows.map((row) => row.name)).not.toContain('Albania');
+    expect(rows.map((row) => row.name)).toContain('Paraguay');
   });
 
   it('defaults a new look to the neutral kit and rejects an unknown id', () => {

@@ -1,6 +1,6 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import {
-  KIT_REGIONS,
+  KIT_CONFEDERATIONS,
   clothingFor,
   filterKits,
   getKitColour,
@@ -15,7 +15,7 @@ import { PlayerPreview } from './PlayerPreview';
 
 const TABS: readonly { id: KitTab; label: string }[] = [
   { id: 'popular', label: 'Popular' },
-  ...KIT_REGIONS.map((region) => ({ id: region, label: region })),
+  ...KIT_CONFEDERATIONS.map((confederation) => ({ id: confederation, label: confederation })),
 ];
 
 function swatchStyle(option: KitColour): CSSProperties {
@@ -80,7 +80,7 @@ export function KitColoursScreen({
           spellCheck={false}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <div className="kit-tabs" role="tablist" aria-label="Kit regions">
+        <div className="kit-tabs" role="tablist" aria-label="Kit confederations">
           {TABS.map((item) => {
             const on = item.id === tab && query.trim() === '';
             return (

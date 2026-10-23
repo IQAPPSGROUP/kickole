@@ -2,17 +2,15 @@ import type { ClothingColors } from './appearance';
 import nationalKitSpec from '../../docs/design-refs/national-kits/spec.json';
 
 /**
- * National kits. Graham adds further countries to
- * `docs/design-refs/national-kits/spec.json`. The sheet currently holds the
- * approved seventeen. A new row needs no code change to show up in search and
- * its region tab.
+ * National kits. Graham edits `docs/design-refs/national-kits/spec.json`.
+ * The app does not invent further countries. A new row needs no code change
+ * to show up in search and on its confederation tab.
  *
- * `name` is the FIFA member-list name, the name on that association's FIFA
- * page, not the federation's legal title. England, Republic of Ireland and USA
- * are those names. The label is that name plus " colours".
+ * `name` is the FIFA member-list name as Graham wrote it. The label is that
+ * name plus " colours". Tiles use `tileLabel`.
  *
- * A shirt is the colour fans recognise. Vertical stripes are only for an iconic
- * striped shirt. Trim bands are flag colours on the collar, cuffs and sock tops.
+ * A shirt is the colour fans recognise. Vertical stripes use `patternSecondary`.
+ * Trim bands run in order on the collar, cuffs and sock tops.
  * Boots are the plain dark pair, not a brand mark.
  */
 export type KitPattern = 'plain' | 'stripes';
@@ -21,18 +19,26 @@ export type KitKind = 'neutral' | 'nation';
 
 export type KitRegion = 'Europe' | 'Africa' | 'Asia' | 'Americas' | 'Oceania';
 
-export type KitTab = 'popular' | KitRegion;
+export type KitConfederation = 'UEFA' | 'CONMEBOL' | 'CONCACAF' | 'CAF' | 'AFC' | 'OFC';
+
+export type KitTab = 'popular' | KitConfederation;
 
 export const KIT_REGIONS: readonly KitRegion[] = ['Europe', 'Africa', 'Asia', 'Americas', 'Oceania'];
 
+/** Tab order. Popular is separate and stays the approved seventeen. */
+export const KIT_CONFEDERATIONS: readonly KitConfederation[] = ['UEFA', 'CONMEBOL', 'CONCACAF', 'CAF', 'AFC', 'OFC'];
+
 export interface KitColour {
   id: string;
+  /** FIFA member-list name. Neutral has no nation name. */
+  name: string;
   /** Full name. Nation rows use "Name colours". Read out by the preview and the screen reader. */
   label: string;
   /** Short tile text. Omitted tiles show `label`. */
   tile?: string;
   kind: KitKind;
   region: KitRegion | null;
+  confederation: KitConfederation | null;
   pattern: KitPattern;
   shirt: string;
   /** Second shirt colour. Stripes use it. A plain shirt keeps the main colour. */
@@ -82,9 +88,14 @@ export const POPULAR_KIT_IDS = [
 ] as const;
 
 const REGIONS: readonly KitRegion[] = KIT_REGIONS;
+const CONFEDERATIONS: readonly KitConfederation[] = KIT_CONFEDERATIONS;
 
 function isRegion(value: string): value is KitRegion {
   return (REGIONS as readonly string[]).includes(value);
+}
+
+function isConfederation(value: string): value is KitConfederation {
+  return (CONFEDERATIONS as readonly string[]).includes(value);
 }
 
 function slug(name: string): string {
@@ -102,6 +113,7 @@ interface SpecRow {
   label: string;
   tileLabel: string;
   region: string;
+  confederation: string;
   pattern: string;
   shirt: string;
   patternSecondary: string | null;
@@ -110,6 +122,9 @@ interface SpecRow {
   trimBands: string[];
   boots: string;
 }
+
+/** Lee's override. White then green, including when the sheet matches already. */
+const NORTHERN_IRELAND_TRIM = ['#FFFFFF', '#00843D'] as const;
 
 function specPattern(value: string): KitPattern {
   switch (value) {
@@ -124,30 +139,36 @@ function specPattern(value: string): KitPattern {
 
 function nationFromSpec(row: SpecRow): KitColour {
   if (!isRegion(row.region)) throw new Error(`Unknown kit region ${row.region}`);
+  if (!isConfederation(row.confederation)) throw new Error(`Unknown kit confederation ${row.confederation}`);
   if (row.label !== `${row.name} colours`) throw new Error(`Kit label must be the FIFA name plus colours: ${row.name}`);
   if (row.boots.toUpperCase() !== KIT_BOOT) throw new Error(`Kit boots must be ${KIT_BOOT}: ${row.name}`);
   if (row.trimBands.length < 2) throw new Error(`Kit needs trim bands: ${row.name}`);
   const pattern = specPattern(row.pattern);
+  const trimBands = row.name === 'Northern Ireland' ? NORTHERN_IRELAND_TRIM : row.trimBands;
   return {
     id: slug(row.name),
+    name: row.name,
     label: row.label,
     tile: row.tileLabel,
     kind: 'nation',
     region: row.region,
+    confederation: row.confederation,
     pattern,
     shirt: row.shirt,
     secondary: pattern === 'stripes' && row.patternSecondary ? row.patternSecondary : row.shirt,
     shorts: row.shorts,
     socks: row.socks,
-    trimBands: row.trimBands,
+    trimBands,
   };
 }
 
 const NEUTRAL: KitColour = {
   id: NEUTRAL_KIT_ID,
+  name: 'Neutral',
   label: 'Neutral',
   kind: 'neutral',
   region: null,
+  confederation: null,
   pattern: 'plain',
   shirt: '#E4E0D8',
   secondary: '#E4E0D8',
@@ -211,23 +232,25 @@ export function popularKits(): readonly KitColour[] {
   return [neutral, ...nations.filter((option): option is KitColour => option != null)];
 }
 
-/** Empty search uses the tab. A query searches every kit, including Neutral. */
+/** Empty search uses the tab. A query searches every kit by name and label. */
 export function filterKits(tab: KitTab, query: string): readonly KitColour[] {
   const text = query.trim().toLowerCase();
   if (text) {
-    return KIT_COLOURS.filter((option) => option.label.toLowerCase().includes(text)
+    return KIT_COLOURS.filter((option) => option.name.toLowerCase().includes(text)
+      || option.label.toLowerCase().includes(text)
       || kitTileLabel(option).toLowerCase().includes(text));
   }
   switch (tab) {
     case 'popular':
       return popularKits();
-    case 'Europe':
-    case 'Africa':
-    case 'Asia':
-    case 'Americas':
-    case 'Oceania':
+    case 'UEFA':
+    case 'CONMEBOL':
+    case 'CONCACAF':
+    case 'CAF':
+    case 'AFC':
+    case 'OFC':
       return KIT_COLOURS
-        .filter((option) => option.region === tab)
+        .filter((option) => option.confederation === tab)
         .slice()
         .sort((a, b) => kitTileLabel(a).localeCompare(kitTileLabel(b), 'en'));
     default: {

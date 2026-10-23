@@ -108,7 +108,7 @@ export function CustomiseScreen({
           <button type="button" className="btn ghost" onClick={onKitColours}>
             {getKitColour(a.kitColourId)?.label ?? 'Choose your kit'}
           </button>
-          <p className="shop-note">Flag colours in a plain block, stripes, hoops, halves or a sash. Saved on this device.</p>
+          <p className="shop-note">A plain shirt in the colour fans recognise, with thin flag-colour bands. Saved on this device.</p>
         </div>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>

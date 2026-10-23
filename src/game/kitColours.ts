@@ -1,17 +1,21 @@
 import type { ClothingColors } from './appearance';
+import nationalKitSpec from '../../docs/design-refs/national-kits/spec.json';
 
 /**
- * Data-driven kits. `pattern` picks the shirt mask. `plain` is a solid shirt.
- * `stripes` are vertical. Nation labels stay "Name colours".
- *
- * Colour values are on hold. Rob wants recognisable traditional football colours
- * rather than flag patterns (solid orange Netherlands, light blue Italy, blue
- * France). Replace `pattern` and the four colour fields when Graham's revised
- * sheet is approved. The hexes below are placeholders, not a final sheet.
+ * National kits. Graham edits `docs/design-refs/national-kits/spec.json`.
+ * A shirt is the colour fans recognise. Vertical stripes are only for an iconic
+ * striped shirt. Trim bands are flag colours on the collar, cuffs and sock tops.
+ * Labels stay "Name colours". Boots are the plain dark pair, not a brand mark.
  */
-export type KitPattern = 'plain' | 'stripes' | 'hoops' | 'halves' | 'sash' | 'chevron' | 'sleeves';
+export type KitPattern = 'plain' | 'stripes';
 
 export type KitKind = 'neutral' | 'nation';
+
+export type KitRegion = 'Europe' | 'Africa' | 'Asia' | 'Americas' | 'Oceania';
+
+export type KitTab = 'popular' | KitRegion;
+
+export const KIT_REGIONS: readonly KitRegion[] = ['Europe', 'Africa', 'Asia', 'Americas', 'Oceania'];
 
 export interface KitColour {
   id: string;
@@ -20,11 +24,15 @@ export interface KitColour {
   /** Short tile text. Omitted tiles show `label`. */
   tile?: string;
   kind: KitKind;
+  region: KitRegion | null;
   pattern: KitPattern;
   shirt: string;
+  /** Second shirt colour. Stripes use it. A plain shirt keeps the main colour. */
   secondary: string;
   shorts: string;
   socks: string;
+  /** Flag-colour bands, collar at the first colour through to the cuff edge. */
+  trimBands: readonly string[];
 }
 
 /** Worn until the player picks something else. */
@@ -44,47 +52,105 @@ export const HISTORICAL_KIT: ClothingColors = {
   socks: '#F8F9FB',
 };
 
-const PATTERNS: readonly KitPattern[] = ['plain', 'stripes', 'hoops', 'halves', 'sash', 'chevron', 'sleeves'];
+/** Rob's approved seventeen, in picker order. */
+export const POPULAR_KIT_IDS = [
+  'england',
+  'scotland',
+  'wales',
+  'northern-ireland',
+  'ireland',
+  'france',
+  'spain',
+  'portugal',
+  'germany',
+  'italy',
+  'netherlands',
+  'sweden',
+  'brazil',
+  'argentina',
+  'usa',
+  'nigeria',
+  'japan',
+] as const;
 
-export function isKitPattern(value: string): value is KitPattern {
-  return (PATTERNS as readonly string[]).includes(value);
+const REGIONS: readonly KitRegion[] = KIT_REGIONS;
+
+function isRegion(value: string): value is KitRegion {
+  return (REGIONS as readonly string[]).includes(value);
 }
 
-function kit(
-  id: string,
-  label: string,
-  kind: KitKind,
-  pattern: KitPattern,
-  shirt: string,
-  secondary: string,
-  shorts: string,
-  socks: string,
-  tile?: string,
-): KitColour {
-  return { id, label, tile, kind, pattern, shirt, secondary, shorts, socks };
+function slug(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
 }
+
+interface SpecRow {
+  name: string;
+  label: string;
+  tileLabel: string;
+  region: string;
+  pattern: string;
+  shirt: string;
+  patternSecondary: string | null;
+  shorts: string;
+  socks: string;
+  trimBands: string[];
+  boots: string;
+}
+
+function specPattern(value: string): KitPattern {
+  switch (value) {
+    case 'solid':
+      return 'plain';
+    case 'stripes':
+      return 'stripes';
+    default:
+      throw new Error(`Unknown kit pattern ${value}`);
+  }
+}
+
+function nationFromSpec(row: SpecRow): KitColour {
+  if (!isRegion(row.region)) throw new Error(`Unknown kit region ${row.region}`);
+  if (!row.label.endsWith(' colours')) throw new Error(`Kit label must end with colours: ${row.label}`);
+  if (row.boots.toUpperCase() !== KIT_BOOT) throw new Error(`Kit boots must be ${KIT_BOOT}: ${row.name}`);
+  if (row.trimBands.length < 2) throw new Error(`Kit needs trim bands: ${row.name}`);
+  const pattern = specPattern(row.pattern);
+  return {
+    id: slug(row.name),
+    label: row.label,
+    tile: row.tileLabel,
+    kind: 'nation',
+    region: row.region,
+    pattern,
+    shirt: row.shirt,
+    secondary: pattern === 'stripes' && row.patternSecondary ? row.patternSecondary : row.shirt,
+    shorts: row.shorts,
+    socks: row.socks,
+    trimBands: row.trimBands,
+  };
+}
+
+const NEUTRAL: KitColour = {
+  id: NEUTRAL_KIT_ID,
+  label: 'Neutral',
+  kind: 'neutral',
+  region: null,
+  pattern: 'plain',
+  shirt: '#E4E0D8',
+  secondary: '#E4E0D8',
+  shorts: '#3A4148',
+  socks: '#E4E0D8',
+  trimBands: ['#5C6570', '#3A4148'],
+};
 
 export const KIT_COLOURS: readonly KitColour[] = [
-  kit('neutral', 'Neutral', 'neutral', 'plain', '#E4E0D8', '#5C6570', '#3A4148', '#E4E0D8'),
-
-  kit('england', 'England colours', 'nation', 'halves', '#FFFFFF', '#C8102E', '#C8102E', '#FFFFFF'),
-  kit('scotland', 'Scotland colours', 'nation', 'hoops', '#0B2A5B', '#FFFFFF', '#FFFFFF', '#0B2A5B'),
-  kit('wales', 'Wales colours', 'nation', 'halves', '#C8102E', '#00843D', '#FFFFFF', '#00843D'),
-  kit('northern-ireland', 'Northern Ireland colours', 'nation', 'sash', '#FFFFFF', '#C8102E', '#FFFFFF', '#C8102E', 'N. Ireland'),
-  kit('ireland', 'Ireland colours', 'nation', 'chevron', '#FFFFFF', '#169B62', '#FF883E', '#169B62'),
-  kit('france', 'France colours', 'nation', 'sleeves', '#ED2939', '#002395', '#FFFFFF', '#002395'),
-  kit('spain', 'Spain colours', 'nation', 'sash', '#F1BF00', '#AA151B', '#AA151B', '#F1BF00'),
-  kit('portugal', 'Portugal colours', 'nation', 'hoops', '#006600', '#FF0000', '#006600', '#FF0000'),
-  kit('germany', 'Germany colours', 'nation', 'chevron', '#FFCE00', '#000000', '#DD0000', '#000000'),
-  kit('italy', 'Italy colours', 'nation', 'sleeves', '#009246', '#FFFFFF', '#CE2B37', '#009246'),
-  kit('netherlands', 'Netherlands colours', 'nation', 'hoops', '#FF6F00', '#FFFFFF', '#21468B', '#FF6F00'),
-  kit('brazil', 'Brazil colours', 'nation', 'halves', '#009C3B', '#FFDF00', '#002776', '#FFDF00'),
-  kit('argentina', 'Argentina colours', 'nation', 'chevron', '#FFFFFF', '#74ACDF', '#74ACDF', '#FFFFFF'),
-  kit('usa', 'USA colours', 'nation', 'sash', '#0A3161', '#B31942', '#FFFFFF', '#B31942'),
-  kit('nigeria', 'Nigeria colours', 'nation', 'stripes', '#008751', '#FFFFFF', '#008751', '#FFFFFF'),
-  kit('japan', 'Japan colours', 'nation', 'sleeves', '#BC002D', '#FFFFFF', '#FFFFFF', '#BC002D'),
-  // Provisional solid yellow and blue so the 17th row can render. Not an approved hex.
-  kit('sweden', 'Sweden colours', 'nation', 'plain', '#FECC02', '#006AA7', '#006AA7', '#FECC02'),
+  NEUTRAL,
+  ...(nationalKitSpec as SpecRow[]).map(nationFromSpec),
 ];
 
 const BY_ID = new Map(KIT_COLOURS.map((option) => [option.id, option]));
@@ -97,11 +163,11 @@ export function kitTileLabel(option: KitColour): string {
   return option.tile ?? option.label;
 }
 
-/** Shirt, collar, shorts and socks from the sheet. The shirt pattern uses shirt and secondary. */
+/** Shirt, collar, shorts and socks. The collar fallback is the first trim band. */
 export function clothingFor(option: KitColour): ClothingColors {
   return {
     shirt: option.shirt,
-    shirtTrim: option.secondary,
+    shirtTrim: option.trimBands[0] ?? option.shirt,
     shorts: option.shorts,
     socks: option.socks,
   };
@@ -120,4 +186,39 @@ export function matchKitColour(clothing: ClothingColors): KitColour | null {
 
 export function kitColoursInGroup(kind: KitKind): readonly KitColour[] {
   return KIT_COLOURS.filter((option) => option.kind === kind);
+}
+
+export function popularKits(): readonly KitColour[] {
+  const neutral = getKitColour(NEUTRAL_KIT_ID);
+  const nations = POPULAR_KIT_IDS.map((id) => getKitColour(id));
+  if (!neutral || nations.some((option) => option == null)) {
+    throw new Error('Popular kits are missing from the sheet');
+  }
+  return [neutral, ...nations.filter((option): option is KitColour => option != null)];
+}
+
+/** Empty search uses the tab. A query searches every kit, including Neutral. */
+export function filterKits(tab: KitTab, query: string): readonly KitColour[] {
+  const text = query.trim().toLowerCase();
+  if (text) {
+    return KIT_COLOURS.filter((option) => option.label.toLowerCase().includes(text)
+      || kitTileLabel(option).toLowerCase().includes(text));
+  }
+  switch (tab) {
+    case 'popular':
+      return popularKits();
+    case 'Europe':
+    case 'Africa':
+    case 'Asia':
+    case 'Americas':
+    case 'Oceania':
+      return KIT_COLOURS
+        .filter((option) => option.region === tab)
+        .slice()
+        .sort((a, b) => kitTileLabel(a).localeCompare(kitTileLabel(b), 'en'));
+    default: {
+      const neverTab: never = tab;
+      return neverTab;
+    }
+  }
 }

@@ -21,7 +21,7 @@ export interface Skin {
   skinTint?: string | null;
   patternPaint?: OutfitPattern | null;
   /** Free kit sheet. Null when a costume replaces the football kit. */
-  kitPaint?: { pattern: KitPattern; main: string; secondary: string } | null;
+  kitPaint?: { pattern: KitPattern; main: string; secondary: string; socks: string; trim: readonly string[] } | null;
   bootStyle?: 'studs' | 'cowboy';
 }
 
@@ -123,7 +123,13 @@ export function composePlayerSkin(
     outfitId: outfit?.id ?? null,
     skinTint: outfit?.skinTint ?? null,
     patternPaint: outfit?.pattern ?? null,
-    kitPaint: outfit || !look ? null : { pattern: look.pattern, main: look.shirt, secondary: look.secondary },
+    kitPaint: outfit || !look ? null : {
+      pattern: look.pattern,
+      main: look.shirt,
+      secondary: look.secondary,
+      socks: look.socks,
+      trim: look.trimBands,
+    },
     bootStyle: outfit && cowboy ? 'cowboy' : 'studs',
   };
 }

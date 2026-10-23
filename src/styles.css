@@ -868,7 +868,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   cursor: pointer;
 }
 .kit-row.on { border-color: #f5c94d; box-shadow: inset 0 0 0 1px #f5c94d; }
-.screen.kit-picker { background: #0F1A14; backdrop-filter: none; }
+.screen.kit-picker { background: #0F1A14; backdrop-filter: none; overflow: hidden; }
 .kit-picker .kit-card {
   background: #0F1A14;
   border: 0;
@@ -876,56 +876,89 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   color: #FFFFFF;
 }
 .kit-picker .kit-card h2 { color: #FFFFFF; letter-spacing: 0.5px; }
-.kit-picker .player-preview { background: #0F1A14; border-color: #1C2B22; }
+.kit-picker .kit-card { height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); overflow: hidden; }
+.kit-picker .player-preview { height: 140px; background: #0F1A14; border-color: #1C2B22; }
 .kit-preview-name { margin: 0; color: #FFFFFF; font-weight: 800; font-size: 16px; }
 .kit-preview-note { margin: 0; color: #D8E2DC; font-size: 12px; }
+.kit-search {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #1C2B22;
+  color: #FFFFFF;
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 700;
+}
+.kit-search::placeholder { color: #D8E2DC; }
+.kit-tabs { display: flex; gap: 6px; overflow-x: auto; }
+.kit-tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: #1C2B22;
+  color: #D8E2DC;
+  font: inherit;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.kit-tab.on { background: #FFD54A; color: #111111; }
+.kit-scroll { flex: 1; min-height: 0; overflow-y: auto; }
 .kit-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  text-align: left;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  text-align: center;
 }
 .kit-tile {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  min-height: 64px;
-  padding: 8px 28px 8px 8px;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: 6px 4px 8px;
   background: #1C2B22;
   color: #FFFFFF;
   border: 4px solid transparent;
   border-radius: 12px;
   font: inherit;
   font-weight: 800;
-  font-size: 13px;
-  text-align: left;
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
   cursor: pointer;
 }
 .kit-tile.on { border-color: #FFD54A; }
 .kit-swatch {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 28px;
+  height: 22px;
+  border-radius: 6px;
   flex-shrink: 0;
   display: block;
 }
 .kit-tick {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 18px;
-  height: 18px;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #FFD54A;
   color: #111111;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 14px;
   text-align: center;
   font-weight: 800;
 }
 .kit-use {
   width: 100%;
+  flex-shrink: 0;
   min-height: 48px;
   border: 0;
   border-radius: 12px;

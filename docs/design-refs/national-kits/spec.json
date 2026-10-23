@@ -72,9 +72,9 @@
   "boots": "#2B2B2B"
  },
  {
-  "name": "Republic of Ireland",
-  "label": "Republic of Ireland colours",
-  "tileLabel": "Rep. of Ireland",
+  "name": "Ireland",
+  "label": "Ireland colours",
+  "tileLabel": "Ireland",
   "region": "Europe",
   "confederation": "UEFA",
   "source": "home nation / Ireland",
@@ -442,7 +442,7 @@
   "shorts": "#111111",
   "socks": "#FFFFFF",
   "trimBands": [
-   "#111111",
+   "#000000",
    "#DD0000",
    "#FFCE00"
   ],

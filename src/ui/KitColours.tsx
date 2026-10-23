@@ -1,40 +1,41 @@
 import { useMemo, useState, type CSSProperties } from 'react';
 import {
-  KIT_COLOURS,
+  KIT_REGIONS,
   clothingFor,
+  filterKits,
   getKitColour,
   kitTileLabel,
   type KitColour,
   type KitPattern,
+  type KitTab,
 } from '../game/kitColours';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
 import { PlayerPreview } from './PlayerPreview';
 
+const TABS: readonly { id: KitTab; label: string }[] = [
+  { id: 'popular', label: 'Popular' },
+  ...KIT_REGIONS.map((region) => ({ id: region, label: region })),
+];
+
 function swatchStyle(option: KitColour): CSSProperties {
-  const main = option.shirt;
-  const second = option.secondary;
+  const bands = option.trimBands;
+  const trim = bands.map((color, index) => {
+    const start = 72 + (index * 28) / bands.length;
+    const end = 72 + ((index + 1) * 28) / bands.length;
+    return `${color} ${start}% ${end}%`;
+  }).join(', ');
   const pattern: KitPattern = option.pattern;
   switch (pattern) {
     case 'plain':
-      return { background: main };
-    case 'halves':
-      return { background: `linear-gradient(90deg, ${main} 50%, ${second} 50%)` };
-    case 'hoops':
-      return { background: `repeating-linear-gradient(${main} 0 7px, ${second} 7px 14px)` };
+      return { backgroundImage: `linear-gradient(to bottom, ${option.shirt} 0 72%, ${trim})` };
     case 'stripes':
-      return { background: `repeating-linear-gradient(90deg, ${main} 0 7px, ${second} 7px 14px)` };
-    case 'sash':
-      return { background: `linear-gradient(115deg, ${main} 36%, ${second} 36% 64%, ${main} 64%)` };
-    case 'chevron':
       return {
-        background: `linear-gradient(135deg, transparent 42%, ${second} 42% 58%, transparent 58%), linear-gradient(45deg, transparent 42%, ${second} 42% 58%, transparent 58%), ${main}`,
+        backgroundImage: `linear-gradient(to bottom, transparent 0 72%, ${trim}), repeating-linear-gradient(90deg, ${option.shirt} 0 5px, ${option.secondary} 5px 10px)`,
       };
-    case 'sleeves':
-      return { background: `linear-gradient(90deg, ${second} 22%, ${main} 22% 78%, ${second} 78%)` };
     default: {
       const neverPattern: never = pattern;
-      return { background: neverPattern };
+      return { backgroundImage: neverPattern };
     }
   }
 }
@@ -49,7 +50,10 @@ export function KitColoursScreen({
   onClose: () => void;
 }) {
   const [pending, setPending] = useState(save.appearance.kitColourId);
+  const [tab, setTab] = useState<KitTab>('popular');
+  const [query, setQuery] = useState('');
   const look = getKitColour(pending);
+  const options = useMemo(() => filterKits(tab, query), [tab, query]);
   const previewSkin = useMemo(() => {
     if (!look) return composePlayerSkin(save.appearance);
     return composePlayerSkin({
@@ -66,26 +70,58 @@ export function KitColoursScreen({
         <h2>Choose your kit</h2>
         <PlayerPreview skin={previewSkin} label={previewName} />
         <p className="kit-preview-name">{previewName}</p>
-        <p className="kit-preview-note">Saved on this device.</p>
-        <div className="kit-grid" role="listbox" aria-label="Choose your kit">
-          {KIT_COLOURS.map((option) => {
-            const on = option.id === pending;
+        <input
+          className="kit-search"
+          value={query}
+          aria-label="Search kits"
+          placeholder="Search"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <div className="kit-tabs" role="tablist" aria-label="Kit regions">
+          {TABS.map((item) => {
+            const on = item.id === tab && query.trim() === '';
             return (
               <button
-                key={option.id}
+                key={item.id}
                 type="button"
-                role="option"
-                className={`kit-tile${on ? ' on' : ''}`}
+                role="tab"
                 aria-selected={on}
-                aria-label={option.label}
-                onClick={() => setPending(option.id)}
+                className={`kit-tab${on ? ' on' : ''}`}
+                onClick={() => {
+                  setTab(item.id);
+                  setQuery('');
+                }}
               >
-                <i className="kit-swatch" style={swatchStyle(option)} aria-hidden="true" />
-                <span>{kitTileLabel(option)}</span>
-                {on && <span className="kit-tick" aria-hidden="true">✓</span>}
+                {item.label}
               </button>
             );
           })}
+        </div>
+        <div className="kit-scroll">
+          <div className="kit-grid" role="listbox" aria-label="Choose your kit">
+            {options.map((option) => {
+              const on = option.id === pending;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  className={`kit-tile${on ? ' on' : ''}`}
+                  aria-selected={on}
+                  aria-label={option.label}
+                  onClick={() => setPending(option.id)}
+                >
+                  <i className="kit-swatch" style={swatchStyle(option)} aria-hidden="true" />
+                  <span>{kitTileLabel(option)}</span>
+                  {on && <span className="kit-tick" aria-hidden="true">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+          {options.length === 0 && <p className="kit-preview-note">No kit matches.</p>}
         </div>
         <button
           type="button"
@@ -95,7 +131,7 @@ export function KitColoursScreen({
             onClose();
           }}
         >
-          Use these colours
+          Use this kit
         </button>
       </div>
     </div>

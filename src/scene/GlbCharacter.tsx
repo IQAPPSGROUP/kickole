@@ -28,7 +28,7 @@ import { ueMovementQuaternion } from './ue-motion';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { mountOutfitSpecs } from './outfitAttach';
 import { MountedOutfit } from './outfitSkin';
-import { applyKitShirtShader, clearKitShirtShader } from './kitShirtShader';
+import { applyKitClothShader, clearKitClothShader, type KitClothZone } from './kitShirtShader';
 import { paintOutfitTexture } from './outfitTexture';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
@@ -233,9 +233,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   }, [skin, materials]);
 
   useEffect(() => {
-    const kitShirt = !skin.patternPaint && skin.kitPaint && skin.kitPaint.pattern !== 'plain'
-      ? skin.kitPaint
-      : null;
+    const kitCloth = !skin.patternPaint && skin.kitPaint ? skin.kitPaint : null;
     const painted = skin.patternPaint
       ? paintOutfitTexture(skin.patternPaint, skin.clothing.shirt, skin.clothing.shirtTrim)
       : null;
@@ -254,10 +252,25 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         || material.name === MATERIAL_NAMES.shorts
         || material.name === MATERIAL_NAMES.socks
         || material.name === MATERIAL_NAMES.shirtTrim;
-      if (material.name === MATERIAL_NAMES.shirt && kitShirt) {
+      const zone: KitClothZone | null = material.name === MATERIAL_NAMES.shirt
+        ? 'shirt'
+        : material.name === MATERIAL_NAMES.shirtTrim
+          ? 'collar'
+          : material.name === MATERIAL_NAMES.socks
+            ? 'socks'
+            : null;
+      if (kitCloth && zone) {
         standard.map = null;
         standard.color.set('#ffffff');
-        applyKitShirtShader(standard, kitShirt.pattern, kitShirt.main, kitShirt.secondary);
+        applyKitClothShader(standard, {
+          pattern: kitCloth.pattern,
+          main: kitCloth.main,
+          secondary: kitCloth.secondary,
+          socks: kitCloth.socks,
+          trim: kitCloth.trim,
+          zone,
+          body: skin.playerBody,
+        });
       } else if (cloth && painted) {
         standard.map = painted;
         if (mapHoldsColour) standard.color.set('#ffffff');
@@ -269,7 +282,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           standard.metalness = 0.18;
         }
       } else if (cloth) {
-        if (material.name === MATERIAL_NAMES.shirt) clearKitShirtShader(standard);
+        if (zone) clearKitClothShader(standard);
         // Solid kit tint. The shared albedo is a boot texture, so it stays off the shirt.
         const tint = skinMaterialColors(skin)[material.name];
         standard.map = null;
@@ -296,7 +309,9 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         standard.map = standard.userData.baseMap;
         if (typeof standard.userData.baseRough === 'number') standard.roughness = standard.userData.baseRough;
         if (typeof standard.userData.baseMetal === 'number') standard.metalness = standard.userData.baseMetal;
-        if (material.name === MATERIAL_NAMES.shirt) clearKitShirtShader(standard);
+        if (material.name === MATERIAL_NAMES.shirt
+          || material.name === MATERIAL_NAMES.shirtTrim
+          || material.name === MATERIAL_NAMES.socks) clearKitClothShader(standard);
       }
       painted?.dispose();
     };

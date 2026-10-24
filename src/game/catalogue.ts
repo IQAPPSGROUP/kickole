@@ -1,8 +1,10 @@
 /**
- * Kickolé wardrobe catalogue — cosmetic boots and kits.
+ * Kickolé wardrobe catalogue — earned boot styles and free kits.
  * Nothing in this list is sold. National kit colours are free and live in kitColours.ts.
- * Boots never alter timing windows or scoring.
+ * Boot styles never alter timing windows or scoring. Progress stays on the device.
  */
+
+import { BOOT_STYLES, CLASSIC_BOOT_ID, type BootStyleId } from './bootStyles';
 
 export type UnlockTier = 'starter' | 'club' | 'street' | 'freestyle' | 'legend';
 
@@ -37,9 +39,9 @@ export interface UnlockRequirement {
 }
 
 export interface BootDesign {
-  id: string;
+  id: BootStyleId;
   name: string;
-  theme: DesignTheme;
+  theme: string;
   unlock: UnlockRequirement;
   main: string;
   sole: string;
@@ -67,119 +69,24 @@ export const UNLOCK_TIERS: Record<Exclude<UnlockTier, 'starter'>, UnlockRequirem
   legend: { tier: 'legend', challenge: 'perfectTouch', challengeTarget: 80 },
 };
 
-export const STARTER_BOOT_ID = 'boot-street-classic';
+export const STARTER_BOOT_ID = CLASSIC_BOOT_ID;
 export const STARTER_KIT_ID = 'kit-street-classic';
 
-export const BOOTS: readonly BootDesign[] = [
-  {
-    id: STARTER_BOOT_ID,
-    name: 'Street Classic',
-    theme: 'Street Classic',
-    unlock: { tier: 'starter', challenge: 'none', challengeTarget: 0 },
-    main: '#FF4F9A',
-    sole: '#222831',
-    lace: '#F8F9FB',
-    trim: '#1E2A5A',
-    pattern: 'panels',
-    note: 'Starter pair. Included from the first run.',
-  },
-  {
-    id: 'boot-beach-wave',
-    name: 'Beach Wave',
-    theme: 'Beach Wave',
-    unlock: UNLOCK_TIERS.club,
-    main: '#3D7EA6',
-    sole: '#F5E6C8',
-    lace: '#F7F5ED',
-    trim: '#12BFA6',
-    pattern: 'wave',
-    note: 'Coastal panels and foam sole.',
-  },
-  {
-    id: 'boot-carnival',
-    name: 'Carnival Flex',
-    theme: 'Carnival',
-    unlock: UNLOCK_TIERS.club,
-    main: '#FF805D',
-    sole: '#F7F5ED',
-    lace: '#EAF44A',
-    trim: '#9B59B6',
-    pattern: 'carnival',
-    note: 'Festival panels with neon trim.',
-  },
-  {
-    id: 'boot-midnight',
-    name: 'Midnight Grip',
-    theme: 'Midnight',
-    unlock: UNLOCK_TIERS.street,
-    main: '#1A1A2E',
-    sole: '#12BFA6',
-    lace: '#F7F5ED',
-    trim: '#3D7EA6',
-    pattern: 'midnight',
-    note: 'Dark leather with teal sole stripe.',
-  },
-  {
-    id: 'boot-mosaic',
-    name: 'Mosaic Tile',
-    theme: 'Mosaic',
-    unlock: UNLOCK_TIERS.street,
-    main: '#F5C94D',
-    sole: '#142D35',
-    lace: '#FF805D',
-    trim: '#12BFA6',
-    pattern: 'mosaic',
-    note: 'Tile-break panels across the vamp.',
-  },
-  {
-    id: 'boot-street-runner',
-    name: 'Street Runner',
-    theme: 'Street Classic',
-    unlock: UNLOCK_TIERS.freestyle,
-    main: '#F7F5ED',
-    sole: '#FF805D',
-    lace: '#142D35',
-    trim: '#EAF44A',
-    pattern: 'stripe',
-    note: 'Court stripes and high-contrast sole.',
-  },
-  {
-    id: 'boot-gold',
-    name: 'Gold Touch',
-    theme: 'Gold',
-    unlock: UNLOCK_TIERS.freestyle,
-    main: '#F5C94D',
-    sole: '#8B6914',
-    lace: '#F7F5ED',
-    trim: '#EAF44A',
-    pattern: 'gold',
-    note: 'Metallic finish with gold trim.',
-  },
-  {
-    id: 'boot-legend-spike',
-    name: 'Legend Spike',
-    theme: 'Gold',
-    unlock: UNLOCK_TIERS.legend,
-    main: '#142D35',
-    sole: '#F5C94D',
-    lace: '#EAF44A',
-    trim: '#FF805D',
-    pattern: 'gold',
-    note: 'Top-tier launch silhouette.',
-  },
-  {
-    id: 'boot-cowboy',
-    name: 'Cowboy Boots',
-    theme: 'Cowboy',
-    unlock: { tier: 'starter', challenge: 'none', challengeTarget: 0 },
-    main: '#8A5A32',
-    sole: '#4A3424',
-    lace: '#E7D3A1',
-    trim: '#C4A574',
-    pattern: 'cowboy',
-    note: 'Tan leather, stitching, a pointed toe and a block heel.',
-  },
-];
+const FREE: UnlockRequirement = { tier: 'starter', challenge: 'none', challengeTarget: 0 };
+
+/** Plain pairs. The written hint is the goal. Colour alone is not the lock. */
+export const BOOTS: readonly BootDesign[] = BOOT_STYLES.map((style) => ({
+  id: style.id,
+  name: style.name,
+  theme: style.name,
+  unlock: FREE,
+  main: style.main,
+  sole: style.dark,
+  lace: style.main,
+  trim: style.dark,
+  pattern: 'plain',
+  note: style.hint,
+}));
 
 export const KITS: readonly KitDesign[] = [
   {

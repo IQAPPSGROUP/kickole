@@ -68,7 +68,10 @@ export function CustomiseScreen({
   onClose: () => void;
 }) {
   const a = save.appearance;
-  const skin = useMemo(() => composePlayerSkin(a), [a]);
+  const skin = useMemo(
+    () => composePlayerSkin(a, save.equippedKit, save.equippedBoot),
+    [a, save.equippedKit, save.equippedBoot],
+  );
 
   const patch = (p: Partial<Appearance>) => {
     onChange({

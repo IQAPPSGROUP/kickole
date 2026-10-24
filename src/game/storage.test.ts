@@ -87,9 +87,8 @@ describe('storage', () => {
     });
     const save = loadSave();
     expect('coins' in save).toBe(false);
-    expect(save.ownedBoots).toContain(STARTER_BOOT_ID);
-    expect(save.ownedBoots).toContain('boot-beach-wave');
-    expect(save.equippedBoot).toBe('boot-beach-wave');
+    expect(save.ownedBoots).toEqual([STARTER_BOOT_ID]);
+    expect(save.equippedBoot).toBe(STARTER_BOOT_ID);
     expect(save.ownedKits).toContain('kit-carnival');
     expect(save.appearance.skinTone).toBe('#8D5A3C');
     expect(save.appearance.body).toBe('male');

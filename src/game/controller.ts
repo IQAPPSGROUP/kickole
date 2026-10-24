@@ -26,6 +26,14 @@ import { fx } from '../scene/fx';
 import { playHaptic, type HapticCue } from './haptics';
 import { prefersReducedMotion, swoopStrength } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
+import {
+  earnedBootIds,
+  getBootStyle,
+  noteBootPlay,
+  type BootPlayDelta,
+  type BootStyleId,
+} from './bootStyles';
+import { STARTER_BOOT_ID } from './catalogue';
 import { normalizeEnabledTracks, SHUFFLE_SONG, toggleEnabled, type GameTrackId } from './tracks';
 import { type ChallengeProgress } from './shop';
 import {
@@ -83,12 +91,18 @@ export interface Result {
   rank: number;
 }
 
+export interface BootToast {
+  id: number;
+  text: string;
+}
+
 export interface Snapshot {
   hud: Hud;
   save: SaveData;
   settings: Settings;
   skin: Skin;
   result: Result | null;
+  bootToast: BootToast | null;
 }
 
 /** Glues the engine to storage, audio, haptics and React (via subscribe/getSnapshot). */
@@ -115,6 +129,12 @@ export class GameController {
   private suppressKickPrompt = false;
   /** Pause menu is open, so the ball stays where it is. */
   private playHeld = false;
+  /** Distinct scored tricks in the current run. Hi-tops reads the size. */
+  private runTrickKinds = new Set<TrickKind>();
+  private bootToast: BootToast | null = null;
+  private bootToastId = 0;
+  /** Kick totals changed since the last write. Flushed when the run ends. */
+  private bootDirty = false;
 
   constructor() {
     this.engine.prepare('menu');
@@ -133,7 +153,7 @@ export class GameController {
   getSnapshot = () => this.snapshot;
 
   private liveSkin(): Skin {
-    return composePlayerSkin(this.save.appearance);
+    return composePlayerSkin(this.save.appearance, this.save.equippedKit, this.save.equippedBoot);
   }
 
   private build(): Snapshot {
@@ -163,7 +183,31 @@ export class GameController {
       settings: this.settings,
       skin: this.liveSkin(),
       result: this.result,
+      bootToast: this.bootToast,
     };
+  }
+
+  /**
+   * Record play toward boot styles. Writes the device save when a style
+   * unlocks, and at the end of a run. The leaderboard never sees this.
+   */
+  private applyBoot(delta: BootPlayDelta, persist: boolean) {
+    const next = noteBootPlay(this.save.bootProgress, delta);
+    if (!next.changed && !(persist && this.bootDirty)) return;
+    const ownedBoots = earnedBootIds(next.progress);
+    const equippedBoot = ownedBoots.includes(this.save.equippedBoot as BootStyleId)
+      ? this.save.equippedBoot
+      : STARTER_BOOT_ID;
+    this.save = { ...this.save, bootProgress: next.progress, ownedBoots, equippedBoot };
+    this.bootDirty = true;
+    if (next.unlocked.length > 0) {
+      const names = next.unlocked.map((id) => getBootStyle(id).name).join(', ');
+      this.bootToast = { id: ++this.bootToastId, text: `${names} unlocked` };
+    }
+    if (next.unlocked.length > 0 || persist) {
+      persistSave(this.save);
+      this.bootDirty = false;
+    }
   }
 
   private publish() {
@@ -265,6 +309,7 @@ export class GameController {
         break;
       case 'kick': {
         this.kickTimesMs.push(this.runElapsedMs());
+        this.applyBoot({ kickUps: 1, combo5: e.streak >= 5 }, false);
         if (e.alternate) this.runChallenges.alternateFoot += 1;
         if (e.stall) this.runChallenges.stalls += 1;
         if (e.grade === 'perfect') this.runChallenges.perfectTouch += 1;
@@ -292,6 +337,13 @@ export class GameController {
         this.publish();
         break;
       case 'trick':
+        if (e.points > 0) {
+          this.runTrickKinds.add(e.kind);
+          this.applyBoot({
+            rainbow: e.kind === 'aroundTheWorld' && e.phase === 'recover',
+            tricksInRun: this.runTrickKinds.size,
+          }, false);
+        }
         if (e.points > 0) {
           const beat = this.engine.lastBeatGrade;
           const label = e.kind === 'header' ? 'HEADER!'
@@ -330,6 +382,7 @@ export class GameController {
         break;
       case 'over': {
         const s = this.engine.stats;
+        const previousBest = this.save.best;
         const streak = Math.max(this.save.bestStreak, s.bestStreak);
         const r = s.score > 0
           ? saveRun(
@@ -346,6 +399,7 @@ export class GameController {
         if (s.score <= 0 && streak !== this.save.bestStreak) persistSave(r.save);
         if (r.newBest) this.pendingCheers.push('best');
         this.save = r.save;
+        this.applyBoot({ beatBest: s.score > previousBest && previousBest > 0 }, true);
         this.result = {
           score: s.score,
           kickUps: s.kickUps,
@@ -528,6 +582,7 @@ export class GameController {
   play() {
     this.feedback = null;
     this.result = null;
+    this.runTrickKinds.clear();
     this.runChallenges = { alternateFoot: 0, stalls: 0, perfectTouch: 0 };
     this.kickTimesMs = [];
     this.perfects = 0;
@@ -628,6 +683,20 @@ export class GameController {
       kitColourId: option.id,
       clothing: clothingFor(option),
     });
+  }
+
+  /** Wear an earned style. A locked pair stays locked. */
+  equipBoot(id: string) {
+    if (!this.save.ownedBoots.includes(id) || this.save.equippedBoot === id) return;
+    this.save = { ...this.save, equippedBoot: id };
+    persistSave(this.save);
+    this.publish();
+  }
+
+  dismissBootToast() {
+    if (!this.bootToast) return;
+    this.bootToast = null;
+    this.publish();
   }
 
   /** Free body choice from the first-launch picker or the wardrobe. */

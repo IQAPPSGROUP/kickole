@@ -7,7 +7,7 @@ import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import { alignFootWindow, clearFootContactAnchors, setFootContactAnchors, type BallCenter } from '../engine/footContact';
-import { cowboyBootSpecs, outfitSpecs } from '../game/outfitFit';
+import { bootStyleSpecs, outfitSpecs } from '../game/outfitFit';
 import { isMeshOutfit, OUTFIT_COVER, outfitModelUrl } from '../game/outfitMesh';
 import { isOutfitId } from '../game/outfits';
 import type { Skin } from '../game/skins';
@@ -298,7 +298,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const meshed = isMeshOutfit(skin.outfitId);
     const specs = [
       ...(!meshed && skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),
-      ...(!meshed && skin.bootStyle === 'cowboy' ? cowboyBootSpecs(skin.playerBody) : []),
+      ...(!meshed && skin.bootStyleId ? bootStyleSpecs(skin.bootStyleId, skin.playerBody) : []),
     ];
     const release = specs.length > 0 ? mountOutfitSpecs(scene, specs) : null;
     return () => {

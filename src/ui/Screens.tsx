@@ -50,12 +50,13 @@ export function Logo() {
 }
 
 export function Home({
-  best, onPlay, onSettings, onCustomise, onKitColours, onLeaderboard,
+  best, onPlay, onSettings, onCustomise, onBoots, onKitColours, onLeaderboard,
 }: {
   best: number;
   onPlay: () => void;
   onSettings: () => void;
   onCustomise: () => void;
+  onBoots: () => void;
   onKitColours: () => void;
   onLeaderboard: () => void;
 }) {
@@ -74,6 +75,7 @@ export function Home({
         <div className="home-actions">
           <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
         </div>
+        <button className="btn ghost" onClick={onBoots}>YOUR BOOTS</button>
         <button className="btn ghost" onClick={onKitColours}>CHOOSE YOUR KIT</button>
         <button className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
         <button className="btn ghost" onClick={onSettings}>SETTINGS</button>

@@ -75,6 +75,18 @@ describe('kit colours', () => {
     expect(getKitColour('usa')?.label).toBe('USA colours');
     expect(kitTileLabel(getKitColour('northern-ireland')!)).toBe('N. Ireland');
     expect(getKitColour('northern-ireland')?.trimBands).toEqual(['#FFFFFF', '#00843D']);
+    expect(getKitColour('anguilla')).toMatchObject({
+      pattern: 'plain', shirt: '#F28C00', shorts: '#0B1F4B', socks: '#F28C00',
+      trimBands: ['#1E4FA8', '#FFFFFF', '#F28C00'],
+    });
+    expect(getKitColour('us-virgin-islands')).toMatchObject({
+      pattern: 'plain', shirt: '#6CB4E4', shorts: '#6CB4E4', socks: '#6CB4E4',
+      trimBands: ['#FFFFFF', '#FCD116', '#1E4FA8'],
+    });
+    expect(getKitColour('lesotho')).toMatchObject({
+      pattern: 'plain', shirt: '#007A3D', shorts: '#007A3D', socks: '#007A3D',
+      trimBands: ['#1E4FA8', '#FFFFFF', '#007A3D'],
+    });
     expect(getKitColour('paraguay')).toMatchObject({ pattern: 'stripes', secondary: '#D52B1E' });
     expect(filterKits('popular', '').map((option) => option.id)).toEqual(['neutral', ...POPULAR_KIT_IDS]);
     const uefa = filterKits('UEFA', '');

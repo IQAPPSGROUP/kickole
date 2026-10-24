@@ -1,4 +1,5 @@
 import type { PlayerBody } from './appearance';
+import { getBootStyle, type BootStyleId } from './bootStyles';
 import { OUTFIT_IDS, type OutfitId } from './outfits';
 
 /**
@@ -177,11 +178,60 @@ function mirrorFoot(spec: MeshSpec): MeshSpec {
   };
 }
 
-export function cowboyBootSpecs(body: PlayerBody): MeshSpec[] {
+function pairFeet(left: MeshSpec[]): MeshSpec[] {
+  return [...left, ...left.map(mirrorFoot)];
+}
+
+/**
+ * Plain foot pieces. Names stay off the contact materials, so the ball still
+ * meets the skinned boot. Shafts stop at the ankle.
+ */
+export function bootStyleSpecs(id: BootStyleId, body: PlayerBody): MeshSpec[] {
+  if (id === 'boot-classic') return [];
+  if (id === 'boot-cowboy') return cowboyPieces(body);
+  const style = getBootStyle(id);
   const m = measuresOf(body);
-  const leather = '#8A5A32';
-  const stitch = '#E7D3A1';
-  const sole = '#4A3424';
+  const bulky = id === 'boot-space';
+  const halfW = m.footHalf + (bulky ? 0.018 : 0.01);
+  const lift = id === 'boot-wellies' ? 0.018 : id === 'boot-hitops' || id === 'boot-snow' ? 0.014 : 0.012;
+  const shaftTop = m.footAnkle + lift;
+  const shaftBottom = m.footSole + 0.008;
+  const shaftH = shaftTop - shaftBottom;
+  const shaftY = (shaftTop + shaftBottom) / 2;
+  const z0 = m.footHeel + 0.012;
+  const z1 = m.footToe - 0.012;
+  const metal = id === 'boot-gold' ? 0.62 : id === 'boot-knight' ? 0.28 : bulky ? 0.16 : 0.06;
+  const rough = id === 'boot-gold' ? 0.32 : 0.5;
+  const prefix = id === 'boot-wellies' ? 'wellie'
+    : id === 'boot-hitops' ? 'hitop'
+      : id === 'boot-snow' ? 'snow'
+        : id === 'boot-space' ? 'space'
+          : id === 'boot-knight' ? 'knight'
+            : 'gold';
+  const soleH = 0.02;
+  const left: MeshSpec[] = [
+    box('footL', 'foot', `${prefix}-shaft`, [m.footX, shaftY, (z0 + z1) / 2], [halfW * 2, shaftH, z1 - z0], style.main, rough, metal),
+    box('footL', 'foot', `${prefix}-sole`, [m.footX, shaftBottom + soleH / 2, (z0 + z1) / 2], [halfW * 2.02, soleH, (z1 - z0) * 0.94], style.dark, 0.72, 0.04),
+  ];
+  if (id === 'boot-snow') {
+    const cuffH = 0.012;
+    left.push(box(
+      'footL',
+      'foot',
+      'snow-cuff',
+      [m.footX, shaftTop - cuffH / 2, (z0 + z1) / 2],
+      [halfW * 2 + 0.004, cuffH, (z1 - z0) * 0.96],
+      style.light,
+      0.6,
+      0.02,
+    ));
+  }
+  return pairFeet(left);
+}
+
+function cowboyPieces(body: PlayerBody): MeshSpec[] {
+  const style = getBootStyle('boot-cowboy');
+  const m = measuresOf(body);
   const halfW = m.footHalf + 0.01;
   const shaftTop = m.footAnkle + 0.012;
   const shaftBottom = m.footSole + 0.008;
@@ -191,12 +241,15 @@ export function cowboyBootSpecs(body: PlayerBody): MeshSpec[] {
   const shaftZ0 = m.footHeel + 0.012;
   const shaftZ1 = m.footToe - 0.018;
   const left: MeshSpec[] = [
-    box('footL', 'foot', 'cowboy-shaft', [m.footX, shaftY, (shaftZ0 + shaftZ1) / 2], [halfW * 2, shaftH, shaftZ1 - shaftZ0], leather, 0.48, 0.08),
-    box('footL', 'foot', 'cowboy-toe', [m.footX, m.footSole + 0.042, (m.footToe + toeTip) / 2], [halfW * 1.15, 0.048, toeTip - (m.footToe - 0.01)], leather, 0.48, 0.08),
-    box('footL', 'foot', 'cowboy-heel', [m.footX, m.footSole - 0.011, m.footHeel + 0.02], [halfW * 1.25, 0.022, 0.044], sole, 0.72, 0.02),
-    box('footL', 'foot', 'cowboy-stitch', [m.footX, shaftY + shaftH * 0.15, (shaftZ0 + shaftZ1) / 2], [halfW * 2 + 0.004, 0.006, (shaftZ1 - shaftZ0) * 0.9], stitch, 0.62, 0.02),
+    box('footL', 'foot', 'cowboy-shaft', [m.footX, shaftY, (shaftZ0 + shaftZ1) / 2], [halfW * 2, shaftH, shaftZ1 - shaftZ0], style.main, 0.48, 0.08),
+    box('footL', 'foot', 'cowboy-toe', [m.footX, m.footSole + 0.042, (m.footToe + toeTip) / 2], [halfW * 1.15, 0.048, toeTip - (m.footToe - 0.01)], style.main, 0.48, 0.08),
+    box('footL', 'foot', 'cowboy-heel', [m.footX, m.footSole - 0.011, m.footHeel + 0.02], [halfW * 1.25, 0.022, 0.044], style.dark, 0.72, 0.02),
   ];
-  return [...left, ...left.map(mirrorFoot)];
+  return pairFeet(left);
+}
+
+export function cowboyBootSpecs(body: PlayerBody): MeshSpec[] {
+  return bootStyleSpecs('boot-cowboy', body);
 }
 
 /** Original bars and dots. Not a cross, eagle, animal, or a known wrestler's mask. */

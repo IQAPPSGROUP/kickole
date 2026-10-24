@@ -65,6 +65,33 @@ function toonRole(name: string): ToonRole {
   return 'flat';
 }
 
+const BOOT_CLOTH = new Set<string>([
+  MATERIAL_NAMES.boots,
+  MATERIAL_NAMES.bootsSole,
+  'Boot_Laces',
+  'Boot_Trim',
+]);
+
+/** Solid colour on the skinned boot so a style shell and any peek-through match. Vertices stay put. */
+function paintBootMaterial(standard: MeshStandardMaterial, skin: Skin) {
+  const sole = standard.name === MATERIAL_NAMES.bootsSole;
+  standard.map = null;
+  standard.color.set(sole ? skin.boots.sole : skin.boots.main);
+  if (skin.bootStyleId === 'boot-gold') {
+    standard.roughness = sole ? 0.45 : 0.32;
+    standard.metalness = sole ? 0.2 : 0.62;
+  } else if (skin.bootStyleId === 'boot-knight') {
+    standard.roughness = 0.42;
+    standard.metalness = sole ? 0.12 : 0.32;
+  } else if (skin.bootStyleId === 'boot-space') {
+    standard.roughness = 0.4;
+    standard.metalness = 0.2;
+  } else {
+    standard.roughness = 0.55;
+    standard.metalness = 0.06;
+  }
+}
+
 /** Straps in foot-bone space. On this rig local +Y runs toward the toe and local −Z is the instep. */
 const LACES: ReadonlyArray<{ position: [number, number, number]; size: [number, number, number] }> = [
   { position: [0, 0.042, -0.055], size: [0.074, 0.012, 0.016] },
@@ -293,6 +320,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       if (material.name === MATERIAL_NAMES.skin) {
         standard.color.set(skin.skinTint ?? standard.userData.baseColor);
       }
+      if (skin.bootStyleId && BOOT_CLOTH.has(material.name)) paintBootMaterial(standard, skin);
       standard.needsUpdate = true;
     }
     const meshed = isMeshOutfit(skin.outfitId);

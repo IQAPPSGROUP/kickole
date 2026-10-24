@@ -35,7 +35,7 @@ export const BOOT_STYLES: readonly BootStyle[] = [
   { id: 'boot-cowboy', name: 'Cowboy', hint: 'Land your first Rainbow', main: '#8B5A2B', dark: '#5A3415', light: '#E0B070' },
   { id: 'boot-hitops', name: 'Hi-tops', hint: '5 different tricks in one run', main: '#D62828', dark: '#F2F2F2', light: '#FFFFFF' },
   { id: 'boot-snow', name: 'Snow boots', hint: 'Beat your best score 3 times', main: '#2F6FB0', dark: '#1E3F66', light: '#F4F1EA' },
-  { id: 'boot-space', name: 'Space boots', hint: 'Hit a x5 combo', main: '#F2F2F2', dark: '#8A9096', light: '#C9CED3' },
+  { id: 'boot-space', name: 'Space boots', hint: 'Hit 5 clean touches in a row', main: '#F2F2F2', dark: '#8A9096', light: '#C9CED3' },
   { id: 'boot-knight', name: 'Knight', hint: '1,000 kick-ups in total', main: '#9AA3AB', dark: '#5E666E', light: '#D5DBE0' },
   { id: 'boot-gold', name: 'Gold', hint: '2,500 kick-ups in total', main: '#D4A62A', dark: '#8A6A14', light: '#FFF0A8' },
 ];

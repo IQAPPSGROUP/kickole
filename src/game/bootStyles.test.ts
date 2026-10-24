@@ -36,7 +36,7 @@ describe('earned boot styles', () => {
       'Land your first Rainbow',
       '5 different tricks in one run',
       'Beat your best score 3 times',
-      'Hit a x5 combo',
+      'Hit 5 clean touches in a row',
       '1,000 kick-ups in total',
       '2,500 kick-ups in total',
     ]);
@@ -78,10 +78,25 @@ describe('earned boot styles', () => {
       'cowboy-shaft',
       'cowboy-toe',
       'cowboy-heel',
+      'cowboy-sole',
       'cowboy-shaft-r',
       'cowboy-toe-r',
       'cowboy-heel-r',
+      'cowboy-sole-r',
     ]);
+    const topOf = (id: BootStyleId, name: string) => {
+      const spec = bootStyleSpecs(id, 'male').find((piece) => piece.name === name);
+      if (!spec) throw new Error(name);
+      return spec.position[1] + spec.size[1] / 2;
+    };
+    expect(topOf('boot-wellies', 'wellie-shaft')).toBeGreaterThan(topOf('boot-gold', 'gold-shaft') + 0.06);
+    expect(topOf('boot-knight', 'knight-shaft')).toBeGreaterThan(topOf('boot-hitops', 'hitop-shaft'));
+    expect(topOf('boot-hitops', 'hitop-shaft')).toBeGreaterThan(topOf('boot-gold', 'gold-shaft'));
+    const space = bootStyleSpecs('boot-space', 'male').find((spec) => spec.name === 'space-shaft');
+    const gold = bootStyleSpecs('boot-gold', 'male').find((spec) => spec.name === 'gold-shaft');
+    expect(space && gold && space.size[0] > gold.size[0] * 1.15).toBe(true);
+    expect(space?.boot?.toe).toBe('blunt');
+    expect(bootStyleSpecs('boot-cowboy', 'male').find((spec) => spec.name === 'cowboy-shaft')?.boot?.toe).toBe('point');
     for (const id of ALL) {
       if (id === 'boot-classic') continue;
       for (const body of ['male', 'female'] as const) {
@@ -91,8 +106,12 @@ describe('earned boot styles', () => {
         expect(names).not.toMatch(/stripe|logo|swoosh|letter|stud|lace|rivet/i);
         for (const spec of specs) {
           expect(BOOT_MATERIALS.has(spec.name)).toBe(false);
+          expect(spec.shape).toBe('boot');
+          expect(spec.boot?.kind === 'upper' || spec.boot?.kind === 'sole' || spec.boot?.kind === 'cuff' || spec.boot?.kind === 'heel').toBe(true);
           expect(spec.bone === 'footL' || spec.bone === 'footR').toBe(true);
-          expect(spec.position[1] + spec.size[1] / 2).toBeLessThanOrEqual(0.073);
+          const top = spec.position[1] + spec.size[1] / 2;
+          expect(top).toBeLessThanOrEqual(0.22);
+          if (spec.name.startsWith('cowboy-shaft')) expect(top).toBeLessThanOrEqual(0.073);
         }
       }
     }

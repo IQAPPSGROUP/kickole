@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { GameEngine } from './engine';
+import { FOOT_SWITCH_BUFFER_SEC, GameEngine } from './engine';
 import { clearFootContactAnchors, setFootContactAnchors } from './footContact';
 
-function runUntilContactDelta(e: GameEngine, targetMs: number) {
+function runUntil(e: GameEngine, ready: () => boolean) {
   for (let i = 0; i < 100000; i++) {
-    if (e.ball.vy < 0 && e.timingDeltaMs() <= targetMs) return;
+    if (ready()) return;
     e.step(e.config.fixedStep);
   }
   throw new Error('never reached');
+}
+
+function runUntilContactDelta(e: GameEngine, targetMs: number) {
+  runUntil(e, () => e.ball.vy < 0 && e.timingDeltaMs() <= targetMs);
 }
 
 function stepN(e: GameEngine, n: number) {
@@ -235,6 +239,84 @@ describe('input abuse', () => {
       expect(e.stats.score, `hold ${holdSteps}`).toBe(kickUp + perfectBonus);
       expect(e.ball.vy).toBeGreaterThan(0);
     }
+  });
+
+  it('a foot switch during the strike is the kick that lands', () => {
+    const e = started();
+    const events: string[] = [];
+    e.on((ev) => {
+      if (ev.type === 'kick' || ev.type === 'miss') events.push(`${ev.type}:${ev.side}`);
+    });
+    runUntilContactDelta(e, 5);
+    e.press('left');
+    e.release('left');
+    e.step(e.config.fixedStep);
+    expect(e.contact?.side).toBe('left');
+    expect(e.stats.kickUps).toBe(0);
+    e.press('right');
+    e.release('right');
+    expect(e.contact?.side).toBe('right');
+    expect(e.stats.kickUps).toBe(0);
+    expect(events).toEqual([]);
+    expect(e.lastKick.right).toBeGreaterThan(e.lastKick.left);
+    for (let i = 0; i < 12 && e.stats.kickUps === 0; i++) e.step(e.config.fixedStep);
+    expect(e.stats.kickUps).toBe(1);
+    expect(e.lastSide).toBe('right');
+    expect(events).toEqual(['kick:right']);
+  });
+
+  it('rapid L-R-L alternation still kicks when each switch arrives early', () => {
+    const e = started();
+    const sides: string[] = [];
+    const missed: string[] = [];
+    e.on((ev) => {
+      if (ev.type === 'kick') sides.push(ev.side);
+      if (ev.type === 'miss') missed.push(ev.side);
+    });
+    runUntilContactDelta(e, 5);
+    e.press('left');
+    e.release('left');
+    for (let i = 0; i < 12 && e.stats.kickUps === 0; i++) e.step(e.config.fixedStep);
+    expect(e.stats.kickUps).toBe(1);
+
+    for (const side of ['right', 'left'] as const) {
+      runUntil(e, () => e.ball.vy < 0 && e.timingDeltaMs() <= 200);
+      expect(e.timingDeltaMs()).toBeGreaterThan(e.config.timing.poorMs);
+      const before = e.stats.kickUps;
+      e.press(side);
+      e.release(side);
+      expect(e.stats.kickUps).toBe(before);
+      expect(e.contact).toBeNull();
+      expect(e.queuedSwitch?.side).toBe(side);
+      const steps = Math.ceil((FOOT_SWITCH_BUFFER_SEC + 0.08) / e.config.fixedStep);
+      for (let i = 0; i < steps && e.stats.kickUps === before; i++) e.step(e.config.fixedStep);
+      expect(e.stats.kickUps, side).toBe(before + 1);
+      expect(e.lastSide).toBe(side);
+    }
+    expect(sides).toEqual(['left', 'right', 'left']);
+    expect(missed).toEqual([]);
+  });
+
+  it('drops a foot switch that is still early when the buffer expires, without a miss', () => {
+    const e = started();
+    const events: string[] = [];
+    e.on((ev) => {
+      if (ev.type === 'kick' || ev.type === 'miss') events.push(ev.type);
+    });
+    runUntilContactDelta(e, 5);
+    e.press('left');
+    e.release('left');
+    for (let i = 0; i < 12 && e.stats.kickUps === 0; i++) e.step(e.config.fixedStep);
+    runUntil(e, () => e.ball.vy < 0 && e.timingDeltaMs() <= 400);
+    e.press('right');
+    e.release('right');
+    expect(e.queuedSwitch?.side).toBe('right');
+    const steps = Math.ceil((FOOT_SWITCH_BUFFER_SEC + 0.02) / e.config.fixedStep);
+    stepN(e, steps);
+    expect(e.queuedSwitch).toBeNull();
+    expect(e.stats.kickUps).toBe(1);
+    expect(events).toEqual(['kick']);
+    expect(e.phase).toBe('playing');
   });
 
   it('rapid alternating taps keep the run alive and score alternate bonuses', () => {

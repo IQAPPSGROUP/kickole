@@ -258,6 +258,43 @@ describe('GameController', () => {
     expect((navigator.vibrate as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
   });
 
+  it('buzzes a foot switch only once that kick is accepted', async () => {
+    const { c } = await make({ ...QUIET, vibration: true });
+    const vibrate = navigator.vibrate as unknown as ReturnType<typeof vi.fn>;
+    c.play();
+    c.press('left');
+    c.release('left');
+    tickTo(c, 5);
+    vibrate.mockClear();
+    c.press('left');
+    c.release('left');
+    c.tick(c.engine.config.fixedStep);
+    c.press('right');
+    c.release('right');
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(c.engine.stats.kickUps).toBe(0);
+    for (let i = 0; i < 12 && c.engine.stats.kickUps === 0; i++) c.tick(c.engine.config.fixedStep);
+    expect(c.engine.lastSide).toBe('right');
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(vibratePattern('perfect'));
+
+    vibrate.mockClear();
+    const early = c.engine;
+    for (let i = 0; i < 100000 && !(early.ball.vy < 0 && early.timingDeltaMs() <= 200); i++) c.tick(early.config.fixedStep);
+    expect(early.timingDeltaMs()).toBeGreaterThan(early.config.timing.poorMs);
+    const before = early.stats.kickUps;
+    c.press('left');
+    c.release('left');
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(early.stats.kickUps).toBe(before);
+    for (let i = 0; i < 40 && early.stats.kickUps === before; i++) c.tick(early.config.fixedStep);
+    expect(early.stats.kickUps).toBe(before + 1);
+    expect(early.lastSide).toBe('left');
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    const accepted = [vibratePattern('perfect'), vibratePattern('good'), vibratePattern('poor')];
+    expect(accepted).toContainEqual(vibrate.mock.calls[0][0]);
+  });
+
   it('grades the buzz by the touch', async () => {
     const { c } = await make({ ...QUIET, vibration: true });
     const vibrate = navigator.vibrate as unknown as ReturnType<typeof vi.fn>;

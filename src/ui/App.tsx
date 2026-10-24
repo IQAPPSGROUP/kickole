@@ -17,7 +17,7 @@ import {
 } from '../scene/openingIntro';
 import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
-import { Hud, TouchZones } from './Hud';
+import { Hud, SongChip, TouchZones } from './Hud';
 import { OpeningSkip } from './OpeningSkip';
 import { CountryScreen, NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
@@ -353,6 +353,17 @@ export function App() {
     setDeviceReady(true);
   };
 
+  const showSongChip = (phase === 'menu' || phase === 'ready' || phase === 'playing')
+    && overlay === 'none'
+    && !paused
+    && !boardOpen
+    && !intro.active
+    && !needsBody
+    && !needsOpt
+    && !needsNick
+    && !needsCountry
+    && !(reviewOpen && board);
+
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
@@ -395,6 +406,7 @@ export function App() {
           }}
         />
       )}
+      {showSongChip && <SongChip controller={controller} />}
       {paused && !boardOpen && (phase === 'ready' || phase === 'playing') && (
         <PauseScreen
           song={snap.settings.song}

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DUCK_DB, clampVolume, duckTarget, playbackDropped, shouldResumeContext } from './audioMix';
 import {
@@ -313,5 +314,129 @@ describe('run opener and decode budget', () => {
     player.releaseDecoded();
     expect(player.retainedTracks()).toEqual([]);
     player.stop();
+  });
+});
+
+describe('change song', () => {
+  function rig() {
+    const clock = { currentTime: 0 };
+    const stops: number[] = [];
+    const starts: number[] = [];
+    const ctx = {
+      get currentTime() { return clock.currentTime; },
+      createGain() {
+        return {
+          gain: {
+            value: 1,
+            setValueAtTime() {},
+            linearRampToValueAtTime() {},
+            cancelScheduledValues() {},
+          },
+          connect(target: unknown) { return target; },
+        };
+      },
+      createBufferSource() {
+        return {
+          buffer: null as AudioBuffer | null,
+          onended: null as null | (() => void),
+          connect(target: { connect?: (node: unknown) => unknown }) { return target; },
+          start() { starts.push(clock.currentTime); },
+          stop(at?: number) { stops.push(at ?? clock.currentTime); },
+        };
+      },
+    };
+    return { clock, stops, starts, ctx: ctx as unknown as AudioContext };
+  }
+
+  const flush = async () => {
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+  };
+
+  it('stops the previous track and updates the label before the next file decodes', async () => {
+    const { clock, stops, starts, ctx } = rig();
+    const heard: Array<string | null> = [];
+    const gate: { release: ((value: AudioBuffer) => void) | null } = { release: null };
+    const load = async (name: string) => {
+      if (name === 'game-song-2') {
+        return new Promise<AudioBuffer>((resolve) => { gate.release = resolve; });
+      }
+      return { duration: 149 } as AudioBuffer;
+    };
+    const player = new RobPlayer(ctx, {} as AudioNode, () => {}, load, (name) => { heard.push(name); }, () => 0);
+    player.setMode('menu');
+    await flush();
+    player.setMode('play');
+    await flush();
+    expect(heard[heard.length - 1]).toBe(OPENER_TRACK_ID);
+    const stopsBefore = stops.length;
+    const startsBefore = starts.length;
+    clock.currentTime = 12;
+    expect(player.skip()).toBe('shuffle');
+    expect(heard[heard.length - 1]).toBe('game-song-2');
+    expect(stops.slice(stopsBefore).some((at) => at <= 12.05)).toBe(true);
+    expect(starts.length).toBe(startsBefore);
+    const open = gate.release;
+    if (!open) throw new Error('next track did not start decoding');
+    open({ duration: 149 } as AudioBuffer);
+    await flush();
+    expect(starts.length).toBe(startsBefore + 1);
+    expect(heard[heard.length - 1]).toBe('game-song-2');
+    player.stop();
+  });
+
+  it('skips from the menu without waiting for a run', async () => {
+    const { clock, stops, ctx } = rig();
+    const heard: Array<string | null> = [];
+    const loads: string[] = [];
+    const load = async (name: string) => {
+      loads.push(name);
+      return { duration: 149 } as AudioBuffer;
+    };
+    const player = new RobPlayer(ctx, {} as AudioNode, () => {}, load, (name) => { heard.push(name); }, () => 0);
+    player.setMode('menu');
+    await flush();
+    expect(heard[heard.length - 1]).toBe('menu-song');
+    const stopsBefore = stops.length;
+    clock.currentTime = 4;
+    player.skip();
+    expect(heard[heard.length - 1]).toBe(OPENER_TRACK_ID);
+    expect(stops.slice(stopsBefore).some((at) => at <= 4.05)).toBe(true);
+    await flush();
+    expect(loads).toContain(OPENER_TRACK_ID);
+    player.stop();
+  });
+
+  it('a second skip before the first file decodes lands on the following track', async () => {
+    const { clock, ctx } = rig();
+    const heard: Array<string | null> = [];
+    const pending: Array<(value: AudioBuffer) => void> = [];
+    const load = async (name: string) => {
+      if (name === 'menu-song' || name === OPENER_TRACK_ID) return { duration: 149 } as AudioBuffer;
+      return new Promise<AudioBuffer>((resolve) => { pending.push(resolve); });
+    };
+    const player = new RobPlayer(ctx, {} as AudioNode, () => {}, load, (name) => { heard.push(name); }, () => 0);
+    player.setMode('menu');
+    await flush();
+    player.setMode('play');
+    await flush();
+    clock.currentTime = 3;
+    player.skip();
+    player.skip();
+    expect(heard[heard.length - 1]).toBe('game-song-3');
+    for (const resolve of pending) resolve({ duration: 149 } as AudioBuffer);
+    await flush();
+    expect(heard[heard.length - 1]).toBe('game-song-3');
+    expect(heard.filter((name) => name === 'game-song-2').length).toBe(1);
+    player.stop();
+  });
+
+  it('keeps AAC m4a files for WKWebView and ogg beside them', () => {
+    for (const name of GAMEPLAY_TRACKS) {
+      const m4a = readFileSync(new URL(`../../public/audio/rob/${name}.m4a`, import.meta.url));
+      const ogg = readFileSync(new URL(`../../public/audio/rob/${name}.ogg`, import.meta.url));
+      expect(m4a.length).toBeGreaterThan(100_000);
+      expect(m4a.subarray(4, 8).toString()).toBe('ftyp');
+      expect(ogg.subarray(0, 4).toString()).toBe('OggS');
+    }
   });
 });

@@ -1617,10 +1617,10 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   border-left: 3px solid #f7e9c5;
   border-right: 3px solid #f7e9c5;
 }
-/* Song chip sits under the world rank. It stays tappable at 60% after a few seconds. */
+/* Song chip sits above the court and the home screen. The whole pill is the control. */
 .now-playing {
   position: absolute;
-  z-index: 8;
+  z-index: 12;
   top: 100px;
   right: max(6px, var(--sat-r));
   display: flex;
@@ -1633,7 +1633,14 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   border-radius: 14px;
   border: 2px solid #f7e9c5;
   background: rgba(16, 10, 14, .78);
+  color: #f7e9c5;
+  font: inherit;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
   pointer-events: auto;
+  touch-action: manipulation;
+  cursor: pointer;
   opacity: 1;
   transition: opacity .45s ease;
 }
@@ -1674,9 +1681,9 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   color: #f7e9c5;
   font-size: 18px;
   line-height: 1;
-  cursor: pointer;
+  pointer-events: none;
 }
-.now-playing-skip:active { transform: scale(.96); }
+.now-playing:active { transform: scale(.96); }
 .song-list { display: flex; flex-direction: column; gap: 6px; }
 .song-list button {
   font: inherit;

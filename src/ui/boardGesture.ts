@@ -3,7 +3,9 @@ export const BOARD_SHEET_SELECTOR = '[data-board-sheet]';
 
 /**
  * A pointer on the court kicks. A pointer on the leaderboard, the rank panel,
- * or a menu must not, or WKWebView never receives the scroll.
+ * a menu, or the song and pause controls must not. The song chip used to fall
+ * through this capture listener, so WKWebView spent the tap on the court and
+ * the button's click never ran.
  */
 function closest(target: EventTarget | null, selector: string): boolean {
   const element = target as { closest?: (selector: string) => unknown } | null;
@@ -16,5 +18,7 @@ export function pointerOpensTheCourt(target: EventTarget | null): boolean {
   if (closest(target, '.world-rank')) return false;
   if (closest(target, '.screen')) return false;
   if (closest(target, '.screen-modal')) return false;
+  if (closest(target, '.now-playing')) return false;
+  if (closest(target, '.pause-btn')) return false;
   return true;
 }

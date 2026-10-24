@@ -91,6 +91,12 @@ export interface Contact {
 
 export type FootTrick = Extract<TrickKind, 'aroundTheWorld' | 'thigh' | 'highFlick' | 'groove'>;
 
+/**
+ * A foot-switch tap waits this long for the striking foot to be free and the
+ * ball to reach the foot. A tap that never becomes a kick is discarded.
+ */
+export const FOOT_SWITCH_BUFFER_SEC = 0.15;
+
 export interface KickCharge {
   side: Side;
   held: number;
@@ -151,6 +157,11 @@ export class GameEngine {
   kickCharge: KickCharge | null = null;
   /** Foot trick waiting for its timing window after a single tap. */
   queuedFoot: { kind: FootTrick; side: Side } | null = null;
+  /**
+   * Other-foot tap waiting out a strike, a cooldown, or an early arrival.
+   * It becomes a kick only when the foot is free inside the timing window.
+   */
+  queuedSwitch: { side: Side; until: number; power: number } | null = null;
   /** Header tap waiting out cooldown or for the ball to arrive. */
   queuedHeader = false;
   /** Neck tap waiting out cooldown. `tap` releases as soon as the catch lands. */
@@ -225,6 +236,7 @@ export class GameEngine {
     this.lastBeatGrade = 'off';
     this.kickCharge = null;
     this.queuedFoot = null;
+    this.queuedSwitch = null;
     this.queuedHeader = false;
     this.queuedNeck = null;
     this.headerGuard = false;
@@ -468,8 +480,15 @@ export class GameEngine {
   }
 
   private tryAction(side: Side) {
+    if (this.retargetPendingFoot(side)) return;
+    // A plain foot change waits. An armed trick still resolves, including a miss.
+    if (this.selectedTrick == null && this.footBusy()) {
+      this.rememberFootSwitch(side, 0);
+      return;
+    }
     if (this.cooldown > 0 || this.contact) return;
     if (this.trickCooldown > 0) return;
+    this.queuedSwitch = null;
 
     const intent = this.selectedTrick;
     if (intent === 'header') {
@@ -505,12 +524,19 @@ export class GameEngine {
     if (this.trick && this.trick.kind === 'aroundTheWorld' && this.trick.phase !== 'fail') return;
     const deltaMs = this.timingDeltaMs();
     const grade = this.gradeFor(deltaMs);
-    this.lastKick[side] = this.time;
     if (grade === 'miss') {
       this.emitMiss(side, deltaMs);
       return;
     }
+    this.queuedSwitch = null;
+    this.lastKick[side] = this.time;
     this.contact = { kind: 'pending', side, grade, deltaMs, held: 0, highFlick, kickPower: highFlick ? 0 : kickPower, thigh: false };
+    this.parkBallOnFoot(side);
+    if (highFlick) this.selectedTrick = null;
+  }
+
+  /** Park the ball on the striking boot. Velocity stays zero until the kick is accepted. */
+  private parkBallOnFoot(side: Side) {
     const b = this.ball;
     b.vx = b.vy = b.vz = 0;
     const anchor = footContactAnchors[side];
@@ -518,12 +544,57 @@ export class GameEngine {
       b.x = anchor.x;
       b.y = anchor.y;
       b.z = anchor.z;
-    } else {
-      b.y = this.config.contactHeight;
-      b.z = this.config.ballZ;
-      b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.6;
+      return;
     }
-    if (highFlick) this.selectedTrick = null;
+    b.y = this.config.contactHeight;
+    b.z = this.config.ballZ;
+    b.x = (side === 'left' ? -1 : 1) * this.config.footX * 0.6;
+  }
+
+  /**
+   * The strike has not been accepted yet. The other foot takes it, so the
+   * haptic waits for that foot's kick instead of buzzing for the one they left.
+   */
+  private retargetPendingFoot(side: Side): boolean {
+    const c = this.contact;
+    if (!c || c.side === side) return false;
+    if (c.kind !== 'pending' || c.thigh || c.groove) return false;
+    const previous = c.side;
+    c.side = side;
+    // Strictly newer than the foot they left, or the kick clip stays on that side when the stamps match.
+    this.lastKick[side] = Math.max(this.time - c.held, this.lastKick[previous] + 1e-4);
+    this.parkBallOnFoot(side);
+    this.queuedSwitch = null;
+    return true;
+  }
+
+  /** True while a new strike cannot start: a contact, a cooldown, or the hit pause. */
+  private footBusy(): boolean {
+    return this.inputBlocked() || this.hitPause > 0;
+  }
+
+  /** Keep an other-foot tap. Same-foot repeats stay on the charge path. */
+  private rememberFootSwitch(side: Side, power: number) {
+    if (this.selectedTrick != null && this.selectedTrick !== 'highFlick') return;
+    const striking = this.contact?.side ?? this.lastSide;
+    if (striking == null || striking === side) return;
+    this.queuedSwitch = { side, until: this.time + FOOT_SWITCH_BUFFER_SEC, power };
+  }
+
+  /** Fire a buffered switch once, and only when that kick would be accepted. */
+  private flushFootSwitch() {
+    const queued = this.queuedSwitch;
+    if (!queued) return;
+    if (this.time > queued.until + 1e-9) {
+      this.queuedSwitch = null;
+      return;
+    }
+    if (this.phase !== 'playing' || this.celebration || this.footBusy()) return;
+    if (this.selectedTrick != null && this.selectedTrick !== 'highFlick') return;
+    if (this.footTiming() !== 'open') return;
+    this.queuedSwitch = null;
+    const highFlick = this.selectedTrick === 'highFlick';
+    this.tryKick(queued.side, highFlick, highFlick ? 0 : queued.power);
   }
 
   private tryThigh(side: Side) {
@@ -1022,8 +1093,14 @@ export class GameEngine {
   }
 
   private releaseCharge(side: Side, power: number) {
-    if (this.phase !== 'playing' || this.inputBlocked() || this.selectedTrick) return;
-    if (this.footTiming() !== 'open') return;
+    const blocked = this.phase !== 'playing' || this.footBusy() || this.selectedTrick != null || this.footTiming() !== 'open';
+    if (blocked) {
+      if (this.phase === 'playing' && this.selectedTrick == null && (this.footBusy() || this.footTiming() !== 'open')) {
+        this.rememberFootSwitch(side, power);
+      }
+      return;
+    }
+    this.queuedSwitch = null;
     this.tryKick(side, false, power);
   }
 
@@ -1177,6 +1254,7 @@ export class GameEngine {
       }
       this.advanceKickCharge(h);
       this.flushQueues();
+      this.flushFootSwitch();
     }
 
     // Milestone dance: keep the ball where it is so the juggle can resume.

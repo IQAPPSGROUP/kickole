@@ -7,7 +7,7 @@ import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import type { GameEngine } from '../engine/engine';
 import { alignFootWindow, clearFootContactAnchors, setFootContactAnchors, type BallCenter } from '../engine/footContact';
-import { bootStyleSpecs, outfitSpecs } from '../game/outfitFit';
+import { cowboyBootSpecs, outfitSpecs } from '../game/outfitFit';
 import { isMeshOutfit, OUTFIT_COVER, outfitModelUrl } from '../game/outfitMesh';
 import { isOutfitId } from '../game/outfits';
 import type { Skin } from '../game/skins';
@@ -63,42 +63,6 @@ function toonRole(name: string): ToonRole {
   if (name === MATERIAL_NAMES.skin) return 'skin';
   if (name === MATERIAL_NAMES.shirt) return 'shirt';
   return 'flat';
-}
-
-const BOOT_CLOTH = new Set<string>([
-  MATERIAL_NAMES.boots,
-  MATERIAL_NAMES.bootsSole,
-  'Boot_Laces',
-  'Boot_Trim',
-]);
-
-function setSkinnedBootVisible(root: Object3D, visible: boolean) {
-  root.traverse((obj) => {
-    const mesh = obj as Mesh;
-    if (!mesh.isMesh) return;
-    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-    if (list.length > 0 && list.every((material) => material && BOOT_CLOTH.has(material.name))) mesh.visible = visible;
-  });
-}
-
-/** Solid colour on the skinned boot. Classic keeps that mesh. Other styles hide it so the loft is the silhouette. Vertices stay put. */
-function paintBootMaterial(standard: MeshStandardMaterial, skin: Skin) {
-  const sole = standard.name === MATERIAL_NAMES.bootsSole;
-  standard.map = null;
-  standard.color.set(sole ? skin.boots.sole : skin.boots.main);
-  if (skin.bootStyleId === 'boot-gold') {
-    standard.roughness = sole ? 0.45 : 0.32;
-    standard.metalness = sole ? 0.2 : 0.62;
-  } else if (skin.bootStyleId === 'boot-knight') {
-    standard.roughness = 0.42;
-    standard.metalness = sole ? 0.12 : 0.32;
-  } else if (skin.bootStyleId === 'boot-space') {
-    standard.roughness = 0.4;
-    standard.metalness = 0.2;
-  } else {
-    standard.roughness = 0.55;
-    standard.metalness = 0.06;
-  }
 }
 
 /** Straps in foot-bone space. On this rig local +Y runs toward the toe and local −Z is the instep. */
@@ -329,19 +293,16 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       if (material.name === MATERIAL_NAMES.skin) {
         standard.color.set(skin.skinTint ?? standard.userData.baseColor);
       }
-      if (skin.bootStyleId && BOOT_CLOTH.has(material.name)) paintBootMaterial(standard, skin);
       standard.needsUpdate = true;
     }
-    setSkinnedBootVisible(scene, !skin.bootStyleId || skin.bootStyleId === 'boot-classic');
     const meshed = isMeshOutfit(skin.outfitId);
     const specs = [
       ...(!meshed && skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),
-      ...(!meshed && skin.bootStyleId ? bootStyleSpecs(skin.bootStyleId, skin.playerBody) : []),
+      ...(!meshed && skin.bootStyle === 'cowboy' ? cowboyBootSpecs(skin.playerBody) : []),
     ];
     const release = specs.length > 0 ? mountOutfitSpecs(scene, specs) : null;
     return () => {
       release?.();
-      setSkinnedBootVisible(scene, true);
       for (const material of materials) {
         const standard = material as MeshStandardMaterial;
         if (!standard.isMeshStandardMaterial || standard.userData.baseMap === undefined) continue;

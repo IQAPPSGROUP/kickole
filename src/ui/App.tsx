@@ -23,13 +23,12 @@ import { CountryScreen, NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
 import { KitColoursScreen } from './KitColours';
-import { BootLocker, BootUnlockToast } from './BootLocker';
 import { BodySelect, CustomiseScreen } from './Wardrobe';
 
 const INSPECT = import.meta.env.DEV && new URLSearchParams(window.location.search).has('inspect');
 const InspectorPanel = INSPECT ? lazy(() => import('./InspectorPanel').then((m) => ({ default: m.InspectorPanel }))) : null;
 
-type Overlay = 'none' | 'settings' | 'customise' | 'kit' | 'boots' | 'data' | 'how';
+type Overlay = 'none' | 'settings' | 'customise' | 'kit' | 'data' | 'how';
 
 const REVIEW_NICKNAME = 'Turbo Striker';
 const REVIEW_COUNTRY = 'GB';
@@ -387,7 +386,6 @@ export function App() {
           onPlay={startGame}
           onSettings={() => setOverlay('settings')}
           onCustomise={() => setOverlay('customise')}
-          onBoots={() => setOverlay('boots')}
           onKitColours={() => openKitColours('none')}
           onLeaderboard={openBoard}
         />
@@ -409,9 +407,6 @@ export function App() {
         />
       )}
       {showSongChip && <SongChip controller={controller} />}
-      {snap.bootToast && (
-        <BootUnlockToast toast={snap.bootToast} onDone={() => controller.dismissBootToast()} />
-      )}
       {paused && !boardOpen && (phase === 'ready' || phase === 'playing') && (
         <PauseScreen
           song={snap.settings.song}
@@ -486,13 +481,6 @@ export function App() {
           save={snap.save}
           onPick={(id) => controller.setKitColour(id)}
           onClose={closeKitColours}
-        />
-      )}
-      {overlay === 'boots' && (
-        <BootLocker
-          save={snap.save}
-          onEquip={(id) => controller.equipBoot(id)}
-          onClose={closeOverlay}
         />
       )}
       {overlay === 'customise' && (

@@ -130,8 +130,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .card h2 { margin: 0; letter-spacing: 3px; color: var(--coral); font-size: 22px; }
 .card .btn { align-self: center; }
 .screen.settings .card > .btn.primary { position: sticky; bottom: 0; flex-shrink: 0; box-shadow: 0 0 0 10px var(--navy); }
-.screen.settings .wardrobe-card > .btn.primary,
-.screen.settings .boot-card > .btn.primary { position: static; box-shadow: none; }
+.screen.settings .wardrobe-card > .btn.primary { position: static; box-shadow: none; }
 .body-select .card > .btn { width: 100%; position: static; box-shadow: none; }
 @keyframes pop { from { transform: scale(.85); opacity: 0; } }
 .final { font-size: 84px; font-weight: 900; line-height: 1; color: var(--lime); text-shadow: 0 4px 0 rgba(0,0,0,.3); }
@@ -1740,84 +1739,4 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .world-rank-delta { animation: none; }
-}
-
-.boot-card {
-  width: min(100%, 420px);
-  max-height: min(92vh, 760px);
-  overflow: hidden;
-  text-align: left;
-  min-height: 0;
-}
-.boot-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding-bottom: 8px;
-}
-.boot-card-item {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  min-height: 168px;
-  padding: 12px 8px 10px;
-  border: 2px solid #2c3b59;
-  border-radius: 14px;
-  background: #101827;
-  color: #fffdf8;
-  font: inherit;
-  cursor: pointer;
-}
-.boot-card-item.on { border-color: #f5c94d; }
-.boot-card-item.locked { cursor: default; }
-.boot-card-item svg { width: 100%; height: 72px; }
-.boot-name { font-size: 15px; font-weight: 800; }
-.boot-hint {
-  font-size: 12px;
-  line-height: 1.3;
-  text-align: center;
-  color: #f7e9c5;
-}
-.boot-lock {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  color: #f7e9c5;
-}
-.boot-tick {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #f5c94d;
-  color: #142d35;
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 22px;
-  text-align: center;
-}
-.boot-toast {
-  position: fixed;
-  z-index: 30;
-  top: max(76px, calc(env(safe-area-inset-top) + 64px));
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: min(320px, calc(100vw - 32px));
-  padding: 10px 14px;
-  border-radius: 14px;
-  border: 2px solid #f5c94d;
-  background: #140814;
-  color: #fffdf8;
-  font-weight: 800;
-  text-align: center;
-  pointer-events: none;
 }

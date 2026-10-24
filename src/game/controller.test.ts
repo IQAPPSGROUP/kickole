@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { streakMultiplier } from '../engine/scoring';
 import { vibratePattern } from './haptics';
 
 function fakeStorage() {
@@ -393,93 +392,6 @@ describe('GameController', () => {
       kickTimesMs: result.kickTimesMs,
       elapsedMs: result.durationMs,
     })).toBeNull();
-  });
-
-  it('unlocks Wellies on the 100th kick and will not wear a locked pair', async () => {
-    vi.resetModules();
-    const ls = fakeStorage();
-    ls.data['kicky.settings.v1'] = JSON.stringify({ ...QUIET, hints: false });
-    ls.data['kicky.save.v1'] = JSON.stringify({
-      wardrobeVersion: 5,
-      bodyChosen: true,
-      best: 20,
-      bootProgress: { kickUps: 99, rainbows: 0, bestTricksInRun: 0, bestBeats: 0, combo5: false },
-      equippedBoot: 'boot-classic',
-    });
-    vi.stubGlobal('localStorage', ls);
-    vi.stubGlobal('navigator', { vibrate: vi.fn() });
-    const { GameController } = await import('./controller');
-    const c = new GameController();
-    c.play();
-    c.press('left');
-    c.release('left');
-    tickTo(c);
-    c.press('right');
-    c.release('right');
-    c.tick(0.05);
-    expect(c.getSnapshot().save.bootProgress.kickUps).toBe(100);
-    expect(c.getSnapshot().save.ownedBoots).toContain('boot-wellies');
-    expect(c.getSnapshot().bootToast?.text).toBe('Wellies unlocked');
-    expect(JSON.parse(ls.data['kicky.save.v1']).bootProgress.kickUps).toBe(100);
-    c.equipBoot('boot-gold');
-    expect(c.getSnapshot().save.equippedBoot).toBe('boot-classic');
-    c.equipBoot('boot-wellies');
-    expect(c.getSnapshot().save.equippedBoot).toBe('boot-wellies');
-    expect(c.getSnapshot().skin.boots.main).toBe('#2E8B3E');
-    expect(c.getSnapshot().skin.clothing.shirt).not.toBe('#2E8B3E');
-  });
-
-  it('unlocks Space boots at five clean touches and still scores at most x4', async () => {
-    const { c } = await make({ ...QUIET, hints: false });
-    juggleTo(c, 5);
-    expect(c.getSnapshot().save.bootProgress.combo5).toBe(true);
-    expect(c.getSnapshot().save.ownedBoots).toContain('boot-space');
-    expect(c.getSnapshot().bootToast?.text).toBe('Space boots unlocked');
-    expect(streakMultiplier(c.engine.streak)).toBe(1);
-    expect(streakMultiplier(50)).toBe(4);
-  });
-
-  it('does not treat the first saved score as beating a best', async () => {
-    const { c } = await make({ ...QUIET, hints: false });
-    expect(c.getSnapshot().save.best).toBe(0);
-    c.play();
-    c.press('left');
-    c.release('left');
-    tickTo(c);
-    c.press('right');
-    c.release('right');
-    c.tick(0.05);
-    dropRun(c);
-    expect(c.getSnapshot().save.best).toBeGreaterThan(0);
-    expect(c.getSnapshot().save.bootProgress.bestBeats).toBe(0);
-  });
-
-  it('counts a beaten best and does not add kick-ups twice at the end of the run', async () => {
-    vi.resetModules();
-    const ls = fakeStorage();
-    ls.data['kicky.settings.v1'] = JSON.stringify({ ...QUIET, hints: false });
-    ls.data['kicky.save.v1'] = JSON.stringify({
-      wardrobeVersion: 5,
-      bodyChosen: true,
-      best: 1,
-      bootProgress: { kickUps: 0, rainbows: 0, bestTricksInRun: 0, bestBeats: 0, combo5: false },
-    });
-    vi.stubGlobal('localStorage', ls);
-    vi.stubGlobal('navigator', { vibrate: vi.fn() });
-    const { GameController } = await import('./controller');
-    const c = new GameController();
-    c.play();
-    c.press('left');
-    c.release('left');
-    tickTo(c);
-    c.press('right');
-    c.release('right');
-    c.tick(0.05);
-    const kicks = c.getSnapshot().save.bootProgress.kickUps;
-    dropRun(c);
-    expect(c.getSnapshot().save.bootProgress.kickUps).toBe(kicks);
-    expect(c.getSnapshot().save.bootProgress.bestBeats).toBe(1);
-    expect(c.getSnapshot().save.ownedBoots).not.toContain('boot-snow');
   });
 
   it('rejects a continuous alternate juggle once the streak reaches 100', async () => {

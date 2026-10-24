@@ -1,8 +1,7 @@
 import type { Appearance, PlayerBody } from './appearance';
 import { getBoot, getKit, STARTER_BOOT_ID, STARTER_KIT_ID, type BootDesign, type KitDesign, type SurfacePattern } from './catalogue';
-import { getBootStyle, type BootStyleId } from './bootStyles';
-import { clothingFor, getKitColour, type KitPattern } from './kitColours';
-import { getOutfit, type OutfitPattern } from './outfits';
+import { clothingFor, getKitColour, KIT_BOOT, type KitPattern } from './kitColours';
+import { COWBOY_BOOT_ID, getOutfit, type OutfitPattern } from './outfits';
 
 export interface Skin {
   id: string;
@@ -22,8 +21,6 @@ export interface Skin {
   patternPaint?: OutfitPattern | null;
   /** Free kit sheet. Null when a costume replaces the football kit. */
   kitPaint?: { pattern: KitPattern; main: string; secondary: string; socks: string; trim: readonly string[] } | null;
-  /** Equipped plain boot. Independent of the national kit. */
-  bootStyleId?: BootStyleId;
   bootStyle?: 'studs' | 'cowboy';
 }
 
@@ -89,20 +86,25 @@ export function composePlayerSkin(
 ): Skin {
   const kit = preview?.kit ?? getKit(kitId);
   const boot = preview?.boot ?? getBoot(bootId);
-  const style = getBootStyle(boot.id);
   const outfit = getOutfit(preview?.outfitId);
   const look = getKitColour(appearance.kitColourId);
-  // A costume replaces the football kit. The boot style still paints the feet.
+  // A costume replaces the football kit. Otherwise the free kit sheet wins.
   const clothing = outfit ? { ...outfit.clothing } : look ? clothingFor(look) : { ...appearance.clothing };
+  const cowboy = boot.id === COWBOY_BOOT_ID;
   return {
-    id: `live:${outfit?.id ?? kit.id}:${style.id}:${appearance.body}`,
-    name: outfit ? `${outfit.name} · ${style.name}` : `${kit.name} · ${style.name}`,
+    id: `live:${outfit?.id ?? kit.id}:${boot.id}:${appearance.body}`,
+    name: outfit ? `${outfit.name} · ${boot.name}` : `${kit.name} · ${boot.name}`,
     clothing,
-    boots: {
-      main: style.main,
-      sole: style.dark,
-      lace: style.main,
-      trim: style.dark,
+    boots: outfit ? {
+      main: boot.main,
+      sole: boot.sole,
+      lace: boot.lace,
+      trim: boot.trim,
+    } : {
+      main: KIT_BOOT,
+      sole: KIT_BOOT,
+      lace: KIT_BOOT,
+      trim: KIT_BOOT,
     },
     body: {
       skin: outfit?.skinTint ?? appearance.skinTone,
@@ -123,7 +125,6 @@ export function composePlayerSkin(
       socks: look.socks,
       trim: look.trimBands,
     },
-    bootStyleId: style.id,
-    bootStyle: style.id === 'boot-cowboy' ? 'cowboy' : 'studs',
+    bootStyle: outfit && cowboy ? 'cowboy' : 'studs',
   };
 }

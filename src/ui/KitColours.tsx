@@ -55,13 +55,13 @@ export function KitColoursScreen({
   const look = getKitColour(pending);
   const options = useMemo(() => filterKits(tab, query), [tab, query]);
   const previewSkin = useMemo(() => {
-    const appearance = !look ? save.appearance : {
+    if (!look) return composePlayerSkin(save.appearance);
+    return composePlayerSkin({
       ...save.appearance,
       kitColourId: look.id,
       clothing: clothingFor(look),
-    };
-    return composePlayerSkin(appearance, save.equippedKit, save.equippedBoot);
-  }, [look, save.appearance, save.equippedKit, save.equippedBoot]);
+    });
+  }, [look, save.appearance]);
   const previewName = look?.label ?? 'Neutral';
 
   return (

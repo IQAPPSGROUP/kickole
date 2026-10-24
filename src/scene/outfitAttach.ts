@@ -1,23 +1,10 @@
 import { BoxGeometry, ConeGeometry, Mesh, MeshStandardMaterial, SphereGeometry, type BufferGeometry, type Material, type Object3D, type Bone } from 'three';
 import { FIT_BONE_NAME, type MeshSpec } from '../game/outfitFit';
-import { createBootGeometry } from './bootShape';
 
 function geometry(spec: MeshSpec): BufferGeometry {
-  switch (spec.shape) {
-    case 'sphere':
-      return new SphereGeometry(spec.size[0], 14, 12);
-    case 'cone':
-      return new ConeGeometry(spec.size[0], spec.size[1], 12);
-    case 'box':
-      return new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]);
-    case 'boot':
-      if (!spec.boot) return new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]);
-      return createBootGeometry(spec.boot, spec.position);
-    default: {
-      const unexpected: never = spec.shape;
-      throw new Error(`Unexpected accessory shape ${String(unexpected)}`);
-    }
-  }
+  if (spec.shape === 'sphere') return new SphereGeometry(spec.size[0], 14, 12);
+  if (spec.shape === 'cone') return new ConeGeometry(spec.size[0], spec.size[1], 12);
+  return new BoxGeometry(spec.size[0], spec.size[1], spec.size[2]);
 }
 
 /** Parent costume pieces to the shared contract bones. Missing bones are skipped. */
@@ -39,9 +26,6 @@ export function mountOutfitSpecs(root: Object3D, specs: readonly MeshSpec[]): ()
       color: spec.color,
       roughness: spec.roughness ?? 0.55,
       metalness: spec.metalness ?? 0.04,
-      polygonOffset: spec.shape === 'boot',
-      polygonOffsetFactor: spec.shape === 'boot' ? -1 : 0,
-      polygonOffsetUnits: spec.shape === 'boot' ? -1 : 0,
     });
     const mesh = new Mesh(geo, mat);
     mesh.name = spec.name;

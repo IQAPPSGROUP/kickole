@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { BOOTS, KITS, STARTER_BOOT_ID, STARTER_KIT_ID } from './catalogue';
-import { EMPTY_BOOT_PROGRESS } from './bootStyles';
 import { COWBOY_BOOT_ID } from './outfits';
 import { WARDROBE_VERSION, normalizeLocker } from './shop';
 
@@ -9,7 +8,6 @@ describe('wardrobe locker', () => {
     const start = normalizeLocker(null);
     expect(start.equippedBoot).toBe(STARTER_BOOT_ID);
     expect(start.ownedBoots).toEqual([STARTER_BOOT_ID]);
-    expect(start.bootProgress).toEqual(EMPTY_BOOT_PROGRESS);
     expect(start.ownedKits).toEqual([STARTER_KIT_ID]);
     expect(start.wardrobeVersion).toBe(WARDROBE_VERSION);
     expect('coins' in start).toBe(false);
@@ -17,45 +15,18 @@ describe('wardrobe locker', () => {
     expect('launchCollectionOwned' in start).toBe(false);
   });
 
-  it('drops old catalogue boots until the play goals are met', () => {
+  it('maps legacy boot ids and drops a cowboy boot', () => {
     const migrated = normalizeLocker({
-      wardrobeVersion: 4,
-      ownedBoots: ['street', 'samba', 'carnival', 'ole', COWBOY_BOOT_ID, 'boot-gold'],
-      equippedBoot: 'boot-gold',
-      challenges: { alternateFoot: 80, stalls: 40, perfectTouch: 100 },
+      ownedBoots: ['street', 'samba', 'carnival', 'ole', COWBOY_BOOT_ID],
+      equippedBoot: COWBOY_BOOT_ID,
     });
-    expect(migrated.ownedBoots).toEqual([STARTER_BOOT_ID]);
+    expect(migrated.ownedBoots).toContain(STARTER_BOOT_ID);
+    expect(migrated.ownedBoots).toContain('boot-beach-wave');
+    expect(migrated.ownedBoots).toContain('boot-carnival');
+    expect(migrated.ownedBoots).toContain('boot-gold');
+    expect(migrated.ownedBoots).not.toContain(COWBOY_BOOT_ID);
     expect(migrated.equippedBoot).toBe(STARTER_BOOT_ID);
-    expect(migrated.bootProgress).toEqual(EMPTY_BOOT_PROGRESS);
     expect('coins' in migrated).toBe(false);
-  });
-
-  it('keeps a style the saved goals have earned and ignores a forged list', () => {
-    const earned = normalizeLocker({
-      wardrobeVersion: 5,
-      bootProgress: { kickUps: 2500, rainbows: 1, bestTricksInRun: 5, bestBeats: 3, combo5: true },
-      equippedBoot: 'boot-gold',
-      ownedBoots: ['boot-classic'],
-    });
-    expect(earned.ownedBoots).toEqual([
-      'boot-classic',
-      'boot-wellies',
-      'boot-cowboy',
-      'boot-hitops',
-      'boot-snow',
-      'boot-space',
-      'boot-knight',
-      'boot-gold',
-    ]);
-    expect(earned.equippedBoot).toBe('boot-gold');
-    const forged = normalizeLocker({
-      wardrobeVersion: 5,
-      bootProgress: { kickUps: 100, rainbows: 0, bestTricksInRun: 0, bestBeats: 0, combo5: false },
-      equippedBoot: 'boot-gold',
-      ownedBoots: ['boot-gold', 'boot-space', 'boot-knight'],
-    });
-    expect(forged.ownedBoots).toEqual(['boot-classic', 'boot-wellies']);
-    expect(forged.equippedBoot).toBe(STARTER_BOOT_ID);
   });
 
   it('ignores a saved receipt, coin balance, and dev grant', () => {

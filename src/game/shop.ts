@@ -2,13 +2,10 @@ import { normalizeAppearance, type Appearance } from './appearance';
 import {
   STARTER_BOOT_ID,
   STARTER_KIT_ID,
+  isBootId,
   isKitId,
 } from './catalogue';
-import {
-  bootProgressFromSave,
-  earnedBootIds,
-  type BootProgress,
-} from './bootStyles';
+import { COWBOY_BOOT_ID } from './outfits';
 import {
   STARTER_DANCE_ID,
   normalizeDances,
@@ -22,13 +19,10 @@ export interface ChallengeProgress {
   perfectTouch: number;
 }
 
-/** On-device look. Kits and boot styles are free. Nothing here is bought. */
+/** On-device look. Kits are free. Nothing here is bought. */
 export interface WardrobeLocker {
-  /** Styles the play goals have earned. Derived from bootProgress. */
   ownedBoots: string[];
   equippedBoot: string;
-  /** Lifetime boot goals. Stays on this device. */
-  bootProgress: BootProgress;
   ownedKits: string[];
   equippedKit: string;
   appearance: Appearance;
@@ -50,14 +44,22 @@ export interface WardrobeLocker {
   wardrobeVersion: number;
 }
 
-/** v5 replaces the old boot catalogue with styles earned by play. */
-export const WARDROBE_VERSION = 5;
+/** v4 drops the coin balance and every store grant. */
+export const WARDROBE_VERSION = 4;
 const LEGACY_SKIN_VERSION = 2;
 
 export const EMPTY_CHALLENGES: ChallengeProgress = {
   alternateFoot: 0,
   stalls: 0,
   perfectTouch: 0,
+};
+
+/** Map legacy boot IDs from the old wardrobe onto the launch catalogue. */
+const LEGACY_BOOT_MAP: Record<string, string> = {
+  street: STARTER_BOOT_ID,
+  samba: 'boot-beach-wave',
+  carnival: 'boot-carnival',
+  ole: 'boot-gold',
 };
 
 /** Map legacy settings skin IDs onto launch kits + free appearance seeds. */
@@ -84,7 +86,6 @@ const LEGACY_SKIN_MAP: Record<string, { kit: string; appearance?: Partial<Appear
 export interface RawSaveFields {
   ownedBoots?: unknown;
   equippedBoot?: unknown;
-  bootProgress?: unknown;
   ownedKits?: unknown;
   equippedKit?: unknown;
   appearance?: unknown;
@@ -102,12 +103,24 @@ export interface RawSaveFields {
   legacySkinId?: string | null;
 }
 
+function mapBootId(id: string): string | null {
+  if (id === COWBOY_BOOT_ID) return null;
+  if (isBootId(id)) return id;
+  const mapped = LEGACY_BOOT_MAP[id];
+  return mapped && isBootId(mapped) ? mapped : null;
+}
+
 export function normalizeLocker(raw: RawSaveFields | null | undefined): WardrobeLocker {
   const storedVersion = typeof raw?.wardrobeVersion === 'number' && Number.isFinite(raw.wardrobeVersion)
     ? Math.floor(raw.wardrobeVersion)
     : 0;
-  const bootProgress = bootProgressFromSave(raw?.bootProgress, storedVersion);
-  const ownedBoots = earnedBootIds(bootProgress);
+  const ownedBoots = Array.isArray(raw?.ownedBoots)
+    ? [...new Set(raw.ownedBoots
+      .filter((id): id is string => typeof id === 'string')
+      .map(mapBootId)
+      .filter((id): id is string => !!id))]
+    : [];
+  if (!ownedBoots.includes(STARTER_BOOT_ID)) ownedBoots.unshift(STARTER_BOOT_ID);
 
   let ownedKits = Array.isArray(raw?.ownedKits)
     ? [...new Set(raw.ownedKits.filter((id): id is string => typeof id === 'string' && isKitId(id)))]
@@ -122,11 +135,8 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
   }
   if (!ownedKits.includes(STARTER_KIT_ID)) ownedKits.unshift(STARTER_KIT_ID);
 
-  const equippedBoot = storedVersion >= 5
-    && typeof raw?.equippedBoot === 'string'
-    && (ownedBoots as readonly string[]).includes(raw.equippedBoot)
-    ? raw.equippedBoot
-    : STARTER_BOOT_ID;
+  const mappedBoot = typeof raw?.equippedBoot === 'string' ? mapBootId(raw.equippedBoot) : null;
+  const equippedBoot = mappedBoot && ownedBoots.includes(mappedBoot) ? mappedBoot : STARTER_BOOT_ID;
 
   let equippedKit = typeof raw?.equippedKit === 'string' && ownedKits.includes(raw.equippedKit)
     ? raw.equippedKit
@@ -179,7 +189,6 @@ export function normalizeLocker(raw: RawSaveFields | null | undefined): Wardrobe
   return {
     ownedBoots,
     equippedBoot,
-    bootProgress,
     ownedKits,
     equippedKit,
     appearance,

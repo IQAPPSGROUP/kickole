@@ -130,7 +130,7 @@ describe('themed outfits', () => {
       const shaft = cowboyBootSpecs(body).find((spec) => spec.name === 'cowboy-shaft');
       expect(heel?.size[1]).toBeGreaterThanOrEqual(0.018);
       expect(heel?.size[1]).toBeLessThanOrEqual(0.028);
-      expect(shaft && shaft.position[1] + shaft.size[1] / 2).toBeLessThanOrEqual(0.053 + 0.02);
+      expect(shaft && shaft.position[1] + shaft.size[1] / 2).toBeLessThanOrEqual(0.22);
     }
     expect(cowboyBootSpecs('female').find((spec) => spec.name === 'cowboy-heel')?.size[1])
       .toBe(cowboyBootSpecs('male').find((spec) => spec.name === 'cowboy-heel')?.size[1]);

@@ -28,6 +28,14 @@ describe('boot loft', () => {
     expect(mid).toBeGreaterThan(0.03);
     expect(toe).toBeLessThan(mid * 0.6);
     expect(normal.getY(top)).toBeGreaterThan(0.3);
+    let rim = 0;
+    const peak = topY;
+    for (let i = 0; i < position.count; i += 1) {
+      const z = position.getZ(i) + spec.position[2];
+      const along = (z - spec.boot.heelZ) / span;
+      if (along > 0.12 && along < 0.45 && position.getY(i) > peak - 0.004) rim += 1;
+    }
+    expect(rim).toBeGreaterThan(8);
     geometry.dispose();
   });
 });

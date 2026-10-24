@@ -89,14 +89,22 @@ describe('earned boot styles', () => {
       if (!spec) throw new Error(name);
       return spec.position[1] + spec.size[1] / 2;
     };
-    expect(topOf('boot-wellies', 'wellie-shaft')).toBeGreaterThan(topOf('boot-gold', 'gold-shaft') + 0.06);
+    expect(topOf('boot-wellies', 'wellie-shaft')).toBeGreaterThan(topOf('boot-cowboy', 'cowboy-shaft') + 0.04);
+    expect(topOf('boot-cowboy', 'cowboy-shaft')).toBeGreaterThan(topOf('boot-knight', 'knight-shaft') + 0.015);
     expect(topOf('boot-knight', 'knight-shaft')).toBeGreaterThan(topOf('boot-hitops', 'hitop-shaft'));
-    expect(topOf('boot-hitops', 'hitop-shaft')).toBeGreaterThan(topOf('boot-gold', 'gold-shaft'));
+    expect(topOf('boot-hitops', 'hitop-shaft')).toBeGreaterThan(topOf('boot-gold', 'gold-shaft') + 0.04);
     const space = bootStyleSpecs('boot-space', 'male').find((spec) => spec.name === 'space-shaft');
+    const spaceSole = bootStyleSpecs('boot-space', 'male').find((spec) => spec.name === 'space-sole');
     const gold = bootStyleSpecs('boot-gold', 'male').find((spec) => spec.name === 'gold-shaft');
-    expect(space && gold && space.size[0] > gold.size[0] * 1.15).toBe(true);
+    const goldSole = bootStyleSpecs('boot-gold', 'male').find((spec) => spec.name === 'gold-sole');
+    const knight = bootStyleSpecs('boot-knight', 'male');
+    expect(space && gold && space.size[0] > gold.size[0] * 1.4).toBe(true);
+    expect(spaceSole && goldSole && spaceSole.size[1] > goldSole.size[1] * 2).toBe(true);
     expect(space?.boot?.toe).toBe('blunt');
+    expect(spaceSole?.color).toBe('#C9CED3');
     expect(bootStyleSpecs('boot-cowboy', 'male').find((spec) => spec.name === 'cowboy-shaft')?.boot?.toe).toBe('point');
+    expect(knight.some((spec) => spec.name === 'knight-plate' && (spec.metalness ?? 0) > 0.6)).toBe(true);
+    expect(bootStyleSpecs('boot-hitops', 'male').some((spec) => spec.name === 'hitop-cuff')).toBe(true);
     for (const id of ALL) {
       if (id === 'boot-classic') continue;
       for (const body of ['male', 'female'] as const) {
@@ -111,7 +119,7 @@ describe('earned boot styles', () => {
           expect(spec.bone === 'footL' || spec.bone === 'footR').toBe(true);
           const top = spec.position[1] + spec.size[1] / 2;
           expect(top).toBeLessThanOrEqual(0.22);
-          if (spec.name.startsWith('cowboy-shaft')) expect(top).toBeLessThanOrEqual(0.073);
+          if (spec.name.startsWith('cowboy-shaft')) expect(top).toBeGreaterThan(0.1);
         }
       }
     }

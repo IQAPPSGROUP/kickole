@@ -23,6 +23,8 @@ export interface BootProfile {
   heelDrop: number;
   toe: 'round' | 'point' | 'blunt';
   bulk: number;
+  /** 0–1 along the sole. The collar stays at shaftY until here, then the vamp drops. */
+  shaftCut: number;
   kind: 'upper' | 'sole' | 'cuff' | 'heel';
 }
 
@@ -206,7 +208,9 @@ interface BootFit {
   toe: BootProfile['toe'];
   bulk: number;
   soleThick: number;
+  soleFlare: number;
   cuff: number;
+  shaftCut: number;
 }
 
 function bootPiece(
@@ -234,7 +238,8 @@ function bootPiece(
     toeZ,
     heelDrop: drop,
     toe: kind === 'heel' || kind === 'cuff' ? 'round' : fit.toe,
-    bulk: kind === 'sole' ? fit.bulk + 0.06 : kind === 'cuff' ? fit.bulk + 0.08 : fit.bulk,
+    bulk: kind === 'sole' ? fit.bulk + fit.soleFlare : kind === 'cuff' ? fit.bulk + 0.05 : fit.bulk,
+    shaftCut: fit.shaftCut,
     kind,
   };
   const high = profile.shaftY;
@@ -263,21 +268,23 @@ export function bootStyleSpecs(id: BootStyleId, body: PlayerBody): MeshSpec[] {
   const style = getBootStyle(id);
   const m = measuresOf(body);
   const fit = bootFit(id, m);
-  const metal = id === 'boot-gold' ? 0.62 : id === 'boot-knight' ? 0.32 : id === 'boot-space' ? 0.2 : 0.08;
+  const metal = id === 'boot-gold' ? 0.62 : id === 'boot-knight' ? 0.28 : id === 'boot-space' ? 0.12 : 0.08;
   const rough = id === 'boot-gold' ? 0.32 : 0.48;
   const prefix = bootPrefix(id);
+  const soleColor = id === 'boot-space' || id === 'boot-hitops' ? style.light : style.dark;
   const upper = bootPiece(`${prefix}-shaft`, m.footX, style.main, rough, metal, 'upper', fit);
-  const sole = bootPiece(`${prefix}-sole`, m.footX, style.dark, 0.7, 0.04, 'sole', fit);
+  const sole = bootPiece(`${prefix}-sole`, m.footX, soleColor, 0.62, 0.04, 'sole', fit);
   const left: MeshSpec[] = id === 'boot-cowboy'
     ? [
       upper,
       bootPiece('cowboy-toe', m.footX, style.main, rough, metal, 'upper', {
         ...fit,
         heelZ: m.footToe - 0.02,
-        toeZ: m.footToe + 0.03,
+        toeZ: m.footToe + 0.045,
         shaftY: m.footSole + 0.05,
         toe: 'point',
-        bulk: -0.08,
+        bulk: -0.12,
+        shaftCut: 0.15,
       }),
       bootPiece('cowboy-heel', m.footX, style.dark, 0.72, 0.02, 'heel', fit),
       sole,
@@ -287,7 +294,24 @@ export function bootStyleSpecs(id: BootStyleId, body: PlayerBody): MeshSpec[] {
     left.push(bootPiece('snow-cuff', m.footX, style.light, 0.62, 0.02, 'cuff', fit));
   }
   if (id === 'boot-wellies') {
-    left.push(bootPiece('wellie-cuff', m.footX, style.dark, 0.55, 0.04, 'cuff', { ...fit, cuff: 0.012 }));
+    left.push(bootPiece('wellie-cuff', m.footX, style.dark, 0.5, 0.04, 'cuff', { ...fit, cuff: 0.016 }));
+  }
+  if (id === 'boot-hitops') {
+    left.push(bootPiece('hitop-cuff', m.footX, style.light, 0.55, 0.02, 'cuff', { ...fit, cuff: 0.018 }));
+  }
+  if (id === 'boot-knight') {
+    left.push(bootPiece('knight-plate', m.footX, style.light, 0.24, 0.74, 'upper', {
+      ...fit,
+      halfWidth: m.footHalf * 1.2,
+      heelZ: m.footToe - 0.07,
+      toeZ: m.footToe + 0.018,
+      soleY: m.footSole + 0.02,
+      shaftY: m.footSole + 0.078,
+      toe: 'blunt',
+      bulk: 0.06,
+      shaftCut: 0.25,
+      heelDrop: 0,
+    }));
   }
   return pairFeet(left);
 }
@@ -320,25 +344,27 @@ function bootFit(id: BootStyleId, m: BodyMeasures): BootFit {
     toe: 'round',
     bulk: 0,
     soleThick: 0.012,
+    soleFlare: 0.08,
     cuff: 0.016,
+    shaftCut: 0.34,
   };
   switch (id) {
     case 'boot-classic':
       return base;
     case 'boot-wellies':
-      return { ...base, shaftY: m.footAnkle + 0.105, toe: 'round', soleThick: 0.014 };
+      return { ...base, shaftY: m.footAnkle + 0.155, toe: 'round', soleThick: 0.016, halfWidth: m.footHalf * 1.18, shaftCut: 0.6 };
     case 'boot-cowboy':
-      return { ...base, shaftY: m.footAnkle + 0.012, toeZ: m.footToe + 0.004, toe: 'point', heelDrop: 0.022, halfWidth: m.footHalf * 0.96 };
+      return { ...base, shaftY: m.footAnkle + 0.108, toeZ: m.footToe + 0.02, toe: 'point', heelDrop: 0.022, halfWidth: m.footHalf * 0.96, shaftCut: 0.4 };
     case 'boot-hitops':
-      return { ...base, shaftY: m.footAnkle + 0.05, soleThick: 0.022, toe: 'round' };
+      return { ...base, shaftY: m.footAnkle + 0.058, soleThick: 0.04, soleFlare: 0.14, toe: 'round', shaftCut: 0.52 };
     case 'boot-snow':
-      return { ...base, shaftY: m.footAnkle + 0.04, cuff: 0.02, toe: 'round' };
+      return { ...base, shaftY: m.footAnkle + 0.05, cuff: 0.028, toe: 'round', shaftCut: 0.4 };
     case 'boot-space':
-      return { ...base, shaftY: m.footAnkle + 0.045, bulk: 0.28, toe: 'blunt', soleThick: 0.016 };
+      return { ...base, shaftY: m.footAnkle + 0.036, bulk: 0.55, toe: 'blunt', soleThick: 0.05, soleFlare: 0.2, halfWidth: m.footHalf * 1.16, shaftCut: 0.3 };
     case 'boot-knight':
-      return { ...base, shaftY: m.footAnkle + 0.078, toe: 'blunt' };
+      return { ...base, shaftY: m.footAnkle + 0.078, toe: 'blunt', halfWidth: m.footHalf * 1.08, shaftCut: 0.46 };
     case 'boot-gold':
-      return { ...base, shaftY: m.footAnkle + 0.014, toe: 'round' };
+      return { ...base, shaftY: m.footAnkle + 0.004, toe: 'round', halfWidth: m.footHalf * 0.94, shaftCut: 0.2 };
     default: {
       const unexpected: never = id;
       return unexpected;

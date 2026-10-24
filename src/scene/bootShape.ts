@@ -8,8 +8,8 @@ import type { BootProfile } from '../game/outfitFit';
  * boot rather than a box stuck on the ankle.
  */
 
-const AROUND = 16;
-const ALONG = 12;
+const AROUND = 20;
+const ALONG = 16;
 
 function smooth(t: number): number {
   const x = Math.min(1, Math.max(0, t));
@@ -44,10 +44,10 @@ function station(profile: BootProfile, t: number): { hw: number; y0: number; y1:
       break;
     }
     case 'cuff': {
-      const heel = t < 0.16 ? 0.7 + 0.3 * smooth(t / 0.16) : 1;
-      const front = t > 0.62 ? 1 - 0.5 * smooth((t - 0.62) / 0.38) : 1;
+      const heel = t < 0.12 ? 0.86 + 0.14 * smooth(t / 0.12) : 1;
+      const front = t > 0.88 ? 1 - 0.12 * smooth((t - 0.88) / 0.12) : 1;
       width = heel * front;
-      height = t > 0.55 ? 1 - 0.4 * smooth((t - 0.55) / 0.45) : 1;
+      height = 1;
       break;
     }
     case 'sole': {
@@ -59,13 +59,13 @@ function station(profile: BootProfile, t: number): { hw: number; y0: number; y1:
       break;
     }
     case 'upper': {
-      const heel = t < 0.14 ? 0.7 + 0.3 * smooth(t / 0.14) : 1;
-      const toe = t > 0.48 ? 1 + (toeScale(profile.toe) - 1) * smooth((t - 0.48) / 0.52) : 1;
+      const heel = t < 0.1 ? 0.84 + 0.16 * smooth(t / 0.1) : 1;
+      const cut = Math.min(0.86, Math.max(0.12, profile.shaftCut));
+      const toe = t > cut ? 1 + (toeScale(profile.toe) - 1) * smooth((t - cut) / (1 - cut)) : 1;
       width = heel * toe;
-      const toeH = profile.toe === 'point' ? 0.16 : profile.toe === 'blunt' ? 0.38 : 0.26;
-      const shaft = t < 0.36 ? 1 : 1 + (toeH - 1) * smooth((t - 0.36) / 0.64);
-      const heelRound = t < 0.1 ? 1 - 0.16 * smooth(1 - t / 0.1) : 1;
-      height = shaft * heelRound;
+      const toeH = profile.toe === 'point' ? 0.2 : profile.toe === 'blunt' ? 0.46 : 0.3;
+      const drop = t > cut ? smooth((t - cut) / (1 - cut)) : 0;
+      height = 1 + (toeH - 1) * drop;
       break;
     }
     default: {
@@ -80,7 +80,10 @@ function station(profile: BootProfile, t: number): { hw: number; y0: number; y1:
   };
 }
 
-/** u=0 is the top. The upper keeps a flat sole and a round instep. */
+/**
+ * u=0 is the centre of a flat collar. The rim stays on one height so the
+ * opening does not serrate, then a quarter-ellipse falls to a flat sole.
+ */
 function sectionPoint(u: number, hw: number, y0: number, y1: number, kind: BootProfile['kind']): [number, number] {
   const a = u * Math.PI * 2;
   const sx = Math.sin(a);
@@ -92,12 +95,25 @@ function sectionPoint(u: number, hw: number, y0: number, y1: number, kind: BootP
     const ay = Math.sign(cy) * Math.pow(Math.abs(cy), 2 / n);
     return [ax * hw, (y0 + y1) / 2 + ay * h * 0.5];
   }
-  let x = sx * hw;
-  if (cy >= 0) return [x, y0 + h * (0.4 + 0.6 * cy)];
-  const down = -cy;
-  const corner = Math.pow(down, 2.15);
-  x *= 1 - 0.1 * corner;
-  return [x, y0 + h * 0.4 * (1 - corner)];
+  const right = u <= 0.5 ? u : 1 - u;
+  const sign = u <= 0.5 ? 1 : -1;
+  const topW = hw * 0.62;
+  let x: number;
+  let y: number;
+  if (right < 0.11) {
+    x = topW * (right / 0.11);
+    y = y1;
+  } else if (right < 0.36) {
+    const s = (right - 0.11) / 0.25;
+    const ang = s * Math.PI * 0.5;
+    x = topW + (hw - topW) * Math.sin(ang);
+    y = y0 + h * Math.cos(ang);
+  } else {
+    const s = (right - 0.36) / 0.14;
+    x = hw * (1 - s);
+    y = y0;
+  }
+  return [sign * x, y];
 }
 
 export function createBootGeometry(profile: BootProfile, center: [number, number, number]): BufferGeometry {

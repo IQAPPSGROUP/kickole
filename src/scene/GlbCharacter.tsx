@@ -72,7 +72,16 @@ const BOOT_CLOTH = new Set<string>([
   'Boot_Trim',
 ]);
 
-/** Solid colour on the skinned boot so a style shell and any peek-through match. Vertices stay put. */
+function setSkinnedBootVisible(root: Object3D, visible: boolean) {
+  root.traverse((obj) => {
+    const mesh = obj as Mesh;
+    if (!mesh.isMesh) return;
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    if (list.length > 0 && list.every((material) => material && BOOT_CLOTH.has(material.name))) mesh.visible = visible;
+  });
+}
+
+/** Solid colour on the skinned boot. Classic keeps that mesh. Other styles hide it so the loft is the silhouette. Vertices stay put. */
 function paintBootMaterial(standard: MeshStandardMaterial, skin: Skin) {
   const sole = standard.name === MATERIAL_NAMES.bootsSole;
   standard.map = null;
@@ -323,6 +332,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
       if (skin.bootStyleId && BOOT_CLOTH.has(material.name)) paintBootMaterial(standard, skin);
       standard.needsUpdate = true;
     }
+    setSkinnedBootVisible(scene, !skin.bootStyleId || skin.bootStyleId === 'boot-classic');
     const meshed = isMeshOutfit(skin.outfitId);
     const specs = [
       ...(!meshed && skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),
@@ -331,6 +341,7 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const release = specs.length > 0 ? mountOutfitSpecs(scene, specs) : null;
     return () => {
       release?.();
+      setSkinnedBootVisible(scene, true);
       for (const material of materials) {
         const standard = material as MeshStandardMaterial;
         if (!standard.isMeshStandardMaterial || standard.userData.baseMap === undefined) continue;

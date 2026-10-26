@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Result } from '../game/controller';
 import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
+import { LEGAL_URL } from '../site';
 import {
   BLOCK_CONFIRMATION,
   DONE_CONFIRMATION,
@@ -526,6 +527,15 @@ export function SettingsScreen({
             We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A scrambled version of your internet address is kept for up to 30 days to stop cheating.
             Tap Delete my leaderboard data to remove your nickname and scores. If someone has reported you, we keep that report for up to 90 days so we can check it.
           </p>
+          {LEGAL_URL && (
+            <p>
+              Read the full{' '}
+              <a href={LEGAL_URL} target="_blank" rel="noopener noreferrer">
+                privacy notice, child safety statement and terms of use
+              </a>
+              .
+            </p>
+          )}
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>Music is a synthesised boom-bap beat. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
           <p>

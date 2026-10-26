@@ -43,7 +43,7 @@ Best score and the top five runs are stored in `localStorage`.
 Cloudflare Pages: build command `npm run build`, output directory `dist`. The build uses relative asset paths (`base: './'`), so it can later be wrapped with Capacitor for iOS/Android.
 See `docs/PREVIEW_DEPLOY.md` for preview deployment and the device test checklist.
 
-## Status (v0.1)
+## Status
 
 Working and checked (unit tests, TypeScript, production build, headless-browser run driven by a timing bot): home/game/game-over screens, ball launch, timed kicks, scoring, combo, foot stall, local best, character kick/stall poses.
 Implemented but only lightly checked: settings persistence, top-5 leaderboard UI, skins (3 free, cosmetic only), sound/vibration, WebGL error state.

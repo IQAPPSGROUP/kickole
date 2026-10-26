@@ -20,7 +20,7 @@ function pngSize(file: string) {
 
 describe('app icon', () => {
   it('uses the 1024 RGB iOS icon and the Play 512 master', () => {
-    const ios = pngSize('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png');
+    const ios = pngSize('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png');
     expect(ios).toMatchObject({ width: 1024, height: 1024, colorType: 2 });
     const play = pngSize('android/app/src/main/ic_launcher-playstore.png');
     expect(play).toMatchObject({ width: 512, height: 512, colorType: 2 });

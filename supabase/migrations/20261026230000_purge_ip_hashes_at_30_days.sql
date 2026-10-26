@@ -1,4 +1,4 @@
--- Commit only. Not applied to the live Supabase project.
+-- Applied live 26 Oct 2026.
 -- Null ip_hash after 30 days on private.scores, private.reports, and private.players.
 -- That includes banned players. There is no exception.
 -- A ban that matched only by IP hash lapses once that hash is cleared.

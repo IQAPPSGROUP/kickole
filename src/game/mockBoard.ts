@@ -1,4 +1,13 @@
 /**
+ * Longest nicknames the rules allow, longest first.
+ * Used only by the in-memory preview crowd. Board rows have no kit field.
+ */
+export const PREVIEW_LONG_NICKNAMES = [
+  'Supersonic Midfielder XXXVIII',
+  'Lightning Midfielder XXXVIII',
+] as const;
+
+/**
  * `?mockBoard=1` opens the in-memory review board.
  * Local `vite` dev allows it. Production web builds and Capacitor release
  * builds (`npm run build` with this unset) ignore it. Cloudflare preview
@@ -27,4 +36,18 @@ export function mockCrowdFromSearch(search: string, env: MockBoardEnv = import.m
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) return undefined;
   return value;
+}
+
+/** Score the leaderboard sheet should show. The mock review card is not phase `over`. */
+export function shownBoardScore(args: {
+  phase: string;
+  best: number;
+  hudScore: number;
+  resultScore: number | null;
+  reviewScore: number | null;
+}): number {
+  if (args.phase === 'over' && args.resultScore != null) return args.resultScore;
+  if (args.reviewScore != null) return args.reviewScore;
+  if (args.phase === 'menu') return args.best;
+  return args.hudScore;
 }

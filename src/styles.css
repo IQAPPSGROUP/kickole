@@ -112,6 +112,8 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .stats span { font-size: 10px; letter-spacing: 1.5px; opacity: 1; color: #f7f4ee; }
 .board { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .board li { display: flex; gap: 12px; align-items: center; background: rgba(247,245,237,.07); border-radius: 10px; padding: 6px 12px; font-size: 14px; }
+.leaderboard-sheet .board li { gap: 6px; padding: 4px 6px; }
+.leaderboard-sheet .board li b { font-size: 15px; min-width: 0; line-height: 1.15; }
 .board li.me { background: rgba(255, 79, 154, .16); outline: none; }
 .board li span { width: 18px; opacity: 1; }
 .board li b { flex: 1; text-align: left; font-size: 18px; }
@@ -1198,7 +1200,11 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .period-scroller button.on { border-color: #ff4f9a; background: #241018; color: #fffdf8; }
 .board-more {
   flex: none;
+  box-sizing: border-box;
+  width: 44px;
   min-width: 44px;
+  max-width: 44px;
+  height: 44px;
   min-height: 44px;
   padding: 0;
   font: inherit;
@@ -1247,7 +1253,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
     max(12px, env(safe-area-inset-right, 0px))
     max(12px, env(safe-area-inset-bottom, 0px))
     max(12px, env(safe-area-inset-left, 0px));
-  background: rgba(12, 22, 32, 0.94);
+  background: rgba(12, 22, 32, 0.96);
   pointer-events: auto;
   touch-action: pan-y;
   overscroll-behavior: contain;
@@ -1377,7 +1383,13 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .screen.settings .privacy-notice hr { width: 100%; border: 0; border-top: 1px solid rgba(247, 245, 237, .28); }
 .leaderboard-you strong { flex: none; font-size: 16px; }
 .leaderboard-sheet .board li { min-height: 44px; }
-.leaderboard-sheet .board li span.board-rank { width: auto; min-width: 2.6em; }
+.leaderboard-sheet .board li span.board-rank {
+  flex: none;
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  font-variant-numeric: tabular-nums;
+}
 .leaderboard-close {
   flex: none;
   width: 100%;
@@ -1798,9 +1810,9 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 80;
-  width: 28px;
-  height: 28px;
+  z-index: 15;
+  width: 10px;
+  height: 48px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -1809,16 +1821,26 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .music-debug {
   position: fixed;
-  left: 8px;
-  bottom: max(8px, env(safe-area-inset-bottom));
-  z-index: 80;
-  max-width: min(92vw, 420px);
+  top: 156px;
+  left: 50%;
+  z-index: 15;
+  width: min(220px, 70vw);
+  max-width: min(220px, 70vw);
+  max-height: 88px;
   margin: 0;
   padding: 8px 10px;
+  border: 0;
   border-radius: 10px;
   background: rgba(0, 0, 0, .78);
   color: #fffdf8;
   font: 12px/1.35 ui-monospace, monospace;
-  pointer-events: none;
+  text-align: left;
+  transform: translateX(-50%);
+  overflow: auto;
+  pointer-events: auto;
+  cursor: pointer;
 }
 .music-debug p { margin: 0; overflow-wrap: anywhere; }
+@media (orientation: landscape) and (max-height: 600px) {
+  .music-debug { top: 8px; width: min(180px, 30vw); max-width: min(180px, 30vw); max-height: 68px; }
+}

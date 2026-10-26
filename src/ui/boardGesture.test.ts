@@ -20,6 +20,8 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(pointerOpensTheCourt(target('.screen-modal') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.now-playing') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.pause-btn') as never)).toBe(false);
+    expect(pointerOpensTheCourt(target('.music-debug') as never)).toBe(false);
+    expect(pointerOpensTheCourt(target('.music-debug-unlock') as never)).toBe(false);
   });
 
   it('puts the song pill above the court so a tap is not a kick', () => {
@@ -46,5 +48,8 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(css).toMatch(/\.leaderboard-periods \{[^}]*flex-wrap: wrap;/s);
     expect(css).not.toMatch(/\.leaderboard-periods \{[^}]*overflow-x: auto;/s);
     expect(css).toContain('.world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }');
+    expect(css).toMatch(/\.leaderboard-sheet \{[^}]*background: rgba\(12, 22, 32, 0\.96\);/s);
+    expect(css).toMatch(/\.leaderboard-sheet \.board li span\.board-rank \{[^}]*width: 28px;/s);
+    expect(css).toMatch(/\.board-more \{[^}]*width: 44px;/s);
   });
 });

@@ -35,6 +35,8 @@ There is no lint script.
 
 ## Open items
 
+The hidden song-load panel (five taps in the thin top-left strip, or `?debug`) must be removed, or gated so only a debug build includes it, before any external, public, or under-18 release. It stays on the device: track, phase, status, error, and the relative song path. It sends nothing.
+
 As of 26 October 2026 at 22:35 UTC, 26 named players remain on the live project: 9 real or test installs, plus 17 zero-score “Turbo Striker III” to “Turbo Striker XIX” test installs. Those 17 have no scores or reports and cannot show on the board. Their deletion is backed up and waiting on Rob’s own approval. This branch does not delete or edit those rows.
 
 `supabase/migrations/20261026230000_purge_ip_hashes_at_30_days.sql` is applied on the live project. Rob approved it in chat and Lee word-checked it. The purge ran once. The three old-hash counts read 0. The daily cron stays at `15 3 * * *`.

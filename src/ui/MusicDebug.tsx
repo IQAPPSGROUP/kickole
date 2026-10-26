@@ -12,13 +12,13 @@ import { trackTitle } from '../game/tracks';
  * Hidden song-load report for a device check.
  * Five taps in the top-left corner, or ?debug / ?musicdebug. No network.
  */
-export function MusicDebug() {
+export function MusicDebug({ activePlay = false }: { activePlay?: boolean }) {
   const [open, setOpen] = useState(() => (
     typeof window !== 'undefined' && musicDebugRequested(window.location.search)
   ));
   const taps = useRef(0);
   const lastTap = useRef(0);
-  const report = useSyncExternalStore(subscribeMusicDebug, musicDebugState);
+  const report = useSyncExternalStore(subscribeMusicDebug, musicDebugState, musicDebugState);
   const title = report.track ? trackTitle(report.track) : 'no track';
 
   const unlock = () => {
@@ -30,7 +30,7 @@ export function MusicDebug() {
 
   return (
     <>
-      {!open && (
+      {!open && !activePlay && (
         <button
           type="button"
           className="music-debug-unlock"
@@ -40,12 +40,18 @@ export function MusicDebug() {
         />
       )}
       {open && (
-        <aside className="music-debug" aria-hidden="true">
+        <button
+          type="button"
+          className="music-debug"
+          aria-hidden="true"
+          tabIndex={-1}
+          onPointerUp={() => setOpen(false)}
+        >
           <p>{title}</p>
           <p>{report.phase}{report.httpStatus == null ? '' : ` · status ${report.httpStatus}`}</p>
           <p>{report.error ?? 'no error'}</p>
           <p>{report.url ?? 'no url'}</p>
-        </aside>
+        </button>
       )}
     </>
   );

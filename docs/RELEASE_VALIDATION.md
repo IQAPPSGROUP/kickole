@@ -33,6 +33,7 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 | No coin balance and no store grant on the save | `shop.ts` wardrobe version 4, `storage.ts` |
 | No billing plugin | `package.json`, `capacitor.config.ts`, empty `App.entitlements`, In-App Purchase capability removed from the Xcode project |
 | Store web build refuses the mock board | `VITE_ALLOW_MOCK` guard in `codemagic.yaml` |
+| Launch screens replace the Capacitor placeholder | `ios/App/App/Assets.xcassets/Splash.imageset`, three 2732×2732 images. `Contents.json` is unchanged |
 
 ## Distribution status template
 

@@ -458,7 +458,7 @@ export function SettingsScreen({
             <NicknameForm initial={nickname} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
             <p className="panel-note">Your nickname is picked from our word lists. You can change it once every 7 days.</p>
             <label>Country</label>
-            <p className="panel-note">Optional. International is the default. This only places you on that country&apos;s board and shows its flag beside your nickname. International shows no flag.Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
+            <p className="panel-note">Optional. International is the default. This only places you on that country&apos;s board and shows its flag beside your nickname. International shows no flag. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
             <CountryChoice initialCountry={country} submitLabel="SAVE" onSubmit={onCountry} />
           </div>
         )}

@@ -1,4 +1,3 @@
-import { publishMusicDebug } from './musicDebug';
 import { GAME_TRACKS, MENU_TRACK_ID, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 
 /** Rob's songs. The generated bed in musicBed.ts plays only when these fail to load. */
@@ -240,11 +239,6 @@ function looksLikeHtml(type: string, bytes: ArrayBuffer): boolean {
   return head.startsWith('<!doctype') || head.startsWith('<html');
 }
 
-function loadError(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  return 'load failed';
-}
-
 /**
  * Capacitor 8.5.3 iOS serves `.m4a` with a plain URLResponse (WebViewAssetHandler
  * `isMediaExtension`), so WKWebView fetch reports status 0 and `ok` false while
@@ -252,55 +246,23 @@ function loadError(error: unknown): string {
  */
 async function loadFirstBuffer(
   ctx: BaseAudioContext,
-  name: string,
   urls: readonly string[],
   fetchImpl: typeof fetch,
 ): Promise<AudioBuffer | null> {
-  let lastError: string | null = null;
-  let lastUrl: string | null = null;
-  let lastStatus: number | null = null;
   for (const url of urls) {
     try {
       const response = await fetchImpl(url);
-      lastUrl = url;
-      lastStatus = response.status;
-      if (!response.ok && response.status !== 0) {
-        lastError = `HTTP ${response.status}`;
-        continue;
-      }
+      if (!response.ok && response.status !== 0) continue;
       const type = response.headers.get('content-type') ?? '';
       const bytes = await response.arrayBuffer();
-      if (bytes.byteLength === 0) {
-        lastError = response.status === 0 ? 'empty body (status 0)' : 'empty body';
-        continue;
-      }
-      if (looksLikeHtml(type, bytes)) {
-        lastError = 'html shell';
-        continue;
-      }
+      if (bytes.byteLength === 0) continue;
+      if (looksLikeHtml(type, bytes)) continue;
       const buffer = await ctx.decodeAudioData(bytes.slice(0));
-      if (buffer.duration > 0) {
-        publishMusicDebug({
-          track: name,
-          phase: 'ready',
-          error: null,
-          url,
-          httpStatus: response.status,
-        });
-        return buffer;
-      }
-      lastError = 'zero duration';
-    } catch (error) {
-      lastError = loadError(error);
+      if (buffer.duration > 0) return buffer;
+    } catch {
+      /* try the other format */
     }
   }
-  publishMusicDebug({
-    track: name,
-    phase: 'miss',
-    error: lastError,
-    url: lastUrl,
-    httpStatus: lastStatus,
-  });
   return null;
 }
 
@@ -314,8 +276,7 @@ export async function loadTrack(
   const urls = options?.base != null
     ? stemUrls(options.base, name)
     : robAudioUrls(name, import.meta.env.BASE_URL);
-  publishMusicDebug({ track: name, phase: 'loading', error: null, url: urls[0] ?? null, httpStatus: null });
-  return loadFirstBuffer(ctx, name, urls, fetchImpl);
+  return loadFirstBuffer(ctx, urls, fetchImpl);
 }
 
 interface Voice {

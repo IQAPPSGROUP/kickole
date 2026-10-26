@@ -20,8 +20,6 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(pointerOpensTheCourt(target('.screen-modal') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.now-playing') as never)).toBe(false);
     expect(pointerOpensTheCourt(target('.pause-btn') as never)).toBe(false);
-    expect(pointerOpensTheCourt(target('.music-debug') as never)).toBe(false);
-    expect(pointerOpensTheCourt(target('.music-debug-unlock') as never)).toBe(false);
   });
 
   it('puts the song pill above the court so a tap is not a kick', () => {

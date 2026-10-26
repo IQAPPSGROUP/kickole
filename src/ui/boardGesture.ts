@@ -20,7 +20,5 @@ export function pointerOpensTheCourt(target: EventTarget | null): boolean {
   if (closest(target, '.screen-modal')) return false;
   if (closest(target, '.now-playing')) return false;
   if (closest(target, '.pause-btn')) return false;
-  if (closest(target, '.music-debug')) return false;
-  if (closest(target, '.music-debug-unlock')) return false;
   return true;
 }

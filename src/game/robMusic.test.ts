@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { DUCK_DB, clampVolume, duckTarget, playbackDropped, shouldRestartMusicOnForeground, shouldResumeContext } from './audioMix';
-import { musicDebugState } from './musicDebug';
 import {
   GAMEPLAY_TRACKS,
   LOOP_END_SEC,
@@ -180,13 +179,6 @@ describe('Rob file loading', () => {
     const decoded = await loadTrack(context(() => buffer(149)), 'gameplay-instrumental', { base: 'audio/rob', fetchImpl });
     expect(decoded?.duration).toBe(149);
     expect(calls).toEqual(['audio/rob/gameplay-instrumental.m4a']);
-    expect(musicDebugState()).toMatchObject({
-      track: 'gameplay-instrumental',
-      phase: 'ready',
-      httpStatus: 0,
-      error: null,
-      url: 'audio/rob/gameplay-instrumental.m4a',
-    });
   });
 
   it('tries ogg when a status 0 body is empty', async () => {
@@ -210,7 +202,6 @@ describe('Rob file loading', () => {
     }), 'game-song-2', { base: '/audio/rob/', fetchImpl });
     expect(missing).toBeNull();
     expect(decoded).toBe(0);
-    expect(musicDebugState()).toMatchObject({ phase: 'miss', httpStatus: 404, error: 'HTTP 404' });
   });
 
   it('skips an html shell and returns null when both formats fail', async () => {

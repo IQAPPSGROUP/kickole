@@ -11,14 +11,11 @@ import {
   ENVIRONMENT_OFFSET_Z,
   type EnvironmentTheme,
 } from './environment';
-import { notifyEnvironmentReady } from './openingIntro';
-
 class BackdropBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: unknown) {
     console.warn('Environment unavailable; using built-in scenery.', error);
-    notifyEnvironmentReady();
   }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
@@ -49,7 +46,6 @@ function Model({ url, theme }: { url: string; theme: EnvironmentTheme }) {
   const { scene } = useGLTF(url, DRACO_DECODER_PATH, true, attachLocalDecoders);
   useLayoutEffect(() => {
     prepareBackdrop(scene, theme);
-    notifyEnvironmentReady();
   }, [scene, theme]);
   // One static atlas mesh, no colliders, animations, shadow passes or frame callbacks.
   // useGLTF owns the shared resources; quality switches must not dispose its cache.
@@ -92,15 +88,9 @@ function backdropPath(theme: EnvironmentTheme): string | null {
 
 export function EnvironmentBackdrop({ quality, fallback, theme = 'street' }: { quality: Quality; fallback: ReactNode; theme?: EnvironmentTheme }) {
   const path = backdropPath(theme);
-  if (!path) {
-    notifyEnvironmentReady();
-    return fallback;
-  }
+  if (!path) return fallback;
   const url = `${import.meta.env.BASE_URL}models/${path}-lod${ENVIRONMENT_LOD[quality]}.glb`;
-  if (import.meta.env.VITE_USE_GLB_ENVIRONMENT === 'false') {
-    notifyEnvironmentReady();
-    return fallback;
-  }
+  if (import.meta.env.VITE_USE_GLB_ENVIRONMENT === 'false') return fallback;
   return (
     <BackdropBoundary key={url} fallback={fallback}>
       <Suspense fallback={fallback}><Model url={url} theme={theme} /></Suspense>

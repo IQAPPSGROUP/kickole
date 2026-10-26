@@ -8,17 +8,9 @@ import { mockBoardFromSearch } from '../game/mockBoard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
-import {
-  cancelOpeningIntroForGameplay,
-  getOpeningIntroSnapshot,
-  initOpeningIntro,
-  skipOpeningIntro,
-  subscribeOpeningIntro,
-} from '../scene/openingIntro';
 import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, SongChip, TouchZones } from './Hud';
-import { OpeningSkip } from './OpeningSkip';
 import { CountryScreen, NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
@@ -46,7 +38,6 @@ const REVIEW_RESULT: Result = {
 export function App() {
   const controller = useMemo(() => new GameController(), []);
   const snap = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
-  const intro = useSyncExternalStore(subscribeOpeningIntro, getOpeningIntroSnapshot);
   const [overlay, setOverlay] = useState<Overlay>('none');
   const [kitReturn, setKitReturn] = useState<Overlay>('none');
   const [paused, setPaused] = useState(false);
@@ -72,12 +63,7 @@ export function App() {
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });
 
   useEffect(() => {
-    if (mockBoard) {
-      skipOpeningIntro();
-      if (!controller.getSnapshot().save.bodyChosen) controller.chooseBody('male');
-      return;
-    }
-    initOpeningIntro();
+    if (mockBoard && !controller.getSnapshot().save.bodyChosen) controller.chooseBody('male');
   }, [controller, mockBoard]);
 
   useEffect(() => {
@@ -188,31 +174,23 @@ export function App() {
       if (e.code === 'Space') {
         if ((e.target as HTMLElement)?.tagName === 'BUTTON') return;
         e.preventDefault();
-        cancelOpeningIntroForGameplay();
         spaceDown = controller.engine.phase === 'ready';
         controller.action();
       } else if (keys[e.code]) {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.press(keys[e.code]);
+        if (controller.engine.phase !== 'menu') controller.press(keys[e.code]);
       } else if (e.code === 'KeyH') {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.attemptHeader();
+        if (controller.engine.phase !== 'menu') controller.attemptHeader();
       } else if (e.code === 'KeyN') {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        neckDown = true;
+        if (controller.engine.phase !== 'menu') neckDown = true;
         controller.pressNeck();
       } else if (e.code === 'KeyT') {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.playTrick('thigh');
+        if (controller.engine.phase !== 'menu') controller.playTrick('thigh');
       } else if (e.code === 'KeyF') {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.playTrick('highFlick');
+        if (controller.engine.phase !== 'menu') controller.playTrick('highFlick');
       } else if (e.code === 'KeyW') {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.playTrick('aroundTheWorld');
+        if (controller.engine.phase !== 'menu') controller.playTrick('aroundTheWorld');
       } else if (e.code === 'KeyG') {
-        if (controller.engine.phase !== 'menu') cancelOpeningIntroForGameplay();
-        controller.playTrick('groove');
+        if (controller.engine.phase !== 'menu') controller.playTrick('groove');
       } else if (e.code === 'Escape') {
         if (controller.engine.celebration) controller.skipCelebration();
         controller.armTrick(null);
@@ -253,7 +231,6 @@ export function App() {
       : snap.hud.score;
 
   const startGame = () => {
-    cancelOpeningIntroForGameplay();
     setOverlay('none');
     board?.startRun();
     controller.play();
@@ -357,7 +334,6 @@ export function App() {
     && overlay === 'none'
     && !paused
     && !boardOpen
-    && !intro.active
     && !needsBody
     && !needsOpt
     && !needsNick
@@ -367,7 +343,6 @@ export function App() {
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
-      {intro.active && !mockBoard && !needsBody && !needsOpt && !needsNick && !needsCountry && <OpeningSkip onSkip={skipOpeningIntro} />}
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
@@ -380,7 +355,7 @@ export function App() {
       {!needsBody && !needsOpt && !needsNick && needsCountry && phase === 'menu' && overlay === 'none' && (
         <CountryScreen onSave={saveCountryChoice} />
       )}
-      {phase === 'menu' && overlay === 'none' && !intro.active && !needsBody && !needsOpt && !needsNick && !needsCountry && !(reviewOpen && board) && (
+      {phase === 'menu' && overlay === 'none' && !needsBody && !needsOpt && !needsNick && !needsCountry && !(reviewOpen && board) && (
         <Home
           best={snap.save.best}
           onPlay={startGame}

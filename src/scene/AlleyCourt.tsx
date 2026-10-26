@@ -15,7 +15,6 @@ import {
 import type { Quality } from '../game/storage';
 import { DRACO_DECODER_PATH } from './decoders';
 import { prefersReducedMotion, sceneLifeBudget } from './juice';
-import { notifyEnvironmentReady } from './openingIntro';
 import { createPennantGeometry, placeRope } from './pennant';
 import {
   ALLEY_BUNTING,
@@ -35,7 +34,6 @@ class AlleyBoundary extends Component<{ children: ReactNode; fallback: ReactNode
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch(error: unknown) {
     console.warn('Alley unavailable; using the concrete pad.', error);
-    notifyEnvironmentReady();
   }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
@@ -79,7 +77,6 @@ function AlleyModel({ quality, shadows }: { quality: Quality; shadows: boolean }
   const { scene } = useGLTF(url, DRACO_DECODER_PATH);
   useLayoutEffect(() => {
     prepareAlley(scene, shadows);
-    notifyEnvironmentReady();
   }, [scene, shadows]);
   return (
     <group position={[ALLEY_OFFSET.x, ALLEY_OFFSET.y, ALLEY_OFFSET.z]}>

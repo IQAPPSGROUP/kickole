@@ -19,7 +19,6 @@ Covered by tests (engine + pose measurements, not UI labels):
 - Max gravity high flick still clears forehead height
 - Rapid / conflicting input, cancel, restart, frame-rate independent stepping
 - Combo tracker: flick→header, header→neck→release, stall→ATW, foot↔thigh; expiry; replay token ignore; mistimed header after flick awards nothing (`combos.test.ts`)
-- Opening camera endpoint matches gameplay framing (`openingCamera.test.ts`)
 - Pose lock + joint angles for header / neck / ATW / thigh (`trickPose.test.ts`) using `V2_LIMBS` calibration
 - Asset presence for beach/street/glb + storage save round-trips
 

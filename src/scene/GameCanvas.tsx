@@ -39,16 +39,12 @@ import {
   useMsaa,
 } from './qualityTier';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
-import { sampleOpeningCamera } from './openingCamera';
-import { isOpeningIntroActive, isOpeningIntroDone, tickOpeningIntro } from './openingIntro';
 
 const FOV = GAMEPLAY_FOV;
 const TARGET = GAMEPLAY_TARGET;
 
 const BASE = new Vector3();
 const LOOK = new Vector3();
-const INTRO_POS = new Vector3();
-const INTRO_TARGET = new Vector3();
 
 interface Kickcam {
   fov: number;
@@ -81,18 +77,7 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
   const { camera, size } = useThree();
   useEffect(() => {
     const cam = camera as PerspectiveCamera;
-    const aspect = size.width / Math.max(1, size.height);
-    if (isOpeningIntroActive()) {
-      const u = tickOpeningIntro(0);
-      const fov = sampleOpeningCamera(u, aspect, ENVIRONMENT_THEME, INTRO_POS, INTRO_TARGET);
-      cam.fov = fov;
-      cam.position.copy(INTRO_POS);
-      cam.lookAt(INTRO_TARGET);
-      cam.updateProjectionMatrix();
-      gameplayCameraPosition(aspect, BASE);
-      return;
-    }
-    applyGameplayCamera(cam, aspect);
+    applyGameplayCamera(cam, size.width / Math.max(1, size.height));
   }, [camera, size]);
   useFrame((state, dt) => {
     const cam = camera as PerspectiveCamera;
@@ -107,21 +92,6 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
       return;
     }
     const aspect = size.width / Math.max(1, size.height);
-    if (!isOpeningIntroDone()) {
-      // idle/waiting hold the start pose (u=0); playing advances; skip/finish snaps to endpoint.
-      const u = isOpeningIntroActive() ? tickOpeningIntro(dt) : 0;
-      const fov = sampleOpeningCamera(u, aspect, ENVIRONMENT_THEME, INTRO_POS, INTRO_TARGET);
-      if (cam.fov !== fov) {
-        cam.fov = fov;
-        cam.updateProjectionMatrix();
-      }
-      cam.position.copy(INTRO_POS);
-      cam.lookAt(INTRO_TARGET);
-      gameplayCameraPosition(aspect, BASE);
-      fx.push = 0;
-      fx.shake = 0;
-      return;
-    }
     if (cam.fov !== FOV) {
       cam.fov = FOV;
       cam.updateProjectionMatrix();

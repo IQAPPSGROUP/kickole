@@ -1,6 +1,6 @@
 # KICKOLÉ privacy notice
 
-Version 1.0. Last updated 25 October 2026.
+Version 1.1. Last updated 26 October 2026.
 
 ## Who we are
 
@@ -27,10 +27,10 @@ The leaderboard is **off until you tap Join leaderboard**. If you join, we send:
 | A **nickname** you pick from our word lists | So other players can see who set the score |
 | A **random device id** created on your device | To keep your scores together and let you delete them |
 | Your **score** | The leaderboard itself |
-| A **country** you choose, or International | Country boards. We never use GPS or a network lookup to work out where you are |
+| A **country** you choose, or International | Country boards, and a flag beside your nickname. We never use GPS or a network lookup to work out where you are |
 | A **hashed IP address**, kept for up to **30 days** | To limit cheating. We store only a hash, not the raw address |
 
-Choosing **International** keeps you off every country board.
+Choosing **International** keeps you off every country board and shows no flag beside your nickname.
 
 **Reports.** If someone reports your nickname or score, we keep that report for up
 to **90 days** so we can look at it. We do not tell you who reported you.

@@ -100,9 +100,10 @@ describe('mock leaderboard', () => {
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
     const world = board.top('world', 23, 50, 'all', NOW);
     expect(world.length).toBeGreaterThan(0);
-    expect(world.every((row) => row.country == null)).toBe(true);
+    expect(world.some((row) => row.country === 'GB')).toBe(true);
     const worldAround = board.around(23, 'world', 'all', NOW);
-    expect([...worldAround.above, worldAround.me, ...worldAround.below].every((row) => row.country == null)).toBe(true);
+    expect(worldAround.me.country).toBe('GB');
+    expect([...worldAround.above, worldAround.me, ...worldAround.below].every((row) => row.country == null)).toBe(false);
   });
 
   it('shows a country review board of more than 20 word-list names', () => {
@@ -118,7 +119,7 @@ describe('mock leaderboard', () => {
     const world = board.board('all', 'world', 420, 25, NOW);
     expect(world.rows.length).toBeGreaterThanOrEqual(10);
     expect(world.rows.filter((row) => !row.mine).length).toBeGreaterThanOrEqual(5);
-    expect(world.rows.every((row) => row.country == null)).toBe(true);
+    expect(world.rows.some((row) => row.country === 'GB')).toBe(true);
     expect(world.rows.every((row) => allowed.has(row.nickname))).toBe(true);
   });
 
@@ -128,7 +129,7 @@ describe('mock leaderboard', () => {
     expect(board.rankFor(23, NOW).countryRank).toBeNull();
     expect(board.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
     expect(board.board('day', 'world', 23, 10, NOW).hidden).toBe(false);
-    expect(board.around(23, 'world', 'all', NOW).me.country).toBeNull();
+    expect(board.around(23, 'world', 'all', NOW).me.country).toBe('AD');
   });
 
   it('treats a week as Monday 00:00 UTC through the following Sunday', () => {

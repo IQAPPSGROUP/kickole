@@ -95,10 +95,6 @@ function readBoardPage(data: unknown): BoardPage {
   return { hidden: false, rows: Array.isArray(body.rows) ? readRows(body.rows) : [] };
 }
 
-function clearCountry(rows: BoardEntry[]): BoardEntry[] {
-  return rows.map((row) => (row.country == null ? row : { ...row, country: null }));
-}
-
 function readRows(data: unknown): BoardEntry[] {
   if (!Array.isArray(data)) return [];
   const rows: BoardEntry[] = [];
@@ -476,7 +472,7 @@ export function createSupabaseLeaderboard(options: {
     offline = false;
     const row = Array.isArray(rankRes.data) ? asRecord(rankRes.data[0]) : asRecord(rankRes.data);
     const hasRow = Array.isArray(rankRes.data) ? rankRes.data.length > 0 : Object.keys(row).length > 0;
-    const neighbours = aroundRes.error ? (rankCache?.neighbours ?? []) : clearCountry(readRows(aroundRes.data));
+    const neighbours = aroundRes.error ? (rankCache?.neighbours ?? []) : readRows(aroundRes.data);
     const countryNeighbours = !countryRes || countryRes.error
       ? (rankCache?.countryNeighbours ?? [])
       : readRows(countryRes.data);
@@ -525,19 +521,17 @@ export function createSupabaseLeaderboard(options: {
     if (aroundRes.error && boardRes.error) return false;
     const key = sliceKey(scope, period);
     const previous = boards.get(key);
-    const rawPage = boardRes.error ? (previous?.page ?? { hidden: false, rows: [] }) : readBoardPage(boardRes.data);
-    const page = scope === 'world' ? { ...rawPage, rows: clearCountry(rawPage.rows) } : rawPage;
+    const page = boardRes.error ? (previous?.page ?? { hidden: false, rows: [] }) : readBoardPage(boardRes.data);
     const around = aroundRes.error || page.hidden
       ? (page.hidden ? [] : (previous?.around ?? []))
       : readRows(aroundRes.data);
-    const worldAround = scope === 'world' ? clearCountry(around) : around;
     boards.set(key, {
-      around: worldAround,
+      around,
       page,
       at: now(),
     });
     if (scope === 'world' && period === 'all' && !aroundRes.error && !page.hidden && rankCache) {
-      rankCache = { ...rankCache, neighbours: worldAround };
+      rankCache = { ...rankCache, neighbours: around };
     }
     if (scope === 'country' && period === 'all' && !aroundRes.error && rankCache) {
       rankCache = {
@@ -792,7 +786,7 @@ export function createSupabaseLeaderboard(options: {
     },
     around(score, scope, period = 'all') {
       const rounded = Math.max(0, Math.floor(score));
-      const me = { rank: 0, nickname, score: rounded, mine: true, country: scope === 'country' ? country : null };
+      const me = { rank: 0, nickname, score: rounded, mine: true, country };
       if (scope === 'country' && !country) return { above: [], me, below: [] };
       requestSlice(scope, period, false);
       const cached = boards.get(sliceKey(scope, period));

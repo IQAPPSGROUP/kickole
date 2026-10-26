@@ -44,11 +44,12 @@ describe('optional country question', () => {
 
   it('keeps country off names on the world board, nickname preview, and world rank', () => {
     const row = screens.slice(screens.indexOf('rows.map'), screens.indexOf('</ol>'));
-    expect(row).not.toContain('row.country');
-    expect(row).not.toContain('countryFlag');
+    expect(row).toContain('NameFlag');
+    expect(row).toContain('row.country');
     expect(row).toContain('{row.nickname}');
-    expect(rank).not.toContain('country');
-    expect(screens).toContain('is not shown next to your name');
+    expect(rank).toContain('country-flag');
+    expect(screens).toContain('shows its flag beside your nickname');
+    expect(screens).toContain('International shows no flag');
     expect(screens).toContain('A country board appears once {COUNTRY_BOARD_MIN} players have joined.');
   });
 

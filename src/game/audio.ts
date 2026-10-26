@@ -26,6 +26,7 @@ import {
   swingDelay,
   type MusicGraph,
 } from './musicBed';
+import { publishMusicDebug } from './musicDebug';
 import { RobPlayer } from './robMusic';
 import { GAME_TRACKS, normalizeEnabledTracks, normalizeSongChoice, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 
@@ -61,6 +62,14 @@ let musicGraph: MusicGraph | null = null;
 let rob: RobPlayer | null = null;
 let robMenu: 'idle' | 'ready' | 'missing' = 'idle';
 let robPlay: 'idle' | 'ready' | 'missing' = 'idle';
+const robRetried = { menu: false, play: false };
+
+/** One reload after a miss, then the generated bed. A success clears the retry. */
+export function nextRobAttempt(ok: boolean, alreadyRetried: boolean): 'ready' | 'retry' | 'fallback' {
+  if (ok) return 'ready';
+  if (!alreadyRetried) return 'retry';
+  return 'fallback';
+}
 let songChoice: SongChoice = SHUFFLE_SONG;
 let enabledSongs: GameTrackId[] = GAME_TRACKS.map((track) => track.id);
 let nowPlaying: string | null = null;
@@ -326,14 +335,24 @@ function applyMusic() {
 }
 
 function noteRob(which: 'menu' | 'play', ok: boolean) {
+  const attempt = nextRobAttempt(ok, robRetried[which]);
+  if (attempt === 'retry' && bed.mode === which && unlocked && foreground && bed.music && rob) {
+    robRetried[which] = true;
+    rob.forgetMisses();
+    rob.setMode(which);
+    return;
+  }
+  if (ok) robRetried[which] = false;
   if (which === 'menu') robMenu = ok ? 'ready' : 'missing';
   else robPlay = ok ? 'ready' : 'missing';
   if (bed.mode !== which || !unlocked || !foreground || !bed.music) return;
-  if (ok) stopScheduler();
-  else {
-    rob?.stop();
-    startScheduler();
+  if (ok) {
+    stopScheduler();
+    return;
   }
+  rob?.stop();
+  startScheduler();
+  publishMusicDebug({ phase: 'fallback' });
 }
 
 function noteTrack(name: string | null) {

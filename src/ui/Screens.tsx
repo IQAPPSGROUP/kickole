@@ -558,7 +558,7 @@ export function SettingsScreen({
             </p>
           )}
           <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
-          <p>Music is a synthesised boom-bap beat. Crowd and cheers are synthesised too. No recorded samples are shipped. See public/audio/LICENSE.txt.</p>
+          <p>Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised. See public/audio/LICENSE.txt.</p>
           <p>
             Original assets:{' '}
             <a href="https://quaternius.com/packs/universalbasecharacters.html" target="_blank" rel="noopener noreferrer">

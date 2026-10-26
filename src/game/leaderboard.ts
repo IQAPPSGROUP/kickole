@@ -19,7 +19,7 @@ export interface BoardEntry {
   rank: number;
   nickname: string;
   score: number;
-  /** ISO alpha-2 when the player chose a country. Null for International. Shown as a flag beside the nickname. */
+  /** ISO alpha-2 of the country the player chose. Shown as a flag beside the nickname. Null for International. */
   country: string | null;
   mine: boolean;
 }

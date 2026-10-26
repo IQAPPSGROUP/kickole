@@ -1,7 +1,8 @@
 import { useRef, useSyncExternalStore } from 'react';
-import { countryByCode, countryFlag } from '../game/countries';
+import { countryByCode } from '../game/countries';
 import type { LeaderboardService } from '../game/leaderboard';
 import { formatRank } from '../game/leaderboard';
+import { NameFlag } from './NameFlag';
 
 /** Broadcast graphic. Places gained are measured from the first score of this visit. */
 export function WorldRank({
@@ -20,12 +21,11 @@ export function WorldRank({
   const snapshot = service.rankFor(score);
   if (snapshot.rank != null && (start.current == null || score <= 0)) start.current = snapshot.rank;
   const gained = snapshot.rank != null && start.current != null ? Math.max(0, start.current - snapshot.rank) : 0;
-  const flag = snapshot.country ? countryFlag(snapshot.country) : '';
-  const countryName = countryByCode(snapshot.country)?.name ?? null;
+  const country = snapshot.country ? countryByCode(snapshot.country)?.name ?? null : null;
   const label = [
     `World rank ${formatRank(snapshot.rank)}`,
     gained > 0 ? `up ${gained}` : null,
-    countryName,
+    country,
     nickname,
   ].filter((part) => part != null).join(', ');
   return (
@@ -33,7 +33,7 @@ export function WorldRank({
       <p className="world-rank-kicker">WORLD RANK</p>
       <p className={`world-rank-line${snapshot.rank === 1 ? ' is-first' : ''}`}><b>{formatRank(snapshot.rank)}</b></p>
       {gained > 0 && <p className="world-rank-delta" key={gained}>↑ +{gained}</p>}
-      <p className="world-rank-name">{flag ? <span className="country-flag" aria-hidden="true">{flag}</span> : null}{nickname}</p>
+      <p className="world-rank-name"><NameFlag country={snapshot.country} />{nickname}</p>
     </button>
   );
 }

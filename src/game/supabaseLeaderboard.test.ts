@@ -282,6 +282,7 @@ describe('supabase leaderboard', () => {
     await vi.waitFor(() => expect(board.top('country', 10, 10).some((row) => row.country === 'GB')).toBe(true));
     await vi.waitFor(() => expect(board.top('world', 10, 10).length).toBeGreaterThan(0));
     expect(board.top('world', 10, 10).some((row) => row.country === 'FR')).toBe(true);
+    expect(board.around(10, 'world').me.country).toBe('GB');
     expect(board.around(10, 'country').me.country).toBe('GB');
 
     board.report('HighKick', 'rude');

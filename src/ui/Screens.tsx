@@ -1,6 +1,7 @@
 import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { Result } from '../game/controller';
+import { countryByCode } from '../game/countries';
 import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
 import { LEGAL_URL } from '../site';
@@ -15,8 +16,9 @@ import {
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
 import type { GraphicsChoice, Settings } from '../game/storage';
 import { GAME_TRACKS, SHUFFLE_SONG, type GameTrackId, type SongChoice } from '../game/tracks';
-import { countryByCode, countryFlag } from '../game/countries';
+import { NameFlag } from './NameFlag';
 import { CountryChoice, NicknameForm } from './NicknameScreen';
+import { PrivacyNotice } from './PrivacyNotice';
 import {
   detectTier,
   getDeviceSnapshot,
@@ -187,14 +189,8 @@ const PERIODS: readonly { id: BoardPeriod; label: string; title?: string }[] = [
 ];
 
 function entryLabel(row: BoardEntry): string {
-  const country = countryByCode(row.country)?.name;
-  return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part).join(' ');
-}
-
-function NameFlag({ country }: { country: string | null }) {
-  const flag = country ? countryFlag(country) : '';
-  if (!flag) return null;
-  return <span className="country-flag" aria-hidden="true">{flag}</span>;
+  const country = row.country ? countryByCode(row.country)?.name : null;
+  return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
 }
 
 const BOARD_ROW_LIMIT = 50;
@@ -239,6 +235,7 @@ export function LeaderboardSheet({
     setRevision((value) => value + 1);
   };
   const rankText = mine && mine.rank > 0 ? mine.rank.toLocaleString('en-US') : '—';
+  const youCountry = countryByCode(mine?.country ?? board?.country)?.name ?? null;
   return createPortal(
     <div className="leaderboard-sheet" data-board-sheet role="dialog" aria-modal="true" aria-label="Leaderboard">
       <div className="leaderboard-head">
@@ -275,16 +272,16 @@ export function LeaderboardSheet({
       </div>
       {!board && (
         <div className="leaderboard-scroll" data-board-scroll>
-          <p className="panel-note">The leaderboard is off until you join. A nickname from our word lists and your score are sent for the board. If you choose a country, its flag is shown beside your nickname. International shows no flag.</p>
+          <p className="panel-note">The leaderboard is off until you join. A nickname from our word lists and your score are sent for the board. Country is optional. If you choose one, its flag is shown beside your nickname.</p>
           {onJoin && <button type="button" className="btn primary" onClick={onJoin}>TURN IT ON</button>}
         </div>
       )}
       {board && (
         <div className="leaderboard-scroll" data-board-scroll>
-          <div className="leaderboard-you" aria-label={`Your rank ${rankText} ${countryByCode(mine?.country)?.name ?? ''} ${board.nickname} ${mine?.score ?? score}`.replace(/\s+/g, ' ')}>
+          <div className="leaderboard-you" aria-label={`Your rank ${rankText}${youCountry ? ` ${youCountry}` : ''} ${board.nickname} ${mine?.score ?? score}`}>
             <span>YOUR RANK</span>
             <b>{rankText}</b>
-            <em><NameFlag country={mine?.country ?? null} />{board.nickname}</em>
+            <em><NameFlag country={mine?.country ?? board.country} />{board.nickname}</em>
             <strong>{mine?.score ?? score}</strong>
           </div>
           {optedOut && <p className="panel-note">You chose not to appear on a country board.</p>}
@@ -458,7 +455,7 @@ export function SettingsScreen({
             <NicknameForm initial={nickname} submitLabel="SAVE" onSubmit={onNickname} onPeek={onPeek} onSuggest={onSuggest} />
             <p className="panel-note">Your nickname is picked from our word lists. You can change it once every 7 days.</p>
             <label>Country</label>
-            <p className="panel-note">Optional. International is the default. This only places you on that country&apos;s board and shows its flag beside your nickname. International shows no flag. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
+            <p className="panel-note">Optional. International is the default. The flag of the country you choose is shown beside your nickname. Choosing International shows no flag. Your kit does not choose it. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
             <CountryChoice initialCountry={country} submitLabel="SAVE" onSubmit={onCountry} />
           </div>
         )}
@@ -529,12 +526,7 @@ export function SettingsScreen({
         </div>
         <div className="group help">
           <label>Privacy</label>
-          <p>
-            Kickolé has no in-app purchases. Your kit, appearance and settings stay on this device and are not sent with your score.
-            The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and, if you choose one, a country are sent for the board. The country only places you on that country&apos;s board. It shows its flag beside your nickname. International shows no flag.
-            We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A scrambled version of your internet address is kept for up to 30 days to stop cheating.
-            Tap Delete my leaderboard data to remove your nickname and scores. If someone has reported you, we keep that report for up to 90 days so we can check it.
-          </p>
+          <PrivacyNotice />
           {LEGAL_URL && (
             <p>
               Read the full{' '}
@@ -650,7 +642,7 @@ export function DataScreen({ onClose }: { onClose: () => void }) {
         <ul>
           <li>It&apos;s off unless you turn it on.</li>
           <li>Build a nickname from our word lists, or tap Pick one for me. You can&apos;t type your own, so your real name stays private.</li>
-          <li>Country is optional and separate from your kit. International is the default, and you can change or remove it later. It only places you on that country&apos;s board and shows its flag beside your nickname. International shows no flag.</li>
+          <li>Country is optional and separate from your kit. International is the default, and you can change or remove it later. The flag of the country you choose is shown beside your nickname. Choosing International shows no flag.</li>
           <li>Boards: Today, Week, Month, Year and All time, for the world and for your country. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</li>
           <li>Your best scores stay until 2 years after you last play. Other runs go after 12 months.</li>
           <li>Tap &apos;Delete my leaderboard data&apos; any time to remove your nickname and scores straight away. If someone has reported you, we keep that report for up to 90 days so we can check it.</li>
@@ -669,7 +661,7 @@ export function LeaderboardDataScreen({ onClose }: { onClose: () => void }) {
     <div className="screen settings">
       <div className="card data-panel">
         <h2>Leaderboard &amp; your data</h2>
-        <p>The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and, if you choose one, a country are sent for the board. Other players see that nickname and your score. The country only places you on that country&apos;s board and shows its flag beside your nickname. International shows no flag.</p>
+        <p>The leaderboard is off until you join. If you join, a nickname picked from our word lists, a random device id, your score and, if you choose one, a country are sent for the board. Other players see that nickname, your score, and the flag of the country you chose. Choosing International shows no flag.</p>
         <p>We do not collect advertising identifiers for tracking. We do not use GPS or a network lookup to pick your country. A scrambled version of your internet address is kept for up to 30 days to stop cheating.</p>
         <p>Your best scores stay until 2 years after you last play. Other runs go after 12 months. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>
         <p>Tap Delete my leaderboard data to remove your nickname and scores straight away. If someone has reported you, we keep that report for up to 90 days so we can check it.</p>

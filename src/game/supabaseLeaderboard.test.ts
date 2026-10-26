@@ -181,8 +181,9 @@ describe('supabase leaderboard', () => {
     const standing = board.around(0, 'world');
     expect(standing.me.rank).toBe(4);
     expect(standing.me.score).toBe(10);
-    expect(standing.me.country).toBeNull();
-    expect([...standing.above, ...standing.below].every((row) => row.country == null)).toBe(true);
+    expect(standing.me.country).toBe('GB');
+    expect(standing.above.map((row) => row.country)).toEqual(['FR', 'GB']);
+    expect(standing.below.map((row) => row.country)).toEqual(['DE']);
     expect(standing.above.map((row) => row.nickname)).toEqual(['HighKick', 'MidKick']);
     expect(standing.below.map((row) => row.nickname)).toEqual(['LowKick']);
     expect(board.rankFor(0).countryRank).toBe(2);
@@ -280,7 +281,8 @@ describe('supabase leaderboard', () => {
     });
     await vi.waitFor(() => expect(board.top('country', 10, 10).some((row) => row.country === 'GB')).toBe(true));
     await vi.waitFor(() => expect(board.top('world', 10, 10).length).toBeGreaterThan(0));
-    expect(board.top('world', 10, 10).every((row) => row.country == null)).toBe(true);
+    expect(board.top('world', 10, 10).some((row) => row.country === 'FR')).toBe(true);
+    expect(board.around(10, 'world').me.country).toBe('GB');
     expect(board.around(10, 'country').me.country).toBe('GB');
 
     board.report('HighKick', 'rude');

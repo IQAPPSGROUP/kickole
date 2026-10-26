@@ -19,7 +19,7 @@ export interface BoardEntry {
   rank: number;
   nickname: string;
   score: number;
-  /** ISO alpha-2 on a country board. Null on every world row, and when the player chose International. */
+  /** ISO alpha-2 of the country the player chose. Shown as a flag beside the nickname. Null for International. */
   country: string | null;
   mine: boolean;
 }
@@ -308,7 +308,7 @@ export function createMockLeaderboard(options: {
       nickname: row.nickname,
       score: row.score,
       mine: row.mine,
-      country: scope === 'world' ? null : row.country,
+      country: row.country,
     }));
   };
 

@@ -125,7 +125,7 @@ describe('kit colours', () => {
     const nick = readFileSync(new URL('../ui/NicknameScreen.tsx', import.meta.url), 'utf8');
     const rank = readFileSync(new URL('../ui/WorldRank.tsx', import.meta.url), 'utf8');
     expect(nick).not.toContain('country-flag');
-    expect(rank).not.toContain('country-flag');
+    expect(rank).toContain('<NameFlag country={snapshot.country} />');
     const submit = readFileSync(new URL('./supabaseLeaderboard.ts', import.meta.url), 'utf8');
     expect(submit).not.toContain('kitColour');
     expect(submit).toContain('run_token');

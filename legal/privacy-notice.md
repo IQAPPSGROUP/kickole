@@ -1,6 +1,6 @@
 # KICKOLÉ privacy notice
 
-Version 1.0. Last updated 25 October 2026.
+Version 1.1. Last updated 26 October 2026.
 
 ## Who we are
 
@@ -27,10 +27,14 @@ The leaderboard is **off until you tap Join leaderboard**. If you join, we send:
 | A **nickname** you pick from our word lists | So other players can see who set the score |
 | A **random device id** created on your device | To keep your scores together and let you delete them |
 | Your **score** | The leaderboard itself |
-| A **country** you choose, or International | Country boards. We never use GPS or a network lookup to work out where you are |
+| A **country** you choose, or International | Country boards, and the flag shown beside your nickname. We never use GPS or a network lookup to work out where you are |
 | A **hashed IP address**, kept for up to **30 days** | To limit cheating. We store only a hash, not the raw address |
 
-Choosing **International** keeps you off every country board.
+**What other players see.** Your nickname, your score and the flag of the country you chose are shown together on the leaderboard, so **anyone who looks at the leaderboard can see them**. Choosing a country is optional. We show only the flag of the country you chose, nothing more precise, and we never show where you actually are. Please don't use your real name as a nickname.
+
+Choosing **International** keeps you off every country board, and no country flag is shown beside your nickname.
+
+**When the leaderboard shows.** A leaderboard only appears once it has 20 or more players.
 
 **Reports.** If someone reports your nickname or score, we keep that report for up
 to **90 days** so we can look at it. We do not tell you who reported you.
@@ -54,7 +58,7 @@ KICKOLÉ is a cartoon football game that children play, so we have followed the
 **ICO's Children's Code (Age Appropriate Design Code)**:
 
 - no accounts and no personal details asked for;
-- the leaderboard is off until you choose to join;
+- the leaderboard is off until you choose to join, and the country question is optional and says the flag is shown publicly beside your nickname;
 - nicknames are chosen from our own word lists, which are screened for offensive,
   abusive and identifying words, and you can change yours only once every 7 days;
 - no chat, no advertising, no profiling and no behavioural tracking;

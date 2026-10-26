@@ -147,16 +147,17 @@ begin
   ) then
     raise exception 'world board should list Turbo Striker: %', result;
   end if;
-  if exists (
+  if not exists (
     select 1 from jsonb_array_elements(result->'rows') elem
-    where elem->>'country' is not null
+    where elem->>'nickname' = 'Turbo Striker' and elem->>'country' = 'GB'
   ) then
-    raise exception 'world rows must not include a country: %', result;
+    raise exception 'world rows should include the chosen country: %', result;
   end if;
-  if exists (
-    select 1 from public.get_around(a, 'all', 'world', 3) g where g.country is not null
+  if not exists (
+    select 1 from public.get_around(a, 'all', 'world', 3) g
+    where g.nickname = 'Turbo Striker' and g.country = 'GB'
   ) then
-    raise exception 'world around must not include a country';
+    raise exception 'world around should include the chosen country';
   end if;
 
   update private.players set created_at = now() - interval '2 days' where id = b;

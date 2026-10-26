@@ -43,7 +43,8 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(css).toMatch(/\.leaderboard-you \{[^}]*position: sticky;/s);
     expect(css).toMatch(/\.leaderboard-close \{[^}]*min-height: 52px;/s);
     expect(css).toMatch(/\.leaderboard-sheet \{[^}]*env\(safe-area-inset-top/s);
-    expect(css).toMatch(/\.leaderboard-periods \{[^}]*overflow-x: auto;/s);
+    expect(css).toMatch(/\.leaderboard-periods \{[^}]*flex-wrap: wrap;/s);
+    expect(css).not.toMatch(/\.leaderboard-periods \{[^}]*overflow-x: auto;/s);
     expect(css).toContain('.world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }');
   });
 });

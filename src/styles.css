@@ -1262,24 +1262,22 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 }
 .leaderboard-periods {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
 }
 .leaderboard-periods button {
-  flex: 0 0 auto;
-  min-width: 72px;
+  flex: 1 1 calc(20% - 4px);
+  min-width: 0;
   min-height: 44px;
-  padding: 8px 10px;
+  padding: 4px 2px;
   font: inherit;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
+  line-height: 1.15;
   letter-spacing: 0;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
   color: #fffdf8;
   background: #101827;
   border: 2px solid #2c3b59;
@@ -1311,9 +1309,17 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   color: #fffdf8;
   font-weight: 800;
 }
-.leaderboard-you span { font-size: 11px; letter-spacing: .4px; color: #f7e9c5; }
-.leaderboard-you b { min-width: 2.4em; color: #ffe14a; font-size: 18px; }
-.leaderboard-you em { flex: 1; font-style: normal; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaderboard-you span { flex: none; font-size: 11px; letter-spacing: .4px; color: #f7e9c5; }
+.leaderboard-you b { flex: none; min-width: 2.4em; color: #ffe14a; font-size: 18px; }
+.leaderboard-you em {
+  flex: 1;
+  min-width: 0;
+  font-style: normal;
+  text-align: left;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
 .leaderboard-you .country-flag,
 .leaderboard-sheet .board li .country-flag,
 .world-rank-name .country-flag {
@@ -1369,7 +1375,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   vertical-align: top;
 }
 .screen.settings .privacy-notice hr { width: 100%; border: 0; border-top: 1px solid rgba(247, 245, 237, .28); }
-.leaderboard-you strong { font-size: 16px; }
+.leaderboard-you strong { flex: none; font-size: 16px; }
 .leaderboard-sheet .board li { min-height: 44px; }
 .leaderboard-sheet .board li span.board-rank { width: auto; min-width: 2.6em; }
 .leaderboard-close {
@@ -1435,6 +1441,8 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   flex-direction: column;
   gap: 4px;
   max-height: 120px;
+  max-width: 100%;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 4px;
   border: 2px solid #ff4f9a;
@@ -1444,9 +1452,17 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
     url('./ui/wall-tile.jpg') center / cover;
 }
 .nick-wheel button {
+  width: 100%;
+  max-width: 100%;
   min-height: 44px;
+  padding: 4px 2px;
   font: inherit;
+  font-size: 13px;
   font-weight: 800;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: center;
   color: #fffdf8;
   background: transparent;
   border: 2px solid transparent;
@@ -1498,10 +1514,20 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   position: relative;
   z-index: 1;
   width: 100%;
-  font-size: clamp(40px, 12vw, 58px);
+  max-width: 100%;
+  font-size: clamp(22px, 7vw, 58px);
   line-height: .9;
   text-align: center;
   transform: rotate(-7deg);
+}
+.nick-preview-tag .prompt-shine,
+.nick-preview-tag .prompt-ink,
+.nick-preview-tag .prompt-face,
+.nick-preview-tag .prompt-spray {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
 }
 .nick-preview-tag .prompt-ink .prompt-ch {
   -webkit-text-stroke: 0.14em #140814;
@@ -1551,6 +1577,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   min-width: 44px;
   padding: 8px 2px;
 }
+.screen.nick-screen { overflow-x: hidden; }
 .screen.settings:has(.settings-card) { overflow: hidden; }
 .settings-card { flex: 1; overflow: hidden; min-height: 0; max-height: 100%; }
 .settings-body {

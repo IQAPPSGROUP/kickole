@@ -435,6 +435,12 @@ export function SettingsScreen({
       <div className="card settings-card">
         <div className="settings-body">
         <h2>SETTINGS</h2>
+        <div className="group help">
+          <p className="data-contact">
+            <a href="mailto:hello@iqappsgroup.co.uk">Contact or report a problem</a>
+          </p>
+          <p className="panel-note">Players can also report from the … on leaderboard rows.</p>
+        </div>
         <div className="group">
           <label>Kit</label>
           <button type="button" className="btn ghost" onClick={onKitColours}>Choose your kit</button>

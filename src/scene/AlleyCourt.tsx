@@ -1,11 +1,7 @@
-import { Component, Suspense, useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { Component, Suspense, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { useGLTF, useTexture } from '@react-three/drei';
 import {
   CanvasTexture,
-  Color,
-  DoubleSide,
-  InstancedMesh,
   Mesh,
   MeshStandardMaterial,
   Object3D,
@@ -14,10 +10,7 @@ import {
 } from 'three';
 import type { Quality } from '../game/storage';
 import { DRACO_DECODER_PATH } from './decoders';
-import { prefersReducedMotion, sceneLifeBudget } from './juice';
-import { createPennantGeometry, placeRope } from './pennant';
 import {
-  ALLEY_BUNTING,
   ALLEY_FLOOR_TINT,
   ALLEY_MURAL,
   ALLEY_OFFSET,
@@ -26,8 +19,6 @@ import {
   alleyUrl,
 } from './alleyLayout';
 import { PITCH_PLANE, fillPitch, pitchPlaneGeometry, pitchTextureSize } from './alleyPitch';
-
-const FESTA = ['#d64545', '#e6b325', '#3aa6a0', '#f4f0e6', '#e07a3d', '#3d6ea8'];
 
 class AlleyBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -188,68 +179,6 @@ class MuralBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-/** Cloth pennants on a sagging cord. Above the play box, across the alley. */
-function Bunting({ sway }: { sway: boolean }) {
-  const count = ALLEY_BUNTING.reduce((sum, row) => sum + row.count, 0);
-  const ropes = count - ALLEY_BUNTING.length;
-  const buntingRef = useRef<InstancedMesh>(null);
-  const ropeRef = useRef<InstancedMesh>(null);
-  const geo = useMemo(() => createPennantGeometry(), []);
-  const dummy = useMemo(() => new Object3D(), []);
-  const tint = useMemo(() => new Color(), []);
-  useEffect(() => () => { geo.dispose(); }, [geo]);
-  const paint = (time: number, colors: boolean) => {
-    const flags = buntingRef.current;
-    const rope = ropeRef.current;
-    if (!flags) return;
-    let flag = 0;
-    let span = 0;
-    ALLEY_BUNTING.forEach((row) => {
-      for (let i = 0; i < row.count; i++) {
-        const u = row.count === 1 ? 0.5 : i / (row.count - 1);
-        const flutter = sway ? Math.sin(time * 1.8 + u * 8 + row.z) * 0.05 : 0;
-        const x = row.x0 + u * (row.x1 - row.x0);
-        const y = row.y - Math.sin(u * Math.PI) * row.sag + flutter;
-        dummy.position.set(x, y, row.z);
-        dummy.rotation.set(flutter * 0.5, 0, flutter);
-        dummy.scale.set(1.05, 1.05, 1);
-        dummy.updateMatrix();
-        flags.setMatrixAt(flag, dummy.matrix);
-        if (colors) flags.setColorAt(flag, tint.set(FESTA[flag % FESTA.length] ?? FESTA[0]));
-        if (rope && i > 0) {
-          const u0 = (i - 1) / (row.count - 1);
-          const flutter0 = sway ? Math.sin(time * 1.8 + u0 * 8 + row.z) * 0.05 : 0;
-          placeRope(
-            dummy,
-            row.x0 + u0 * (row.x1 - row.x0), row.y - Math.sin(u0 * Math.PI) * row.sag + flutter0, row.z,
-            x, y, row.z,
-          );
-          rope.setMatrixAt(span, dummy.matrix);
-          span += 1;
-        }
-        flag += 1;
-      }
-    });
-    flags.instanceMatrix.needsUpdate = true;
-    if (colors && flags.instanceColor) flags.instanceColor.needsUpdate = true;
-    if (rope) rope.instanceMatrix.needsUpdate = true;
-  };
-  useLayoutEffect(() => { paint(0, true); }, []);
-  useFrame((state) => { if (sway) paint(state.clock.elapsedTime, false); });
-  return (
-    <group>
-      <instancedMesh ref={ropeRef} args={[undefined, undefined, ropes]} frustumCulled={false}>
-        <cylinderGeometry args={[0.01, 0.01, 1, 5]} />
-        <meshStandardMaterial color="#d9d1c4" roughness={0.6} />
-      </instancedMesh>
-      <instancedMesh ref={buntingRef} args={[undefined, undefined, count]} frustumCulled={false}>
-        <primitive object={geo} attach="geometry" />
-        <meshStandardMaterial side={DoubleSide} roughness={0.55} metalness={0} />
-      </instancedMesh>
-    </group>
-  );
-}
-
 /** One baked decal. The concrete shows through the chips, and the sun lights the paint. */
 function AlleyPitch({ quality }: { quality: Quality }) {
   const texture = useMemo(() => {
@@ -294,11 +223,9 @@ function AlleyPitch({ quality }: { quality: Quality }) {
 }
 
 export function AlleyCourt({ shadows, quality }: { shadows: boolean; quality: Quality }) {
-  const sway = sceneLifeBudget(quality, prefersReducedMotion()).buntingSway;
   const url = alleyModelUrl(quality);
   return (
     <group>
-      <Bunting sway={sway} />
       <Posters />
       <MuralBoundary>
         <Suspense fallback={null}>

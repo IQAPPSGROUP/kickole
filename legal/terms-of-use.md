@@ -108,8 +108,3 @@ notice.
 These terms are governed by the law of England and Wales. If you live in Scotland
 or Northern Ireland, you can also bring a claim in your local courts, and you keep
 any rights your local law gives you.
-
----
-
-*Prepared with AI assistance. Consider a solicitor's review before your next
-major release.*

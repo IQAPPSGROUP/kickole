@@ -1,6 +1,6 @@
 # Rob's music
 
-Four licensed tracks. The game does not add songs or read the phone library.
+Four of Rob's own tracks. The game does not add songs or read the phone library.
 
 Shuffle is the default. A shuffle run always starts with Alley Beat (`gameplay-instrumental`). When that track hands off, the run continues through We Rise, Keep It in the Air, and Don't Let It Drop in a shuffle, without playing the same song twice in a row. The next shuffle run starts on Alley Beat again.
 

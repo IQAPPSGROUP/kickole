@@ -56,8 +56,3 @@ KICKOLÉ is a single-player game with an optional scoreboard. It is not a social
 network, it has no user-to-user messaging, and it is not an emergency or support
 service. If a child is in immediate danger, call **999**. For non-urgent
 safeguarding advice in the UK, the **NSPCC helpline** is 0808 800 5000.
-
----
-
-*Prepared with AI assistance. Consider a solicitor's review before your next
-major release.*

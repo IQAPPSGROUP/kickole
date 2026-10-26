@@ -54,7 +54,6 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       const list = parts.current;
       if (e.type === 'kick') {
         ringT.current = 0;
-        fx.push = Math.max(fx.push, e.grade === 'perfect' ? 1 : 0.35);
         spawnInto(list, max, quality === 'low' ? 5 : 8, b.x, b.y - 0.04, b.z, 0.7, 1.4, 0.28, true);
         if (e.grade === 'perfect') {
           fx.shake = 1;

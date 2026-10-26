@@ -36,14 +36,6 @@ export function comboHeat(streak: number): ComboHeat {
   return { t, color, opacity: 0.16 + t * 0.62 };
 }
 
-/** Camera swoop amount for a big combo. Reduced motion keeps the camera still. */
-export function swoopStrength(streak: number, comboPoints: number, reducedMotion: boolean): number {
-  if (reducedMotion) return 0;
-  if (comboPoints >= 5 || streak >= 25) return 1;
-  if (streak >= 10) return 0.72;
-  return 0;
-}
-
 export function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;

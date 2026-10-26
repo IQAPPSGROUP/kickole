@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cameraSway, comboHeat, crowdBob, particleBudget, sceneLifeBudget, swoopStrength } from './juice';
+import { cameraSway, comboHeat, crowdBob, particleBudget, sceneLifeBudget } from './juice';
 import { kickToeClearance } from './kickClearance';
 
 describe('graphics juice budgets', () => {
@@ -17,13 +17,6 @@ describe('graphics juice budgets', () => {
     expect(comboHeat(16).color).toBe('#FFD93D');
     expect(comboHeat(40).t).toBe(1);
     expect(comboHeat(12).opacity).toBeGreaterThan(comboHeat(1).opacity);
-  });
-
-  it('swoops on big combos and stays still when motion is reduced', () => {
-    expect(swoopStrength(4, 0, false)).toBe(0);
-    expect(swoopStrength(10, 0, false)).toBeGreaterThan(0);
-    expect(swoopStrength(10, 0, true)).toBe(0);
-    expect(swoopStrength(3, 5, false)).toBe(1);
   });
 
   it('scales background life down for low quality and reduced motion', () => {

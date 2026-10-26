@@ -44,7 +44,6 @@ const FOV = GAMEPLAY_FOV;
 const TARGET = GAMEPLAY_TARGET;
 
 const BASE = new Vector3();
-const LOOK = new Vector3();
 
 interface Kickcam {
   fov: number;
@@ -72,7 +71,7 @@ function applyGameplayCamera(cam: PerspectiveCamera, aspect: number) {
   cam.updateProjectionMatrix();
 }
 
-/** Head-height camera aimed at the back brick, with kick push-in and shake. */
+/** Head-height camera aimed at the back brick. A kick does not zoom or dolly in. Shake still runs. */
 function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
   const { camera, size } = useThree();
   useEffect(() => {
@@ -96,45 +95,23 @@ function CameraRig({ shake, quality }: { shake: boolean; quality: Quality }) {
       cam.fov = FOV;
       cam.updateProjectionMatrix();
     }
-    fx.push = Math.max(0, fx.push - dt * 3);
     fx.shake = Math.max(0, fx.shake - dt * 4);
-    const reduced = prefersReducedMotion();
-    if (reduced) fx.swoop = 0;
-    fx.swoop = Math.max(0, fx.swoop - dt * 0.72);
     if (BASE.lengthSq() === 0) gameplayCameraPosition(aspect, BASE);
-    const swoop = fx.swoop;
+    const reduced = prefersReducedMotion();
     const swayStill = cameraSway(state.clock.elapsedTime, quality, reduced);
-    if (!shake && swoop <= 0 && swayStill.x === 0 && swayStill.y === 0) {
-      if (cam.fov !== FOV) {
-        cam.fov = FOV;
-        cam.updateProjectionMatrix();
-      }
+    if (!shake && swayStill.x === 0 && swayStill.y === 0) {
       cam.position.copy(BASE);
       cam.lookAt(TARGET);
       return;
     }
     const t = state.clock.elapsedTime;
     const sway = cameraSway(t, quality, reduced);
-    LOOK.copy(TARGET).sub(BASE).multiplyScalar(fx.push * 0.03);
-    camera.position.copy(BASE).add(LOOK);
+    camera.position.copy(BASE);
     camera.position.x += sway.x;
     camera.position.y += sway.y;
     if (shake) {
       camera.position.x += Math.sin(t * 55) * 0.015 * fx.shake;
       camera.position.y += Math.cos(t * 63) * 0.015 * fx.shake;
-    }
-    if (swoop > 0) {
-      camera.position.x += Math.sin(swoop * 1.15) * 0.62;
-      camera.position.y += swoop * 0.32;
-      camera.position.z -= swoop * 0.38;
-      const nextFov = FOV - swoop * 5.5;
-      if (Math.abs(cam.fov - nextFov) > 0.05) {
-        cam.fov = nextFov;
-        cam.updateProjectionMatrix();
-      }
-    } else if (cam.fov !== FOV) {
-      cam.fov = FOV;
-      cam.updateProjectionMatrix();
     }
     camera.lookAt(TARGET);
   });

@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PerspectiveCamera, Vector3 } from 'three';
-import { ALLEY_BUNTING, ALLEY_FILES, ALLEY_MURAL, ALLEY_OFFSET, alleySkyUrl } from './alleyLayout';
+import { ALLEY_FILES, ALLEY_MURAL, ALLEY_OFFSET, alleySkyUrl } from './alleyLayout';
 import { resolveEnvironmentTheme } from './environment';
 import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 import { inPlayVolume } from './streetLayout';
@@ -93,10 +93,6 @@ describe('alley environment', () => {
     expect(x + width / 2).toBeLessThan(3.25);
     expect(inPlayVolume(x, z)).toBe(false);
     expect(width / height).toBeGreaterThan(2.5);
-    for (const row of ALLEY_BUNTING) {
-      expect(row.y).toBeLessThan(y - height / 2 - 0.08);
-      expect(inPlayVolume(0, row.z)).toBe(false);
-    }
   });
 
   it('shows the full wordmark between the phone HUD and the player', () => {
@@ -168,12 +164,6 @@ describe('alley environment', () => {
       const fence = screen(0.4, 2.115, -4.14);
       expect(letters[2].y).toBeLessThan(fence.y - 0.01);
       expect(letters[3].y).toBeLessThan(fence.y - 0.01);
-      for (const row of ALLEY_BUNTING) {
-        const rope = screen(0, row.y, row.z);
-        const tip = screen(0, row.y - row.sag - 0.36, row.z);
-        expect(rope.y).toBeGreaterThan(letters[2].y);
-        expect(tip.y).toBeGreaterThan(rope.y);
-      }
     }
   });
 

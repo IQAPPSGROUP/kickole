@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   colorSaturation,
   contrastCurve,
+  DISPLAY_CONTRAST,
   depthOfFieldActive,
   depthOfFieldFocus,
   depthOfFieldScale,
@@ -40,12 +41,16 @@ describe('presentation', () => {
     expect(white.every((channel) => channel <= 1 && channel >= 0.92)).toBe(true);
   });
 
-  it('spreads mid greys with a gentle S-curve', () => {
+  it('spreads mid greys with a softer S-curve', () => {
+    expect(DISPLAY_CONTRAST).toBe(0.68);
     const dark = contrastCurve(0.22);
     const light = contrastCurve(0.72);
+    expect(dark).toBeCloseTo(0.1459, 3);
+    expect(light).toBeCloseTo(0.7968, 3);
     expect(dark).toBeLessThan(0.22);
     expect(light).toBeGreaterThan(0.72);
     expect(light - dark).toBeGreaterThan(0.72 - 0.22);
+    expect(light - dark).toBeLessThan(0.67);
     const gradedDark = rec709Luma(...gradeDisplayColor(0.22, 0.22, 0.22));
     const gradedLight = rec709Luma(...gradeDisplayColor(0.72, 0.72, 0.72));
     expect(gradedLight - gradedDark).toBeGreaterThan(0.5);

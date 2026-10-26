@@ -30,7 +30,7 @@ export function depthOfFieldFocus(
 /**
  * three r186 bokeh blur is `clamp((focus + viewZ) * aperture, ±maxblur)` in screen space.
  * The back wall is only a few metres behind the player, so this stays a hint.
- * A wider disk read as fog on the wall and the bunting.
+ * A wider disk read as fog on the back wall.
  */
 export function depthOfFieldScale(phase: Phase, celebrating: boolean): { aperture: number; maxblur: number } {
   if (phase === 'menu' || celebrating) return { aperture: 0.0014, maxblur: 0.005 };
@@ -47,6 +47,13 @@ function clamp01(value: number): number {
 }
 
 /**
+ * How far the display S-curve pulls the quarters away from mid grey.
+ * The previous grade used 0.9. 0.68 keeps black, white, and mid grey put
+ * and cuts that extra pull by about a quarter (24%).
+ */
+export const DISPLAY_CONTRAST = 0.68;
+
+/**
  * Contrast S-curve. Black, white, and mid grey stay put.
  * The quarters pull apart. The ends ease off so a bright pastel is not crushed to white.
  */
@@ -54,7 +61,7 @@ export function contrastCurve(value: number): number {
   const t = clamp01(value);
   const centered = t - 0.5;
   const falloff = Math.pow(Math.max(0, 1 - Math.abs(centered) * 2), 1.15);
-  return clamp01(t + centered * 0.9 * falloff);
+  return clamp01(t + centered * DISPLAY_CONTRAST * falloff);
 }
 
 function vibrate(r: number, g: number, b: number): [number, number, number] {
@@ -74,8 +81,8 @@ function vibrate(r: number, g: number, b: number): [number, number, number] {
 }
 
 /**
- * Display grade after AgX. Vibrance runs first so pastel walls and bunting
- * gain chroma. The S-curve then moves luma only, so it does not lift mid grey
+ * Display grade after AgX. Vibrance runs first so pastel walls gain chroma.
+ * The S-curve then moves luma only, so it does not lift mid grey
  * or crush those colours back to white.
  */
 export function gradeDisplayColor(r: number, g: number, b: number): [number, number, number] {

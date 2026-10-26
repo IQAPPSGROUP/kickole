@@ -4,7 +4,7 @@ import {
   DUCK_RELEASE_SEC,
   clampVolume,
   duckTarget,
-  playbackDropped,
+  shouldRestartMusicOnForeground,
   shouldResumeContext,
 } from './audioMix';
 import {
@@ -67,7 +67,6 @@ let nowPlaying: string | null = null;
 const trackListeners = new Set<(name: string | null) => void>();
 let interruptWatch = false;
 let resumeAttempt = 0;
-let droppedByInterrupt = false;
 
 let bed = {
   mode: 'menu' as 'menu' | 'play',
@@ -409,10 +408,7 @@ function ensureRob(c: AudioContext) {
 
 function recoverPlayback() {
   if (!foreground || !unlocked) return;
-  if (droppedByInterrupt) {
-    droppedByInterrupt = false;
-    rob?.resume();
-  }
+  if (shouldRestartMusicOnForeground(unlocked, bed.music)) rob?.resume();
   applyBed();
 }
 
@@ -421,7 +417,6 @@ function watchInterruptions(c: AudioContext) {
   interruptWatch = true;
   c.addEventListener('statechange', () => {
     const state = c.state as string;
-    if (playbackDropped(state)) droppedByInterrupt = true;
     if (!shouldResumeContext(state, foreground, unlocked)) return;
     const now = Date.now();
     if (now - resumeAttempt < 400) return;

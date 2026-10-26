@@ -26,3 +26,11 @@ export function shouldResumeContext(state: string, foreground: boolean, unlocked
 export function playbackDropped(state: string): boolean {
   return state === 'interrupted';
 }
+
+/**
+ * Coming back to the foreground has to schedule the current song again.
+ * Resume alone leaves WKWebView silent, and a fresh run would restart Alley Beat.
+ */
+export function shouldRestartMusicOnForeground(unlocked: boolean, musicOn: boolean): boolean {
+  return unlocked && musicOn;
+}

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { DUCK_DB, clampVolume, duckTarget, playbackDropped, shouldRestartMusicOnForeground, shouldResumeContext } from './audioMix';
+import { musicDebugState } from './musicDebug';
 import {
   GAMEPLAY_TRACKS,
   LOOP_END_SEC,
@@ -24,10 +25,11 @@ import {
   trackWindow,
 } from './robMusic';
 
-function response(ok: boolean, type = 'audio/mp4', bytes?: ArrayBuffer): Response {
+function response(ok: boolean, type = 'audio/mp4', bytes?: ArrayBuffer, status = ok ? 200 : 404): Response {
   const body = bytes ?? new ArrayBuffer(4);
   return {
     ok,
+    status,
     headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? type : null) },
     arrayBuffer: async () => body,
   } as Response;
@@ -167,6 +169,48 @@ describe('Rob file loading', () => {
       '/audio/rob/game-song-3.m4a',
       '/audio/rob/game-song-3.ogg',
     ]);
+  });
+
+  it('decodes an iOS media response whose status is 0 and does not ask for ogg', async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(String(url));
+      return response(false, 'audio/mp4', new ArrayBuffer(8), 0);
+    }) as typeof fetch;
+    const decoded = await loadTrack(context(() => buffer(149)), 'gameplay-instrumental', { base: 'audio/rob', fetchImpl });
+    expect(decoded?.duration).toBe(149);
+    expect(calls).toEqual(['audio/rob/gameplay-instrumental.m4a']);
+    expect(musicDebugState()).toMatchObject({
+      track: 'gameplay-instrumental',
+      phase: 'ready',
+      httpStatus: 0,
+      error: null,
+      url: 'audio/rob/gameplay-instrumental.m4a',
+    });
+  });
+
+  it('tries ogg when a status 0 body is empty', async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(String(url));
+      const m4a = String(url).endsWith('.m4a');
+      return response(!m4a, 'audio/mp4', m4a ? new ArrayBuffer(0) : new ArrayBuffer(8), m4a ? 0 : 200);
+    }) as typeof fetch;
+    const decoded = await loadTrack(context(() => buffer(12)), 'menu-song', { base: '/audio/rob/', fetchImpl });
+    expect(decoded?.duration).toBe(12);
+    expect(calls).toEqual(['/audio/rob/menu-song.m4a', '/audio/rob/menu-song.ogg']);
+  });
+
+  it('does not decode a real HTTP error', async () => {
+    let decoded = 0;
+    const fetchImpl = (async () => response(false, 'audio/mp4', new ArrayBuffer(8), 404)) as typeof fetch;
+    const missing = await loadTrack(context(() => {
+      decoded += 1;
+      return buffer(12);
+    }), 'game-song-2', { base: '/audio/rob/', fetchImpl });
+    expect(missing).toBeNull();
+    expect(decoded).toBe(0);
+    expect(musicDebugState()).toMatchObject({ phase: 'miss', httpStatus: 404, error: 'HTTP 404' });
   });
 
   it('skips an html shell and returns null when both formats fail', async () => {
@@ -317,6 +361,67 @@ describe('run opener and decode budget', () => {
     player.releaseDecoded();
     expect(player.retainedTracks()).toEqual([]);
     player.stop();
+  });
+
+  it('loads Alley Beat again when setMode is retried after a miss', async () => {
+    const clock = { currentTime: 0 };
+    const loads: string[] = [];
+    const results: boolean[] = [];
+    let open = false;
+    const ctx = {
+      get currentTime() { return clock.currentTime; },
+      createGain() {
+        return {
+          gain: {
+            value: 1,
+            setValueAtTime() {},
+            linearRampToValueAtTime() {},
+            cancelScheduledValues() {},
+          },
+          connect(target: unknown) { return target; },
+        };
+      },
+      createBufferSource() {
+        return {
+          buffer: null as AudioBuffer | null,
+          onended: null as null | (() => void),
+          connect(target: { connect?: (node: unknown) => unknown }) { return target; },
+          start() {},
+          stop() {},
+        };
+      },
+    };
+    const load = async (name: string) => {
+      loads.push(name);
+      await Promise.resolve();
+      return open ? { duration: 149 } as AudioBuffer : null;
+    };
+    const player = new RobPlayer(
+      ctx as unknown as AudioContext,
+      {} as AudioNode,
+      (_mode, ok) => { results.push(ok); },
+      load,
+      () => {},
+      () => 0,
+    );
+    const flush = async () => {
+      for (let i = 0; i < 12; i++) await Promise.resolve();
+    };
+    try {
+      player.setMode('play');
+      await flush();
+      expect(results).toEqual([false]);
+      expect(loads[0]).toBe(OPENER_TRACK_ID);
+      open = true;
+      player.forgetMisses();
+      player.setMode('play');
+      await flush();
+      expect(results).toEqual([false, true]);
+      expect(loads[loads.length - 1]).toBe(OPENER_TRACK_ID);
+      expect(player.retainedTracks()).toEqual([OPENER_TRACK_ID]);
+    } finally {
+      player.stop();
+    }
   });
 });
 

@@ -11,6 +11,7 @@ import { GameCanvas } from '../scene/GameCanvas';
 import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, SongChip, TouchZones } from './Hud';
+import { MusicDebug } from './MusicDebug';
 import { CountryScreen, NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
@@ -468,6 +469,7 @@ export function App() {
           onClose={closeOverlay}
         />
       )}
+      <MusicDebug />
     </div>
   );
 }

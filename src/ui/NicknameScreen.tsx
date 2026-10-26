@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { countryByCode, searchCountries } from '../game/countries';
-import { COUNTRY_BOARD_MIN } from '../game/leaderboard';
 import { ADJECTIVES, NOUNS } from '../game/nicknameWords';
 import { composeNickname, isBlockedPair, parseNickname, pickFreePair, unblockIndex, wordIndex, type FreePair } from '../game/nickname';
 import type { PeekOutcome } from '../game/supabaseLeaderboard';
@@ -20,7 +19,7 @@ export function OptInCard({
       <div className="card nick-card">
         <p className="court-label">LEADERBOARD</p>
         <h2 className="nick-title">JOIN IN?</h2>
-        <p className="panel-lead">The leaderboard is off until you join. Other players would see a nickname picked from our word lists and your score. Country is a separate optional question, and it is not shown next to your name. The game works either way.</p>
+        <p className="panel-lead">The leaderboard is off until you join. Other players would see a nickname picked from our word lists, your score, and the flag of a country if you choose one. Country is a separate optional question. The game works either way.</p>
         <button type="button" className="btn primary" onClick={onJoin}>Join leaderboard</button>
         <button type="button" className="btn ghost" onClick={onNotNow}>Not now</button>
         <button type="button" className="btn ghost" onClick={onData}>How it works</button>
@@ -460,11 +459,7 @@ export function CountryScreen({
       <div className="card nick-card">
         <p className="court-label">OPTIONAL</p>
         <h2 className="nick-title">COUNTRY?</h2>
-        <p className="panel-lead">
-          International is the default. This only places you on that country&apos;s board.
-          It is not shown next to your name. A country board appears once {COUNTRY_BOARD_MIN} players have joined.
-          Your kit does not choose a country. You can change or remove this later.
-        </p>
+        <p className="panel-lead">Optional. The flag of the country you choose is shown to everyone beside your nickname.</p>
         <CountryChoice onSubmit={onSave} />
       </div>
     </div>

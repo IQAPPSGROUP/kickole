@@ -10,7 +10,10 @@ export type BoardPeriod = 'day' | 'week' | 'month' | 'year' | 'all';
 /** World is every player. Country is one self-chosen code. */
 export type BoardScope = 'world' | 'country';
 
-/** A country board with fewer players than this stays hidden. */
+/**
+ * A world or country board with fewer scored players than this stays hidden.
+ * The count is per time frame. International (no country) is a separate empty state.
+ */
 export const COUNTRY_BOARD_MIN = 20;
 
 export const BOARD_BLOCKS_KEY = 'kicky.board.blocks.v1';
@@ -19,7 +22,7 @@ export interface BoardEntry {
   rank: number;
   nickname: string;
   score: number;
-  /** ISO alpha-2 on a country board. Null on every world row, and when the player chose International. */
+  /** ISO alpha-2 of the country the player chose. Shown as a flag beside the nickname. Null for International. */
   country: string | null;
   mine: boolean;
 }
@@ -41,6 +44,8 @@ export interface RankSnapshot {
   countryRank: number | null;
   /** True when their country has fewer than {@link COUNTRY_BOARD_MIN} players this period. */
   countryHidden: boolean;
+  /** True when the all-time world board has fewer than {@link COUNTRY_BOARD_MIN} players. */
+  worldHidden: boolean;
 }
 
 export interface RunSubmit {
@@ -253,10 +258,19 @@ export function createMockLeaderboard(options: {
   country?: string | null;
   storage?: Storage;
   now?: number;
+  /**
+   * How many stand-in players to invent. The review crowd is {@link CROWD}.
+   * A smaller size is only for tests and the dev `?mockPlayers=` preview.
+   */
+  crowdSize?: number;
 }): LeaderboardService {
   const storage = options.storage ?? localStorage;
   const nickname = options.nickname;
   const country = countryByCode(options.country)?.code ?? null;
+  const requestedCrowd = options.crowdSize;
+  const crowdLimit = typeof requestedCrowd === 'number' && Number.isInteger(requestedCrowd)
+    ? Math.max(0, Math.min(CROWD, requestedCrowd))
+    : CROWD;
   const deviceId = loadDeviceId(storage);
   let blocked = readBlockedNames(storage);
   const reports = new Set(readList(storage, REPORTS_KEY).map((name) => name.toLowerCase()));
@@ -276,7 +290,7 @@ export function createMockLeaderboard(options: {
   const crowd = (now: number, scope: BoardScope, period: BoardPeriod): CrowdRow[] => {
     const rows: CrowdRow[] = [];
     const mine = nickname.toLowerCase();
-    for (let index = 0; index < CROWD; index += 1) {
+    for (let index = 0; index < crowdLimit; index += 1) {
       const rowName = crowdNickname(index);
       const key = rowName.toLowerCase();
       if (key === mine || hidden(rowName)) continue;
@@ -308,7 +322,7 @@ export function createMockLeaderboard(options: {
       nickname: row.nickname,
       score: row.score,
       mine: row.mine,
-      country: scope === 'world' ? null : row.country,
+      country: row.country,
     }));
   };
 
@@ -316,6 +330,7 @@ export function createMockLeaderboard(options: {
     if (scope === 'country' && country == null) return { hidden: false, rows: [] };
     const rows = placed(score, scope, period, now);
     if (scope === 'country' && rows.length < COUNTRY_BOARD_MIN) return { hidden: true, rows: [] };
+    if (scope === 'world' && rows.length < COUNTRY_BOARD_MIN) return { hidden: true, rows: [] };
     const cap = Math.max(1, Math.min(50, Math.floor(limit)));
     return { hidden: false, rows: rows.slice(0, cap) };
   };
@@ -331,18 +346,20 @@ export function createMockLeaderboard(options: {
     startRun() {},
     rankFor(score, now = Date.now()) {
       const board = placed(score, 'world', 'all', now);
+      const worldHidden = board.length < COUNTRY_BOARD_MIN;
       const me = board.find((row) => row.mine);
       const rounded = Math.max(0, Math.floor(score));
       const countryRows = country ? placed(score, 'country', 'all', now) : [];
       const countryHidden = country != null && countryRows.length < COUNTRY_BOARD_MIN;
       return {
-        rank: me?.rank ?? board.length,
-        total: board.length,
+        rank: worldHidden ? null : (me?.rank ?? board.length),
+        total: worldHidden ? 0 : board.length,
         nickname,
         score: rounded,
         country,
         countryRank: countryHidden ? null : countryRows.find((row) => row.mine)?.rank ?? null,
         countryHidden,
+        worldHidden,
       };
     },
     around(score, scope, period = 'all', now = Date.now()) {

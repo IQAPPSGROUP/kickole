@@ -2,7 +2,6 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useThree } from '@react-three/fiber';
 import { BackSide, EquirectangularReflectionMapping, PMREMGenerator, SRGBColorSpace, TextureLoader, type Texture } from 'three';
 import type { Quality } from '../game/storage';
-import { notifyEnvironmentReady } from './openingIntro';
 import { ALLEY_SKY_LOOK, alleySkyUrl } from './alleyLayout';
 import { gpuGeneration, subscribeGpuRestore } from './gpuRestore';
 
@@ -88,11 +87,9 @@ export function AlleySky({ quality }: { quality: Quality }) {
       }
       disposePm();
       applyLook();
-      notifyEnvironmentReady();
     }, undefined, () => {
       disposePm();
       if (alive) setFailed(true);
-      notifyEnvironmentReady();
     });
     return () => {
       alive = false;

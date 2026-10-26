@@ -17,7 +17,9 @@ describe('optional country question', () => {
 
   it('asks for a country separately from the kit, with International as the default', () => {
     expect(COUNTRY_BOARD_MIN).toBe(20);
-    expect(nick).toContain('International is the default');
+    expect(nick).toContain('Optional. The flag of the country you choose is shown to everyone beside your nickname.');
+    expect(nick).not.toContain('is not shown next to your name');
+    expect(screens).toContain('International is the default');
     expect(nick).toContain("selected ? selected.name : 'International'");
     expect(nick).toContain('International\n');
     expect(nick).not.toContain('Prefer not to say');
@@ -42,14 +44,25 @@ describe('optional country question', () => {
     expect(app).toContain('needsCountry');
   });
 
-  it('keeps country off names on the world board, nickname preview, and world rank', () => {
+  it('shows the chosen country flag beside nicknames on the boards', () => {
     const row = screens.slice(screens.indexOf('rows.map'), screens.indexOf('</ol>'));
-    expect(row).not.toContain('row.country');
-    expect(row).not.toContain('countryFlag');
+    expect(row).toContain('<NameFlag country={row.country} />');
     expect(row).toContain('{row.nickname}');
-    expect(rank).not.toContain('country');
-    expect(screens).toContain('is not shown next to your name');
+    expect(screens).toContain('NameFlag country={mine?.country ?? board.country}');
+    expect(screens).not.toContain('is not shown next to your name');
+    expect(rank).toContain('<NameFlag country={snapshot.country} />');
     expect(screens).toContain('A country board appears once {COUNTRY_BOARD_MIN} players have joined.');
+    expect(screens).toContain('Leaderboard appears once ${COUNTRY_BOARD_MIN} players have scored');
+    expect(screens).toContain('{!page.hidden && (');
+    const over = screens.slice(screens.indexOf('export function GameOver'), screens.indexOf('type SheetStep'));
+    expect(over).toContain('LEADERBOARD');
+    expect(over).not.toContain('className="board"');
+    expect(rank).toContain('snapshot.worldHidden ? null : snapshot.rank');
+    expect(rank).toContain('Leaderboard appears once ${COUNTRY_BOARD_MIN} players have scored');
+    expect(rank).toContain('{!snapshot.worldHidden && <p className="world-rank-name">');
+    const boardSource = source('../game/leaderboard.ts');
+    expect(boardSource).toContain("if (scope === 'country' && rows.length < COUNTRY_BOARD_MIN)");
+    expect(boardSource).toContain("if (scope === 'world' && rows.length < COUNTRY_BOARD_MIN)");
   });
 
   it('stores International as no country and can clear a country later', () => {

@@ -8,7 +8,7 @@ import type {
   RankSnapshot,
   RunSubmit,
 } from './leaderboard';
-import { readBlockedNames, writeBlockedNames } from './leaderboard';
+import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames } from './leaderboard';
 import { composeNickname, isBlockedPair, parseNickname, type FreePair } from './nickname';
 import { kickTimesText, runChecksum } from './runProof';
 import { loadDeviceId } from './nicknameStore';
@@ -37,6 +37,8 @@ interface RankCache {
   score: number;
   countryRank: number | null;
   countryHidden: boolean;
+  /** All-time world board is under {@link COUNTRY_BOARD_MIN}. Names and the count stay off the panel. */
+  worldHidden: boolean;
   neighbours: BoardEntry[];
   countryNeighbours: BoardEntry[];
 }
@@ -93,10 +95,6 @@ function readBoardPage(data: unknown): BoardPage {
   const body = asRecord(data);
   if (body.hidden === true) return { hidden: true, rows: [] };
   return { hidden: false, rows: Array.isArray(body.rows) ? readRows(body.rows) : [] };
-}
-
-function clearCountry(rows: BoardEntry[]): BoardEntry[] {
-  return rows.map((row) => (row.country == null ? row : { ...row, country: null }));
 }
 
 function readRows(data: unknown): BoardEntry[] {
@@ -476,28 +474,34 @@ export function createSupabaseLeaderboard(options: {
     offline = false;
     const row = Array.isArray(rankRes.data) ? asRecord(rankRes.data[0]) : asRecord(rankRes.data);
     const hasRow = Array.isArray(rankRes.data) ? rankRes.data.length > 0 : Object.keys(row).length > 0;
-    const neighbours = aroundRes.error ? (rankCache?.neighbours ?? []) : clearCountry(readRows(aroundRes.data));
+    const neighbours = aroundRes.error ? (rankCache?.neighbours ?? []) : readRows(aroundRes.data);
     const countryNeighbours = !countryRes || countryRes.error
       ? (rankCache?.countryNeighbours ?? [])
       : readRows(countryRes.data);
     const score = numberOrNull(row.score) ?? 0;
     const countryHidden = row.country_hidden === true;
+    const reportedTotal = numberOrNull(row.total);
+    const worldHidden = reportedTotal != null && reportedTotal < COUNTRY_BOARD_MIN;
+    const worldNeighbours = worldHidden || aroundRes.error ? [] : neighbours;
     rankCache = {
-      rank: hasRow ? numberOrNull(row.rank) : null,
-      total: numberOrNull(row.total) ?? rankCache?.total ?? 0,
+      rank: worldHidden ? null : (hasRow ? numberOrNull(row.rank) : null),
+      total: worldHidden ? 0 : (reportedTotal ?? rankCache?.total ?? 0),
       score,
       countryRank: country && !countryHidden ? numberOrNull(row.country_rank) : null,
       countryHidden,
-      neighbours,
+      worldHidden,
+      neighbours: worldNeighbours,
       countryNeighbours: countryHidden ? [] : countryNeighbours,
     };
     syncedBest = Math.max(syncedBest, score);
     const world = boards.get('world:all');
-    boards.set('world:all', {
-      around: neighbours,
-      page: world?.page ?? { hidden: false, rows: [] },
-      at: world?.at ?? 0,
-    });
+    boards.set('world:all', worldHidden
+      ? { around: [], page: { hidden: true, rows: [] }, at: now() }
+      : {
+        around: worldNeighbours,
+        page: world?.page ?? { hidden: false, rows: [] },
+        at: world?.at ?? 0,
+      });
     if (country) {
       const countryBoard = boards.get('country:all');
       boards.set('country:all', {
@@ -525,19 +529,19 @@ export function createSupabaseLeaderboard(options: {
     if (aroundRes.error && boardRes.error) return false;
     const key = sliceKey(scope, period);
     const previous = boards.get(key);
-    const rawPage = boardRes.error ? (previous?.page ?? { hidden: false, rows: [] }) : readBoardPage(boardRes.data);
-    const page = scope === 'world' ? { ...rawPage, rows: clearCountry(rawPage.rows) } : rawPage;
-    const around = aroundRes.error || page.hidden
-      ? (page.hidden ? [] : (previous?.around ?? []))
+    const page = boardRes.error ? (previous?.page ?? { hidden: false, rows: [] }) : readBoardPage(boardRes.data);
+    const worldTooSmall = scope === 'world' && period === 'all' && rankCache?.worldHidden === true;
+    const hiddenPage = page.hidden || worldTooSmall;
+    const around = aroundRes.error || hiddenPage
+      ? (hiddenPage ? [] : (previous?.around ?? []))
       : readRows(aroundRes.data);
-    const worldAround = scope === 'world' ? clearCountry(around) : around;
     boards.set(key, {
-      around: worldAround,
-      page,
+      around,
+      page: hiddenPage ? { hidden: true, rows: [] } : page,
       at: now(),
     });
     if (scope === 'world' && period === 'all' && !aroundRes.error && !page.hidden && rankCache) {
-      rankCache = { ...rankCache, neighbours: worldAround };
+      rankCache = { ...rankCache, neighbours: around };
     }
     if (scope === 'country' && period === 'all' && !aroundRes.error && rankCache) {
       rankCache = {
@@ -734,6 +738,7 @@ export function createSupabaseLeaderboard(options: {
     country,
     countryRank: null,
     countryHidden: false,
+    worldHidden: false,
   });
 
   const isHidden = (name: string) => blocked.some((item) => item.toLowerCase() === name.toLowerCase());
@@ -773,13 +778,15 @@ export function createSupabaseLeaderboard(options: {
       lastLive = live;
       requestWidget(false);
       if (!rankCache) return blankRank(live);
+      const worldHidden = rankCache.worldHidden;
       return {
-        rank: climbed(rankCache.rank, rankCache.score, live, rankCache.neighbours),
-        total: rankCache.total,
+        rank: worldHidden ? null : climbed(rankCache.rank, rankCache.score, live, rankCache.neighbours),
+        total: worldHidden ? 0 : rankCache.total,
         nickname,
         score: live,
         country,
         countryHidden: rankCache.countryHidden,
+        worldHidden,
         countryRank: country && !rankCache.countryHidden
           ? climbed(
             rankCache.countryRank,
@@ -792,11 +799,12 @@ export function createSupabaseLeaderboard(options: {
     },
     around(score, scope, period = 'all') {
       const rounded = Math.max(0, Math.floor(score));
-      const me = { rank: 0, nickname, score: rounded, mine: true, country: scope === 'country' ? country : null };
+      const me = { rank: 0, nickname, score: rounded, mine: true, country };
       if (scope === 'country' && !country) return { above: [], me, below: [] };
       requestSlice(scope, period, false);
       const cached = boards.get(sliceKey(scope, period));
-      if (!cached || cached.page.hidden || cached.around.length === 0) return { above: [], me, below: [] };
+      const worldTooSmall = scope === 'world' && period === 'all' && rankCache?.worldHidden === true;
+      if (worldTooSmall || !cached || cached.page.hidden || cached.around.length === 0) return { above: [], me, below: [] };
       const rows = cached.around.filter((row) => row.mine || !isHidden(row.nickname));
       const serverMe = rows.find((row) => row.mine);
       const baseRank = serverMe?.rank ?? (scope === 'world' && period === 'all' ? rankCache?.rank ?? null : null);
@@ -817,7 +825,9 @@ export function createSupabaseLeaderboard(options: {
       requestSlice(scope, period, false);
       const cached = boards.get(sliceKey(scope, period));
       if (!cached) return { hidden: false, rows: [] };
-      if (cached.page.hidden) return { hidden: true, rows: [] };
+      if (cached.page.hidden || (scope === 'world' && period === 'all' && rankCache?.worldHidden === true)) {
+        return { hidden: true, rows: [] };
+      }
       const cap = Math.max(1, Math.min(50, Math.floor(limit)));
       return {
         hidden: false,

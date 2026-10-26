@@ -65,13 +65,3 @@ export const ALLEY_MURAL = {
   position: [0.76, 2.68, -7.03] as const,
   size: [2.386, 0.858] as const,
 };
-
-/**
- * Two strings under the wordmark, in front of the back brick and behind the fence.
- * The rope stays below the letters so the pennants cannot cover them.
- * `sag` is how far the middle of the rope drops.
- */
-export const ALLEY_BUNTING: readonly { z: number; y: number; x0: number; x1: number; count: number; sag: number }[] = [
-  { z: -5.9, y: 1.96, x0: -2.5, x1: 2.4, count: 12, sag: 0.07 },
-  { z: -6.55, y: 2.05, x0: -2.2, x1: 2.15, count: 10, sag: 0.05 },
-];

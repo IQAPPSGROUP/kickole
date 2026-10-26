@@ -24,7 +24,7 @@ import {
 } from './dances';
 import { fx } from '../scene/fx';
 import { playHaptic, type HapticCue } from './haptics';
-import { prefersReducedMotion, swoopStrength } from '../scene/juice';
+import { prefersReducedMotion } from '../scene/juice';
 import { composePlayerSkin, type Skin } from './skins';
 import { normalizeEnabledTracks, SHUFFLE_SONG, toggleEnabled, type GameTrackId } from './tracks';
 import { type ChallengeProgress } from './shop';
@@ -235,8 +235,6 @@ export class GameController {
     this.engine.startCelebration(dance, reason, beatsToSeconds(beats, GAMEPLAY_BPM));
     fx.flash = reduced ? 0.25 : 1;
     fx.confetti = reduced ? 0 : 1;
-    const big = reason.endsWith(':50') || reason.endsWith(':100') || reason === 'best';
-    if (big) fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, big ? 5 : 0, reduced));
   }
 
   /** Resume the audio graph from a tap or key press. */
@@ -274,7 +272,6 @@ export class GameController {
         this.show(e.stall ? 'stall' : e.grade, label, e.points);
         if (sound) { if (e.stall) sfx.stall(); sfx.kick(e.grade, e.streak); }
         this.buzz(e.grade);
-        fx.swoop = Math.max(fx.swoop, swoopStrength(e.streak, 0, prefersReducedMotion()));
         if (this.suppressKickPrompt) this.suppressKickPrompt = false;
         else if (high) this.onPromptAction('flick');
         else this.onPromptAction('kick');
@@ -314,7 +311,6 @@ export class GameController {
         this.show('perfect', `${e.label} +${e.points}`, e.points);
         if (sound) sfx.combo();
         this.buzz('combo');
-        fx.swoop = Math.max(fx.swoop, swoopStrength(this.engine.streak, e.points, prefersReducedMotion()));
         this.publish();
         break;
       case 'trickFail':

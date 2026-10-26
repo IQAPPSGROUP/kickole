@@ -30,7 +30,7 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(css).toMatch(/\.now-playing \{[^}]*touch-action: manipulation;/s);
     expect(css).toMatch(/\.now-playing \{[^}]*z-index: 12;/s);
     expect(app).toContain('<SongChip controller={controller} />');
-    expect(hud).toContain('onPointerUp={skip}');
+    expect(hud).toContain("onPointerUp={(event) => skip('pointer', event)}");
     expect(hud).toContain('Change song.');
     expect(hud).not.toContain('<SongChip controller={controller} playing={playing} />');
   });

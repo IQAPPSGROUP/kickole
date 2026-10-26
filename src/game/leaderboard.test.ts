@@ -100,9 +100,10 @@ describe('mock leaderboard', () => {
     expect(rows.every((row) => row.country === 'GB')).toBe(true);
     const world = board.top('world', 23, 50, 'all', NOW);
     expect(world.length).toBeGreaterThan(0);
-    expect(world.every((row) => row.country == null)).toBe(true);
+    expect(world.some((row) => row.country != null)).toBe(true);
     const worldAround = board.around(23, 'world', 'all', NOW);
-    expect([...worldAround.above, worldAround.me, ...worldAround.below].every((row) => row.country == null)).toBe(true);
+    expect(worldAround.me.country).toBe('GB');
+    expect([...worldAround.above, ...worldAround.below].some((row) => row.country != null)).toBe(true);
   });
 
   it('shows a country review board of more than 20 word-list names', () => {
@@ -118,7 +119,8 @@ describe('mock leaderboard', () => {
     const world = board.board('all', 'world', 420, 25, NOW);
     expect(world.rows.length).toBeGreaterThanOrEqual(10);
     expect(world.rows.filter((row) => !row.mine).length).toBeGreaterThanOrEqual(5);
-    expect(world.rows.every((row) => row.country == null)).toBe(true);
+    expect(world.rows.some((row) => row.country != null)).toBe(true);
+    expect(board.around(420, 'world', 'all', NOW).me.country).toBe('GB');
     expect(world.rows.every((row) => allowed.has(row.nickname))).toBe(true);
   });
 
@@ -128,7 +130,49 @@ describe('mock leaderboard', () => {
     expect(board.rankFor(23, NOW).countryRank).toBeNull();
     expect(board.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
     expect(board.board('day', 'world', 23, 10, NOW).hidden).toBe(false);
-    expect(board.around(23, 'world', 'all', NOW).me.country).toBeNull();
+    expect(board.around(23, 'world', 'all', NOW).me.country).toBe('AD');
+    expect(board.board('all', 'world', 23, 10, NOW).hidden).toBe(false);
+    expect(board.rankFor(23, NOW).worldHidden).toBe(false);
+  });
+
+  it('hides every world time frame until 20 players have scored', () => {
+    const periods = ['day', 'week', 'month', 'year', 'all'] as const;
+    const small = createMockLeaderboard({
+      nickname: 'StreetKick42',
+      country: 'GB',
+      storage: memory(),
+      now: NOW,
+      crowdSize: 8,
+    });
+    for (const period of periods) {
+      const page = small.board(period, 'world', 23, 50, NOW);
+      expect(page).toEqual({ hidden: true, rows: [] });
+      const around = small.around(23, 'world', period, NOW);
+      expect(around.above).toEqual([]);
+      expect(around.below).toEqual([]);
+      expect(JSON.stringify(page)).not.toContain('nickname');
+    }
+    const snap = small.rankFor(23, NOW);
+    expect(snap.worldHidden).toBe(true);
+    expect(snap.rank).toBeNull();
+    expect(snap.total).toBe(0);
+    expect(formatRank(snap.rank)).toBe('—');
+    expect(small.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
+
+    const ready = createMockLeaderboard({
+      nickname: 'StreetKick42',
+      country: 'GB',
+      storage: memory(),
+      now: NOW,
+      crowdSize: 19,
+    });
+    const world = ready.board('all', 'world', 420, 25, NOW);
+    expect(world.hidden).toBe(false);
+    expect(world.rows.length).toBeGreaterThanOrEqual(20);
+    expect(world.rows.some((row) => row.nickname.length > 0)).toBe(true);
+    expect(ready.rankFor(420, NOW).worldHidden).toBe(false);
+    expect(ready.rankFor(420, NOW).rank).not.toBeNull();
+    expect(ready.board('day', 'world', 420, 25, NOW).hidden).toBe(true);
   });
 
   it('treats a week as Monday 00:00 UTC through the following Sunday', () => {

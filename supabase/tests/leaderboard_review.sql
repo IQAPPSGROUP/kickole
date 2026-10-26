@@ -141,22 +141,55 @@ begin
     raise exception 'a country with one player must be hidden: %', result;
   end if;
   result := public.get_board('all', 'world', null, 20, a);
+  if result->>'hidden' <> 'true' or result->'rows' <> '[]'::jsonb then
+    raise exception 'a world board with one player must be hidden and list nobody';
+  end if;
+  if exists (select 1 from public.get_around(a, 'all', 'world', 3)) then
+    raise exception 'world around must be empty under 20 players';
+  end if;
+  if exists (
+    select 1 from public.get_rank(a, 'all') g
+    where g.rank is not null or g.total is not null
+  ) then
+    raise exception 'world rank and total stay hidden under 20 players';
+  end if;
+
+  insert into private.players (id, nickname, country)
+  select
+    ('00000000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid,
+    (array[
+      'Amber','Bravo','Cinder','Delta','Ember','Frost','Golden','Harbor','Ivory',
+      'Jade','Karma','Lunar','Maple','Noble','Olive','Pearl','Quartz','River','Solar'
+    ])[g] || ' Falcon',
+    'DE'
+  from generate_series(1, 19) g;
+  insert into private.period_best (player_id, period, period_start, score, achieved_at)
+  select
+    ('00000000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid,
+    'all',
+    private.period_start('all'),
+    1,
+    now()
+  from generate_series(1, 19) g;
+  result := public.get_board('all', 'world', null, 20, a);
+  if result->>'hidden' <> 'false' then
+    raise exception 'a world board with 20 players must be visible';
+  end if;
   if not exists (
     select 1 from jsonb_array_elements(result->'rows') elem
-    where elem->>'nickname' = 'Turbo Striker'
+    where elem->>'nickname' = 'Turbo Striker' and elem->>'country' = 'GB'
   ) then
-    raise exception 'world board should list Turbo Striker: %', result;
+    raise exception 'world rows must include Turbo Striker country: %', result;
   end if;
-  if exists (
-    select 1 from jsonb_array_elements(result->'rows') elem
-    where elem->>'country' is not null
+  if not exists (
+    select 1 from public.get_around(a, 'all', 'world', 3) g
+    where g.nickname = 'Turbo Striker' and g.country = 'GB'
   ) then
-    raise exception 'world rows must not include a country: %', result;
+    raise exception 'world around must include Turbo Striker country';
   end if;
-  if exists (
-    select 1 from public.get_around(a, 'all', 'world', 3) g where g.country is not null
-  ) then
-    raise exception 'world around must not include a country';
+  result := public.get_board('day', 'world', null, 20, a);
+  if result->>'hidden' <> 'true' or result->'rows' <> '[]'::jsonb then
+    raise exception 'a world day board under 20 players must stay hidden and list nobody';
   end if;
 
   update private.players set created_at = now() - interval '2 days' where id = b;

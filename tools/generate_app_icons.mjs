@@ -153,7 +153,7 @@ for (const [dir, size] of adaptive) {
   await writePng(path.join(androidRes, dir, 'ic_launcher_foreground.png'), front);
 }
 
-await copyFile(icon1024, path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png'));
+await copyFile(icon1024, path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'));
 await copyFile(play512, path.join(root, 'android/app/src/main/ic_launcher-playstore.png'));
 
 const web = path.join(root, 'public/icons');
@@ -165,7 +165,7 @@ await sharp(icon1024).resize(512, 512).png({ compressionLevel: 9 }).toFile(path.
 const maskable = await sharp(await concretePlate(512)).composite([{ input: await foreground(512, art) }]).png().toBuffer();
 await writePng(path.join(web, 'icon-maskable-512.png'), maskable);
 
-const iosMeta = await sharp(path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png')).metadata();
+const iosMeta = await sharp(path.join(root, 'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png')).metadata();
 if (iosMeta.width !== 1024 || iosMeta.height !== 1024 || iosMeta.hasAlpha) {
   throw new Error(`iOS icon must be 1024 RGB without alpha, got ${iosMeta.width}x${iosMeta.height} alpha=${iosMeta.hasAlpha}`);
 }

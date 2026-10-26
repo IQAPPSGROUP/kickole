@@ -1,7 +1,7 @@
 import { Vector3 } from 'three';
 
 /**
- * Gameplay frame shared by the live camera and the opening pan.
+ * Gameplay frame. The menu and a run use this camera from the first frame.
  * Lens height/depth and the look-at point sit halfway between the higher
  * main frame (y 1.78, z 7.4, look-at y 0.5, z 1.3) and the lower frame
  * (y 2.38, z 5.7, look-at y 1.22, z -1.1). Field of view stays 40.

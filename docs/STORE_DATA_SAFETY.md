@@ -10,7 +10,7 @@ Kickolé is paid upfront. The price is set in the stores. The app does not offer
 | --- | --- | --- |
 | Purchase history | No | No in-app purchases. Kickolé does not receive card numbers, receipts, or purchase tokens. |
 | Device / app activity (appearance, settings) | Stored **on device** | `localStorage` / Capacitor Preferences. Not used for advertising. |
-| Gameplay scores and nickname | Sent only if the player joins the leaderboard | Nickname picked from our word lists, random device id, score, combo, run length, and the country the player picked (if any). Other players can see the nickname and score. Country is not shown next to the name. The board is off until they tap Join leaderboard. No account. |
+| Gameplay scores and nickname | Sent only if the player joins the leaderboard | Nickname picked from our word lists, random device id, score, combo, run length, and the country the player picked (if any). Other players can see the nickname, the score, and the flag of the chosen country. International shows no flag. The flag is that country only, nothing finer. The board is off until they tap Join leaderboard. No account. |
 | Coarse network signal | Hashed IP, server only, 30 days | Used to limit cheating and report spam. The app does not read GPS. Country is the code the player chooses, not a location lookup. |
 | Location, contacts, photos, files | No | Country is the code the player chooses. Kickolé does not read GPS or a network lookup to set it. |
 | Advertising ID / analytics SDKs | No | None bundled in this release. |
@@ -19,7 +19,11 @@ Kickolé is paid upfront. The price is set in the stores. The app does not offer
 ## App Store Connect — privacy nutrition (guidance)
 
 - **Purchase History:** not collected by Kickolé. There are no in-app purchases to restore.
-- **Product Interaction / Gameplay:** if the player joins, scores, a nickname picked from our word lists, and the chosen country are sent to the Kickolé scoreboard (Supabase) for app functionality. Not used for tracking. A hashed IP may be stored for 30 days to limit cheating.
+- **Name:** the nickname, if the player joins. Linked to the player. App functionality. Not used for tracking.
+- **User ID:** the random install id (`kicky.device.v1`). This is the same id previously described as a device id. It is not IDFA, IDFV, or a hardware identifier. Linked to the player. App functionality. Not used for tracking. Do not also declare Device ID for it.
+- **Gameplay Content:** the score, if the player joins. Linked to the player. App functionality. Not used for tracking.
+- **Other User Content:** the country the player chose, if any. Shown as that country's flag beside the nickname. Linked to the player. App functionality. Not used for tracking.
+- **Not collected:** location, contacts, purchases, advertising data, and analytics. A hashed IP may be stored for 30 days to limit cheating. It is not a location fix and it is not a separate privacy-manifest type in this build.
 - **Tracking:** No. App does not link with third-party data for advertising.
 - **Privacy Policy URL:** point to the published policy that includes the Privacy text from Settings (and this repo’s wording).
 

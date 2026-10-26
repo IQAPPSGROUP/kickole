@@ -181,8 +181,9 @@ describe('supabase leaderboard', () => {
     const standing = board.around(0, 'world');
     expect(standing.me.rank).toBe(4);
     expect(standing.me.score).toBe(10);
-    expect(standing.me.country).toBeNull();
-    expect([...standing.above, ...standing.below].every((row) => row.country == null)).toBe(true);
+    expect(standing.me.country).toBe('GB');
+    expect(standing.above.map((row) => row.country)).toEqual(['FR', 'GB']);
+    expect(standing.below.map((row) => row.country)).toEqual(['DE']);
     expect(standing.above.map((row) => row.nickname)).toEqual(['HighKick', 'MidKick']);
     expect(standing.below.map((row) => row.nickname)).toEqual(['LowKick']);
     expect(board.rankFor(0).countryRank).toBe(2);
@@ -280,8 +281,10 @@ describe('supabase leaderboard', () => {
     });
     await vi.waitFor(() => expect(board.top('country', 10, 10).some((row) => row.country === 'GB')).toBe(true));
     await vi.waitFor(() => expect(board.top('world', 10, 10).length).toBeGreaterThan(0));
-    expect(board.top('world', 10, 10).every((row) => row.country == null)).toBe(true);
+    expect(board.top('world', 10, 10).some((row) => row.country === 'FR')).toBe(true);
+    expect(board.around(10, 'world').me.country).toBe('GB');
     expect(board.around(10, 'country').me.country).toBe('GB');
+    expect(board.rankFor(0).worldHidden).toBe(false);
 
     board.report('HighKick', 'rude');
     expect(board.around(10, 'world').above.some((row) => row.nickname === 'HighKick')).toBe(false);
@@ -429,5 +432,60 @@ describe('supabase leaderboard', () => {
     const queued = storage.getItem('kicky.board.pending-moderation.v1') ?? '';
     expect(queued).toContain('HighKick');
     expect(queued).toContain('impersonation');
+  });
+
+  it('hides the world board and the rank when fewer than 20 players have scored', async () => {
+    const { rpc } = scripted(liveHandlers({
+      get_rank: () => ({ data: [{ ...rankRow, rank: 4, total: 7 }] }),
+      get_board: () => ({ data: { hidden: false, rows: aroundRows } }),
+    }));
+    const board = createSupabaseLeaderboard({
+      nickname: NICK,
+      country: 'GB',
+      storage: memory(),
+      rpc,
+      deviceId: DEVICE,
+      now: () => 9_000_000,
+    });
+    open.push(board);
+    board.start();
+    await vi.waitFor(() => expect(board.rankFor(0).worldHidden).toBe(true));
+    expect(board.rankFor(80).rank).toBeNull();
+    expect(board.rankFor(80).total).toBe(0);
+    expect(formatRank(board.rankFor(80).rank)).toBe('—');
+    const page = board.board('all', 'world', 10, 50);
+    expect(page).toEqual({ hidden: true, rows: [] });
+    expect(JSON.stringify(page)).not.toContain('HighKick');
+    const around = board.around(10, 'world', 'all');
+    expect(around.above).toEqual([]);
+    expect(around.below).toEqual([]);
+    expect(JSON.stringify(around.above)).not.toContain('HighKick');
+  });
+
+  it('drops names from a period the server marks hidden', async () => {
+    const { rpc } = scripted(liveHandlers({
+      get_board: (args) => (
+        args.period === 'week'
+          ? { data: { hidden: true, rows: [{ rank: 1, nickname: 'Secret Keeper', country: 'FR', score: 9, mine: false }] } }
+          : { data: { hidden: false, rows: aroundRows.slice(0, 3).map((row) => ({ ...row, mine: false })) } }
+      ),
+    }));
+    const board = createSupabaseLeaderboard({
+      nickname: NICK,
+      country: 'GB',
+      storage: memory(),
+      rpc,
+      deviceId: DEVICE,
+      now: () => 9_000_000,
+    });
+    open.push(board);
+    board.start();
+    board.board('week', 'world', 10, 50);
+    await vi.waitFor(() => expect(board.board('week', 'world', 10, 50).hidden).toBe(true));
+    const week = board.board('week', 'world', 10, 50);
+    expect(week.rows).toEqual([]);
+    expect(JSON.stringify(week)).not.toContain('Secret Keeper');
+    expect(board.around(10, 'world', 'week').above).toEqual([]);
+    await vi.waitFor(() => expect(board.board('all', 'world', 10, 10).rows.some((row) => row.nickname === 'HighKick')).toBe(true));
   });
 });

@@ -207,6 +207,32 @@ function stemUrls(base: string, name: string): readonly string[] {
   return [`${root}${name}.m4a`, `${root}${name}.ogg`];
 }
 
+const reportedMisses = new Set<string>();
+
+/**
+ * A missing or undecodable file is skipped for the rest of this run.
+ * Warn once. The next run tries the file again instead of dropping it for the page session.
+ */
+export function reportMissingTrack(name: string): void {
+  if (reportedMisses.has(name)) return;
+  reportedMisses.add(name);
+  console.warn(`Kickolé music: "${name}" did not load and will be skipped until the next run.`);
+}
+
+/**
+ * Files the store WebView requests, `.m4a` first.
+ * The store build uses Vite `base: './'`, so this is `./audio/rob/<id>.m4a`
+ * beside `index.html` (ios/App/App/public/audio/rob after cap sync).
+ */
+export function robAudioUrls(name: string, base = './'): readonly string[] {
+  const root = base.endsWith('/') ? base : `${base}/`;
+  return robAudioUrlsFromRoot(`${root}audio/rob`, name);
+}
+
+function robAudioUrlsFromRoot(base: string, name: string): readonly string[] {
+  return stemUrls(base, name);
+}
+
 function looksLikeHtml(type: string, bytes: ArrayBuffer): boolean {
   if (type.toLowerCase().includes('text/html')) return true;
   const head = new TextDecoder().decode(bytes.slice(0, 24)).trim().toLowerCase();
@@ -240,9 +266,11 @@ export async function loadTrack(
   name: string,
   options?: { base?: string; fetchImpl?: typeof fetch },
 ): Promise<AudioBuffer | null> {
-  const base = options?.base ?? `${import.meta.env.BASE_URL}audio/rob/`;
   const fetchImpl = options?.fetchImpl ?? fetch;
-  return loadFirstBuffer(ctx, stemUrls(base, name), fetchImpl);
+  const urls = options?.base != null
+    ? stemUrls(options.base, name)
+    : robAudioUrls(name, import.meta.env.BASE_URL);
+  return loadFirstBuffer(ctx, urls, fetchImpl);
 }
 
 interface Voice {
@@ -363,42 +391,54 @@ export class RobPlayer {
     if (choice === this.songChoice) return;
     this.songChoice = choice;
     if (choice === SHUFFLE_SONG) {
-      this.generation += 1;
-      this.skipSerial += 1;
-      this.pending = null;
-      if (this.playhead && this.order) {
-        const index = this.order.indexOf(this.playhead.name);
+      const armed = this.armSkip();
+      const audible = this.audibleVoice();
+      if (audible) {
+        this.playhead = { name: audible.track, offset: this.heardOffset(audible) };
+        const index = (this.order ?? []).indexOf(audible.track);
         if (index >= 0) this.cursor = index;
+        this.onTrack(audible.track);
+        return;
       }
+      this.playhead = null;
+      if (this.bedOpen()) void this.restoreShuffle(armed.generation);
       return;
     }
+    this.failed.delete(choice);
     this.playhead = { name: choice, offset: trackLeadIn(choice) };
     this.ensureOrder();
     const index = this.order?.indexOf(choice) ?? -1;
     if (index >= 0) this.cursor = index;
     this.onTrack(choice);
-    if (this.mode === 'play' || this.mode === 'menu') {
+    if (this.bedOpen()) {
       const armed = this.armSkip();
       void this.jumpTo(choice, armed.generation, armed.serial, true);
     }
   }
 
   /**
-   * Skip to the next track immediately, on the menu or mid-run.
-   * The label updates before the next file decodes, and the previous
-   * buffer is stopped instead of fading for the playlist overlap.
+   * Next track, on the menu or mid-run.
+   * A menu tap pins that song so the next run opens on it. A run that is
+   * still on shuffle keeps shuffle, and the next run still opens on Alley Beat.
+   * The label updates before the file decodes. The previous buffer stays
+   * until the new one is ready, then it is cut.
    * Returns the choice to persist.
    */
   skip(): SongChoice {
     this.ensureOrder();
-    const plan = choiceAfterSkip(this.songChoice, this.order ?? GAMEPLAY_TRACKS, this.currentName(), this.unavailable());
+    const plan = choiceAfterSkip(this.songChoice, this.order ?? GAMEPLAY_TRACKS, this.skipCursor(), this.unavailable());
     if (!plan.track) return this.songChoice;
-    this.songChoice = plan.choice;
+    if (this.mode === 'menu') {
+      const pinned = GAME_TRACKS.find((item) => item.id === plan.track?.name);
+      if (pinned) this.songChoice = pinned.id;
+    } else {
+      this.songChoice = plan.choice;
+    }
     const index = (this.order ?? []).indexOf(plan.track.name);
     if (index >= 0) this.cursor = index;
     this.playhead = { name: plan.track.name, offset: trackLeadIn(plan.track.name) };
     this.onTrack(plan.track.name);
-    if (this.mode === 'play' || this.mode === 'menu') {
+    if (this.bedOpen()) {
       const armed = this.armSkip();
       void this.jumpTo(plan.track.name, armed.generation, armed.serial, true);
     }
@@ -408,14 +448,18 @@ export class RobPlayer {
   setMode(mode: BedMode, force = false) {
     const live = this.voices.some((voice) => voice.stopAt > this.ctx.currentTime + 0.05);
     if (!force && this.mode === mode && (live || this.pending === mode)) return;
-    const enteringPlay = mode === 'play' && this.mode !== 'play';
-    if (this.mode === 'play') this.capturePlayhead();
+    const previous = this.mode;
+    this.capturePlayhead();
     this.skipSerial += 1;
     this.jumping = false;
     this.generation += 1;
     const generation = this.generation;
     this.mode = mode;
-    this.freshRun = force ? false : enteringPlay;
+    // A new run is menu -> play. Mute and background clear the mode without
+    // being a new run, and must not open Alley Beat over the song in progress.
+    const enteringFromMenu = mode === 'play' && previous === 'menu';
+    const firstPlay = mode === 'play' && previous !== 'play' && previous !== 'menu' && !this.playhead;
+    this.freshRun = force ? false : enteringFromMenu || firstPlay;
     this.pending = mode;
     this.fadeOutAll(MODE_CROSSFADE_SEC);
     this.ensureTicker();
@@ -430,7 +474,7 @@ export class RobPlayer {
 
   stop() {
     if (this.mode == null && this.pending == null && this.voices.length === 0) return;
-    if (this.mode === 'play') this.capturePlayhead();
+    this.capturePlayhead();
     this.mode = null;
     this.pending = null;
     this.skipSerial += 1;
@@ -452,6 +496,11 @@ export class RobPlayer {
   }
 
   private async startMenu(generation: number): Promise<boolean> {
+    if (this.songChoice !== SHUFFLE_SONG && !this.unavailable().has(this.songChoice)) {
+      const pinned = await this.startPinned(generation);
+      if (generation !== this.generation || this.mode !== 'menu') return false;
+      if (pinned) return true;
+    }
     const ready = this.menuBuffer ?? (this.cache?.name === ROB_MENU_NAME ? this.cache.buffer : null);
     const buffer = ready ?? await this.load(ROB_MENU_NAME);
     if (generation !== this.generation || this.mode !== 'menu') return false;
@@ -488,7 +537,7 @@ export class RobPlayer {
         }
         this.cursor = (Math.max(0, order.indexOf(saved.name)) + 1) % order.length;
       } else {
-        this.failed.add(saved.name);
+        this.markMissing(saved.name);
         this.cursor = (Math.max(0, order.indexOf(saved.name)) + 1) % order.length;
       }
       this.playhead = null;
@@ -513,7 +562,7 @@ export class RobPlayer {
       const buffer = await this.song(pick.name, generation);
       if (generation !== this.generation) return null;
       if (buffer && buffer.duration > trackLeadIn(pick.name) + 0.05) return { ...pick, buffer };
-      this.failed.add(pick.name);
+      this.markMissing(pick.name);
       current = pick.name;
     }
     return null;
@@ -531,7 +580,7 @@ export class RobPlayer {
       const buffer = await this.song(pick.name, generation);
       if (generation !== this.generation) return null;
       if (buffer && buffer.duration > trackLeadIn(pick.name) + 0.05) return { ...pick, buffer };
-      this.failed.add(pick.name);
+      this.markMissing(pick.name);
       index = pick.index + 1;
       prior = null;
     }
@@ -540,6 +589,7 @@ export class RobPlayer {
 
   private async beginFreshShuffle(generation: number): Promise<boolean> {
     this.releaseDecoded();
+    this.failed.clear();
     const enabled = GAMEPLAY_TRACKS.filter((name) => !this.disabled.has(name));
     this.order = openingPlaylist(enabled, this.random);
     this.cursor = 0;
@@ -549,7 +599,7 @@ export class RobPlayer {
     let buffer = await this.song(name, generation);
     if (generation !== this.generation || this.mode !== 'play') return false;
     if (!buffer || !(buffer.duration > trackLeadIn(name) + 0.05)) {
-      this.failed.add(name);
+      this.markMissing(name);
       const fallback = nextRotationTrack(this.order, name, this.unavailable());
       if (!fallback) return false;
       name = fallback.name;
@@ -613,7 +663,7 @@ export class RobPlayer {
       this.prefetchAt = 0;
       if (!this.prefetch) this.prefetch = this.song(name, generation);
     }
-    if (this.handoffAt > 0 && this.mode === 'play' && now + 0.45 >= this.handoffAt) {
+    if (this.handoffAt > 0 && this.bedOpen() && now + 0.45 >= this.handoffAt) {
       const at = this.handoffAt;
       const fade = this.handoffFade;
       this.handoffAt = 0;
@@ -633,9 +683,9 @@ export class RobPlayer {
     const name = this.songChoice;
     if (name === SHUFFLE_SONG || this.unavailable().has(name)) return false;
     const buffer = await this.song(name, generation);
-    if (generation !== this.generation || this.mode !== 'play') return false;
+    if (generation !== this.generation || !this.bedOpen()) return false;
     if (!buffer || !(buffer.duration > trackLeadIn(name) + 0.05)) {
-      this.failed.add(name);
+      this.markMissing(name);
       return false;
     }
     const saved = this.playhead?.name === name ? this.playhead.offset : trackLeadIn(name);
@@ -680,6 +730,53 @@ export class RobPlayer {
     return names;
   }
 
+  private markMissing(name: string) {
+    this.failed.add(name);
+    reportMissingTrack(name);
+  }
+
+  private bedOpen(): boolean {
+    return this.mode === 'play' || this.mode === 'menu';
+  }
+
+  /**
+   * While a tap is waiting on a decode, the old buffer is still audible.
+   * The cursor has to follow the song the pill already shows.
+   * The menu loop is not a playlist position, so the first tap can offer every song.
+   */
+  private skipCursor(): string | null {
+    if (this.jumping && this.playhead) return this.playhead.name;
+    if (this.menuBedOnly()) return null;
+    return this.currentName();
+  }
+
+  /** The menu loop is We Rise. It is not a playlist position, so the first tap can offer every song. */
+  private menuBedOnly(): boolean {
+    const now = this.ctx.currentTime;
+    const live = this.voices.filter((voice) => voice.stopAt > now);
+    return live.length > 0 && live.every((voice) => voice.role === 'menu');
+  }
+
+  private audibleVoice(): Voice | null {
+    const now = this.ctx.currentTime;
+    return [...this.voices].reverse().find((voice) => voice.stopAt > now + 0.05) ?? null;
+  }
+
+  private heardOffset(voice: Voice): number {
+    return voice.fileStart + Math.max(0, this.ctx.currentTime - voice.startedAt);
+  }
+
+  /** Shuffle was chosen while nothing was audible. Start the bed again instead of staying silent. */
+  private async restoreShuffle(generation: number) {
+    if (generation !== this.generation || !this.bedOpen()) return;
+    if (this.mode === 'menu') {
+      await this.startMenu(generation);
+      return;
+    }
+    this.freshRun = true;
+    await this.startPlay(generation);
+  }
+
   private ensureOrder(): string[] {
     if (!this.order) {
       const enabled = GAMEPLAY_TRACKS.filter((name) => !this.disabled.has(name));
@@ -690,7 +787,6 @@ export class RobPlayer {
 
   private async jumpTo(name: string, generation: number, serial: number, immediate = false) {
     this.jumping = true;
-    if (immediate) this.stopVoicesNow();
     let target = name;
     let buffer = await this.song(target, generation);
     if (generation !== this.generation || serial !== this.skipSerial || !this.acceptsJump(immediate)) {
@@ -698,7 +794,7 @@ export class RobPlayer {
       return;
     }
     if (!buffer || !(buffer.duration > trackLeadIn(target) + 0.05)) {
-      this.failed.add(target);
+      this.markMissing(target);
       const taken = await this.takeNext(this.ensureOrder().indexOf(target) + 1, target, generation);
       if (generation !== this.generation || serial !== this.skipSerial || !this.acceptsJump(immediate) || !taken) {
         if (serial === this.skipSerial) this.jumping = false;
@@ -706,31 +802,39 @@ export class RobPlayer {
       }
       target = taken.name;
       buffer = taken.buffer;
+      this.failed.delete(target);
       this.onTrack(target);
+      if (this.mode === 'menu') {
+        const pinned = GAME_TRACKS.find((item) => item.id === target);
+        if (pinned) this.songChoice = pinned.id;
+      }
+    } else {
+      this.failed.delete(target);
     }
-    if (serial !== this.skipSerial) return;
+    if (serial !== this.skipSerial || generation !== this.generation) return;
     const index = this.ensureOrder().indexOf(target);
     if (index >= 0) this.cursor = index;
     const fade = immediate ? 0 : TRACK_CROSSFADE_SEC;
-    if (!immediate) this.fadeOutAll(TRACK_CROSSFADE_SEC);
+    if (immediate) this.stopVoicesNow();
+    else this.fadeOutAll(TRACK_CROSSFADE_SEC);
     this.spawnTrack(buffer, target, trackWindow(buffer.duration, undefined, target).offset, this.ctx.currentTime, fade);
     this.jumping = false;
   }
 
   private async crossfadeNext(when: number, fade: number, generation: number) {
-    const order = this.order;
-    if (!order || this.mode !== 'play') return;
+    const order = this.ensureOrder();
+    if (!this.bedOpen()) return;
     if (this.songChoice !== SHUFFLE_SONG && !this.unavailable().has(this.songChoice)) {
       const name = this.songChoice;
       const pinned = await this.song(name, generation);
-      if (generation !== this.generation || this.mode !== 'play') return;
+      if (generation !== this.generation || !this.bedOpen()) return;
       if (pinned && pinned.duration > trackLeadIn(name) + 0.05) {
         const index = order.indexOf(name);
         if (index >= 0) this.cursor = index;
         this.spawnTrack(pinned, name, trackWindow(pinned.duration, undefined, name).offset, when, fade);
         return;
       }
-      this.failed.add(name);
+      this.markMissing(name);
     }
     const previous = this.playhead?.name ?? order[this.cursor] ?? null;
     const hoped = this.songChoice === SHUFFLE_SONG
@@ -743,8 +847,8 @@ export class RobPlayer {
     let pick: TrackPick | null = null;
     if (loaded && hoped) {
       const decoded = await loaded;
-      if (generation !== this.generation || this.mode !== 'play') return;
-      if (hoped && !decoded) this.failed.add(hoped.name);
+      if (generation !== this.generation || !this.bedOpen()) return;
+      if (hoped && !decoded) this.markMissing(hoped.name);
       if (hoped && decoded && this.cache?.name === hoped.name) {
         buffer = decoded;
         pick = hoped;
@@ -754,8 +858,8 @@ export class RobPlayer {
       const taken = this.songChoice === SHUFFLE_SONG
         ? await this.takeRotation(previous, generation)
         : await this.takeNext(this.cursor + 1, previous, generation);
-      if (generation !== this.generation || this.mode !== 'play' || !taken) {
-        if (generation === this.generation && this.mode === 'play') this.onResult('play', false);
+      if (generation !== this.generation || !this.bedOpen() || !taken) {
+        if (generation === this.generation && this.mode) this.onResult(this.mode, false);
         return;
       }
       pick = taken;

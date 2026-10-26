@@ -8,6 +8,7 @@ import { beatClock, subscribeNowPlaying } from '../game/audio';
 import { MENU_TRACK_ID, trackTitle } from '../game/tracks';
 import { prefersReducedMotion } from '../scene/juice';
 import { FAN_BUTTON, FOOT_BUTTON, fanLayout } from './fanLayout';
+import { acceptSongTap } from './songTap';
 import { applyNeckPointer, classifyTrickRelease, type NeckPointerState } from './trickInput';
 
 export function Hud({
@@ -177,12 +178,9 @@ export function SongChip({ controller }: { controller: GameController }) {
   const [notice, setNotice] = useState<{ id: number; name: string } | null>(null);
   const [quietId, setQuietId] = useState<number | null>(null);
   const noticeSerial = useRef(0);
-  const lastSkip = useRef(0);
+  const lastPointer = useRef(Number.NEGATIVE_INFINITY);
   useEffect(() => subscribeNowPlaying((name) => {
-    if (!name) {
-      setNotice(null);
-      return;
-    }
+    if (!name) return;
     noticeSerial.current += 1;
     setNotice({ id: noticeSerial.current, name });
   }), []);
@@ -193,12 +191,12 @@ export function SongChip({ controller }: { controller: GameController }) {
   }, [notice]);
   const title = trackTitle(notice?.name ?? MENU_TRACK_ID);
   const quiet = notice != null && quietId === notice.id;
-  const skip = (event: { preventDefault(): void; stopPropagation(): void }) => {
+  const skip = (source: 'pointer' | 'click', event: { preventDefault(): void; stopPropagation(): void }) => {
     event.preventDefault();
     event.stopPropagation();
     const now = performance.now();
-    if (now - lastSkip.current < 350) return;
-    lastSkip.current = now;
+    if (!acceptSongTap(source, now - lastPointer.current)) return;
+    if (source === 'pointer') lastPointer.current = now;
     controller.changeSong();
   };
   return (
@@ -211,8 +209,8 @@ export function SongChip({ controller }: { controller: GameController }) {
         event.stopPropagation();
         try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* the pointer already ended */ }
       }}
-      onPointerUp={skip}
-      onClick={skip}
+      onPointerUp={(event) => skip('pointer', event)}
+      onClick={(event) => skip('click', event)}
     >
       <span className="now-playing-label">
         <span className="now-playing-note" aria-hidden="true">♪</span>

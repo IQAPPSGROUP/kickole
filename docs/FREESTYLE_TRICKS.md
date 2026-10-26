@@ -43,10 +43,6 @@ Progress expires after `tricks.comboExpirySec` (default 3.5 s). Miss, drop, fail
 
 Logical ball-centre contacts (radius baked into authored heights) live in `config.contacts`: foot, thigh, forehead, nape. Rendering uses `limbCalibration.ts` for visual IK only — physics and scores stay simulation-authoritative.
 
-## Opening camera
-
-When present, the scenic opening pan plays once per fresh load, settles to the gameplay camera before home/play, pauses while hidden, respects `prefers-reduced-motion`, and does **not** replay when returning home, restarting, changing quality or performing tricks.
-
 ## Review
 
 `tools/movement-preview.tsx` stages success/fail/pause scenarios for each trick (both sides where relevant). Prefer joint/contact measurements over label-only checks.

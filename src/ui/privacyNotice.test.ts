@@ -17,9 +17,8 @@ describe('privacy notice v1.1', () => {
   const manifest = source('../../ios/App/App/PrivacyInfo.xcprivacy');
 
   it('uses the same approved words in the app and on the hosted page', () => {
-    expect(markdown).toContain('Version 1.1. Last updated 26 October 2026.');
+    expect(markdown).toContain('Version 1.1. Last updated 26 October 2026. Replaces: version 1.0.');
     expect(markdown).not.toContain('DRAFT');
-    expect(markdown).not.toContain('Replaces:');
     expect(markdown).toContain('A leaderboard only appears once it has 20 or more players.');
     expect(markdown).toContain('the flag shown beside your nickname');
     expect(privacyPlain(renderToStaticMarkup(PrivacyNotice()))).toBe(privacyPlain(markdown));

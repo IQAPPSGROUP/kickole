@@ -1,6 +1,6 @@
 # KICKOLÉ privacy notice
 
-Version 1.1. Last updated 26 October 2026.
+Version 1.1. Last updated 26 October 2026. Replaces: version 1.0.
 
 ## Who we are
 

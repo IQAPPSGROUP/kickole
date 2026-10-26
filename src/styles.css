@@ -1253,7 +1253,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
     max(12px, env(safe-area-inset-right, 0px))
     max(12px, env(safe-area-inset-bottom, 0px))
     max(12px, env(safe-area-inset-left, 0px));
-  background: rgba(12, 22, 32, 0.96);
+  background: #0c1620;
   pointer-events: auto;
   touch-action: pan-y;
   overscroll-behavior: contain;
@@ -1385,10 +1385,16 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .leaderboard-sheet .board li { min-height: 44px; }
 .leaderboard-sheet .board li span.board-rank {
   flex: none;
-  width: 28px;
+  width: auto;
   min-width: 28px;
-  max-width: 28px;
+  max-width: 3.2em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.leaderboard-sheet .board li span.board-rank.is-wide {
+  font-size: 11px;
+  max-width: 4.4em;
 }
 .leaderboard-close {
   flex: none;

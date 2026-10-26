@@ -100,8 +100,3 @@ on 0303 123 1113.
 ## Changes
 
 If we make a significant change, we will tell you in the app before it takes effect.
-
----
-
-*Prepared with AI assistance. Consider a solicitor's review before your next
-major release.*

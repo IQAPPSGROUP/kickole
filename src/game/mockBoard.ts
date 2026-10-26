@@ -18,3 +18,13 @@ export function mockBoardFromSearch(search: string, env: MockBoardEnv = import.m
   if (!mockBoardAllowed(env)) return false;
   return new URLSearchParams(search).get('mockBoard') === '1';
 }
+
+/** Dev-only stand-in crowd size. Ignored unless `?mockBoard=1` is already allowed. */
+export function mockCrowdFromSearch(search: string, env: MockBoardEnv = import.meta.env): number | undefined {
+  if (!mockBoardFromSearch(search, env)) return undefined;
+  const raw = new URLSearchParams(search).get('mockPlayers');
+  if (raw == null || raw === '') return undefined;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) return undefined;
+  return value;
+}

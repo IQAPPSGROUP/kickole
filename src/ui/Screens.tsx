@@ -188,6 +188,19 @@ const PERIODS: readonly { id: BoardPeriod; label: string; title?: string }[] = [
   { id: 'all', label: 'All time' },
 ];
 
+function hiddenBoardNote(scope: BoardScope): string {
+  switch (scope) {
+    case 'country':
+      return `Not enough players in your country yet. A country board appears once ${COUNTRY_BOARD_MIN} players have joined.`;
+    case 'world':
+      return `Leaderboard appears once ${COUNTRY_BOARD_MIN} players have scored`;
+    default: {
+      const neverScope: never = scope;
+      return neverScope;
+    }
+  }
+}
+
 function entryLabel(row: BoardEntry): string {
   const country = row.country ? countryByCode(row.country)?.name : null;
   return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
@@ -278,14 +291,16 @@ export function LeaderboardSheet({
       )}
       {board && (
         <div className="leaderboard-scroll" data-board-scroll>
-          <div className="leaderboard-you" aria-label={`Your rank ${rankText}${youCountry ? ` ${youCountry}` : ''} ${board.nickname} ${mine?.score ?? score}`}>
-            <span>YOUR RANK</span>
-            <b>{rankText}</b>
-            <em><NameFlag country={mine?.country ?? board.country} />{board.nickname}</em>
-            <strong>{mine?.score ?? score}</strong>
-          </div>
+          {!page.hidden && (
+            <div className="leaderboard-you" aria-label={`Your rank ${rankText}${youCountry ? ` ${youCountry}` : ''} ${board.nickname} ${mine?.score ?? score}`}>
+              <span>YOUR RANK</span>
+              <b>{rankText}</b>
+              <em><NameFlag country={mine?.country ?? board.country} />{board.nickname}</em>
+              <strong>{mine?.score ?? score}</strong>
+            </div>
+          )}
           {optedOut && <p className="panel-note">You chose not to appear on a country board.</p>}
-          {!optedOut && page.hidden && <p className="panel-note">Not enough players in your country yet. A country board appears once {COUNTRY_BOARD_MIN} players have joined.</p>}
+          {!optedOut && page.hidden && <p className="panel-note">{hiddenBoardNote(scope)}</p>}
           {!optedOut && !page.hidden && (
             <ol className="board">
               {rows.map((row) => (

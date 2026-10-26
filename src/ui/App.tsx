@@ -4,7 +4,7 @@ import { GameController, type Result } from '../game/controller';
 import { countryByCode } from '../game/countries';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
 import { parseNickname } from '../game/nickname';
-import { mockBoardFromSearch } from '../game/mockBoard';
+import { mockBoardFromSearch, mockCrowdFromSearch } from '../game/mockBoard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
@@ -46,6 +46,7 @@ export function App() {
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
   const mockBoard = useMemo(() => mockBoardFromSearch(window.location.search), []);
+  const mockCrowd = useMemo(() => mockCrowdFromSearch(window.location.search), []);
   const [deviceReady, setDeviceReady] = useState(mockBoard);
   const [blockedTick, setBlockedTick] = useState(0);
   const [reviewOpen, setReviewOpen] = useState(mockBoard);
@@ -56,8 +57,8 @@ export function App() {
   const board = useMemo((): LeaderboardService | null => {
     if (!leaderboardOn || !boardName || !deviceReady) return null;
     const options = { nickname: boardName, country: boardCountry };
-    return mockBoard ? createMockLeaderboard(options) : createSupabaseLeaderboard(options);
-  }, [leaderboardOn, boardName, boardCountry, deviceReady, mockBoard]);
+    return mockBoard ? createMockLeaderboard({ ...options, crowdSize: mockCrowd }) : createSupabaseLeaderboard(options);
+  }, [leaderboardOn, boardName, boardCountry, deviceReady, mockBoard, mockCrowd]);
   if (import.meta.env.DEV) (window as unknown as { __kicky?: GameController }).__kicky = controller;
   const { phase } = snap.hud;
   if (import.meta.env.DEV) void import('../scene/inspector').then((m) => { (window as unknown as { __inspectorState?: unknown }).__inspectorState = m.inspector; });

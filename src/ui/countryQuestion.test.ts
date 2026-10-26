@@ -52,9 +52,17 @@ describe('optional country question', () => {
     expect(screens).not.toContain('is not shown next to your name');
     expect(rank).toContain('<NameFlag country={snapshot.country} />');
     expect(screens).toContain('A country board appears once {COUNTRY_BOARD_MIN} players have joined.');
+    expect(screens).toContain('Leaderboard appears once ${COUNTRY_BOARD_MIN} players have scored');
+    expect(screens).toContain('{!page.hidden && (');
+    const over = screens.slice(screens.indexOf('export function GameOver'), screens.indexOf('type SheetStep'));
+    expect(over).toContain('LEADERBOARD');
+    expect(over).not.toContain('className="board"');
+    expect(rank).toContain('snapshot.worldHidden ? null : snapshot.rank');
+    expect(rank).toContain('Leaderboard appears once ${COUNTRY_BOARD_MIN} players have scored');
+    expect(rank).toContain('{!snapshot.worldHidden && <p className="world-rank-name">');
     const boardSource = source('../game/leaderboard.ts');
     expect(boardSource).toContain("if (scope === 'country' && rows.length < COUNTRY_BOARD_MIN)");
-    expect(boardSource).not.toContain("scope === 'world' && rows.length < COUNTRY_BOARD_MIN");
+    expect(boardSource).toContain("if (scope === 'world' && rows.length < COUNTRY_BOARD_MIN)");
   });
 
   it('stores International as no country and can clear a country later', () => {

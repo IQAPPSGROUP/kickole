@@ -132,6 +132,47 @@ describe('mock leaderboard', () => {
     expect(board.board('day', 'world', 23, 10, NOW).hidden).toBe(false);
     expect(board.around(23, 'world', 'all', NOW).me.country).toBe('AD');
     expect(board.board('all', 'world', 23, 10, NOW).hidden).toBe(false);
+    expect(board.rankFor(23, NOW).worldHidden).toBe(false);
+  });
+
+  it('hides every world time frame until 20 players have scored', () => {
+    const periods = ['day', 'week', 'month', 'year', 'all'] as const;
+    const small = createMockLeaderboard({
+      nickname: 'StreetKick42',
+      country: 'GB',
+      storage: memory(),
+      now: NOW,
+      crowdSize: 8,
+    });
+    for (const period of periods) {
+      const page = small.board(period, 'world', 23, 50, NOW);
+      expect(page).toEqual({ hidden: true, rows: [] });
+      const around = small.around(23, 'world', period, NOW);
+      expect(around.above).toEqual([]);
+      expect(around.below).toEqual([]);
+      expect(JSON.stringify(page)).not.toContain('nickname');
+    }
+    const snap = small.rankFor(23, NOW);
+    expect(snap.worldHidden).toBe(true);
+    expect(snap.rank).toBeNull();
+    expect(snap.total).toBe(0);
+    expect(formatRank(snap.rank)).toBe('—');
+    expect(small.board('all', 'country', 23, 10, NOW)).toEqual({ hidden: true, rows: [] });
+
+    const ready = createMockLeaderboard({
+      nickname: 'StreetKick42',
+      country: 'GB',
+      storage: memory(),
+      now: NOW,
+      crowdSize: 19,
+    });
+    const world = ready.board('all', 'world', 420, 25, NOW);
+    expect(world.hidden).toBe(false);
+    expect(world.rows.length).toBeGreaterThanOrEqual(20);
+    expect(world.rows.some((row) => row.nickname.length > 0)).toBe(true);
+    expect(ready.rankFor(420, NOW).worldHidden).toBe(false);
+    expect(ready.rankFor(420, NOW).rank).not.toBeNull();
+    expect(ready.board('day', 'world', 420, 25, NOW).hidden).toBe(true);
   });
 
   it('treats a week as Monday 00:00 UTC through the following Sunday', () => {

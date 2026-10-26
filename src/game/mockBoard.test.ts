@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { build } from 'vite';
-import { mockBoardAllowed, mockBoardFromSearch, type MockBoardEnv } from './mockBoard';
+import { mockBoardAllowed, mockBoardFromSearch, mockCrowdFromSearch, type MockBoardEnv } from './mockBoard';
 import { assertStoreBuildOmitsMock } from './releaseBuildGuard';
 
 const production: MockBoardEnv = { MODE: 'production' };
@@ -24,6 +24,10 @@ describe('mock board gate', () => {
     expect(mockBoardFromSearch('?mockBoard=1', { MODE: 'production', VITE_ALLOW_MOCK: '' })).toBe(false);
     expect(mockBoardFromSearch('?mockBoard=0', development)).toBe(false);
     expect(mockBoardFromSearch('', development)).toBe(false);
+    expect(mockCrowdFromSearch('?mockBoard=1&mockPlayers=8', development)).toBe(8);
+    expect(mockCrowdFromSearch('?mockPlayers=8', development)).toBeUndefined();
+    expect(mockCrowdFromSearch('?mockBoard=1&mockPlayers=8', production)).toBeUndefined();
+    expect(mockCrowdFromSearch('?mockBoard=1&mockPlayers=nope', development)).toBeUndefined();
   });
 
   it('keeps the flag off main and off the Capacitor release scripts', () => {

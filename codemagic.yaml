@@ -23,6 +23,7 @@ workflows:
         # Publishable client key. Not a service-role secret.
         VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
         VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
+        VITE_LEGAL_URL: https://kickole.pages.dev/legal/
     scripts:
       - name: Require the Kickolé App Store Apple ID
         script: |

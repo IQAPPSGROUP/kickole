@@ -5,7 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { build } from 'vite';
-import { mockBoardAllowed, mockBoardFromSearch, mockCrowdFromSearch, type MockBoardEnv } from './mockBoard';
+import { mockBoardAllowed, mockBoardFromSearch, mockCrowdFromSearch, shownBoardScore, type MockBoardEnv } from './mockBoard';
 import { assertStoreBuildOmitsMock } from './releaseBuildGuard';
 
 const production: MockBoardEnv = { MODE: 'production' };
@@ -17,6 +17,13 @@ describe('mock board gate', () => {
     expect(mockBoardFromSearch('?mockBoard=1', development)).toBe(true);
     expect(mockBoardFromSearch('?mockBoard=1&x=2', preview)).toBe(true);
     expect(mockBoardAllowed(preview)).toBe(true);
+  });
+
+  it('uses the review score while the mock card is up, and a saved best on the menu', () => {
+    expect(shownBoardScore({ phase: 'menu', best: 0, hudScore: 0, resultScore: null, reviewScore: 420 })).toBe(420);
+    expect(shownBoardScore({ phase: 'menu', best: 0, hudScore: 12, resultScore: null, reviewScore: null })).toBe(0);
+    expect(shownBoardScore({ phase: 'over', best: 0, hudScore: 0, resultScore: 88, reviewScore: null })).toBe(88);
+    expect(shownBoardScore({ phase: 'playing', best: 10, hudScore: 15, resultScore: null, reviewScore: null })).toBe(15);
   });
 
   it('ignores the query in a production build unless VITE_ALLOW_MOCK=1', () => {

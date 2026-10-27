@@ -35,6 +35,8 @@ There is no lint script.
 
 ## Open items
 
+The hidden song-load panel has been removed. Rob confirmed the songs play on TestFlight build 11. The iOS status-0 load and its one retry stay.
+
 As of 26 October 2026 at 22:35 UTC, 26 named players remain on the live project: 9 real or test installs, plus 17 zero-score “Turbo Striker III” to “Turbo Striker XIX” test installs. Those 17 have no scores or reports and cannot show on the board. Their deletion is backed up and waiting on Rob’s own approval. This branch does not delete or edit those rows.
 
 `supabase/migrations/20261026230000_purge_ip_hashes_at_30_days.sql` is applied on the live project. Rob approved it in chat and Lee word-checked it. The purge ran once. The three old-hash counts read 0. The daily cron stays at `15 3 * * *`.

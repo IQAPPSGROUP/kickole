@@ -26,7 +26,6 @@ import {
   swingDelay,
   type MusicGraph,
 } from './musicBed';
-import { publishMusicDebug } from './musicDebug';
 import { RobPlayer } from './robMusic';
 import { GAME_TRACKS, normalizeEnabledTracks, normalizeSongChoice, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 
@@ -352,7 +351,6 @@ function noteRob(which: 'menu' | 'play', ok: boolean) {
   }
   rob?.stop();
   startScheduler();
-  publishMusicDebug({ phase: 'fallback' });
 }
 
 function noteTrack(name: string | null) {

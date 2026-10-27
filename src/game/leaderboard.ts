@@ -1,4 +1,5 @@
 import { COUNTRIES, countryByCode } from './countries';
+import { PREVIEW_LONG_NICKNAMES } from './mockBoard';
 import { isBlockedPair } from './nickname';
 import { ADJECTIVES, NOUNS } from './nicknameWords';
 import { loadDeviceId } from './nicknameStore';
@@ -156,7 +157,10 @@ interface StoredBest {
   at: number;
 }
 
-function crowdNickname(index: number): string {
+function crowdNickname(index: number, crowdLimit: number): string {
+  const preview = crowdLimit >= 20 ? PREVIEW_LONG_NICKNAMES : [];
+  if (preview.length > 0 && index === crowdLimit - 1) return preview[0] ?? 'Turbo Striker';
+  if (preview.length > 1 && index === crowdLimit - 2) return preview[1] ?? 'Turbo Striker';
   const adjective = ADJECTIVES[index % ADJECTIVES.length] ?? 'Turbo';
   let nounIndex = Math.floor(index / ADJECTIVES.length) % NOUNS.length;
   let noun = NOUNS[nounIndex] ?? 'Striker';
@@ -291,7 +295,7 @@ export function createMockLeaderboard(options: {
     const rows: CrowdRow[] = [];
     const mine = nickname.toLowerCase();
     for (let index = 0; index < crowdLimit; index += 1) {
-      const rowName = crowdNickname(index);
+      const rowName = crowdNickname(index, crowdLimit);
       const key = rowName.toLowerCase();
       if (key === mine || hidden(rowName)) continue;
       const at = crowdAt(index, now);
@@ -307,10 +311,10 @@ export function createMockLeaderboard(options: {
     const at = now;
     const combined: StandingRow[] = crowd(now, scope, period).map((row) => ({ ...row, mine: false }));
     const onBoard = scope === 'world' || (scope === 'country' && country != null);
-    if (onBoard) {
+    if (onBoard && Math.floor(score) > 0) {
       combined.push({
         nickname,
-        score: Math.max(0, Math.floor(score)),
+        score: Math.floor(score),
         at,
         mine: true,
         country,
@@ -352,7 +356,7 @@ export function createMockLeaderboard(options: {
       const countryRows = country ? placed(score, 'country', 'all', now) : [];
       const countryHidden = country != null && countryRows.length < COUNTRY_BOARD_MIN;
       return {
-        rank: worldHidden ? null : (me?.rank ?? board.length),
+        rank: worldHidden || rounded <= 0 ? null : (me?.rank ?? null),
         total: worldHidden ? 0 : board.length,
         nickname,
         score: rounded,

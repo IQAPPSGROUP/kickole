@@ -201,6 +201,15 @@ function hiddenBoardNote(scope: BoardScope): string {
   }
 }
 
+function rankLabel(rank: number): string {
+  return rank > 0 ? rank.toLocaleString('en-US') : '—';
+}
+
+/** Four-digit places ("1,600") use a tighter face so they stay inside the rank column. */
+function rankClass(rank: number): string {
+  return rankLabel(rank).length > 4 ? 'board-rank is-wide' : 'board-rank';
+}
+
 function entryLabel(row: BoardEntry): string {
   const country = row.country ? countryByCode(row.country)?.name : null;
   return [String(row.rank), country, row.nickname, String(row.score)].filter((part) => part != null && part !== '').join(' ');
@@ -305,7 +314,7 @@ export function LeaderboardSheet({
             <ol className="board">
               {rows.map((row) => (
                 <li key={`${period}:${scope}:${row.rank}:${row.nickname}`} className={`${row.mine ? 'me' : ''}${row.rank === 1 ? ' is-first' : ''}`} aria-label={entryLabel(row)}>
-                  <span className="board-rank">{row.rank > 0 ? row.rank.toLocaleString('en-US') : '—'}</span>
+                  <span className={rankClass(row.rank)}>{rankLabel(row.rank)}</span>
                   <b><NameFlag country={row.country} />{row.nickname}</b>
                   <em>{row.score}</em>
                   {!row.mine && (

@@ -46,5 +46,10 @@ describe('court gestures leave the leaderboard alone', () => {
     expect(css).toMatch(/\.leaderboard-periods \{[^}]*flex-wrap: wrap;/s);
     expect(css).not.toMatch(/\.leaderboard-periods \{[^}]*overflow-x: auto;/s);
     expect(css).toContain('.world-rank { top: auto; margin-top: 0; left: auto; bottom: 64px; width: min(24vw, 140px); }');
+    expect(css).toMatch(/\.leaderboard-sheet \{[^}]*background: #0c1620;/s);
+    expect(css).toMatch(/\.leaderboard-sheet \.board li span\.board-rank \{[^}]*min-width: 28px;/s);
+    expect(css).toMatch(/\.leaderboard-sheet \.board li span\.board-rank \{[^}]*max-width: 3\.2em;/s);
+    expect(css).toMatch(/\.leaderboard-sheet \.board li span\.board-rank\.is-wide \{[^}]*font-size: 11px;/s);
+    expect(css).toMatch(/\.board-more \{[^}]*width: 44px;/s);
   });
 });

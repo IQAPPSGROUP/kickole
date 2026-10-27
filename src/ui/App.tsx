@@ -4,14 +4,13 @@ import { GameController, type Result } from '../game/controller';
 import { countryByCode } from '../game/countries';
 import { createMockLeaderboard, type LeaderboardService } from '../game/leaderboard';
 import { parseNickname } from '../game/nickname';
-import { mockBoardFromSearch, mockCrowdFromSearch } from '../game/mockBoard';
+import { mockBoardFromSearch, mockCrowdFromSearch, shownBoardScore } from '../game/mockBoard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
 import { GameCanvas } from '../scene/GameCanvas';
 import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
 import { Hud, SongChip, TouchZones } from './Hud';
-import { MusicDebug } from './MusicDebug';
 import { CountryScreen, NicknameScreen, OptInCard } from './NicknameScreen';
 import { DataScreen, Home, GameOver, LeaderboardDataScreen, LeaderboardSheet, PauseScreen, SettingsScreen } from './Screens';
 import { pointerOpensTheCourt } from './boardGesture';
@@ -226,11 +225,13 @@ export function App() {
     setBoardOpen(true);
   };
 
-  const boardScore = phase === 'over' && snap.result
-    ? snap.result.score
-    : phase === 'menu'
-      ? snap.save.best
-      : snap.hud.score;
+  const boardScore = shownBoardScore({
+    phase,
+    best: snap.save.best,
+    hudScore: snap.hud.score,
+    resultScore: phase === 'over' && snap.result ? snap.result.score : null,
+    reviewScore: reviewOpen ? REVIEW_RESULT.score : null,
+  });
 
   const startGame = () => {
     setOverlay('none');
@@ -469,7 +470,6 @@ export function App() {
           onClose={closeOverlay}
         />
       )}
-      <MusicDebug />
     </div>
   );
 }

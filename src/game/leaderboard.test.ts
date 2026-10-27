@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMockLeaderboard, formatRank, isoWeekStartUtc } from './leaderboard';
-import { DEVICE_ID_KEY } from './nicknameStore';
+import { createMockLeaderboard, formatRank, isoWeekStartUtc, type BoardEntry } from './leaderboard';
+import { PREVIEW_LONG_NICKNAMES } from './mockBoard';
+import { checkNickname, composeNickname, NICKNAME_MAX } from './nickname';
 import { ADJECTIVES, NOUNS } from './nicknameWords';
+import { DEVICE_ID_KEY } from './nicknameStore';
 
 const NOW = 1_700_000_000_000;
 
@@ -26,12 +28,14 @@ describe('mock leaderboard', () => {
     const low = board.rankFor(0, NOW);
     const mid = board.rankFor(23, NOW);
     const high = board.rankFor(2000, NOW);
-    expect(low.rank).not.toBeNull();
+    expect(low.rank).toBeNull();
+    expect(low.score).toBe(0);
+    expect(board.around(0, 'world', 'all', NOW).me.rank).toBe(0);
     expect(mid.rank).not.toBeNull();
     expect(high.rank).not.toBeNull();
-    expect(low.rank!).toBeGreaterThan(mid.rank!);
     expect(mid.rank!).toBeGreaterThan(high.rank!);
-    expect(low.total).toBe(mid.total);
+    expect(low.total).toBe(1600);
+    expect(mid.total).toBe(1601);
     expect(formatRank(mid.rank)).toMatch(/^#[\d,]+$/);
     expect(mid.country).toBeNull();
     expect(mid.countryRank).toBeNull();
@@ -121,7 +125,31 @@ describe('mock leaderboard', () => {
     expect(world.rows.filter((row) => !row.mine).length).toBeGreaterThanOrEqual(5);
     expect(world.rows.some((row) => row.country != null)).toBe(true);
     expect(board.around(420, 'world', 'all', NOW).me.country).toBe('GB');
-    expect(world.rows.every((row) => allowed.has(row.nickname))).toBe(true);
+    const preview: string[] = [...PREVIEW_LONG_NICKNAMES];
+    expect(preview).toHaveLength(2);
+    expect(preview[0]!.length).toBeGreaterThanOrEqual(preview[1]!.length);
+    expect(preview[0]!.length).toBeLessThanOrEqual(NICKNAME_MAX);
+    expect(preview.every((name) => checkNickname(name).ok)).toBe(true);
+    let first = '';
+    let second = '';
+    const consider = (nickname: string | null) => {
+      if (!nickname || nickname === first || nickname === second || !checkNickname(nickname).ok) return;
+      if (nickname.length > first.length) {
+        second = first;
+        first = nickname;
+      } else if (nickname.length > second.length) second = nickname;
+    };
+    for (const adjective of ADJECTIVES) {
+      for (const noun of NOUNS) {
+        consider(composeNickname(adjective, noun));
+        for (let suffix = 2; suffix <= 40; suffix += 1) consider(composeNickname(adjective, noun, suffix));
+      }
+    }
+    expect(preview).toEqual([first, second]);
+    expect(world.rows.some((row) => preview.includes(row.nickname))).toBe(true);
+    const sample: BoardEntry = { rank: 1, nickname: preview[0] ?? '', score: 1, country: null, mine: false };
+    expect('kit' in sample).toBe(false);
+    expect(world.rows.every((row) => allowed.has(row.nickname) || preview.includes(row.nickname) || row.mine)).toBe(true);
   });
 
   it('hides a country board with fewer than 20 players', () => {

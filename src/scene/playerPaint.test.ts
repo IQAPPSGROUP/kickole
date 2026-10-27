@@ -49,7 +49,7 @@ function expectRendered(body: PlayerBody, kitId: string, before: Skin, after: Sk
   paintForRender(mats.materials, before);
   paintForRender(mats.materials, after);
   expect(hex(mats.skinMat), `${body} ${kit.id} skin`).toBe('3b2418');
-  if (mats.faceMat) expect(hex(mats.faceMat), `${body} ${kit.id} head`).toBe('3b2418');
+  if (mats.faceMat) expect(hex(mats.faceMat), `${body} ${kit.id} head`).toBe('ffffff');
   expect(hex(mats.hairMat), `${body} ${kit.id} hair`).toBe('f5e6c8');
   expect(hex(mats.skinMat), `${body} ${kit.id} skin changed`).not.toBe(before.body.skin.slice(1).toLowerCase());
   expect(hex(mats.hairMat), `${body} ${kit.id} hair changed`).not.toBe(before.body.hair.slice(1).toLowerCase());

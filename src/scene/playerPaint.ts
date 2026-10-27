@@ -15,8 +15,9 @@ function toonRole(name: string): ToonRole {
 type PreviewMaterial = MeshToonMaterial | MeshStandardMaterial | MeshBasicMaterial;
 
 /**
- * First colour pass on the GLB player. Skin and hair take the wardrobe swatch.
- * Eyes and the mouth stay as authored.
+ * First colour pass on the GLB player. Body skin takes the wardrobe swatch.
+ * Hair uses the swatch as its albedo. The photographed face keeps its texture
+ * and the crown above the eyes is drawn in the hair swatch. Eyes and mouth stay as authored.
  */
 export function paintPreviewColours(materials: readonly Material[], skin: Skin): void {
   const colors = skinMaterialColors(skin);

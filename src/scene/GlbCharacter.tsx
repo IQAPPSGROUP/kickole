@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D, type Texture, type WebGLRenderer } from 'three';
+import { AnimationMixer, BoxGeometry, LoopOnce, LoopRepeat, Mesh, MeshBasicMaterial, MeshStandardMaterial, MeshToonMaterial, Quaternion, Vector3, type AnimationAction, type Bone, type Object3D, type WebGLRenderer } from 'three';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { DRACO_DECODER_PATH, KTX2_TRANSCODER_PATH } from './decoders';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
@@ -28,6 +28,7 @@ import { ueMovementQuaternion } from './ue-motion';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { mountOutfitSpecs } from './outfitAttach';
 import { MountedOutfit } from './outfitSkin';
+import { measureHeadSpan, meshIsPhotographedFace } from './bodyColour';
 import { clearKitClothShader } from './kitShirtShader';
 import { paintKitClothColours, paintPreviewColours } from './playerPaint';
 import { bindSunsetToon, toToonMaterial } from './toon';
@@ -110,8 +111,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
     const boneNames: string[] = [];
     const matNames: string[] = [];
     let textured = false;
-    let headAlbedo: Texture | null = null;
-    let headNormal: Texture | null = null;
     root.traverse((o) => {
       if ((o as Bone).isBone) {
         boneNames.push(o.name);
@@ -131,13 +130,15 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
           if (source.normalMap || source.map) textured = true;
           const next = keepPbr ? source.clone() : toToonMaterial(m, m.name === MATERIAL_NAMES.skin);
           next.name = m.name;
-          // The head photograph stays at the file's own colour. The wardrobe swatch must not multiply it.
-          if (source.userData.headPhoto) {
+          // The head photograph stays at the file's own colour. A swatch multiply
+          // turns the eyes into rings and the mouth into mud. The female head is
+          // a separate Skin mesh weighted to the Head bone, with no file flag.
+          if (next.name === MATERIAL_NAMES.skin && (source.userData.headPhoto || meshIsPhotographedFace(mesh))) {
             next.userData.headPhoto = true;
             next.userData.facePhoto = true;
-            // The purchased scalp and ponytail were split off this same photograph.
-            if (source.map) headAlbedo = source.map;
-            if (source.normalMap) headNormal = source.normalMap;
+            const span = measureHeadSpan(mesh);
+            next.userData.headMin = span.min;
+            next.userData.headSpan = span.span;
           }
           return next;
         });
@@ -145,22 +146,6 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         cloned.forEach((m) => { matNames.push(m.name); mats.push(m); });
       }
     });
-    // The hair atlas was flattened to grey so a wardrobe tint could recolour it.
-    // Sample the head photograph instead, and stay opaque so an empty border cannot punch holes.
-    if (headAlbedo) {
-      for (const material of mats) {
-        const hair = material as MeshStandardMaterial;
-        if (hair.name !== MATERIAL_NAMES.hair || !hair.isMeshStandardMaterial) continue;
-        hair.map = headAlbedo;
-        if (headNormal) hair.normalMap = headNormal;
-        hair.color.set(0xffffff);
-        hair.transparent = false;
-        hair.alphaTest = 0;
-        hair.opacity = 1;
-        hair.depthWrite = true;
-        hair.needsUpdate = true;
-      }
-    }
     const resolved = rigKind(boneNames);
     const names: Partial<Record<BoneKey, string>> = resolved === 'ue'
       ? UE_BONE_NAMES

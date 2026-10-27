@@ -861,16 +861,28 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   font-weight: 700;
 }
 .kit-search::placeholder { color: #D8E2DC; }
+.kit-tab-scroller { position: relative; margin-right: -22px; }
+@media (max-height: 700px) and (orientation: portrait) {
+  .kit-tab-scroller { margin-right: -16px; }
+}
+.kit-tab-scroller::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 24px;
+  background: linear-gradient(to right, transparent, #0F1A14);
+  pointer-events: none;
+}
 .kit-tabs {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   scroll-snap-type: x proximity;
-  scroll-padding-inline-end: 28px;
-  padding-inline-end: 28px;
+  scroll-padding-inline-end: 24px;
+  padding-inline-end: 24px;
   -webkit-overflow-scrolling: touch;
-  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent);
 }
 .kit-tab {
   flex: 0 0 auto;

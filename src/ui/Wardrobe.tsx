@@ -6,7 +6,7 @@ import {
   type PlayerBody,
 } from '../game/appearance';
 import { getKitColour } from '../game/kitColours';
-import { kitLookNote } from '../game/kitLookNote';
+import { KIT_HELPER_NOTE, kitHelperNote } from '../game/kitLookNote';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
 import { PlayerPreview } from './PlayerPreview';
@@ -110,7 +110,7 @@ export function CustomiseScreen({
           <button type="button" className="btn ghost" onClick={onKitColours}>
             {kit?.label ?? 'Choose your kit'}
           </button>
-          <p className="panel-note">{kit ? kitLookNote(kit) : 'Saved on this device.'}</p>
+          <p className="panel-note">{kit ? kitHelperNote(kit) : KIT_HELPER_NOTE}</p>
         </div>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>

@@ -80,7 +80,8 @@ export function KitColoursScreen({
           spellCheck={false}
           onChange={(event) => setQuery(event.target.value)}
         />
-        <div className="kit-tabs" role="tablist" aria-label="Kit confederations">
+        <div className="kit-tab-scroller">
+          <div className="kit-tabs" role="tablist" aria-label="Kit confederations">
           {TABS.map((item) => {
             const on = item.id === tab && query.trim() === '';
             return (
@@ -99,6 +100,7 @@ export function KitColoursScreen({
               </button>
             );
           })}
+          </div>
         </div>
         <div className="kit-scroll">
           <div className="kit-grid" role="listbox" aria-label="Choose your kit">

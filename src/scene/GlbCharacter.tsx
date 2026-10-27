@@ -20,7 +20,7 @@ import { computePlayerMotion, createPlayerMotion } from './motion';
 import { createMotionRig } from './motionRig';
 import { characterLod } from './qualityTier';
 import {
-  ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, MATERIAL_NAMES, characterModelUrl, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, animationSampleTime, skinMaterialColors, validateModel,
+  ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, MATERIAL_NAMES, characterModelUrl, LOOPING_STATES, UE_BONE_NAMES, rigKind, selectAnimationState, animationSampleTime, validateModel,
   type AnimationState, type BoneKey,
 } from './rig';
 import { ueDeltaQuaternion } from './ue-pose';
@@ -28,10 +28,9 @@ import { ueMovementQuaternion } from './ue-motion';
 import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { mountOutfitSpecs } from './outfitAttach';
 import { MountedOutfit } from './outfitSkin';
-import { applyKitClothShader, clearKitClothShader, type KitClothZone } from './kitShirtShader';
-import { applyWardrobeBodyColours } from './bodyColour';
-import { paintOutfitTexture } from './outfitTexture';
-import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
+import { clearKitClothShader } from './kitShirtShader';
+import { paintKitClothColours, paintPreviewColours } from './playerPaint';
+import { bindSunsetToon, toToonMaterial } from './toon';
 
 function ballCenter(v: Vector3): BallCenter {
   return { x: v.x, y: v.y, z: v.z };
@@ -58,12 +57,6 @@ function liftKickToe(
   const foot = bones[state === 'KickLeft' ? 'footLeft' : 'footRight'];
   if (!foot) return;
   foot.quaternion.multiply(toeClearanceQuaternion(pitch, out));
-}
-
-function toonRole(name: string): ToonRole {
-  if (name === MATERIAL_NAMES.skin) return 'skin';
-  if (name === MATERIAL_NAMES.shirt) return 'shirt';
-  return 'flat';
 }
 
 /** Straps in foot-bone space. On this rig local +Y runs toward the toe and local −Z is the instep. */
@@ -215,87 +208,11 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
   }, [usable, report, onInvalid, kind]);
 
   useEffect(() => {
-    const colors = skinMaterialColors(skin);
-    applyWardrobeBodyColours(materials, skin);
-    for (const m of materials) {
-      const name = m.name;
-      // Skin and hair take the wardrobe swatch above. Eyes and the mouth stay as authored.
-      if (name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair) continue;
-      if (m.userData.facePhoto || m.userData.headPhoto) continue;
-      if (colors[name]) m.color.set(colors[name]);
-      if ((m as MeshToonMaterial).isMeshToonMaterial) {
-        const toon = m as MeshToonMaterial;
-        // Flat kit swaps. Skin keeps its atlas so the eye texels survive a tone change.
-        if (name !== MATERIAL_NAMES.skin) toon.map = null;
-        bindSunsetToon(toon, toonRole(name), skin.clothing.shirtTrim);
-        setToonTrim(toon, skin.clothing.shirtTrim);
-        continue;
-      }
-    }
+    paintPreviewColours(materials, skin);
   }, [skin, materials]);
 
   useEffect(() => {
-    const kitCloth = !skin.patternPaint && skin.kitPaint ? skin.kitPaint : null;
-    const painted = skin.patternPaint
-      ? paintOutfitTexture(skin.patternPaint, skin.clothing.shirt, skin.clothing.shirtTrim)
-      : null;
-    const mapHoldsColour = skin.patternPaint === 'stripes'
-      || skin.patternPaint === 'chain'
-      || skin.patternPaint === 'torn'
-      || skin.patternPaint === 'gold';
-    for (const material of materials) {
-      const standard = material as MeshStandardMaterial;
-      if (!standard.isMeshStandardMaterial) continue;
-      if (standard.userData.baseMap === undefined) standard.userData.baseMap = standard.map ?? null;
-      if (standard.userData.baseRough === undefined) standard.userData.baseRough = standard.roughness;
-      if (standard.userData.baseMetal === undefined) standard.userData.baseMetal = standard.metalness;
-      if (standard.userData.baseColor === undefined) standard.userData.baseColor = `#${standard.color.getHexString()}`;
-      const cloth = material.name === MATERIAL_NAMES.shirt
-        || material.name === MATERIAL_NAMES.shorts
-        || material.name === MATERIAL_NAMES.socks
-        || material.name === MATERIAL_NAMES.shirtTrim;
-      const zone: KitClothZone | null = material.name === MATERIAL_NAMES.shirt
-        ? 'shirt'
-        : material.name === MATERIAL_NAMES.shirtTrim
-          ? 'collar'
-          : material.name === MATERIAL_NAMES.socks
-            ? 'socks'
-            : null;
-      if (kitCloth && zone) {
-        standard.map = null;
-        standard.color.set('#ffffff');
-        applyKitClothShader(standard, {
-          pattern: kitCloth.pattern,
-          main: kitCloth.main,
-          secondary: kitCloth.secondary,
-          socks: kitCloth.socks,
-          trim: kitCloth.trim,
-          zone,
-          body: skin.playerBody,
-        });
-      } else if (cloth && painted) {
-        standard.map = painted;
-        if (mapHoldsColour) standard.color.set('#ffffff');
-        if (skin.patternPaint === 'gold') {
-          standard.roughness = 0.32;
-          standard.metalness = 0.65;
-        } else if (skin.patternPaint === 'leather') {
-          standard.roughness = 0.45;
-          standard.metalness = 0.18;
-        }
-      } else if (cloth) {
-        if (zone) clearKitClothShader(standard);
-        // Solid kit tint. The shared albedo is a boot texture, so it stays off the shirt.
-        const tint = skinMaterialColors(skin)[material.name];
-        standard.map = null;
-        if (tint) standard.color.set(tint);
-        standard.roughness = standard.userData.baseRough;
-        standard.metalness = standard.userData.baseMetal;
-      }
-      standard.needsUpdate = true;
-    }
-    // After kit maps are assigned, put the saved skin and hair swatches on those materials.
-    applyWardrobeBodyColours(materials, skin);
+    const painted = paintKitClothColours(materials, skin);
     const meshed = isMeshOutfit(skin.outfitId);
     const specs = [
       ...(!meshed && skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),

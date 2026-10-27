@@ -861,7 +861,17 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   font-weight: 700;
 }
 .kit-search::placeholder { color: #D8E2DC; }
-.kit-tabs { display: flex; gap: 6px; overflow-x: auto; }
+.kit-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline-end: 28px;
+  padding-inline-end: 28px;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent);
+}
 .kit-tab {
   flex: 0 0 auto;
   min-height: 36px;
@@ -874,6 +884,7 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   font-weight: 800;
   font-size: 12px;
   cursor: pointer;
+  scroll-snap-align: start;
 }
 .kit-tab.on { background: #FFD54A; color: #111111; }
 .kit-scroll { flex: 1; min-height: 0; overflow-y: auto; }

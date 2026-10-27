@@ -6,6 +6,7 @@ import {
   type PlayerBody,
 } from '../game/appearance';
 import { getKitColour } from '../game/kitColours';
+import { kitLookNote } from '../game/kitLookNote';
 import { composePlayerSkin } from '../game/skins';
 import type { SaveData } from '../game/storage';
 import { PlayerPreview } from './PlayerPreview';
@@ -68,6 +69,7 @@ export function CustomiseScreen({
   onClose: () => void;
 }) {
   const a = save.appearance;
+  const kit = getKitColour(a.kitColourId);
   const skin = useMemo(() => composePlayerSkin(a), [a]);
 
   const patch = (p: Partial<Appearance>) => {
@@ -106,9 +108,9 @@ export function CustomiseScreen({
         <div className="group">
           <label>Kit</label>
           <button type="button" className="btn ghost" onClick={onKitColours}>
-            {getKitColour(a.kitColourId)?.label ?? 'Choose your kit'}
+            {kit?.label ?? 'Choose your kit'}
           </button>
-          <p className="panel-note">A plain shirt in the colour fans recognise, with thin flag-colour bands. Saved on this device.</p>
+          <p className="panel-note">{kit ? kitLookNote(kit) : 'Saved on this device.'}</p>
         </div>
         <button type="button" className="btn primary" onClick={onClose}>DONE</button>
       </div>

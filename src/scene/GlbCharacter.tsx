@@ -29,6 +29,7 @@ import { kickToeClearance, toeClearanceQuaternion } from './kickClearance';
 import { mountOutfitSpecs } from './outfitAttach';
 import { MountedOutfit } from './outfitSkin';
 import { applyKitClothShader, clearKitClothShader, type KitClothZone } from './kitShirtShader';
+import { applyWardrobeBodyColours } from './bodyColour';
 import { paintOutfitTexture } from './outfitTexture';
 import { bindSunsetToon, setToonTrim, toToonMaterial, type ToonRole } from './toon';
 
@@ -215,11 +216,12 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
 
   useEffect(() => {
     const colors = skinMaterialColors(skin);
+    applyWardrobeBodyColours(materials, skin);
     for (const m of materials) {
       const name = m.name;
-      // The purchased face and body skin keep their own albedo. A swatch multiply
-      // repaints the photograph. Kit colours still come from the wardrobe.
-      if (m.userData.facePhoto || m.userData.headPhoto || name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair) continue;
+      // Skin and hair take the wardrobe swatch above. Eyes and the mouth stay as authored.
+      if (name === MATERIAL_NAMES.skin || name === MATERIAL_NAMES.hair) continue;
+      if (m.userData.facePhoto || m.userData.headPhoto) continue;
       if (colors[name]) m.color.set(colors[name]);
       if ((m as MeshToonMaterial).isMeshToonMaterial) {
         const toon = m as MeshToonMaterial;
@@ -290,11 +292,10 @@ export function GlbCharacter({ engine, skin, onInvalid, expressive = true, quali
         standard.roughness = standard.userData.baseRough;
         standard.metalness = standard.userData.baseMetal;
       }
-      if (material.name === MATERIAL_NAMES.skin) {
-        standard.color.set(skin.skinTint ?? standard.userData.baseColor);
-      }
       standard.needsUpdate = true;
     }
+    // After kit maps are assigned, put the saved skin and hair swatches on those materials.
+    applyWardrobeBodyColours(materials, skin);
     const meshed = isMeshOutfit(skin.outfitId);
     const specs = [
       ...(!meshed && skin.outfitId && isOutfitId(skin.outfitId) ? outfitSpecs(skin.outfitId, skin.playerBody) : []),

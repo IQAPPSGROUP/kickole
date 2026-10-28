@@ -34,9 +34,12 @@ describe('privacy notice v1.1', () => {
     expect(hosted).toContain('nothing to spend money on inside the game');
     expect(hosted).toContain('href="https://www.iqappsgroup.co.uk/kickole/licences/music"');
     expect(hosted).toContain('href="https://www.iqappsgroup.co.uk/kickole/licences/models"');
+    expect(hosted).toContain('>model licence</a> are linked from this page and from Settings.');
+    expect(hosted).not.toContain('picture licence');
     const settings = source('./Screens.tsx');
-    expect(settings).toContain('https://www.iqappsgroup.co.uk/kickole/licences/music');
-    expect(settings).toContain('https://www.iqappsgroup.co.uk/kickole/licences/models');
+    expect(settings).toContain('href="https://www.iqappsgroup.co.uk/kickole/licences/music" target="_blank" rel="noopener noreferrer">Music licence');
+    expect(settings).toContain('href="https://www.iqappsgroup.co.uk/kickole/licences/models" target="_blank" rel="noopener noreferrer">Model licence');
+    expect(settings).not.toContain('picture licence');
     expect(settings).not.toContain('public/audio/LICENSE.txt');
     expect(settings).not.toContain('kickole.pages.dev');
   });

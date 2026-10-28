@@ -70,7 +70,7 @@ repeatedly break these terms, or if the law requires it.
 
 The game, its artwork, its models, its audio, its code and the KICKOLÉ name and logo
 belong to us or our licensors. Third-party components are used under their own
-licences. The [music licence](https://www.iqappsgroup.co.uk/kickole/licences/music) and the [model and picture licence](https://www.iqappsgroup.co.uk/kickole/licences/models) are linked from
+licences. The [music licence](https://www.iqappsgroup.co.uk/kickole/licences/music) and the [model licence](https://www.iqappsgroup.co.uk/kickole/licences/models) are linked from
 this page and from Settings. Nothing in these terms transfers
 ownership of any of that to you.
 

@@ -5,7 +5,7 @@ those files are present. The game tries the .m4a first and falls
 back to the .ogg. If both fail to load, the generated boom-bap bed
 in src/game/musicBed.ts plays instead.
 
-The four songs in Kickolé were created by IQ Apps Group using ElevenLabs under a paid commercial licence. You may not copy, extract or reuse the songs outside the game.
+The four songs in Kickolé were created by IQ Apps Group using ElevenLabs under a paid plan that permits commercial use. Please don't copy, extract or reuse them.
 
 Kicks, misses, stalls, the crowd murmur and the milestone cheers
 are synthesised in src/game/audio.ts (Web Audio oscillators and

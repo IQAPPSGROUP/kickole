@@ -566,20 +566,8 @@ export function SettingsScreen({
               .
             </p>
           )}
-          <p>The Kickolé footballer is adapted from Universal Base Characters by Quaternius, released under CC0 1.0 Universal. Character modifications, kit and game integration by IQ Apps Group.</p>
+          <p>The Kickolé footballers are adapted from models by artistofthemonth, used under the Fab Standard licence, Personal tier. Both looks can be chosen. The game is paid up front, with no in-app purchases. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised. See public/audio/LICENSE.txt.</p>
-          <p>
-            Original assets:{' '}
-            <a href="https://quaternius.com/packs/universalbasecharacters.html" target="_blank" rel="noopener noreferrer">
-              quaternius.com/packs/universalbasecharacters.html
-            </a>
-          </p>
-          <p>
-            CC0:{' '}
-            <a href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">
-              creativecommons.org/publicdomain/zero/1.0/
-            </a>
-          </p>
         </div>
         </div>
         <div className="settings-dock">

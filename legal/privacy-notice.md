@@ -1,6 +1,6 @@
 # KICKOLÉ privacy notice
 
-Version 1.1. Last updated 26 October 2026. Replaces: version 1.0.
+Version 1.1. Last updated 28 October 2026. Replaces: version 1.0.
 
 ## Who we are
 
@@ -54,7 +54,7 @@ their 90 days, then deleted.
 
 ## Children
 
-KICKOLÉ is a cartoon football game that children play, so we have followed the
+KICKOLÉ is a football game that children play, so we have followed the
 **ICO's Children's Code (Age Appropriate Design Code)**:
 
 - no accounts and no personal details asked for;

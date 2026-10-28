@@ -566,7 +566,12 @@ export function SettingsScreen({
               .
             </p>
           )}
-          <p>Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised. See public/audio/LICENSE.txt.</p>
+          <p>
+            Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised.{' '}
+            <a href={`${import.meta.env.BASE_URL}audio/LICENSE.txt`}>Music licence</a>
+            {' · '}
+            <a href={`${import.meta.env.BASE_URL}models/LICENSE`}>Model and picture licence</a>
+          </p>
         </div>
         </div>
         <div className="settings-dock">

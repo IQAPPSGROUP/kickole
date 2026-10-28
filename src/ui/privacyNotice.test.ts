@@ -17,15 +17,27 @@ describe('privacy notice v1.1', () => {
   const manifest = source('../../ios/App/App/PrivacyInfo.xcprivacy');
 
   it('uses the same approved words in the app and on the hosted page', () => {
-    expect(markdown).toContain('Version 1.1. Last updated 26 October 2026. Replaces: version 1.0.');
+    expect(markdown).toContain('Version 1.1. Last updated 28 October 2026. Replaces: version 1.0.');
+    expect(markdown).not.toContain('cartoon');
     expect(markdown).not.toContain('DRAFT');
     expect(markdown).toContain('A leaderboard only appears once it has 20 or more players.');
     expect(markdown).toContain('the flag shown beside your nickname');
     expect(privacyPlain(renderToStaticMarkup(PrivacyNotice()))).toBe(privacyPlain(markdown));
     expect(privacyPlain(privacyHtml)).toBe(privacyPlain(markdown));
     expect(hosted).toContain('<h1>KICKOLÉ terms of use</h1>');
+    expect(hosted).toContain('<p>Version 1.0. Last updated 28 October 2026.</p>');
     expect(hosted).toContain('<p>Version 1.0. Last updated 25 October 2026.</p>');
     expect(hosted).toContain('<h1>KICKOLÉ child safety statement</h1>');
+    expect(hosted).not.toContain('<p>  ');
+    expect(hosted).toContain('identify anyone, or to advertise');
+    expect(hosted).toContain('We will try to keep them running');
+    expect(hosted).toContain('nothing to spend money on inside the game');
+    expect(hosted).toContain('href="../audio/LICENSE.txt"');
+    expect(hosted).toContain('href="../models/LICENSE"');
+    const settings = source('./Screens.tsx');
+    expect(settings).toContain('audio/LICENSE.txt');
+    expect(settings).toContain('models/LICENSE');
+    expect(settings).not.toContain('public/audio/LICENSE.txt');
   });
 
   it('declares nickname, user id, score and chosen country, and not a separate device id', () => {

@@ -1,7 +1,8 @@
-"""Generate Kicky's arcade footballer: a low-poly skinned character with a real armature and five animation clips.
+"""Retired arcade-footballer generator.
 
-Run (Blender 3.6 - 5.x):  blender --background --python tools/generate_kicky_player.py
-Output: public/models/kicky-player-rigged.glb
+This used to write public/models/kicky-player-rigged.glb. That file has been
+removed. The game uses the Fab players in public/models/. Running this script
+stops before it writes anything. The functions below are the old generator.
 
 Contract (see docs/CHARACTER_GLB.md):
   * Units are metres, feet on Z=0 (Y=0 in glTF), about 1.8 m tall. The character faces Blender -Y, which the
@@ -13,9 +14,17 @@ Contract (see docs/CHARACTER_GLB.md):
     The kick clips reach foot contact at CONTACT_FRAME / 30 = 0.30 s.
   * One skinned mesh with detailed face, boots and kit accents; no textures: mobile friendly.
 """
+import sys
+
+sys.stderr.write(
+    "generate_kicky_player.py is retired. "
+    "public/models/kicky-player-rigged.glb has been removed. "
+    "The game uses the Fab players described in public/models/LICENSE.\n"
+)
+raise SystemExit(0)
+
 import math
 import os
-import sys
 
 import bpy
 from mathutils import Vector
@@ -294,4 +303,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.stderr.write(
+        "generate_kicky_player.py is retired. "
+        "public/models/kicky-player-rigged.glb has been removed. "
+        "The game uses the Fab players described in public/models/LICENSE.\n"
+    )
+    raise SystemExit(0)

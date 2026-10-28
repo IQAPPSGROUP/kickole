@@ -1,6 +1,6 @@
 # KICKOLÉ terms of use
 
-Version 1.0. Last updated 25 October 2026.
+Version 1.0. Last updated 28 October 2026.
 
 ## 1. Who we are
 
@@ -70,7 +70,8 @@ repeatedly break these terms, or if the law requires it.
 
 The game, its artwork, its models, its audio, its code and the KICKOLÉ name and logo
 belong to us or our licensors. Third-party components are used under their own
-licences, listed in the app's licences file. Nothing in these terms transfers
+licences. The music licence and the model and picture licence are linked from
+this page and from Settings. Nothing in these terms transfers
 ownership of any of that to you.
 
 You must not pull the footballer models out of the game or use them outside it.

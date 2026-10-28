@@ -1,8 +1,8 @@
 # Freestyle tricks
 
-The old character file named below is no longer in the project. The game uses the Fab players.
+The character file named below has been removed. The game uses the Fab players. This note records the freestyle foundation. It is not a step to restore `kickole_player_v2.glb`.
 
-Simulation-first freestyle foundation on `feature/freestyle-tricks`, driven by `GameEngine` with the Quaternius v2 character (`kickole_player_v2.glb`) posed procedurally.
+The foundation on `feature/freestyle-tricks` was driven by `GameEngine` with the Quaternius v2 character posed procedurally. That file is gone.
 
 ## Controls
 

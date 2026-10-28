@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { countryByCode } from './countries';
 import { checkNickname } from './nickname';
 
@@ -40,7 +41,6 @@ export function saveBoardOptIn(value: Exclude<BoardOptIn, 'unknown'>, storage: S
 export async function hydrateBoardOptIn(storage: Storage = localStorage): Promise<BoardOptIn> {
   const local = loadBoardOptIn(storage);
   try {
-    const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()) return local;
     const { Preferences } = await import('@capacitor/preferences');
     const stored = await Preferences.get({ key: OPT_IN_KEY });
@@ -70,7 +70,6 @@ export async function resetLeaderboardIdentity(storage: Storage = localStorage):
     try { storage.removeItem(key); } catch { /* ignore */ }
   }
   try {
-    const { Capacitor } = await import('@capacitor/core');
     if (Capacitor.isNativePlatform()) {
       const { Preferences } = await import('@capacitor/preferences');
       await Preferences.remove({ key: NICKNAME_KEY });
@@ -149,7 +148,6 @@ export function loadDeviceId(storage: Storage = localStorage): string {
 export async function hydrateDeviceId(storage: Storage = localStorage): Promise<string> {
   const local = loadDeviceId(storage);
   try {
-    const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()) return local;
     const { Preferences } = await import('@capacitor/preferences');
     const stored = await Preferences.get({ key: DEVICE_ID_KEY });
@@ -166,7 +164,6 @@ export async function hydrateDeviceId(storage: Storage = localStorage): Promise<
 
 async function mirrorPreference(key: string, value: string): Promise<void> {
   try {
-    const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()) return;
     const { Preferences } = await import('@capacitor/preferences');
     await Preferences.set({ key, value });
@@ -182,7 +179,6 @@ async function mirrorPreference(key: string, value: string): Promise<void> {
 export async function hydrateNickname(storage: Storage = localStorage): Promise<string | null> {
   const local = loadNickname(storage);
   try {
-    const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()) return local;
     const { Preferences } = await import('@capacitor/preferences');
     const stored = await Preferences.get({ key: NICKNAME_KEY });
@@ -227,7 +223,6 @@ export function saveCountry(country: string | null, storage: Storage = localStor
 export async function hydrateCountry(storage: Storage = localStorage): Promise<StoredCountry> {
   const local = loadStoredCountry(storage);
   try {
-    const { Capacitor } = await import('@capacitor/core');
     if (!Capacitor.isNativePlatform()) return local;
     const { Preferences } = await import('@capacitor/preferences');
     const stored = await Preferences.get({ key: COUNTRY_KEY });

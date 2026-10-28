@@ -1,5 +1,6 @@
 {
   "date": "2026-10-19",
+  "note": "Historical record. kickole_player_v2.glb is no longer in the project. The game loads kickole_player_v4.glb.",
   "base": "bfe489b",
   "model": {
     "url": "/models/kickole_player_v2.glb",

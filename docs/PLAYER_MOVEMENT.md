@@ -1,10 +1,14 @@
 # Expressive player movement
 
-Branch `graphics/expressive-player-movement` incorporates main `bfe489b`, including the newer Quaternius v2 model, its materials/lighting/laces, both environments and main's deployment configuration.
+This file records a check from 19 October 2026. The model it measured, `public/models/kickole_player_v2.glb`, has been removed. Do not rebuild it. `docs/CURSOR_MOVEMENT_HANDOFF.md` does not ask anyone to merge or deploy that work.
+
+The game loads `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb`. See `public/models/LICENSE`.
+
+The sections below are that old check. They are not steps for the current player.
 
 ## Model and distinct movements
 
-The default game and review model is `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb`. See `public/models/LICENSE` for the licence.
+The check used the Quaternius v2 model on branch `graphics/expressive-player-movement`, which had incorporated main `bfe489b`. That model is gone.
 
 The original movement preview used the older five-clip reference character. Simply applying those accents to v2 also made celebrations look similar: they assumed an authored celebration clip that v2 does not have. `ue-motion.ts` now supplies complete arm poses in v2's local axes, retaining its rest-quaternion and arm-hang corrections. It gives the one-arm pump, shoulder shimmy and two-hand salute separate targets and an engine-clock envelope. These are runtime animation variations, not embedded clips or scoring tricks.
 
@@ -67,4 +71,4 @@ Outputs are ignored under `movement-shots/`; selected previews and the report ar
 
 ## Remaining limits
 
-Headless Chromium uses SwiftShader software rendering. Physical-device smoothness, sustained GPU/battery/thermal behaviour, real-time touch latency and hosted deployment remain unverified. Existing v2 surface/contact alignment has not been retargeted or tuned. Merge/deploy instructions preserve the newer model and current theme in `CURSOR_MOVEMENT_HANDOFF.md`.
+Headless Chromium uses SwiftShader software rendering. Physical-device smoothness, sustained GPU/battery/thermal behaviour, real-time touch latency and hosted deployment were unverified on that date. The old merge and deploy instructions have been removed from `CURSOR_MOVEMENT_HANDOFF.md`.

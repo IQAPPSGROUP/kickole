@@ -7,6 +7,20 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [react()],
-    build: { chunkSizeWarningLimit: 1500 },
+    build: {
+      chunkSizeWarningLimit: 1500,
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: 'three',
+                test: /node_modules[\\/](?:three|@react-three)[\\/]/,
+              },
+            ],
+          },
+        },
+      },
+    },
   };
 });

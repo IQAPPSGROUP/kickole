@@ -4,7 +4,7 @@ Branch `graphics/expressive-player-movement` incorporates main `bfe489b`, includ
 
 ## Model and distinct movements
 
-The default game and review model is `public/models/kickole_player_v2.glb`: 65 UE-style bones, 16,889 triangles, 361,448 bytes, Meshopt/WebP, no embedded animation clips. Its binary is unchanged from main. See `FREDDIE_CHARACTER_MODELS.md` for asset/licence details.
+The default game and review model is `public/models/kickole_player_v4.glb` (male) or `kickole_player_v4_female.glb`. See `public/models/LICENSE` for the licence.
 
 The original movement preview used the older five-clip reference character. Simply applying those accents to v2 also made celebrations look similar: they assumed an authored celebration clip that v2 does not have. `ue-motion.ts` now supplies complete arm poses in v2's local axes, retaining its rest-quaternion and arm-hang corrections. It gives the one-arm pump, shoulder shimmy and two-hand salute separate targets and an engine-clock envelope. These are runtime animation variations, not embedded clips or scoring tricks.
 

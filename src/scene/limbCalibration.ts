@@ -1,5 +1,5 @@
 /**
- * Limb lengths and contact offsets measured from `kickole_player_v2.glb`
+ * Limb lengths and contact offsets for the contract rig.
  * (Quaternius UE hierarchy). Simulation contact targets in `config.contacts`
  * stay authoritative; these values only calibrate visual IK / pose accents.
  */

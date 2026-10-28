@@ -79,9 +79,3 @@ public/textures/alley/modern_buildings_2.jpg
   Poly Haven modern_buildings_2, 1K HDR and a tone-mapped JPEG, CC0.
   Alexander Scholten. https://polyhaven.com/a/modern_buildings_2
   Daytime glass and concrete towers behind the open side of the alley.
-
-Quaternius sources still in this folder
----------------------------------------
-kickole_player_v2.glb and kickole_player_v3.glb are derived from the
-Quaternius Universal Base Characters (Standard), CC0 1.0 Universal.
-They are not the default runtime character. See LICENSE.txt.

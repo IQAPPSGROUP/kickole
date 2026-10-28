@@ -73,7 +73,6 @@ export const EXTRA_BONE_NAMES = {
 export type BoneKey = keyof typeof BONE_NAMES | keyof typeof EXTRA_BONE_NAMES;
 
 /**
- * Same joints on `kickole_player_v2.glb`.
  * Quaternius `_l` is anatomical left (world +X while facing +Z). The game's left
  * is world −X, so the sides are swapped here.
  */

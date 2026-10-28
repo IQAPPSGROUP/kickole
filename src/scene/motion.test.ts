@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Group, Quaternion, Vector3, type Bone } from 'three';
+import { AnimationMixer, Group, Quaternion, Texture, Vector3, type Bone } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { GameEngine } from '../engine/engine';
 import { buildScenario } from './inspector';
 import { computePlayerMotion, createPlayerMotion } from './motion';
@@ -81,8 +82,13 @@ describe('motion rig',()=>{
   });
 
   it('keeps both authored GLB boots exactly fixed while upper-body accents move through a stall',async()=>{
-    const b=readFileSync(new URL('../../public/models/kicky-player-rigged.glb',import.meta.url));
-    const gltf=await new GLTFLoader().parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
+    (globalThis as { self?: typeof globalThis }).self ??= globalThis;
+    await MeshoptDecoder.ready;
+    const b=readFileSync(new URL('../../public/models/kickole_player_v4.glb',import.meta.url));
+    const loader=new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.register(()=>({ name: 'KHR_texture_basisu', loadTexture: () => Promise.resolve(new Texture()) }));
+    const gltf=await loader.parseAsync(b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),'');
     const bones:Partial<Record<BoneKey,Bone>>={};gltf.scene.traverse(o=>{for(const key of Object.keys(BONE_NAMES) as (keyof typeof BONE_NAMES)[])if(o.name===BONE_NAMES[key])bones[key]=o as Bone;});
     const rig=createMotionRig({root:gltf.scene,spine:bones.spine,head:bones.head,armLeft:bones.armLeft,armRight:bones.armRight,footLeft:bones.footLeft,footRight:bones.footRight});
     const mixer=new AnimationMixer(gltf.scene),e=new GameEngine();

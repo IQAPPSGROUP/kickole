@@ -2,7 +2,7 @@ import { Euler, Quaternion } from 'three';
 
 /**
  * Extra foot pitch at the kick contact frame.
- * Measured on kickole_player_v3: local +X swings the boot mesh back out of the
+ * Measured on the contract rig: local +X swings the boot mesh back out of the
  * ball. At 0.30 s the sole is only about 3 mm clear; this adds a couple of
  * centimetres so the toe meets the ball instead of sinking into it.
  */

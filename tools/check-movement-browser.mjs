@@ -18,7 +18,7 @@ try{
     await page.goto(`${url}/tools/movement-preview.html`);
     await page.waitForFunction(()=>window.__movementReview?.ready);
     const model=await page.evaluate(()=>({url:window.__movementReview.modelUrl,rig:window.__movementReview.rig,clips:window.__movementReview.clips}));
-    assert.ok(model.url.endsWith('/models/kickole_player_v2.glb'));assert.equal(model.rig,'ue');assert.equal(model.clips,0);
+    assert.ok(model.url.endsWith('/models/kickole_player_v4.glb'));assert.equal(model.rig,'contract');assert.equal(model.clips,5);
     // Regression: a selected movement must animate even if the previous sample was paused.
     await page.getByRole('button',{name:'Pause',exact:true}).click();
     const frozen=await page.evaluate(()=>window.__movementReview.time);
@@ -82,7 +82,7 @@ try{
       await context.addInitScript(q=>localStorage.setItem('kicky.settings.v1',JSON.stringify({sound:false,vibration:false,quality:q,skinId:'kicky-teal'})),quality);
       const page=await context.newPage(),errors=[],character=[];
       page.on('pageerror',e=>errors.push(e.message));
-      page.on('response',r=>{if(r.url().endsWith('/models/kickole_player_v2.glb'))character.push(r.status());});
+      page.on('response',r=>{if(r.url().endsWith('/models/kickole_player_v4.glb'))character.push(r.status());});
       await page.goto(url);await page.getByRole('button',{name:/LET.S PLAY/}).waitFor();await page.waitForTimeout(650);
       await page.getByRole('button',{name:/LET.S PLAY/}).click();await page.keyboard.press('KeyA');await page.waitForTimeout(300);
       assert.equal(await page.locator('.zones').count(),1);assert.equal(await page.locator('.gl-error').count(),0);
@@ -123,7 +123,7 @@ try{
       await context.close();
     }
     const page=await browser.newPage({viewport:{width:390,height:844}});
-    await page.route('**/models/kickole_player_v2.glb',r=>r.abort());
+    await page.route('**/models/kickole_player_v4.glb',r=>r.abort());
     await page.goto(`${url}/?environment=beach`);await page.getByRole('button',{name:/LET.S PLAY/}).waitFor();await page.waitForTimeout(600);
     await page.getByRole('button',{name:/LET.S PLAY/}).click();
     assert.equal(await page.locator('.gl-error').count(),0);await page.screenshot({path:fileURLToPath(new URL('fallback.png',out))});

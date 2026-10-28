@@ -1,20 +1,33 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Box3, Vector3, type AnimationClip, type Bone, type Group } from 'three';
+import { AnimationMixer, Box3, Texture, Vector3, type AnimationClip, type Bone, type Group } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { DEFAULT_CONFIG } from '../engine/config';
 import { ANIMATION_STATES, BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel } from './rig';
 
-async function load() {
-  const buf = readFileSync(new URL('../../public/models/kicky-player-rigged.glb', import.meta.url));
+const PLAYERS = [
+  ['kickole_player_v4.glb', new URL('../../public/models/kickole_player_v4.glb', import.meta.url)],
+  ['kickole_player_v4_female.glb', new URL('../../public/models/kickole_player_v4_female.glb', import.meta.url)],
+] as const;
+
+async function load(file: URL) {
+  (globalThis as { self?: typeof globalThis }).self ??= globalThis;
+  await MeshoptDecoder.ready;
+  const buf = readFileSync(file);
   const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-  return new Promise<{ scene: Group; animations: AnimationClip[] }>((res, rej) => new GLTFLoader().parse(ab, '', (g) => res(g as never), rej));
+  return new Promise<{ scene: Group; animations: AnimationClip[] }>((res, rej) => {
+    const loader = new GLTFLoader();
+    loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.register(() => ({ name: 'KHR_texture_basisu', loadTexture: () => Promise.resolve(new Texture()) }));
+    loader.parse(ab, '', (g) => res(g as never), rej);
+  });
 }
 
-describe('kicky-player-rigged.glb', () => {
+describe.each(PLAYERS)('%s', (_label, file) => {
   it('has the contract rig, materials and exactly the five named clips', async () => {
-    const gltf = await load();
+    const gltf = await load(file);
     const bones: string[] = []; const mats = new Set<string>();
     gltf.scene.traverse((o) => {
       if ((o as Bone).isBone) bones.push(o.name);
@@ -27,16 +40,16 @@ describe('kicky-player-rigged.glb', () => {
   });
 
   it('is about 1.8 units tall, stands on the floor and stays mobile-light', async () => {
-    const gltf = await load();
+    const gltf = await load(file);
     const box = new Box3().setFromObject(gltf.scene);
     expect(box.max.y - box.min.y).toBeGreaterThan(1.7);
     expect(box.max.y - box.min.y).toBeLessThan(1.95);
     expect(Math.abs(box.min.y)).toBeLessThan(0.02);
-    expect(readFileSync(new URL('../../public/models/kicky-player-rigged.glb', import.meta.url)).length).toBeLessThan(500_000);
+    expect(readFileSync(file).length).toBeLessThan(8_000_000);
   });
 
   it('faces +Z (the game camera): the kick swings the foot forward in +Z', async () => {
-    const gltf = await load();
+    const gltf = await load(file);
     const bones: Record<string, Bone> = {};
     gltf.scene.traverse((o) => { if ((o as Bone).isBone) bones[o.name] = o as Bone; });
     const mixer = new AnimationMixer(gltf.scene);
@@ -51,7 +64,7 @@ describe('kicky-player-rigged.glb', () => {
   it.each([['KickLeft', 'Foot_L', -1], ['KickRight', 'Foot_R', 1]] as const)(
     '%s: at 0.30 s the boot toe meets the ball position used by the physics engine',
     async (clip, boneName, sx) => {
-      const gltf = await load();
+      const gltf = await load(file);
       const bones: Record<string, Bone> = {};
       gltf.scene.traverse((o) => { if ((o as Bone).isBone) bones[o.name] = o as Bone; });
       const mixer = new AnimationMixer(gltf.scene);

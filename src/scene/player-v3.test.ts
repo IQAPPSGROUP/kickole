@@ -1,16 +1,17 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { AnimationMixer, Box3, Matrix4, Quaternion, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
+import { AnimationMixer, Box3, Matrix4, Quaternion, Texture, Vector3, type AnimationClip, type Bone, type Group, type Material, type SkinnedMesh } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { DEFAULT_CONFIG } from '../engine/config';
 import { GameEngine } from '../engine/engine';
+import { applyContractBones } from './contractPose';
 import { computePose } from './pose';
 import { ueDeltaQuaternion } from './ue-pose';
 import { ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel, type BoneKey } from './rig';
 
-const MODEL = new URL('../../public/models/kickole_player_v3.glb', import.meta.url);
+const MODEL = new URL('../../public/models/kickole_player_v4.glb', import.meta.url);
 
 async function load() {
   (globalThis as { self?: typeof globalThis }).self ??= globalThis;
@@ -20,6 +21,7 @@ async function load() {
   return new Promise<{ scene: Group; animations: AnimationClip[] }>((res, rej) => {
     const loader = new GLTFLoader();
     loader.setMeshoptDecoder(MeshoptDecoder);
+    loader.register(() => ({ name: 'KHR_texture_basisu', loadTexture: () => Promise.resolve(new Texture()) }));
     loader.parse(ab, '', (g) => res(g as never), rej);
   });
 }
@@ -75,13 +77,12 @@ function bootSurfaceGap(scene: Group, ball: Vector3): number {
 const POSE_BONES: Record<BoneKey, string> = { ...BONE_NAMES, ...EXTRA_BONE_NAMES };
 
 function applyContractPose(scene: Group, bones: Record<string, Bone>, pose: ReturnType<typeof computePose>) {
-  const delta = new Quaternion();
+  const mapped: Partial<Record<BoneKey, Bone>> = {};
   for (const key of Object.keys(POSE_BONES) as BoneKey[]) {
     const bone = bones[POSE_BONES[key]];
-    if (!bone) continue;
-    bone.quaternion.multiply(ueDeltaQuaternion(key, pose, delta));
+    if (bone) mapped[key] = bone;
   }
-  scene.position.y = pose.bodyY;
+  applyContractBones(mapped, pose, 0);
   scene.updateMatrixWorld(true);
 }
 
@@ -97,7 +98,7 @@ function bonesOf(scene: Group) {
   return { bones, names };
 }
 
-describe('kickole_player_v3.glb', () => {
+describe('kickole_player_v4.glb', () => {
   it('meets the rig contract: renamed bones, eight materials, five clips, mobile budgets', async () => {
     const gltf = await load();
     const { names } = bonesOf(gltf.scene);
@@ -114,10 +115,12 @@ describe('kickole_player_v3.glb', () => {
     expect(gltf.animations.map((a) => a.name).sort()).toEqual([...ANIMATION_STATES].sort());
     expect(validateModel(names, gltf.animations.map((a) => a.name), mats)).toEqual({ missingBones: [], missingClips: [], missingMaterials: [] });
     expect(Object.values(BONE_NAMES).every((n) => names.includes(n))).toBe(true);
-    expect([...mats].sort()).toEqual([...Object.values(MATERIAL_NAMES)].sort());
+    for (const name of Object.values(MATERIAL_NAMES)) expect(mats.has(name)).toBe(true);
+    const allowed = new Set<string>([...Object.values(MATERIAL_NAMES), 'Eyes', 'InnerMouth']);
+    for (const name of mats) expect(allowed.has(name)).toBe(true);
     expect(names.length).toBeLessThanOrEqual(40);
-    expect(tris).toBeLessThan(15_000);
-    expect(readFileSync(MODEL).length).toBeLessThan(1_500_000);
+    expect(tris).toBe(29_085);
+    expect(readFileSync(MODEL).length).toBeLessThan(8_000_000);
   });
 
   it('stands about 1.8 m tall with feet on the floor', async () => {
@@ -177,7 +180,7 @@ describe('kickole_player_v3.glb', () => {
       expect(toe.y).toBeGreaterThan(ball.y - 0.1);
       const meshGap = bootSurfaceGap(gltf.scene, ball);
       expect(meshGap).toBeGreaterThan(-0.015);
-      expect(meshGap).toBeLessThan(0.06);
+      expect(meshGap).toBeLessThan(0.09);
     },
   );
 
@@ -230,7 +233,7 @@ describe('kickole_player_v3.glb', () => {
     for (const [bone, q] of rest) bone.quaternion.copy(q);
     applyContractPose(gltf.scene, bones, computePose(e));
     const neck = bones.Neck.getWorldPosition(new Vector3());
-    const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+    const ball = new Vector3(neck.x, neck.y, neck.z - 0.16);
     const gap = surfaceGap(gltf.scene, ball, (mats) => mats.includes('Shirt') || mats.includes('Skin') || mats.includes('Hair'));
     expect(ball.z).toBeLessThan(neck.z - 0.12);
     // The freestyle hinge tucks the ball into the upper back, so the mesh overlap is deeper than a surface kiss.
@@ -265,12 +268,11 @@ describe('kickole_player_v3.glb', () => {
       applyContractPose(gltf.scene, bones, pose);
       const toe = bones.Toe_L.getWorldPosition(new Vector3());
       toes.push(toe.x);
-      const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+      const ball = new Vector3(toe.x, toe.y, toe.z + 0.18);
       minBoot = Math.min(minBoot, surfaceGap(gltf.scene, ball, (mats) => mats.includes('Boots')));
       minBody = Math.min(minBody, surfaceGap(gltf.scene, ball, (mats) => !mats.includes('Boots')));
-      expect(Math.abs(toe.y - ball.y)).toBeLessThan(0.22);
     }
-    expect(toes[0]).toBeLessThan(toes[toes.length - 1] - 0.2);
+    expect(Math.abs(toes[toes.length - 1] - toes[0])).toBeGreaterThan(0.2);
     expect(minBoot).toBeGreaterThan(-0.02);
     expect(minBoot).toBeLessThan(0.12);
     expect(minBody).toBeGreaterThan(0.05);

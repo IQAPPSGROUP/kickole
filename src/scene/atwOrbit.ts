@@ -2,7 +2,7 @@ import type { Side } from '../engine/config';
 import type { LegPose } from './pose';
 
 /**
- * Outside-in foot arc measured on kickole_player_v3.
+ * Outside-in foot arc for the contract rig.
  * The thigh stays raised and the knee stays bent near a right angle. Abduct,
  * a little twist, and ankle roll carry the foot from outside-behind the ball,
  * around its far side, to the inside-front. The calf stays on the hip side of

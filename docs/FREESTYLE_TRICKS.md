@@ -1,5 +1,7 @@
 # Freestyle tricks
 
+The old character file named below is no longer in the project. The game uses the Fab players.
+
 Simulation-first freestyle foundation on `feature/freestyle-tricks`, driven by `GameEngine` with the Quaternius v2 character (`kickole_player_v2.glb`) posed procedurally.
 
 ## Controls

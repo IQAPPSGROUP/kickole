@@ -1,5 +1,7 @@
 # Kickolé — premium stylised footballer upgrade
 
+The old reference model named below is no longer in the project. The game uses the Fab players.
+
 Status: implementation specification; new artist-quality GLB not yet supplied or verified.
 
 ## Objective

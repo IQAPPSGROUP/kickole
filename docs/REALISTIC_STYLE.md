@@ -6,9 +6,9 @@ Kickolé’s street theme is a mobile-friendly realistic look: a photographed co
 
 `kickole_player_v4.glb` (male) and `kickole_player_v4_female.glb` are the Fab footballers from artistofthemonth (see `public/models/LICENSE`). Both keep human proportions, a face and eyes. The male also keeps the inner mouth. The kit is its own materials (shirt, trim, shorts, socks, boots, sole) so colours and the chest number still come from `skinMaterialColors`. Hair is a separate material. Eyes and the inner mouth are not tinted. Neither body uses exaggerated or sexualised proportions. Materials are glTF PBR (base colour and normal, KTX2).
 
-The two bodies are free. A first-launch picker writes `appearance.body`; older saves migrate to male and are not asked again. Customise can switch later. Only the selected body is loaded.
+The body choice is selectable. A first-launch picker writes `appearance.body`; older saves migrate to male and are not asked again. Customise can switch later. Only the selected body is loaded.
 
-LOD0 is the source mesh: about 21k triangles for the male and 29k for the female. LOD1 is the low-tier mesh, about 13k triangles, same bones and the same five clips. Bone names stay on the contract in `docs/CHARACTER_GLB.md` (19 deform bones plus `Root`, under the 40-bone cap). Fingers, twist bones and face bones are merged into those deform bones. There is no `Clavicle_L`, so the runtime stays on the contract Euler path.
+LOD0 is the source mesh: 29,085 triangles for the male and 21,203 for the female. LOD1 is the low-tier mesh, about 13k triangles, same bones and the same five clips. Bone names stay on the contract in `docs/CHARACTER_GLB.md` (19 deform bones plus `Root`, under the 40-bone cap). Fingers, twist bones and face bones are merged into those deform bones. There is no `Clavicle_L`, so the runtime stays on the contract Euler path.
 
 Clips are sampled from the procedural pose at 30 fps, eased between keys, with the 0.30 s kick frame forced onto the contact solve so the toe joint stays outside the ball while the boot can touch it.
 

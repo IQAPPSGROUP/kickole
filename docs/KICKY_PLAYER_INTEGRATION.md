@@ -1,5 +1,7 @@
 # Kicky animated player integration
 
+The model named below is no longer in the project. The game uses the Fab players.
+
 Asset package: `kicky-player-animated-package.zip`
 Extract `kicky-player-rigged.glb` into `public/models/kicky-player-rigged.glb`.
 

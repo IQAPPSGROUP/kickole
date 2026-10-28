@@ -1,9 +1,8 @@
 # Kicky animated player integration
 
-The model named below is no longer in the project. The game uses the Fab players.
+The model named below has been removed. Do not extract it. The game uses the Fab players.
 
-Asset package: `kicky-player-animated-package.zip`
-Extract `kicky-player-rigged.glb` into `public/models/kicky-player-rigged.glb`.
+This note used to say: extract `kicky-player-rigged.glb` from `kicky-player-animated-package.zip` into `public/models/kicky-player-rigged.glb`. That file is gone. `tools/generate_kicky_player.py` stops before it can write the file again.
 
 This first-stage model is articulated (rigid body parts with animated joints), not a fully skinned humanoid mesh. Animation clips: `Idle`, `KickLeft`, `KickRight`, `Miss`, `Celebrate`.
 

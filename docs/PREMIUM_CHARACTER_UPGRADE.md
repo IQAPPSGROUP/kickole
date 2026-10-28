@@ -1,8 +1,8 @@
 # Kickolé — premium stylised footballer upgrade
 
-The old reference model named below is no longer in the project. The game uses the Fab players.
+The old reference model named below has been removed. The game uses the Fab players in `public/models/LICENSE`. Do not restore `kicky-player-rigged.glb`.
 
-Status: implementation specification; new artist-quality GLB not yet supplied or verified.
+Status: historical specification. The Fab players replaced this plan.
 
 ## Objective
 Replace the 172 KB procedural reference footballer with a polished, commercially licensed, mobile-ready stylised Brazilian street-football character. Retain the existing engine, controls, scoring and deterministic animation timing.
@@ -10,8 +10,8 @@ Replace the 172 KB procedural reference footballer with a polished, commercially
 ## Existing integration
 - Loader: src/scene/CharacterSwitch.tsx and src/scene/GlbCharacter.tsx
 - Contract: src/scene/rig.ts and docs/CHARACTER_GLB.md
-- Existing asset: public/models/kicky-player-rigged.glb
-- Existing generator: tools/generate_kicky_player.py
+- Removed asset: public/models/kicky-player-rigged.glb
+- Retired generator: tools/generate_kicky_player.py (it exits before writing)
 - Existing fallback: src/scene/Character.tsx
 
 ## Character art direction

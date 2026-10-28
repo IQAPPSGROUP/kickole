@@ -1,14 +1,28 @@
 // Optional: npm install --prefix .validation --no-save playwright-core
 // URL=http://127.0.0.1:5189 CHROMIUM=/path/to/chrome node tools/check-movement-browser.mjs [review|contact|game]
 import { createRequire } from 'node:module';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 const require=createRequire(new URL('../.validation/package.json',import.meta.url));
 const {chromium}=require('playwright-core');
 const out=new URL('../movement-shots/',import.meta.url);mkdirSync(out,{recursive:true});
 const url=process.env.URL??'http://127.0.0.1:5189',mode=process.argv[2]??'review';
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM??'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,
+const chromeCandidates=[
+  process.env.CHROMIUM,
+  '/usr/bin/google-chrome',
+  '/usr/bin/google-chrome-stable',
+  '/usr/bin/chromium',
+  '/usr/bin/chromium-browser',
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  'C:/Program Files/Google/Chrome/Application/chrome.exe',
+].filter(Boolean);
+const executablePath=chromeCandidates.find((path)=>existsSync(path));
+if(!executablePath){
+  console.error('Set CHROMIUM to a Chrome or Chromium binary.');
+  process.exit(1);
+}
+const browser=await chromium.launch({executablePath,headless:true,
   args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist']});
 const results=[];
 try{

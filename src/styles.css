@@ -137,6 +137,7 @@ body { font-family: var(--font); color: var(--white); user-select: none; -webkit
 .help p { margin: 4px 0; font-size: 13px; line-height: 1.35; opacity: .9; }
 .help b { color: var(--lime); }
 .help a { color: var(--lime); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
+.help a.licence-link { word-break: normal; }
 
 .hud { position: absolute; inset: 0; z-index: 5; pointer-events: none; padding-top: var(--sat-t); }
 .hud-top { text-align: center; padding-top: 14px; }

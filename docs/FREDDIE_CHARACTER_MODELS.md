@@ -1,8 +1,8 @@
 # Freddie character models (Quaternius CC0)
 
-The model files named in this note are no longer in the project. The game uses the Fab players described in `public/models/LICENSE`.
+The model files named in this note have been removed. Do not rebuild them. The game uses the Fab players described in `public/models/LICENSE`. `tools/build_player_v3.ts` and `tools/freddie/` are not in the project.
 
-Branch `freddie/character-models` added `public/models/kickole_player_v2.glb`. The game now loads `public/models/kickole_player_v3.glb`, built from that file by `tools/build_player_v3.ts` so it matches `docs/CHARACTER_GLB.md` (contract bone names, screen-left `_L`, ≤40 bones, eight materials, <15k triangles, and the five clips). `kicky-player-rigged.glb` stays as the procedural contract reference. v2 itself has no clips; `src/scene/ue-pose.ts` still maps the procedural pose onto the UE bone names (sides swapped) and is what v3's clips and trick overlay use.
+Branch `freddie/character-models` added `public/models/kickole_player_v2.glb`. A later build wrote `public/models/kickole_player_v3.glb` from that file. Both files, and `kicky-player-rigged.glb`, have been removed. The notes below describe those old files.
 
 Licence: Quaternius Universal Base Characters [Standard], **CC0 1.0**. That licence file was removed with the models.
 
@@ -20,7 +20,7 @@ Licence: Quaternius Universal Base Characters [Standard], **CC0 1.0**. That lice
 | Idle bbox width < 1 m | T-pose arm span ~1.86 m (no Idle clip yet) | resolved once an Idle clip lowers arms |
 | Meshopt/Draco + KTX2/WebP | Meshopt + WebP (`EXT_meshopt_compression`, `EXT_texture_webp`) | the loader must set a Meshopt decoder |
 
-## v2 – `public/models/kickole_player_v2.glb` (modelled kit) — recommended
+## v2 – `public/models/kickole_player_v2.glb` (removed)
 
 ![v2 preview](img/kickole_player_v2_preview.png)
 
@@ -37,7 +37,7 @@ How it was built (`tools/freddie/blender_build_player_v2.py`, Blender 4.5.9 LTS 
 - Shirt / shorts / socks are copies of the body surface, cut with planes (clean hems: waist hem z=1.0 m, sleeves at |x|=0.36 m, crew neck lower at the front), decimated to 60 %, pushed out 6–25 mm along normals (shirt and shorts flare slightly at the hem). They keep the body's original skin weights.
 - Boots: convex hull of each foot inflated by 13 mm, voxel-remeshed, smoothed, decimated, opening cut at the ankle, a sole band cut at 16 mm; weights by Data Transfer from the body (nearest-face interpolated).
 - Body faces fully hidden under clothing (torso, thighs, calves, feet) were deleted, so no skin pokes through. Skin stays on the head, neck, forearms, hands, knees and the gap between socks and shorts.
-- Rebuild: `blender -b --python tools/freddie/blender_build_player_v2.py` (paths at the top), then `node tools/freddie/post_player_v2.mjs raw.glb kickole_player_v2.glb`.
+- The old rebuild command cannot be run. `tools/freddie/` is not in the project. It was `blender -b --python tools/freddie/blender_build_player_v2.py`, then `node tools/freddie/post_player_v2.mjs raw.glb kickole_player_v2.glb`.
 
 Known limitations: boots are a simple rounded "clog" shape (no studs or laces); collar trim edge is a little uneven; light faceting from decimation on the shirt; sock bands share `Shirt_Trim`, so recolouring the trim also changes the sock bands. The extra `Eyes` material makes 9 materials (contract max 8). 16.9k tris is over the contract's 15k (decimate the body or drop eyebrows to reach it).
 

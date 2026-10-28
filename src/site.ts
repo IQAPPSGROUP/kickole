@@ -19,3 +19,6 @@ function readUrl(value: unknown, fallback: string): string {
 export const PRIVACY_URL = readUrl(import.meta.env.VITE_PRIVACY_URL, COMPANY_PRIVACY_URL);
 export const CHILD_SAFETY_URL = readUrl(import.meta.env.VITE_CHILD_SAFETY_URL, COMPANY_CHILD_SAFETY_URL);
 export const TERMS_URL = readUrl(import.meta.env.VITE_TERMS_URL, COMPANY_TERMS_URL);
+
+/** Company support page. The game must not be served at this address. */
+export const SUPPORT_URL = 'https://iqappsgroup.co.uk/kickole/support';

@@ -4,7 +4,7 @@ import type { Result } from '../game/controller';
 import { countryByCode } from '../game/countries';
 import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
-import { LEGAL_URL } from '../site';
+import { PRIVACY_URL, TERMS_URL } from '../site';
 import {
   BLOCK_CONFIRMATION,
   DONE_CONFIRMATION,
@@ -557,15 +557,17 @@ export function SettingsScreen({
         <div className="group help">
           <label>Privacy</label>
           <PrivacyNotice />
-          {LEGAL_URL && (
-            <p>
-              Read the full{' '}
-              <a href={LEGAL_URL} target="_blank" rel="noopener noreferrer">
-                privacy notice, child safety statement and terms of use
-              </a>
-              .
-            </p>
-          )}
+          <p>
+            Read the full{' '}
+            <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">
+              privacy notice
+            </a>
+            , child safety statement and{' '}
+            <a href={TERMS_URL} target="_blank" rel="noopener noreferrer">
+              terms of use
+            </a>
+            .
+          </p>
           <p>
             Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised.{' '}
             <a href="https://iqappsgroup.co.uk/kickole/licences/music">Music licence</a>

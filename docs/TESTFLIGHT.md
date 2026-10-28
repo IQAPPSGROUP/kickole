@@ -22,6 +22,8 @@ The signed workflow is `ios-testflight`. `ios-simulator` is an unsigned compile 
 | Marketing version | `1.0` (`MARKETING_VERSION`; the workflow replaces the build number) |
 | In-App Purchase | Not used. The capability is off, and the entitlements file is empty. |
 | Privacy manifest | `ios/App/App/PrivacyInfo.xcprivacy` |
+| In-app privacy link | https://iqappsgroup.co.uk/kickole/privacy |
+| In-app terms link | https://iqappsgroup.co.uk/kickole/terms |
 | Export compliance | `ITSAppUsesNonExemptEncryption` is `false` |
 | App icon | Present (`AppIcon`, Kickolé wordmark) |
 | Launch screen | `LaunchScreen.storyboard` is wired up |

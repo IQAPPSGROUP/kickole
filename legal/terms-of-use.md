@@ -73,6 +73,8 @@ belong to us or our licensors. Third-party components are used under their own
 licences, listed in the app's licences file. Nothing in these terms transfers
 ownership of any of that to you.
 
+You must not pull the footballer models out of the game or use them outside it.
+
 ## 9. Our responsibility to you
 
 - We will provide the game with **reasonable care and skill**.

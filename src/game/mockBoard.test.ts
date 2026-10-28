@@ -80,7 +80,7 @@ describe('mock board gate', () => {
       expect(assignments, file).toEqual([]);
     }
     const codemagic = readFileSync('codemagic.yaml', 'utf8');
-    expect(codemagic.split('VITE_ALLOW_MOCK must not be set for a store build.').length - 1).toBe(2);
+    expect(codemagic.split('VITE_ALLOW_MOCK must not be set for a store build.').length - 1).toBe(3);
     expect(readFileSync('.github/workflows/ios-archive.yml', 'utf8')).toContain('npm run ios:sync');
     const validate = readFileSync('.github/workflows/validate.yml', 'utf8');
     expect(validate).toContain('npm run build:store');

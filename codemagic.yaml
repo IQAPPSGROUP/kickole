@@ -172,9 +172,9 @@ workflows:
         # Publishable client key. Not a service-role secret.
         VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
         VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
-        VITE_PRIVACY_URL: https://iqappsgroup.co.uk/kickole/privacy
-        VITE_CHILD_SAFETY_URL: https://iqappsgroup.co.uk/kickole/child-safety
-        VITE_TERMS_URL: https://iqappsgroup.co.uk/kickole/terms
+        VITE_PRIVACY_URL: https://www.iqappsgroup.co.uk/kickole/privacy
+        VITE_CHILD_SAFETY_URL: https://www.iqappsgroup.co.uk/kickole/child-safety
+        VITE_TERMS_URL: https://www.iqappsgroup.co.uk/kickole/terms
     scripts:
       - name: Require the Play service account
         script: |

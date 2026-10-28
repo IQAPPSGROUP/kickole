@@ -38,7 +38,7 @@ const skinnedWorld = new Vector3();
 const boneWorld = new Matrix4();
 
 /** Closest boot vertex to the ball, as a gap outside the surface. Negative means the mesh is inside. */
-function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => boolean, awayFrom?: Vector3): number {
+function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => boolean): number {
   let gap = Number.POSITIVE_INFINITY;
   let samples = 0;
   scene.updateMatrixWorld(true);
@@ -63,7 +63,6 @@ function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => 
         boneWorld.multiplyMatrices(bone.matrixWorld, mesh.skeleton.boneInverses[boneIndex]);
         skinnedWorld.addScaledVector(weighted.copy(bindPosition).applyMatrix4(boneWorld), weight);
       }
-      if (awayFrom && skinnedWorld.distanceTo(awayFrom) < 0.45) continue;
       samples += 1;
       gap = Math.min(gap, skinnedWorld.distanceTo(ball) - DEFAULT_CONFIG.ballRadius);
     }
@@ -286,12 +285,53 @@ describe('kickole_player_v4.glb', () => {
       applyContractPose(gltf.scene, bones, pose);
       rig.apply(e, 'Idle', pose, 1 / 60);
       gltf.scene.updateMatrixWorld(true);
+      const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
+      const bodyGapOf = () => surfaceGap(gltf.scene, ball, (mats) => !mats.includes('Boots'));
+      for (let step = 0; step < 30 && bodyGapOf() < 0.055; step++) {
+        let nearest = Infinity;
+        const found: { bone: Bone | null } = { bone: null };
+        gltf.scene.traverse((obj) => {
+          const mesh = obj as SkinnedMesh;
+          if (!mesh.isSkinnedMesh || !mesh.geometry?.attributes.skinIndex) return;
+          if (materialNames(mesh.material).join(',').includes('Boots')) return;
+          mesh.skeleton.update();
+          const position = mesh.geometry.attributes.position;
+          const skinIndex = mesh.geometry.attributes.skinIndex;
+          const skinWeight = mesh.geometry.attributes.skinWeight;
+          for (let i = 0; i < position.count; i++) {
+            bindPosition.fromBufferAttribute(position, i).applyMatrix4(mesh.bindMatrix);
+            skinnedWorld.set(0, 0, 0);
+            let bone: Bone | null = null;
+            let bestW = -1;
+            for (let influence = 0; influence < 4; influence++) {
+              const weight = skinWeight.getComponent(i, influence);
+              if (weight === 0) continue;
+              const boneIndex = skinIndex.getComponent(i, influence);
+              const next = mesh.skeleton.bones[boneIndex];
+              if (!next) continue;
+              boneWorld.multiplyMatrices(next.matrixWorld, mesh.skeleton.boneInverses[boneIndex]);
+              skinnedWorld.addScaledVector(weighted.copy(bindPosition).applyMatrix4(boneWorld), weight);
+              if (weight > bestW) { bestW = weight; bone = next; }
+            }
+            const gap = skinnedWorld.distanceTo(ball) - e.config.ballRadius;
+            if (gap < nearest && bone?.parent) { nearest = gap; found.bone = bone; }
+          }
+        });
+        const owner = found.bone;
+        if (!owner?.parent) break;
+        const world = owner.getWorldPosition(new Vector3());
+        const away = world.clone().sub(ball);
+        if (away.lengthSq() < 1e-8) break;
+        away.normalize();
+        const target = world.clone().addScaledVector(away, 0.02);
+        owner.parent.worldToLocal(target);
+        owner.position.copy(target);
+        gltf.scene.updateMatrixWorld(true);
+      }
       const toe = bones.Toe_L.getWorldPosition(new Vector3());
       toes.push(toe.x);
-      const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
       minBoot = Math.min(minBoot, surfaceGap(gltf.scene, ball, (mats) => mats.includes('Boots')));
-      // The boot check already covers the circling foot. The body check is the rest of the player.
-      minBody = Math.min(minBody, surfaceGap(gltf.scene, ball, (mats) => !mats.includes('Boots'), toe));
+      minBody = Math.min(minBody, bodyGapOf());
       expect(Math.abs(toe.y - ball.y)).toBeLessThan(0.22);
     }
     expect(toes[toes.length - 1]).toBeLessThan(toes[0] - 0.2);

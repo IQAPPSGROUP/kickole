@@ -49,7 +49,7 @@ Confirm these match the **existing** App Store Connect and Play Console apps bef
 1. Confirm bundle/application id matches live listings.
 2. Do not create in-app products. This build has no shop and no Restore Purchases.
 3. Codemagic TestFlight upload (`ios-testflight`). Hand steps, including the App Store profile for `com.iqappsgroup.kickole`, are in [`TESTFLIGHT.md`](./TESTFLIGHT.md).
-4. Play App Signing + upload keystore; build signed AAB; upload internal track.
+4. Play internal upload. The signed bundle is workflow `android-internal` in `codemagic.yaml`. The upload keystore stays in Codemagic under the reference name `kickole`. Hand steps are in [`PLAY_INTERNAL.md`](./PLAY_INTERNAL.md). Production Play stays unpublished.
 5. Publish privacy policy URL + ASC / Play Data safety from [`STORE_DATA_SAFETY.md`](./STORE_DATA_SAFETY.md).
 
 **Store uploads have not been verified in this file.** The TestFlight build number comes from the Codemagic run, not from this page.

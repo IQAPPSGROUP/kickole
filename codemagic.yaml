@@ -150,3 +150,78 @@ workflows:
             build
     artifacts:
       - /tmp/xcodebuild_logs/*.log
+
+  android-internal:
+    name: Android Play internal
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    # Start from the Codemagic UI. Do not publish on every push.
+    # Internal draft only. Production Play stays unpublished.
+    triggering:
+      events: []
+    environment:
+      node: "22"
+      java: 21
+      android_signing:
+        - kickole
+      groups:
+        - google_play
+      vars:
+        PACKAGE_NAME: com.iqappsgroup.kickole
+        # Publishable client key. Not a service-role secret.
+        VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
+        VITE_LEGAL_URL: https://kickole.pages.dev/legal/
+    scripts:
+      - name: Require the upload keystore and Play credentials
+        script: |
+          set -euo pipefail
+          if [ -z "${CM_KEYSTORE_PATH:-}" ] || [ -z "${CM_KEYSTORE_PASSWORD:-}" ] || [ -z "${CM_KEY_ALIAS:-}" ] || [ -z "${CM_KEY_PASSWORD:-}" ]; then
+            echo "The Kickolé upload keystore is missing."
+            echo "In Codemagic, add an Android keystore with the reference name kickole."
+            echo "Do not commit the keystore, and do not print the passwords."
+            exit 1
+          fi
+          if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS:-}" ]; then
+            echo "GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS is missing."
+            echo "Add that secret to the google_play environment group."
+            echo "Do not commit the JSON key, and do not print it."
+            exit 1
+          fi
+          echo "Android signing and Play credentials are set."
+      - name: Install npm dependencies
+        script: |
+          set -euo pipefail
+          npm ci
+      - name: Run tests and typecheck
+        script: |
+          set -euo pipefail
+          npm test
+          npm run typecheck
+      - name: Build web assets and sync Android
+        script: |
+          set -euo pipefail
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
+          npm run build:store
+          npx cap sync android
+      - name: Build the signed Android App Bundle
+        script: |
+          set -euo pipefail
+          VERSION_CODE="${PROJECT_BUILD_NUMBER:-1}"
+          case "${VERSION_CODE}" in
+            ''|*[!0-9]*) VERSION_CODE=1 ;;
+          esac
+          echo "Android versionCode: ${VERSION_CODE}"
+          export KICKOLE_VERSION_CODE="${VERSION_CODE}"
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true

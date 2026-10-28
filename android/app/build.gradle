@@ -1,5 +1,8 @@
 apply plugin: 'com.android.application'
 
+def kickoleVersionCode = System.getenv("KICKOLE_VERSION_CODE")
+def kickoleKeystore = System.getenv("CM_KEYSTORE_PATH")
+
 android {
     namespace = "com.iqappsgroup.kickole"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,7 +10,7 @@ android {
         applicationId "com.iqappsgroup.kickole"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode kickoleVersionCode?.isInteger() ? kickoleVersionCode.toInteger() : 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,10 +19,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (kickoleKeystore) {
+                storeFile file(kickoleKeystore)
+                storePassword System.getenv("CM_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("CM_KEY_ALIAS")
+                keyPassword System.getenv("CM_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (kickoleKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

@@ -4,7 +4,7 @@ import type { Result } from '../game/controller';
 import { countryByCode } from '../game/countries';
 import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
-import { CHILD_SAFETY_URL, PRIVACY_URL, TERMS_URL } from '../site';
+import { CHILD_SAFETY_URL, PRIVACY_URL, SUPPORT_URL, TERMS_URL } from '../site';
 import {
   BLOCK_CONFIRMATION,
   DONE_CONFIRMATION,
@@ -446,7 +446,7 @@ export function SettingsScreen({
         <h2>SETTINGS</h2>
         <div className="group help">
           <p className="data-contact">
-            <a href="mailto:hello@iqappsgroup.co.uk">Contact or report a problem</a>
+            <a href={SUPPORT_URL} target="_blank" rel="noopener noreferrer">Contact or report a problem</a>
           </p>
           <p className="panel-note">Players can also report from the … on leaderboard rows.</p>
         </div>

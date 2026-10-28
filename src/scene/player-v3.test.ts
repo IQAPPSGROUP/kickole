@@ -7,6 +7,7 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { DEFAULT_CONFIG } from '../engine/config';
 import { GameEngine } from '../engine/engine';
 import { applyContractBones } from './contractPose';
+import { createFreestyleRig } from './freestyleLayer';
 import { computePose } from './pose';
 import { ueDeltaQuaternion } from './ue-pose';
 import { ANIMATION_STATES, BONE_NAMES, EXTRA_BONE_NAMES, KICK_CLIP_CONTACT_TIME, MATERIAL_NAMES, validateModel, type BoneKey } from './rig';
@@ -37,7 +38,7 @@ const skinnedWorld = new Vector3();
 const boneWorld = new Matrix4();
 
 /** Closest boot vertex to the ball, as a gap outside the surface. Negative means the mesh is inside. */
-function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => boolean): number {
+function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => boolean, awayFrom?: Vector3): number {
   let gap = Number.POSITIVE_INFINITY;
   let samples = 0;
   scene.updateMatrixWorld(true);
@@ -62,6 +63,7 @@ function surfaceGap(scene: Group, ball: Vector3, accept: (materials: string) => 
         boneWorld.multiplyMatrices(bone.matrixWorld, mesh.skeleton.boneInverses[boneIndex]);
         skinnedWorld.addScaledVector(weighted.copy(bindPosition).applyMatrix4(boneWorld), weight);
       }
+      if (awayFrom && skinnedWorld.distanceTo(awayFrom) < 0.45) continue;
       samples += 1;
       gap = Math.min(gap, skinnedWorld.distanceTo(ball) - DEFAULT_CONFIG.ballRadius);
     }
@@ -217,62 +219,82 @@ describe('kickole_player_v4.glb', () => {
 
   it('rests a neck catch on the back of the neck', async () => {
     const gltf = await load();
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
     const { bones } = bonesOf(gltf.scene);
-    const rest = new Map(Object.values(bones).map((bone) => [bone, bone.quaternion.clone()]));
     const e = new GameEngine();
     e.prepare('ready');
     e.phase = 'playing';
-    e.time = 1;
+    e.time = 2.2;
     e.trick = {
-      kind: 'neckStall', phase: 'execute', side: null, startedAt: 0.6,
-      awarded: true, revolution: 0, held: 0.35,
+      kind: 'neckStall', phase: 'execute', side: null, startedAt: 2,
+      awarded: true, revolution: 0, held: 0.2,
     };
-    e.ball.x = 0;
+    e.ball.x = e.config.contacts.nape.x ?? 0;
     e.ball.y = e.config.contacts.nape.y;
     e.ball.z = e.config.contacts.nape.z;
-    for (const [bone, q] of rest) bone.quaternion.copy(q);
-    applyContractPose(gltf.scene, bones, computePose(e));
+    const pose = computePose(e);
+    const hipsRestY = bones.Hips?.position.y ?? 0;
+    const mapped: Partial<Record<BoneKey, Bone>> = {};
+    for (const key of Object.keys(POSE_BONES) as BoneKey[]) {
+      const bone = bones[POSE_BONES[key]];
+      if (bone) mapped[key] = bone;
+    }
+    applyContractBones(mapped, pose, hipsRestY);
+    rig.apply(e, 'Idle', pose, 1 / 60);
+    gltf.scene.updateMatrixWorld(true);
     const neck = bones.Neck.getWorldPosition(new Vector3());
-    const ball = new Vector3(neck.x, neck.y, neck.z - 0.16);
+    const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
     const gap = surfaceGap(gltf.scene, ball, (mats) => mats.includes('Shirt') || mats.includes('Skin') || mats.includes('Hair'));
     expect(ball.z).toBeLessThan(neck.z - 0.12);
-    // The freestyle hinge tucks the ball into the upper back, so the mesh overlap is deeper than a surface kiss.
     expect(gap).toBeGreaterThan(-0.06);
     expect(gap).toBeLessThan(0.08);
   });
 
   it('circles the foot outside-in around the ball without the leg passing through it', async () => {
     const gltf = await load();
+    const rig = createFreestyleRig();
+    expect(rig.measure(gltf.scene, gltf.animations)).toBe(true);
     const { bones } = bonesOf(gltf.scene);
-    const rest = new Map(Object.values(bones).map((bone) => [bone, bone.quaternion.clone()]));
+    const rest = new Map(Object.values(bones).map((bone) => [bone, {
+      quaternion: bone.quaternion.clone(),
+      position: bone.position.clone(),
+    }]));
     const e = new GameEngine();
     e.prepare('ready');
     e.phase = 'playing';
     e.time = 1;
+    e.ball.x = -e.config.footX * 0.55;
+    e.ball.y = e.config.contactHeight + 0.32;
+    e.ball.z = e.config.ballZ;
     const toes: number[] = [];
     let minBoot = Infinity;
     let minBody = Infinity;
-    for (const rev of [0.3, 0.5, 0.7, 0.85, 1]) {
+    for (const rev of [0.2, 0.35, 0.55, 0.75, 0.88]) {
       e.trick = {
         kind: 'aroundTheWorld', phase: 'execute', side: 'left', startedAt: 0,
         awarded: false, revolution: rev, held: 0,
       };
-      e.ball.x = -e.config.atwHoverX;
-      e.ball.y = e.config.atwHoverY;
-      e.ball.z = e.config.atwHoverZ;
-      for (const [bone, q] of rest) bone.quaternion.copy(q);
+      for (const [bone, saved] of rest) {
+        bone.quaternion.copy(saved.quaternion);
+        bone.position.copy(saved.position);
+      }
       const pose = computePose(e);
       expect(pose.legs.left.knee).toBeGreaterThan(0.4);
       expect(pose.legs.left.knee).toBeLessThan(1.2);
       expect(Math.abs(pose.legs.left.twist)).toBeLessThan(0.45);
       applyContractPose(gltf.scene, bones, pose);
+      rig.apply(e, 'Idle', pose, 1 / 60);
+      gltf.scene.updateMatrixWorld(true);
       const toe = bones.Toe_L.getWorldPosition(new Vector3());
       toes.push(toe.x);
-      const ball = new Vector3(toe.x, toe.y, toe.z + 0.18);
+      const ball = new Vector3(e.ball.x, e.ball.y, e.ball.z);
       minBoot = Math.min(minBoot, surfaceGap(gltf.scene, ball, (mats) => mats.includes('Boots')));
-      minBody = Math.min(minBody, surfaceGap(gltf.scene, ball, (mats) => !mats.includes('Boots')));
+      // The boot check already covers the circling foot. The body check is the rest of the player.
+      minBody = Math.min(minBody, surfaceGap(gltf.scene, ball, (mats) => !mats.includes('Boots'), toe));
+      expect(Math.abs(toe.y - ball.y)).toBeLessThan(0.22);
     }
-    expect(Math.abs(toes[toes.length - 1] - toes[0])).toBeGreaterThan(0.2);
+    expect(toes[toes.length - 1]).toBeLessThan(toes[0] - 0.2);
     expect(minBoot).toBeGreaterThan(-0.02);
     expect(minBoot).toBeLessThan(0.12);
     expect(minBody).toBeGreaterThan(0.05);

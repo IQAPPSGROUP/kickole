@@ -43,6 +43,8 @@ to **90 days** so we can look at it. We do not tell you who reported you.
 That removes your nickname and scores. Reports that are still open are kept for
 their 90 days, then deleted.
 
+If you have been reported, hidden or banned, we keep an empty record, with only a random id and no nickname or country, until about 90 days after the last report or moderation action about you.
+
 ## What we do not do
 
 - No account, no email address, no name, no date of birth.
@@ -82,7 +84,7 @@ Data Transfer Addendum or the UK Extension to the EU–US Data Privacy Framework
 
 | Data | Kept for |
 | --- | --- |
-| Leaderboard entry (nickname, device id, score, country) | Until you delete it |
+| Leaderboard entry (nickname, device id, score, country) | Until you delete it. If you have been reported, hidden or banned, an empty record (random id only) stays until about 90 days after the last report or moderation action. |
 | Hashed IP address | Up to 30 days |
 | Reports about a player | Up to 90 days |
 

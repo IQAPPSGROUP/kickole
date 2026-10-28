@@ -13,7 +13,7 @@ import {
   matchKitColour,
 } from './kitColours';
 
-/** Body choice. Not a shop item. Both looks can be chosen. The game is paid up front. Existing saves migrate to male. */
+/** Body choice. Not a shop item. The body choice is selectable. Existing saves migrate to male. */
 export type PlayerBody = 'male' | 'female';
 
 export interface ClothingColors {
@@ -24,7 +24,7 @@ export interface ClothingColors {
 }
 
 export interface Appearance {
-  /** Male or female footballer. Both looks can be chosen. The game is paid up front. */
+  /** Male or female footballer. The body choice is selectable. */
   body: PlayerBody;
   skinTone: string;
   hairColor: string;

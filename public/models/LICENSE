@@ -10,9 +10,8 @@ footballers bought on Fab.
   Licence:     Fab Standard License, Personal tier
   Licensee: Rob, trading as IQ Apps Group
   Artist:      artistofthemonth
-  Male source: the 21,071-triangle model with the Godot humanoid rig
-               (84 bones in the download; reduced to the game contract)
-  Female source: the 29,085-triangle model with the normal FBX rig
+  Male: kickole_player_v4.glb, 29,085 triangles
+  Female: kickole_player_v4_female.glb, 21,203 triangles
 
 The optimised GLBs may ship inside the Kickolé app and the web build.
 The raw purchased source (zips, FBX, blend, and the unpacked textures)
@@ -27,8 +26,7 @@ Both bodies share the skeleton and clip contract in `docs/CHARACTER_GLB.md`.
 Fingers, twist bones and face bones are merged into at most 20 joints.
 The clips (Idle, KickLeft, KickRight, Miss, Celebrate) are original and
 sampled from the game pose. Kit colours and the chest number are applied
-at runtime. No club, league or real-player likeness is included. Both
-looks can be chosen. The game is paid up front, with no in-app purchases.
+at runtime. No club, league or real-player likeness is included.
 
 Court and lighting textures
 ---------------------------

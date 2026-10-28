@@ -566,7 +566,7 @@ export function SettingsScreen({
               .
             </p>
           )}
-          <p>The Kickolé footballers are adapted from models by artistofthemonth, used under the Fab Standard licence, Personal tier. Both looks can be chosen. The game is paid up front, with no in-app purchases. Character modifications, kit and game integration by IQ Apps Group.</p>
+          <p>The Kickolé footballers are adapted from models by artistofthemonth, used under the Fab Standard licence, Personal tier. Character modifications, kit and game integration by IQ Apps Group.</p>
           <p>Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised. See public/audio/LICENSE.txt.</p>
         </div>
         </div>

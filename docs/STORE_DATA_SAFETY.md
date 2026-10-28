@@ -25,15 +25,15 @@ Kickolé is paid upfront. The price is set in the stores. The app does not offer
 - **Other User Content:** the country the player chose, if any. Shown as that country's flag beside the nickname. Linked to the player. App functionality. Not used for tracking.
 - **Not collected:** location, contacts, purchases, advertising data, and analytics. A hashed IP may be stored for 30 days to limit cheating. It is not a location fix and it is not a separate privacy-manifest type in this build.
 - **Tracking:** No. App does not link with third-party data for advertising.
-- **Privacy Policy URL:** https://iqappsgroup.co.uk/kickole/privacy. This is the published policy. It includes the Privacy text from Settings and this repo’s wording.
-- **Child safety statement URL:** https://iqappsgroup.co.uk/kickole/child-safety
-- **Terms of use URL:** https://iqappsgroup.co.uk/kickole/terms
+- **Privacy Policy URL:** https://www.iqappsgroup.co.uk/kickole/privacy. This is the published policy. It includes the Privacy text from Settings and this repo’s wording.
+- **Child safety statement URL:** https://www.iqappsgroup.co.uk/kickole/child-safety
+- **Terms of use URL:** https://www.iqappsgroup.co.uk/kickole/terms
 
 ## Google Play — Data safety (guidance)
 
-- **Privacy policy URL:** https://iqappsgroup.co.uk/kickole/privacy
-- **Child safety statement URL:** https://iqappsgroup.co.uk/kickole/child-safety
-- **Terms of use URL:** https://iqappsgroup.co.uk/kickole/terms
+- **Privacy policy URL:** https://www.iqappsgroup.co.uk/kickole/privacy
+- **Child safety statement URL:** https://www.iqappsgroup.co.uk/kickole/child-safety
+- **Terms of use URL:** https://www.iqappsgroup.co.uk/kickole/terms
 - **Does your app collect or share user data?** Yes, only after the player joins the leaderboard. A nickname picked from our word lists, a random device id, a score and a chosen country are collected for the leaderboard (app functionality, not advertising). A hashed IP may be kept for 30 days to limit cheating. Kit choice and appearance stay on device.
 - **In-app purchases:** No.
 - **Data encryption / deletion:** The board is reached over HTTPS. In the app, Delete my leaderboard data removes the nickname and scores. If someone has reported that player, the report is kept for up to 90 days. Uninstall clears the on-device nickname, device id and country.

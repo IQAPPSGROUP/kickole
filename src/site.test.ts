@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHILD_SAFETY_URL, PRIVACY_URL, TERMS_URL } from './site';
 
-const PRIVACY = 'https://iqappsgroup.co.uk/kickole/privacy';
-const CHILD_SAFETY = 'https://iqappsgroup.co.uk/kickole/child-safety';
-const TERMS = 'https://iqappsgroup.co.uk/kickole/terms';
+const PRIVACY = 'https://www.iqappsgroup.co.uk/kickole/privacy';
+const CHILD_SAFETY = 'https://www.iqappsgroup.co.uk/kickole/child-safety';
+const TERMS = 'https://www.iqappsgroup.co.uk/kickole/terms';
 const MODELS_SENTENCE = 'You must not pull the footballer models out of the game or use them outside it.';
 
 function source(path: string): string {

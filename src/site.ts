@@ -8,9 +8,9 @@
  * Codemagic can set VITE_PRIVACY_URL, VITE_CHILD_SAFETY_URL, and VITE_TERMS_URL.
  * When those are unset, the company-site addresses below are used.
  */
-const COMPANY_PRIVACY_URL = 'https://iqappsgroup.co.uk/kickole/privacy';
-const COMPANY_CHILD_SAFETY_URL = 'https://iqappsgroup.co.uk/kickole/child-safety';
-const COMPANY_TERMS_URL = 'https://iqappsgroup.co.uk/kickole/terms';
+const COMPANY_PRIVACY_URL = 'https://www.iqappsgroup.co.uk/kickole/privacy';
+const COMPANY_CHILD_SAFETY_URL = 'https://www.iqappsgroup.co.uk/kickole/child-safety';
+const COMPANY_TERMS_URL = 'https://www.iqappsgroup.co.uk/kickole/terms';
 
 function readUrl(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : fallback;

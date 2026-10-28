@@ -32,11 +32,11 @@ describe('privacy notice v1.1', () => {
     expect(hosted).toContain('identify anyone, or to advertise');
     expect(hosted).toContain('We will try to keep them running');
     expect(hosted).toContain('nothing to spend money on inside the game');
-    expect(hosted).toContain('href="https://iqappsgroup.co.uk/kickole/licences/music"');
-    expect(hosted).toContain('href="https://iqappsgroup.co.uk/kickole/licences/models"');
+    expect(hosted).toContain('href="https://www.iqappsgroup.co.uk/kickole/licences/music"');
+    expect(hosted).toContain('href="https://www.iqappsgroup.co.uk/kickole/licences/models"');
     const settings = source('./Screens.tsx');
-    expect(settings).toContain('https://iqappsgroup.co.uk/kickole/licences/music');
-    expect(settings).toContain('https://iqappsgroup.co.uk/kickole/licences/models');
+    expect(settings).toContain('https://www.iqappsgroup.co.uk/kickole/licences/music');
+    expect(settings).toContain('https://www.iqappsgroup.co.uk/kickole/licences/models');
     expect(settings).not.toContain('public/audio/LICENSE.txt');
     expect(settings).not.toContain('kickole.pages.dev');
   });

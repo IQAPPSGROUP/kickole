@@ -1,9 +1,15 @@
 name: Deploy Kickolé to Cloudflare Pages
 
+# Only the live branch publishes the live site. A branch named preview, or
+# preview/<name>, may publish a preview site. That is the preview branch the
+# build rules name (for example preview/initial). Any other saved copy does
+# not publish, including a manual run.
 on:
   push:
     branches:
-      - '**'
+      - main
+      - preview
+      - 'preview/**'
   workflow_dispatch:
 
 permissions:
@@ -15,6 +21,9 @@ concurrency:
 
 jobs:
   deploy:
+    # Same allow-list as the push filter, so a manual run of any other
+    # saved copy does not publish a site.
+    if: github.ref_name == 'main' || github.ref_name == 'preview' || startsWith(github.ref_name, 'preview/')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -44,7 +53,7 @@ jobs:
           VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
         run: npm run build
-      # main stays the production branch. Any other branch is a Pages preview
+      # main stays the production branch. A preview branch is a Pages preview
       # at https://<branch-alias>.<project>.pages.dev. A slash in the branch
       # name becomes a hyphen in that alias.
       - name: Deploy to Cloudflare Pages

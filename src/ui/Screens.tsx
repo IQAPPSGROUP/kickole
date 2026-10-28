@@ -574,9 +574,9 @@ export function SettingsScreen({
           </p>
           <p>
             Menu and gameplay music are Rob's four songs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised.{' '}
-            <a href="https://www.iqappsgroup.co.uk/kickole/licences/music" target="_blank" rel="noopener noreferrer">Music licence</a>
+            <a className="licence-link" href="https://www.iqappsgroup.co.uk/kickole/licences/music" target="_blank" rel="noopener noreferrer">Music licence</a>
             {' · '}
-            <a href="https://www.iqappsgroup.co.uk/kickole/licences/models" target="_blank" rel="noopener noreferrer">Model licence</a>
+            <a className="licence-link" href="https://www.iqappsgroup.co.uk/kickole/licences/models" target="_blank" rel="noopener noreferrer">Model licence</a>
           </p>
         </div>
         </div>

@@ -25,7 +25,7 @@ The signed workflow is `ios-testflight`. `ios-simulator` is an unsigned compile 
 | In-app privacy link | https://www.iqappsgroup.co.uk/kickole/privacy |
 | In-app child safety link | https://www.iqappsgroup.co.uk/kickole/child-safety |
 | In-app terms link | https://www.iqappsgroup.co.uk/kickole/terms |
-| In-app support link | https://iqappsgroup.co.uk/kickole/support |
+| In-app support link | https://www.iqappsgroup.co.uk/kickole/support |
 | Export compliance | `ITSAppUsesNonExemptEncryption` is `false` |
 | App icon | Present (`AppIcon`, Kickolé wordmark) |
 | Launch screen | `LaunchScreen.storyboard` is wired up |

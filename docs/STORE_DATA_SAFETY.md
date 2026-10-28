@@ -28,14 +28,14 @@ Kickolé is paid upfront. The price is set in the stores. The app does not offer
 - **Privacy Policy URL:** https://www.iqappsgroup.co.uk/kickole/privacy. This is the published policy. It includes the Privacy text from Settings and this repo’s wording.
 - **Child safety statement URL:** https://www.iqappsgroup.co.uk/kickole/child-safety
 - **Terms of use URL:** https://www.iqappsgroup.co.uk/kickole/terms
-- **Support URL:** https://iqappsgroup.co.uk/kickole/support. The page gives hello@iqappsgroup.co.uk. Do not list https://kickole.pages.dev/support. That address opens this support page, not the game.
+- **Support URL:** https://www.iqappsgroup.co.uk/kickole/support. The page gives hello@iqappsgroup.co.uk. Do not list https://kickole.pages.dev/support. That address opens this support page, not the game.
 
 ## Google Play — Data safety (guidance)
 
 - **Privacy policy URL:** https://www.iqappsgroup.co.uk/kickole/privacy
 - **Child safety statement URL:** https://www.iqappsgroup.co.uk/kickole/child-safety
 - **Terms of use URL:** https://www.iqappsgroup.co.uk/kickole/terms
-- **Support URL:** https://iqappsgroup.co.uk/kickole/support
+- **Support URL:** https://www.iqappsgroup.co.uk/kickole/support
 - **Does your app collect or share user data?** Yes, only after the player joins the leaderboard. A nickname picked from our word lists, a random device id, a score and a chosen country are collected for the leaderboard (app functionality, not advertising). A hashed IP may be kept for 30 days to limit cheating. Kit choice and appearance stay on device.
 - **In-app purchases:** No.
 - **Data encryption / deletion:** The board is reached over HTTPS. In the app, Delete my leaderboard data removes the nickname and scores. If someone has reported that player, the report is kept for up to 90 days. Uninstall clears the on-device nickname, device id and country.

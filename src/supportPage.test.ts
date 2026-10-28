@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { SUPPORT_URL } from './site';
 
-const SUPPORT = 'https://iqappsgroup.co.uk/kickole/support';
+const SUPPORT = 'https://www.iqappsgroup.co.uk/kickole/support';
 
 function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8');

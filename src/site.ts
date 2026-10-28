@@ -21,4 +21,4 @@ export const CHILD_SAFETY_URL = readUrl(import.meta.env.VITE_CHILD_SAFETY_URL, C
 export const TERMS_URL = readUrl(import.meta.env.VITE_TERMS_URL, COMPANY_TERMS_URL);
 
 /** Company support page. The game must not be served at this address. */
-export const SUPPORT_URL = 'https://iqappsgroup.co.uk/kickole/support';
+export const SUPPORT_URL = 'https://www.iqappsgroup.co.uk/kickole/support';

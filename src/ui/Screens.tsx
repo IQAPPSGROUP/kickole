@@ -4,7 +4,7 @@ import type { Result } from '../game/controller';
 import { countryByCode } from '../game/countries';
 import { COUNTRY_BOARD_MIN, readBlockedNames, writeBlockedNames, type BoardEntry, type BoardPeriod, type BoardScope, type LeaderboardService } from '../game/leaderboard';
 import type { FreePair } from '../game/nickname';
-import { PRIVACY_URL, TERMS_URL } from '../site';
+import { CHILD_SAFETY_URL, PRIVACY_URL, TERMS_URL } from '../site';
 import {
   BLOCK_CONFIRMATION,
   DONE_CONFIRMATION,
@@ -562,7 +562,11 @@ export function SettingsScreen({
             <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer">
               privacy notice
             </a>
-            , child safety statement and{' '}
+            ,{' '}
+            <a href={CHILD_SAFETY_URL} target="_blank" rel="noopener noreferrer">
+              child safety statement
+            </a>
+            {' '}and{' '}
             <a href={TERMS_URL} target="_blank" rel="noopener noreferrer">
               terms of use
             </a>

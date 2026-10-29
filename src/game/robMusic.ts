@@ -1,6 +1,6 @@
 import { GAME_TRACKS, MENU_TRACK_ID, SHUFFLE_SONG, type GameTrackId, type SongChoice } from './tracks';
 
-/** Rob's songs. The generated bed in musicBed.ts plays only when these fail to load. */
+/** the four ElevenLabs instrumental songs. The generated bed in musicBed.ts plays only when these fail to load. */
 
 export const ROB_MENU_NAME = MENU_TRACK_ID;
 

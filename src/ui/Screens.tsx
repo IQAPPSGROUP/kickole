@@ -573,7 +573,7 @@ export function SettingsScreen({
             .
           </p>
           <p>
-            Menu and gameplay music were created by IQ Apps Group using ElevenLabs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised.{' '}
+            Menu and gameplay music are four instrumental songs made for Kickolé in ElevenLabs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised. See public/audio/LICENSE.txt.{' '}
             <a className="licence-link" href="https://www.iqappsgroup.co.uk/kickole/licences/music" target="_blank" rel="noopener noreferrer">Music licence</a>
             {' · '}
             <a className="licence-link" href="https://www.iqappsgroup.co.uk/kickole/licences/models" target="_blank" rel="noopener noreferrer">Model licence</a>

@@ -1,6 +1,6 @@
 # KICKOLÉ privacy notice
 
-Version 1.1. Last updated 28 October 2026. Replaces: version 1.0.
+Version 1.2. Last updated 29 October 2026. Replaces: version 1.1.
 
 ## Who we are
 
@@ -27,6 +27,7 @@ The leaderboard is **off until you tap Join leaderboard**. If you join, we send:
 | A **nickname** you pick from our word lists | So other players can see who set the score |
 | A **random device id** created on your device | To keep your scores together and let you delete them |
 | Your **score** | The leaderboard itself |
+| How your run went (**combo, run length and the timing of your kicks**) | To check scores are genuine and limit cheating. We check the kick timings when your score is sent and do not keep them. |
 | A **country** you choose, or International | Country boards, and the flag shown beside your nickname. We never use GPS or a network lookup to work out where you are |
 | A **hashed IP address**, kept for up to **30 days** | To limit cheating. We store only a hash, not the raw address |
 
@@ -37,13 +38,14 @@ Choosing **International** keeps you off every country board, and no country fla
 **When the leaderboard shows.** A leaderboard only appears once it has 20 or more players.
 
 **Reports.** If someone reports your nickname or score, we keep that report for up
-to **90 days** so we can look at it. We do not tell you who reported you.
+to **90 days** so we can look at it, or longer if it is still open. We do not tell you who reported you.
 
 **Deleting your leaderboard data.** Tap **Delete my leaderboard data** in Settings.
-That removes your nickname and scores. Reports that are still open are kept for
-their 90 days, then deleted.
-
-If you have been reported, hidden or banned, we keep an empty record, with only a random id and no nickname or country, until about 90 days after the last report or moderation action about you.
+That removes your nickname and scores. Reports that are still open are kept until
+we have dealt with them, then deleted once they are more than 90 days old. If you
+have been reported, hidden or banned, we keep an empty record, with only a random
+id and no nickname or country, until about 90 days after the last report or
+moderation action about you.
 
 ## What we do not do
 
@@ -84,9 +86,10 @@ Data Transfer Addendum or the UK Extension to the EU–US Data Privacy Framework
 
 | Data | Kept for |
 | --- | --- |
-| Leaderboard entry (nickname, device id, score, country) | Until you delete it. If you have been reported, hidden or banned, an empty record (random id only) stays until about 90 days after the last report or moderation action. |
+| Leaderboard entry (nickname, device id, score, country) | Until you delete it, or about 2 years after you last played, whichever comes first. If you have been reported, hidden or banned, an empty record (random id only) stays until about 90 days after the last report or moderation action about you, or longer if a report about you is still open. |
+| Your scores, combo and run length | Until you delete them, or 12 months after the run, whichever comes first |
 | Hashed IP address | Up to 30 days |
-| Reports about a player | Up to 90 days |
+| Reports about a player | Up to 90 days, or longer while a report is still open |
 
 ## Your rights
 

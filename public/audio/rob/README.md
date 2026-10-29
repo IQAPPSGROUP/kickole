@@ -1,6 +1,6 @@
-# Rob's music
+# Kickolé music
 
-Four of Rob's own tracks. The game does not add songs or read the phone library.
+Four instrumental tracks made for Kickolé in ElevenLabs, on a paid plan.
 
 Shuffle is the default. A shuffle run always starts with Alley Beat (`gameplay-instrumental`). When that track hands off, the run continues through We Rise, Keep It in the Air, and Don't Let It Drop in a shuffle, without playing the same song twice in a row. The next shuffle run starts on Alley Beat again.
 
@@ -23,4 +23,4 @@ The menu loop of We Rise runs from 0.6s to 146.0s when shuffle is selected. A pi
 
 Display titles live in `src/game/tracks.ts`. Pause can pin one track or return to shuffle. That choice is saved on the device.
 
-These are Rob's own songs for Kickolé. The generated bed in `src/game/musicBed.ts` plays only when a mode has no usable file.
+These four instrumental songs were created for Kickolé in ElevenLabs on a paid plan, under an account in Rob's name, and are used under that licence. The generated bed in `src/game/musicBed.ts` plays only when a mode has no usable file.

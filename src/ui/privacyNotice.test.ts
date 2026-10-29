@@ -7,7 +7,7 @@ function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), 'utf8');
 }
 
-describe('privacy notice v1.1', () => {
+describe('privacy notice v1.2', () => {
   const markdown = source('../../legal/privacy-notice.md');
   const hosted = source('../../public/legal/index.html');
   const privacyHtml = hosted.slice(
@@ -17,7 +17,7 @@ describe('privacy notice v1.1', () => {
   const manifest = source('../../ios/App/App/PrivacyInfo.xcprivacy');
 
   it('uses the same approved words in the app and on the hosted page', () => {
-    expect(markdown).toContain('Version 1.1. Last updated 28 October 2026. Replaces: version 1.0.');
+    expect(markdown).toContain('Version 1.2. Last updated 29 October 2026. Replaces: version 1.1.');
     expect(markdown).not.toContain('cartoon');
     expect(markdown).not.toContain('DRAFT');
     expect(markdown).toContain('A leaderboard only appears once it has 20 or more players.');
@@ -58,11 +58,12 @@ describe('privacy notice v1.1', () => {
     expect(manifest).not.toContain('NSPrivacyCollectedDataTypePurchaseHistory');
     expect(manifest).not.toContain('NSPrivacyCollectedDataTypeProductInteraction');
     expect(manifest).not.toContain('NSPrivacyCollectedDataTypeAdvertisingData');
+    expect(manifest).toContain('NSPrivacyCollectedDataTypeOtherDataTypes');
     expect(manifest).toContain('NSPrivacyCollectedDataTypePurposeAppFunctionality');
     expect(manifest).not.toContain('NSPrivacyCollectedDataTypePurposeAnalytics');
     expect(manifest).not.toContain('NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising');
-    expect(manifest.match(/<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<true\/>/g)).toHaveLength(4);
-    expect(manifest.match(/<key>NSPrivacyCollectedDataTypeTracking<\/key>\s*<false\/>/g)).toHaveLength(4);
+    expect(manifest.match(/<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<true\/>/g)).toHaveLength(5);
+    expect(manifest.match(/<key>NSPrivacyCollectedDataTypeTracking<\/key>\s*<false\/>/g)).toHaveLength(5);
     expect(manifest).toContain('<key>NSPrivacyTracking</key>\n\t<false/>');
   });
 });

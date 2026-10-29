@@ -42,7 +42,7 @@ describe('privacy notice v1.2', () => {
     expect(settings).not.toContain('picture licence');
     const css = source('../styles.css');
     expect(css).toMatch(/\.help a\.licence-link \{[^}]*word-break: normal/);
-    expect(settings).not.toContain('public/audio/LICENSE.txt');
+    expect(settings).toContain('Menu and gameplay music are four instrumental songs made for Kickolé in ElevenLabs. If a song file does not load, a synthesised boom-bap beat plays instead. Crowd and cheers are synthesised. See public/audio/LICENSE.txt.');
     expect(settings).not.toContain('kickole.pages.dev');
   });
 

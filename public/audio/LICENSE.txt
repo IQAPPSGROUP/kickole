@@ -1,11 +1,14 @@
 Kickolé music, crowd and cheers
 --------------------------------
-Menu and gameplay music are Rob's songs in public/audio/rob/ when
-those files are present. The game tries the .m4a first and falls
-back to the .ogg. If both fail to load, the generated boom-bap bed
-in src/game/musicBed.ts plays instead.
+Menu and gameplay music are the four instrumental songs in
+public/audio/rob/ when those files are present. The game tries the
+.m4a first and falls back to the .ogg. If both fail to load, the
+generated boom-bap bed in src/game/musicBed.ts plays instead.
 
-The four songs in Kickolé were created by IQ Apps Group using ElevenLabs under a paid plan that permits commercial use. Please don't copy, extract or reuse them.
+The four songs: the four instrumental songs in public/audio/rob/ were
+created for Kickolé in ElevenLabs, on a paid plan (Creator) under an
+account in Rob's name, in October 2026. They are used in Kickolé,
+including the paid commercial build, under that licence.
 
 Kicks, misses, stalls, the crowd murmur and the milestone cheers
 are synthesised in src/game/audio.ts (Web Audio oscillators and
@@ -21,6 +24,6 @@ voices and a vinyl crackle. Gameplay is the street loop at 92 BPM.
 The menu is a sparser variation at 90 BPM. No recorded drum breaks
 or sample library are used for that fallback.
 
-Rob's songs are the files in public/audio/rob/ when they are present.
+The four songs are the files in public/audio/rob/ when they are present.
 The fallback bed and the sound effects are synthesised here and need
 no further attribution.

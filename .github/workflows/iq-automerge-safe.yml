@@ -4,6 +4,7 @@ on:
     workflows: ["Validate"]
     types: [completed]
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 concurrency:
@@ -35,4 +36,8 @@ jobs:
             if (!safe) { core.info('HOLD: file path not in pilot allowlist'); return; }
             const { data: merged } = await github.rest.pulls.merge({ owner, repo, pull_number: number, sha: pr.head.sha, merge_method: 'squash', commit_title: `Automated CI-approved docs merge: #${number}` });
             core.info(`Merged=${merged.merged} sha=${merged.sha || 'unknown'}`);
-            if (!merged.merged) core.setFailed('GitHub did not confirm merge');
+            if (!merged.merged) { core.setFailed('GitHub did not confirm merge'); return; }
+            // A merge made using GITHUB_TOKEN does not trigger a normal push workflow.
+            // workflow_dispatch is a documented exception, so explicitly start the existing main-only deployment.
+            await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: 'deploy-cloudflare.yml', ref: 'main' });
+            core.info(`Cloudflare deployment workflow dispatched for newly merged main commit ${merged.sha}`);

@@ -16,6 +16,8 @@ npm run build      # production build into dist/
 npm run preview    # serve the production build
 ```
 
+To start the local preview, run `npm run dev` and open http://localhost:5173.
+
 ## Controls
 
 | Input | Action |

@@ -1,0 +1,32 @@
+name: IQ Apps safe docs Copilot dispatch pilot
+on:
+  issues:
+    types: [opened]
+permissions:
+  issues: write
+concurrency:
+  group: iq-autocode-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  assign-copilot:
+    if: ${{ github.event.issue.user.login == 'IQAPPSGROUP' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assign only explicitly scoped, low-risk docs tasks
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const { owner, repo } = context.repo;
+            if (!/^\[AUTO-CODE DOCS\] /i.test(issue.title || '')) { core.info('HOLD: not a safe docs task'); return; }
+            const body = String(issue.body || '');
+            if (!body || body.length > 4000) { core.info('HOLD: missing or oversized scope'); return; }
+            const prohibited = /\b(secret|password|token|oauth|payment|billing|database|children|child|personal data|privacy|security|deploy|release|authentication|authorization|api key|production infrastructure|dns|app store)\b/i;
+            if (prohibited.test(issue.title + ' ' + body)) { core.info('HOLD: sensitive scope'); return; }
+            if (!/\bREADME\.md\b/.test(body)) { core.info('HOLD: no explicit README scope'); return; }
+            if ((issue.assignees || []).some(x => x.login === 'Copilot')) { core.info('Already assigned'); return; }
+            const result = await github.rest.issues.addAssignees({ owner, repo, issue_number: issue.number, assignees: ['copilot-swe-agent[bot]'] });
+            const names = (result.data.assignees || []).map(x => x.login);
+            if (!names.some(x => x.toLowerCase() === 'copilot')) { core.setFailed('Copilot assignee not confirmed'); return; }
+            core.info(`Copilot coding assignment confirmed on issue #${issue.number}; actual coding status requires PR evidence`);

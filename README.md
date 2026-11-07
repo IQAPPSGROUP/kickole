@@ -16,6 +16,8 @@ npm run build      # production build into dist/
 npm run preview    # serve the production build
 ```
 
+For an automated docs review, run `npm run typecheck` before requesting review.
+
 ## Controls
 
 | Input | Action |

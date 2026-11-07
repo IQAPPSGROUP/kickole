@@ -1,0 +1,38 @@
+name: IQ Apps low-risk auto-merge pilot
+on:
+  workflow_run:
+    workflows: ["Validate"]
+    types: [completed]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: iq-automerge-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+jobs:
+  merge-after-ci:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Merge only same-repository documentation PRs after exact-SHA CI success
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { owner, repo } = context.repo;
+            const prs = Array.isArray(run.pull_requests) ? run.pull_requests : [];
+            if (prs.length !== 1) { core.info('HOLD: no unique PR associated with CI run'); return; }
+            const number = prs[0].number;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+            if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'main') { core.info('HOLD: PR state/base'); return; }
+            if (pr.head.repo.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) { core.info('HOLD: external fork'); return; }
+            if (pr.head.sha !== run.head_sha) { core.info('HOLD: CI run is stale'); return; }
+            if ((pr.labels || []).some(x => ['security-review','hold','no-auto-merge'].includes(x.name.toLowerCase()))) { core.info('HOLD: review label'); return; }
+            const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: number, per_page: 100 });
+            if (!files.length || files.length > 10) { core.info('HOLD: unexpected file count'); return; }
+            const safe = files.every(f => f.status !== 'removed' && (f.filename === 'README.md' || /^docs\/[A-Za-z0-9_./-]+\.md$/.test(f.filename)));
+            if (!safe) { core.info('HOLD: file path not in pilot allowlist'); return; }
+            const { data: merged } = await github.rest.pulls.merge({ owner, repo, pull_number: number, sha: pr.head.sha, merge_method: 'squash', commit_title: `Automated CI-approved docs merge: #${number}` });
+            core.info(`Merged=${merged.merged} sha=${merged.sha || 'unknown'}`);
+            if (!merged.merged) core.setFailed('GitHub did not confirm merge');

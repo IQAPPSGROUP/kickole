@@ -66,7 +66,11 @@ jobs:
           git add -- README.md
           git commit -m "Docs: scoped Copilot CLI update for issue #$ISSUE_NUMBER"
           git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin HEAD:"$branch"
-          gh pr create --base main --head "$branch" \
+          if gh pr create --base main --head "$branch" \
             --title "Automated docs task #$ISSUE_NUMBER" \
-            --body "Closes #$ISSUE_NUMBER. Copilot CLI generated README.md-only changes with a 30-credit session cap. GitHub CI and exact-SHA review are still required."
-          gh workflow run validate.yml --ref "$branch"
+            --body "Closes #$ISSUE_NUMBER. Copilot CLI generated README.md-only changes with a 30-credit session cap. GitHub CI and exact-SHA review are still required."; then
+            gh workflow run validate.yml --ref "$branch"
+          else
+            echo "GitHub Actions PR creation blocked; the authenticated IQ Apps dispatcher will create the PR from $branch."
+            echo "Coding completed and branch pushed: $branch. PR creation pending external user-authenticated dispatcher." >> "$GITHUB_STEP_SUMMARY"
+          fi

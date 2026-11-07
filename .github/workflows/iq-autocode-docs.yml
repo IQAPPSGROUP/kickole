@@ -1,7 +1,6 @@
-name: IQ Apps safe docs Copilot dispatch pilot
+name: IQ Apps legacy Copilot issue assignment (requires user token)
 on:
-  issues:
-    types: [opened]
+  workflow_dispatch:
 permissions:
   issues: write
 concurrency:

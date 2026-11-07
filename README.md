@@ -77,3 +77,5 @@ Foot contact: the engine responds `contactDelay` (0.04 s) after a tap. The defau
 ## Automated deployment verification
 
 For the IQ Apps controller pilot, a documentation-only pull request is used to verify the CI-gated merge and existing Cloudflare Pages deployment workflow. App builds and releases remain separate from store submissions.
+
+Automated CI/CD smoke note: the Pages publish pipeline is exercised only after a successful, trusted merge to `main`.

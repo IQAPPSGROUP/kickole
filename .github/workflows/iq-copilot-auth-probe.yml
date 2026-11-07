@@ -1,0 +1,19 @@
+name: IQ Copilot CLI auth capability probe
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/iq-copilot-auth-probe.yml']
+permissions:
+  contents: read
+  copilot-requests: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Install official GitHub Copilot CLI
+        run: npm install -g @github/copilot
+      - name: Confirm GitHub token can invoke Copilot without extra secrets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: copilot -p 'Respond with only READY. Do not use tools or make changes.' --yolo

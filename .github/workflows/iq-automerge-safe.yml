@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   merge-after-ci:
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && (github.event.workflow_run.event == 'pull_request' || (github.event.workflow_run.event == 'workflow_dispatch' && startsWith(github.event.workflow_run.head_branch, 'auto/docs-issue-'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -23,8 +23,18 @@ jobs:
             const run = context.payload.workflow_run;
             const { owner, repo } = context.repo;
             const prs = Array.isArray(run.pull_requests) ? run.pull_requests : [];
-            if (prs.length !== 1) { core.info('HOLD: no unique PR associated with CI run'); return; }
-            const number = prs[0].number;
+            let numbers = prs.map(x => x.number);
+            if (!numbers.length && run.event === 'workflow_dispatch') {
+              // GitHub suppresses pull_request events from GITHUB_TOKEN-created PRs.
+              // Only trust a successful, explicitly dispatched Validate run for our known safe bot branch.
+              if (!/^auto\/docs-issue-[0-9]+$/.test(run.head_branch || '') || run.actor?.login !== 'github-actions[bot]') {
+                core.info('HOLD: dispatched CI actor/branch not verified'); return;
+              }
+              const open = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', base: 'main', per_page: 100 });
+              numbers = open.filter(pr => pr.head.sha === run.head_sha && pr.head.ref === run.head_branch && pr.head.repo.full_name.toLowerCase() === `${owner}/${repo}`.toLowerCase()).map(pr => pr.number);
+            }
+            if (numbers.length !== 1) { core.info('HOLD: no unique PR associated with CI run'); return; }
+            const number = numbers[0];
             const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: number });
             if (pr.state !== 'open' || pr.draft || pr.base.ref !== 'main') { core.info('HOLD: PR state/base'); return; }
             if (pr.head.repo.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) { core.info('HOLD: external fork'); return; }

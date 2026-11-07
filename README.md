@@ -73,3 +73,7 @@ clip times. It shows the tap-to-ball-response time, the ball position/velocity, 
 The scene is rebuilt by replaying the real engine, so the frames match gameplay.
 
 Foot contact: the engine responds `contactDelay` (0.04 s) after a tap. The default v2 rig follows the procedural leg pose at that instant. The older clip-based reference starts its kick clip at 0.26 s so its 0.30 s contact frame coincides with that response. The inspector retains that clip-time scale for kick scrubbing.
+
+## Automated deployment verification
+
+For the IQ Apps controller pilot, a documentation-only pull request is used to verify the CI-gated merge and existing Cloudflare Pages deployment workflow. App builds and releases remain separate from store submissions.

@@ -1,0 +1,72 @@
+name: IQ Apps restricted Copilot CLI coding pilot
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+  actions: write
+  copilot-requests: write
+concurrency:
+  group: iq-copilot-cli-docs
+  cancel-in-progress: false
+jobs:
+  code-readme:
+    if: ${{ github.event.issue.user.login == 'IQAPPSGROUP' && startsWith(github.event.issue.title, '[AUTO-CODE DOCS] ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Guard request scope
+        id: guard
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const body = process.env.ISSUE_BODY || '';
+          const risky = /\b(secret|password|token|oauth|payment|billing|database|children|child|personal data|privacy|security|deploy|release|authentication|authorization|api key|production infrastructure|dns|app store)\b/i;
+          const eligible = body.length > 15 && body.length <= 1500 && /\bREADME\.md\b/.test(body) && !risky.test(body);
+          console.log(eligible ? 'Eligible docs-only task' : 'HOLD: restricted to safe README tasks');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'eligible=' + eligible + '\n');
+          NODE
+      - name: Checkout trusted main
+        if: steps.guard.outputs.eligible == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Install official GitHub Copilot CLI
+        if: steps.guard.outputs.eligible == 'true'
+        run: npm install -g @github/copilot
+      - name: Edit README through restricted Copilot tools
+        if: steps.guard.outputs.eligible == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          copilot -p "Edit README.md ONLY. Add a one-sentence note to the existing local development section: 'For an automated docs review, run npm run typecheck before requesting review.' Do not edit or create other project files. This is a narrow documentation-only verification task." \
+            --max-ai-credits=30 \
+            --available-tools='view,edit,grep,glob' \
+            --allow-tool='read,write(README.md)' \
+            --no-ask-user
+      - name: Publish only README diff as a pull request
+        if: steps.guard.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          files="$(git status --porcelain --untracked-files=all | sed -E 's/^...//')"
+          if [ -z "$files" ]; then echo "HOLD: no file changes"; exit 0; fi
+          if [ "$files" != "README.md" ]; then echo "HOLD: unexpected changed files: $files"; exit 1; fi
+          branch="auto/docs-issue-$ISSUE_NUMBER"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add -- README.md
+          git commit -m "Docs: scoped Copilot CLI update for issue #$ISSUE_NUMBER"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin HEAD:"$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Automated docs task #$ISSUE_NUMBER" \
+            --body "Closes #$ISSUE_NUMBER. Copilot CLI generated README.md-only changes with a 30-credit session cap. GitHub CI and exact-SHA review are still required."
+          gh workflow run validate.yml --ref "$branch"

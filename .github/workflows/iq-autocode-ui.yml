@@ -9,7 +9,7 @@ permissions:
   actions: write
   copilot-requests: write
 concurrency:
-  group: iq-ui-pilot
+  group: iq-ui-pilot-${{ github.event.issue.number }}
   cancel-in-progress: false
 jobs:
   code-ui:
@@ -72,6 +72,23 @@ jobs:
           git add -- src/ui/KitColours.tsx
           git commit -m "UI: scoped Copilot pilot for issue #$ISSUE_NUMBER"
           git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin HEAD:"$branch"
-          if ! gh pr create --base main --head "$branch" --title "UI pilot for issue #$ISSUE_NUMBER" --body "Copilot CLI generated a bounded UI change. Independent review and exact-SHA CI required. No automatic merge authorised."; then
-            echo "PR creation blocked; authenticated dispatcher must open PR for $branch" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          expected_sha="$(git rev-parse HEAD)"
+          # GITHUB_TOKEN pushes do not trigger normal push workflows. Dispatch validation explicitly.
+          gh workflow run validate.yml --ref "$branch" -f expected_sha="$expected_sha"
+          validated=false
+          for attempt in $(seq 1 45); do
+            sleep 20
+            runs="$(gh run list --workflow validate.yml --branch "$branch" --event workflow_dispatch --json headSha,status,conclusion,databaseId --limit 20)"
+            match="$(echo "$runs" | jq -c --arg sha "$expected_sha" '[.[] | select(.headSha == $sha)] | first // empty')"
+            if [ -z "$match" ]; then continue; fi
+            status="$(echo "$match" | jq -r '.status')"
+            conclusion="$(echo "$match" | jq -r '.conclusion // ""')"
+            if [ "$status" = completed ]; then
+              if [ "$conclusion" = success ]; then validated=true; break; fi
+              echo "HOLD: exact-head validation failed: $conclusion" >&2
+              exit 1
+            fi
+          done
+          if [ "$validated" != true ]; then echo "HOLD: exact-head validation not confirmed" >&2; exit 1; fi
+          # A failed PR creation is a failed coding job, not an apparent success.
+          gh pr create --base main --head "$branch" --title "UI pilot for issue #$ISSUE_NUMBER" --body "Bounded Copilot change. Exact-head workflow_dispatch validation succeeded for $expected_sha. Independent review required; no automatic merge."

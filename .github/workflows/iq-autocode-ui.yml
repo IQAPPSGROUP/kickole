@@ -65,6 +65,15 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - name: Check paid coding budget gate
+        if: steps.guard.outputs.eligible == 'true'
+        env:
+          PAID_CODING_ALLOWED: ${{ vars.IQ_PAID_CODING_ALLOWED }}
+        run: |
+          if [ "$PAID_CODING_ALLOWED" != true ]; then
+            echo 'HOLD: paid coding is disabled until the £100 monthly spend monitor explicitly authorises it.'
+            exit 1
+          fi
       - name: Install Copilot CLI
         if: steps.guard.outputs.eligible == 'true'
         run: npm install -g @github/copilot
@@ -92,6 +101,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+          IQ_DISPATCH_TOKEN: ${{ secrets.IQ_APPS_DISPATCH_TOKEN }}
         run: |
           set -euo pipefail
           branch="auto/ui-issue-$ISSUE_NUMBER"
@@ -120,8 +130,14 @@ jobs:
             fi
           done
           if [ "$validated" != true ]; then echo "HOLD: exact-head validation not confirmed" >&2; exit 1; fi
-          # A failed PR creation is a failed coding job, not an apparent success.
-          if ! gh pr create --base main --head "$branch" --title "UI pilot for issue #$ISSUE_NUMBER" --body "Bounded Copilot change. Exact-head workflow_dispatch validation succeeded for $expected_sha. Independent review required; no automatic merge."; then
-            echo "HOLD: GitHub Actions token could not create PR. Authenticated dispatcher must open $branch at $expected_sha." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+          # Prefer the workflow token; fall back to a separately provisioned,
+          # narrowly scoped GitHub App/dispatcher token if repository policy blocks it.
+          pr_title="UI pilot for issue #$ISSUE_NUMBER"
+          pr_body="Bounded Copilot change. Exact-head validation succeeded for $expected_sha. Independent review required; no automatic merge."
+          if ! gh pr create --base main --head "$branch" --title "$pr_title" --body "$pr_body"; then
+            if [ -z "${IQ_DISPATCH_TOKEN:-}" ]; then
+              echo "HOLD: Actions PR creation blocked and IQ_APPS_DISPATCH_TOKEN is not configured." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            GH_TOKEN="$IQ_DISPATCH_TOKEN" gh pr create --base main --head "$branch" --title "$pr_title" --body "$pr_body"
           fi

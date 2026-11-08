@@ -2,6 +2,9 @@ name: IQ Apps restricted UI coding pilot
 on:
   issues:
     types: [opened]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 permissions:
   contents: write
   pull-requests: write
@@ -15,20 +18,44 @@ concurrency:
   cancel-in-progress: false
 jobs:
   code-ui:
-    if: ${{ github.event.issue.user.login == 'IQAPPSGROUP' && startsWith(github.event.issue.title, '[AUTO-CODE UI] ') }}
+    if: ${{ github.event_name != 'issues' || (github.event.issue.user.login == 'IQAPPSGROUP' && startsWith(github.event.issue.title, '[AUTO-CODE UI] ')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 65
     steps:
+      - name: Resolve oldest unprocessed eligible issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = issues ]; then
+            number="$EVENT_ISSUE"
+          else
+            number=""
+            while IFS= read -r candidate; do
+              [ -n "$candidate" ] || continue
+              branch="auto/ui-issue-$candidate"
+              if gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" >/dev/null 2>&1; then continue; fi
+              number="$candidate"
+              break
+            done < <(gh issue list --state open --limit 100 --json number,title,author --jq '[.[] | select(.author.login == "IQAPPSGROUP" and (.title | startswith("[AUTO-CODE UI] "))) | .number] | sort | .[]')
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          if [ -n "$number" ]; then
+            gh issue view "$number" --json body --jq .body > "$RUNNER_TEMP/iq-issue-body.txt"
+          fi
       - name: Guard exact low-risk scope
         id: guard
         env:
-          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_BODY_FILE: ${{ runner.temp }}/iq-issue-body.txt
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const body = process.env.ISSUE_BODY || '';
+          const body = fs.existsSync(process.env.ISSUE_BODY_FILE) ? fs.readFileSync(process.env.ISSUE_BODY_FILE, 'utf8') : '';
           const risky = /\b(secret|password|token|oauth|payment|billing|database|children|child|personal data|privacy|security|deploy|release|authentication|authorization|api key|production infrastructure|dns|app store|workflow|actions|storage|backend|supabase)\b/i;
-          const eligible = body.length > 20 && body.length <= 700 && !risky.test(body) && /\bKitColours\.tsx\b/.test(body);
+          const eligible = Boolean('${{ steps.issue.outputs.number }}') && body.length > 20 && body.length <= 700 && !risky.test(body) && /\bKitColours\.tsx\b/.test(body);
           fs.appendFileSync(process.env.GITHUB_OUTPUT, 'eligible=' + eligible + '\n');
           console.log(eligible ? 'Eligible narrowly scoped UI task' : 'HOLD: not eligible');
           NODE
@@ -64,7 +91,7 @@ jobs:
         if: steps.guard.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
         run: |
           set -euo pipefail
           branch="auto/ui-issue-$ISSUE_NUMBER"

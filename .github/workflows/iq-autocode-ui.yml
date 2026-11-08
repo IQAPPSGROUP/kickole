@@ -9,7 +9,9 @@ permissions:
   actions: write
   copilot-requests: write
 concurrency:
-  group: iq-ui-pilot-${{ github.event.issue.number }}
+  # Conservative single-worker lock: at most one paid coding job can run.
+  # A displaced pending workflow remains represented by its open GitHub issue.
+  group: iq-ui-pilot-global
   cancel-in-progress: false
 jobs:
   code-ui:

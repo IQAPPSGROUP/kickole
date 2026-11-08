@@ -1,0 +1,77 @@
+name: IQ Apps restricted UI coding pilot
+on:
+  issues:
+    types: [opened]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: read
+  actions: write
+  copilot-requests: write
+concurrency:
+  group: iq-ui-pilot
+  cancel-in-progress: false
+jobs:
+  code-ui:
+    if: ${{ github.event.issue.user.login == 'IQAPPSGROUP' && startsWith(github.event.issue.title, '[AUTO-CODE UI] ') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Guard exact low-risk scope
+        id: guard
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const body = process.env.ISSUE_BODY || '';
+          const risky = /\b(secret|password|token|oauth|payment|billing|database|children|child|personal data|privacy|security|deploy|release|authentication|authorization|api key|production infrastructure|dns|app store|workflow|actions|storage|backend|supabase)\b/i;
+          const eligible = body.length > 20 && body.length <= 700 && !risky.test(body) && /\bKitColours\.tsx\b/.test(body);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'eligible=' + eligible + '\n');
+          console.log(eligible ? 'Eligible narrowly scoped UI task' : 'HOLD: not eligible');
+          NODE
+      - name: Checkout trusted main
+        if: steps.guard.outputs.eligible == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Install Copilot CLI
+        if: steps.guard.outputs.eligible == 'true'
+        run: npm install -g @github/copilot
+      - name: Implement bounded UI change
+        if: steps.guard.outputs.eligible == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          copilot -p "In src/ui/KitColours.tsx ONLY, make a small, safe accessibility improvement to the visual colour-selection UI, keeping current props, behaviour and functionality. Do not touch any other files. Keep the change minimal and readable." \
+            --max-ai-credits=15 \
+            --available-tools='view,edit,grep,glob' \
+            --allow-tool='read,write(src/ui/KitColours.tsx)' \
+            --no-ask-user
+      - name: Verify scoped diff and run tests
+        if: steps.guard.outputs.eligible == 'true'
+        run: |
+          set -euo pipefail
+          files="$(git status --porcelain --untracked-files=all | sed -E 's/^...//')"
+          test "$files" = "src/ui/KitColours.tsx" || { echo "HOLD: changed files outside allowlist or no changes: $files"; exit 1; }
+          npm ci
+          npm run typecheck
+          npm test
+      - name: Push review branch and attempt PR
+        if: steps.guard.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          branch="auto/ui-issue-$ISSUE_NUMBER"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add -- src/ui/KitColours.tsx
+          git commit -m "UI: scoped Copilot pilot for issue #$ISSUE_NUMBER"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin HEAD:"$branch"
+          if ! gh pr create --base main --head "$branch" --title "UI pilot for issue #$ISSUE_NUMBER" --body "Copilot CLI generated a bounded UI change. Independent review and exact-SHA CI required. No automatic merge authorised."; then
+            echo "PR creation blocked; authenticated dispatcher must open PR for $branch" >> "$GITHUB_STEP_SUMMARY"
+          fi

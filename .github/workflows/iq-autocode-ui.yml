@@ -20,7 +20,7 @@ jobs:
   code-ui:
     if: ${{ github.event_name != 'issues' || (github.event.issue.user.login == 'IQAPPSGROUP' && startsWith(github.event.issue.title, '[AUTO-CODE UI] ')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 110
     steps:
       - name: Resolve oldest unprocessed eligible issue
         id: issue
@@ -100,13 +100,14 @@ jobs:
           git checkout -b "$branch"
           git add -- src/ui/KitColours.tsx
           git commit -m "UI: scoped Copilot pilot for issue #$ISSUE_NUMBER"
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push origin HEAD:"$branch"
+          # Retry safely: update the issue's existing branch only if it has not diverged.
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" push --force-with-lease origin HEAD:"$branch"
           expected_sha="$(git rev-parse HEAD)"
           # GITHUB_TOKEN pushes do not trigger normal push workflows. Dispatch validation explicitly.
           gh workflow run validate.yml --ref "$branch" -f expected_sha="$expected_sha"
           validated=false
-          for attempt in $(seq 1 45); do
-            sleep 20
+          for attempt in $(seq 1 280); do
+            sleep 15
             runs="$(gh run list --workflow validate.yml --branch "$branch" --event workflow_dispatch --json headSha,status,conclusion,databaseId --limit 20)"
             match="$(echo "$runs" | jq -c --arg sha "$expected_sha" '[.[] | select(.headSha == $sha)] | first // empty')"
             if [ -z "$match" ]; then continue; fi
@@ -120,4 +121,7 @@ jobs:
           done
           if [ "$validated" != true ]; then echo "HOLD: exact-head validation not confirmed" >&2; exit 1; fi
           # A failed PR creation is a failed coding job, not an apparent success.
-          gh pr create --base main --head "$branch" --title "UI pilot for issue #$ISSUE_NUMBER" --body "Bounded Copilot change. Exact-head workflow_dispatch validation succeeded for $expected_sha. Independent review required; no automatic merge."
+          if ! gh pr create --base main --head "$branch" --title "UI pilot for issue #$ISSUE_NUMBER" --body "Bounded Copilot change. Exact-head workflow_dispatch validation succeeded for $expected_sha. Independent review required; no automatic merge."; then
+            echo "HOLD: GitHub Actions token could not create PR. Authenticated dispatcher must open $branch at $expected_sha." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

@@ -15,7 +15,7 @@ jobs:
   code-ui:
     if: ${{ github.event.issue.user.login == 'IQAPPSGROUP' && startsWith(github.event.issue.title, '[AUTO-CODE UI] ') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 65
     steps:
       - name: Guard exact low-risk scope
         id: guard

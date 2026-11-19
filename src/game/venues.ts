@@ -21,12 +21,6 @@ export const STAGE_VENUES: readonly StageVenue[] = [
     image: base('backdrops/urban-concrete.png'),
   },
   {
-    id: 'cliff-lookout',
-    name: 'Cliff Lookout',
-    subtitle: 'Copacabana Edge · Sunset',
-    image: base('backdrops/cliff-lookout.png'),
-  },
-  {
     id: 'helipad-vista',
     name: 'Helipad Vista',
     subtitle: 'Skyline Deck · Golden Hour',

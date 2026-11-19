@@ -54,9 +54,11 @@ export function Logo() {
 }
 
 export function Home({
-  best, onPlay, onSettings, onCustomise, onKitColours, onLeaderboard,
+  best, venueName = 'Urban Concrete', onCycleVenue, onPlay, onSettings, onCustomise, onKitColours, onLeaderboard,
 }: {
   best: number;
+  venueName?: string;
+  onCycleVenue?: () => void;
   onPlay: () => void;
   onSettings: () => void;
   onCustomise: () => void;
@@ -70,15 +72,19 @@ export function Home({
           <span className="neo-badge volt">CYPHER BATTLE</span>
           <span className="neo-badge cyan">NEO-ARCADE</span>
         </div>
-        <p className="court-label">FUTEBOL DE RUA <span>•</span> STREET FREESTYLE</p>
         <Logo />
-        <p className="tagline">Find your rhythm. Own the court.</p>
       </div>
       <div className="home-bottom">
         <div className="pill-row">
-          <div className="best-pill">BEST <b>{best}</b></div>
+          <div className="best-pill">PB <b>{best}</b></div>
+          {onCycleVenue && (
+            <button type="button" className="neo-venue-btn" onClick={onCycleVenue}>
+              <span>STAGE: {venueName}</span>
+              <b>CYCLE VENUE →</b>
+            </button>
+          )}
         </div>
-        <button className="btn primary big neo-cta" onClick={onPlay}>LET’S PLAY <span aria-hidden="true">↗</span></button>
+        <button className="btn primary big neo-cta" onClick={onPlay}>DROP IN TO PITCH <span aria-hidden="true">→</span></button>
         <div className="home-actions neo-action-grid">
           <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
           <button className="btn ghost" onClick={onKitColours}>CHOOSE YOUR KIT</button>
@@ -90,7 +96,6 @@ export function Home({
           <span><b>HOLD</b> Stall</span>
           <span><b>SWIPE</b> Tricks</span>
         </div>
-        <p className="home-help">Tap to juggle · Hold L or R to kick higher · Hold through the ball to stall</p>
         <p className="credit">IQ Apps Group · v1.0</p>
       </div>
     </div>

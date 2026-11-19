@@ -2085,3 +2085,53 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 .neo-track-meta b {
   color: var(--volt);
 }
+
+/* 2D Calibrated Stage Backdrop behind transparent 3D character canvas */
+.stage-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  z-index: 0;
+  pointer-events: none;
+  filter: brightness(0.78) contrast(1.06);
+}
+
+.home-top .logo-mark {
+  display: none;
+}
+
+.home-top .logo-word {
+  width: min(56vw, 240px);
+}
+
+.neo-venue-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  color: var(--bone);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.neo-venue-btn b {
+  color: var(--volt);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+}
+
+.foot-btn.left {
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.4), 3px 3px 0 #000000;
+}
+
+.foot-btn.right {
+  box-shadow: 0 0 18px rgba(226, 248, 4, 0.4), 3px 3px 0 #000000;
+}

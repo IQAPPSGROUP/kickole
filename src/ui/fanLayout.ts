@@ -23,6 +23,8 @@ const PHONE_MIN_W = 360;
 const PHONE_MAX_W = 430;
 const PHONE_INSET_X = 8;
 const PHONE_MIDDLE = 8;
+/** Cap corner fan radius on iPads and wide landscape screens so tricks stay in thumb reach. */
+const MAX_FAN_D = 168;
 
 export interface FanLayout {
   button: number;
@@ -54,8 +56,8 @@ export function fanLayout(
   // Open the fan until ATW and GROOVE keep `middle` between them. On a narrow
   // phone that radius is shorter than the 35° chord, so the diagonal trick
   // steps out along the same ray until it clears its two neighbours.
-  const d = Math.max(0, dMax);
-  const maxDx = (width - insetLeft - insetRight - button * 2 - gap) / 2;
+  const d = Math.min(MAX_FAN_D, Math.max(0, dMax));
+  const maxDx = Math.min(MAX_FAN_D, (width - insetLeft - insetRight - button * 2 - gap) / 2);
   const diag = diagonalRadius(d, button, gap, Math.max(d, maxDx / COS_35));
   const dx = diag * COS_35;
   const dy = diag * SIN_35;

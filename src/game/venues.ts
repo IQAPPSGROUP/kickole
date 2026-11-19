@@ -12,19 +12,19 @@ export const STAGE_VENUES: readonly StageVenue[] = [
     id: 'neon-cage',
     name: 'Neon Cage',
     subtitle: 'Eye-Level Court · Dusk',
-    image: base('backdrops/neon-cage.png'),
+    image: base('backdrops/neon-cage.webp'),
   },
   {
     id: 'urban-concrete',
     name: 'Urban Concrete',
     subtitle: 'Rio Terrace · Street',
-    image: base('backdrops/urban-concrete.png'),
+    image: base('backdrops/urban-concrete.webp'),
   },
   {
     id: 'helipad-vista',
     name: 'Helipad Vista',
     subtitle: 'Skyline Deck · Golden Hour',
-    image: base('backdrops/helipad-vista.png'),
+    image: base('backdrops/helipad-vista.webp'),
   },
 ] as const;
 

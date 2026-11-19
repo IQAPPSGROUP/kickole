@@ -2148,6 +2148,37 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   color: var(--volt);
 }
 
+.home ~ .now-playing {
+  top: max(12px, var(--sat-t));
+}
+
+@media (orientation: landscape) {
+  .stage-backdrop {
+    object-position: center 72%;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 768px) {
+  .home {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: max(32px, env(safe-area-inset-left));
+    padding-right: max(32px, env(safe-area-inset-right));
+  }
+  .home-top {
+    align-self: flex-start;
+    padding-top: 28px;
+    text-align: left;
+  }
+  .home-top .neo-badge-row {
+    justify-content: flex-start;
+  }
+  .home-bottom {
+    align-items: flex-end;
+  }
+}
+
 .neo-venue-btn {
   display: inline-flex;
   align-items: center;

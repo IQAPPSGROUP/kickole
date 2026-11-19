@@ -1813,3 +1813,397 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) {
   .world-rank-delta { animation: none; }
 }
+
+/* ==========================================================================
+   Neo-Arcade Street Football (Google Stitch Rework Layer)
+   ========================================================================== */
+:root {
+  --asphalt: #0D1117;
+  --concrete: #161B22;
+  --slate: #1A1F2C;
+  --volt: #E2F804;
+  --cyan: #00F0FF;
+  --flare: #FF4D30;
+  --bone: #F6F8FA;
+  --steel: #8B949E;
+  --font-display: 'Barlow Condensed', 'Trebuchet MS', system-ui, sans-serif;
+  --font-body: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+}
+
+.neo-badge-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.neo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: skewX(-8deg);
+  border-radius: 3px;
+}
+
+.neo-badge.volt {
+  background: var(--volt);
+  color: var(--asphalt);
+  box-shadow: 3px 3px 0 #000000;
+}
+
+.neo-badge.cyan {
+  background: rgba(0, 240, 255, 0.14);
+  color: var(--cyan);
+  border: 1px solid rgba(0, 240, 255, 0.65);
+}
+
+.neo-cta {
+  background: var(--volt) !important;
+  color: var(--asphalt) !important;
+  font-family: var(--font-display) !important;
+  letter-spacing: 0.08em !important;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  box-shadow: 0 0 18px rgba(226, 248, 4, 0.45), 4px 4px 0 #000000 !important;
+}
+
+.neo-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: min(92vw, 360px);
+}
+
+.neo-action-grid .btn.ghost {
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  padding: 10px 12px;
+  min-height: 44px;
+  border-radius: 6px;
+  transform: skewX(-4deg);
+}
+
+.neo-controls-strip {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.neo-controls-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 4px;
+  background: rgba(13, 17, 23, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--bone);
+  font-family: var(--font-body);
+  font-size: 11px;
+}
+
+.neo-controls-strip b {
+  color: var(--volt);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+.neo-over-card {
+  background: var(--asphalt) !important;
+  border: 2px solid rgba(226, 248, 4, 0.45) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 0 28px rgba(0, 240, 255, 0.18), 0 20px 60px rgba(0, 0, 0, 0.72) !important;
+}
+
+.neo-over-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.neo-over-head h2 {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 32px;
+  letter-spacing: 0.04em;
+  color: var(--bone);
+}
+
+.neo-rank-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  transform: skewX(-6deg);
+  background: var(--volt);
+  color: var(--asphalt);
+  box-shadow: 4px 4px 0 #000000;
+  flex: none;
+}
+
+.neo-rank-badge.rank-a {
+  background: var(--cyan);
+}
+
+.neo-rank-badge.rank-b {
+  background: var(--bone);
+}
+
+.neo-rank-badge.rank-c {
+  background: var(--concrete);
+  color: var(--bone);
+  border: 1px solid var(--steel);
+}
+
+.neo-rank-badge strong {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.neo-rank-badge span {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.neo-stats-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.neo-stats-grid div {
+  background: var(--concrete);
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.neo-stats-grid b {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--bone);
+}
+
+.neo-stats-grid span {
+  color: var(--steel);
+}
+
+.neo-cadence-rail {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(13, 17, 23, 0.72);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+.neo-cadence-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.55);
+}
+
+.neo-cadence-diamond {
+  width: 10px;
+  height: 10px;
+  background: var(--volt);
+  box-shadow: 0 0 10px rgba(226, 248, 4, 0.75);
+  transform: rotate(45deg);
+}
+
+.combo.is-combo {
+  color: var(--cyan);
+}
+
+.combo.is-fever {
+  background: var(--flare);
+  color: var(--asphalt);
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-shadow: 0 0 14px rgba(255, 77, 48, 0.65);
+}
+
+.neo-soundtrack-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.song-tick,
+.song-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.neo-track-name {
+  flex: 1;
+  text-align: left;
+  font-weight: 700;
+}
+
+.neo-track-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.neo-track-role {
+  font-style: normal;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 240, 255, 0.14);
+  color: var(--cyan);
+}
+
+.neo-track-meta b {
+  color: var(--volt);
+}
+
+/* 2D Calibrated Stage Backdrop behind transparent 3D character canvas */
+.stage-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 65%;
+  z-index: 0;
+  pointer-events: none;
+  filter: brightness(0.78) contrast(1.06);
+}
+
+.home-top .logo-mark {
+  display: none;
+}
+
+.home-top .logo-word {
+  width: min(44vw, 180px);
+}
+
+.zones {
+  z-index: 20;
+}
+
+/* 140px Bi-Lateral Radial Thumb Arcs with Slide/Swipe Gesture Affordance */
+.fan-left .foot-btn,
+.fan-right .foot-btn {
+  width: 124px;
+  height: 124px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.fan-left .foot-btn {
+  border-radius: 22px 124px 22px 22px;
+  padding-right: 14px;
+  padding-top: 10px;
+}
+
+.fan-right .foot-btn {
+  border-radius: 124px 22px 22px 22px;
+  padding-left: 14px;
+  padding-top: 10px;
+}
+
+.neo-arc-sub {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+  opacity: 0.9;
+}
+
+.fan-right .neo-arc-sub {
+  color: var(--volt);
+}
+
+.home ~ .now-playing {
+  top: max(12px, var(--sat-t));
+}
+
+@media (orientation: landscape) {
+  .stage-backdrop {
+    object-position: center 72%;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 768px) {
+  .home {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: max(32px, env(safe-area-inset-left));
+    padding-right: max(32px, env(safe-area-inset-right));
+  }
+  .home-top {
+    align-self: flex-start;
+    padding-top: 28px;
+    text-align: left;
+  }
+  .home-top .neo-badge-row {
+    justify-content: flex-start;
+  }
+  .home-bottom {
+    align-items: flex-end;
+  }
+}
+
+.neo-venue-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.45);
+  color: var(--bone);
+  font-family: var(--font-body);
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.neo-venue-btn b {
+  color: var(--volt);
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+}
+
+.foot-btn.left {
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.4), 3px 3px 0 #000000;
+}
+
+.foot-btn.right {
+  box-shadow: 0 0 18px rgba(226, 248, 4, 0.4), 3px 3px 0 #000000;
+}

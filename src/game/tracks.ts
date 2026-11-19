@@ -1,10 +1,10 @@
 /** Gameplay songs. Alley Beat and We Rise are provisional titles. */
 
 export const GAME_TRACKS = [
-  { id: 'gameplay-instrumental', title: 'Alley Beat' },
-  { id: 'menu-song', title: 'We Rise' },
-  { id: 'game-song-2', title: 'Keep It in the Air' },
-  { id: 'game-song-3', title: "Don't Let It Drop" },
+  { id: 'gameplay-instrumental', title: 'Alley Beat', bpm: 128, role: 'OPENER' },
+  { id: 'menu-song', title: 'We Rise', bpm: 130, role: 'ANTHEM' },
+  { id: 'game-song-2', title: 'Keep It in the Air', bpm: 136, role: 'ROTATION' },
+  { id: 'game-song-3', title: "Don't Let It Drop", bpm: 140, role: 'CLIMAX' },
 ] as const;
 
 export type GameTrackId = (typeof GAME_TRACKS)[number]['id'];

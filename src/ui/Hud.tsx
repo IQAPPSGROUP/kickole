@@ -38,8 +38,16 @@ export function Hud({
         </div>
         <div className="hud-sub">
           <GraffitiText text={`KICK-UPS ${hud.kickUps}`} className="graffiti score-sub" />
-          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
+          {combo > 1 && (
+            <span
+              className={`combo ${hud.streak >= 30 ? 'is-fever' : combo >= 3 ? 'is-combo' : ''}`}
+              key={combo}
+            >
+              {hud.streak >= 30 ? `5X FEVER · x${combo}` : `COMBO x${combo}`}
+            </span>
+          )}
         </div>
+        {hud.phase === 'playing' && <CadenceRail />}
         {hud.trickRepeat && (
           <p className={hud.trickRepeat.left <= 3 ? 'trick-repeat is-low' : 'trick-repeat'}>
             {trickRepeatText(hud.trickRepeat.kind, hud.trickRepeat.left)}
@@ -353,17 +361,52 @@ function PowerRing({ controller, side }: { controller: GameController; side: Sid
 }
 
 function bindFoot(controller: GameController, side: Side) {
+  let active: { id: number; x: number; y: number; swiped: boolean } | null = null;
+  let lastTapAt = 0;
   return {
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.stopPropagation();
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      active = { id: e.pointerId, x: e.clientX, y: e.clientY, swiped: false };
       controller.press(side, e.pointerId);
+    },
+    onPointerMove: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!active || active.id !== e.pointerId || active.swiped) return;
+      if (controller.engine.phase !== 'playing') return;
+      const dx = e.clientX - active.x;
+      const dy = e.clientY - active.y;
+      if (Math.hypot(dx, dy) < 28) return;
+      active.swiped = true;
+      if (dy <= -28 && Math.abs(dy) >= Math.abs(dx)) {
+        controller.playTrick('highFlick');
+      } else if (dy >= 28 && Math.abs(dy) >= Math.abs(dx)) {
+        controller.playTrick('thigh');
+      } else if (side === 'right' && dx <= -28) {
+        controller.playTrick('aroundTheWorld');
+      } else if (side === 'left' && dx >= 28) {
+        controller.playTrick('groove');
+      }
     },
     onPointerUp: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.stopPropagation();
+      const wasSwiped = active?.swiped ?? false;
+      active = null;
+      controller.release(side);
+      if (!wasSwiped && side === 'right' && controller.engine.phase === 'playing') {
+        const now = performance.now();
+        if (now - lastTapAt < 260) {
+          controller.playTrick('aroundTheWorld');
+          lastTapAt = 0;
+        } else {
+          lastTapAt = now;
+        }
+      }
+    },
+    onPointerCancel: () => {
+      active = null;
       controller.release(side);
     },
-    onPointerCancel: () => controller.release(side),
   };
 }
 
@@ -583,6 +626,7 @@ export function TouchZones({ controller, onPause }: { controller: GameController
           <PowerRing controller={controller} side="left" />
           <span className="foot-btn-mark">L</span>
           <span className="foot-btn-label">LEFT</span>
+          <span className="neo-arc-sub">SLIDE · STALL</span>
         </button>
       </div>
       <div className="fan fan-right" role="group" aria-label="Right foot and tricks">
@@ -592,8 +636,43 @@ export function TouchZones({ controller, onPause }: { controller: GameController
           {clueOn('feet') && clue && <ClueMark gesture={clue.gesture} />}
           <span className="foot-btn-mark">R</span>
           <span className="foot-btn-label">RIGHT</span>
+          <span className="neo-arc-sub">SLIDE · 2X ATW</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Top-center BPM cadence beat rail synced to the active track's beat clock. */
+function CadenceRail() {
+  const diamondRef = useRef<HTMLSpanElement>(null);
+  const trackId = useSyncExternalStore(subscribeNowPlaying, () => {
+    // subscribeNowPlaying passes no snapshot reader; trackTitle handles fallback cleanly.
+    return MENU_TRACK_ID;
+  });
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    let frame = 0;
+    const tick = () => {
+      const el = diamondRef.current;
+      if (el) {
+        const { pulse } = beatClock();
+        el.style.transform = `rotate(45deg) scale(${(0.85 + pulse * 0.45).toFixed(3)})`;
+        el.style.opacity = String(0.55 + pulse * 0.45);
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const label = trackTitle(trackId);
+  return (
+    <div className="neo-cadence-rail" aria-hidden="true">
+      <span className="neo-cadence-dot" />
+      <span className="neo-cadence-dot" />
+      <span ref={diamondRef} className="neo-cadence-diamond" title={label} />
+      <span className="neo-cadence-dot" />
+      <span className="neo-cadence-dot" />
     </div>
   );
 }

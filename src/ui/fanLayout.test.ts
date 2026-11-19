@@ -87,4 +87,10 @@ describe('corner fan', () => {
       expect(rect.y + rect.h).toBeLessThanOrEqual(844 - 34);
     }
   });
+
+  it('caps fan spread on iPad and landscape widths so tricks stay in thumb reach', () => {
+    const ipad = fanLayout(1024);
+    expect(ipad.d).toBeLessThanOrEqual(168);
+    expect(ipad.dx).toBeLessThanOrEqual(168);
+  });
 });

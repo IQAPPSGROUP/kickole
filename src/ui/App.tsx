@@ -7,6 +7,7 @@ import { parseNickname } from '../game/nickname';
 import { mockBoardFromSearch, mockCrowdFromSearch, shownBoardScore } from '../game/mockBoard';
 import { hydrateBoardOptIn, hydrateCountry, hydrateDeviceId, hydrateNickname, loadBoardOptIn, loadDeviceId, loadNickname, loadStoredCountry, resetLeaderboardIdentity, saveBoardOptIn, saveCountry, saveNickname, type BoardOptIn } from '../game/nicknameStore';
 import { deletePlayerAccount, peekNickname, registerPlayer, serverNicknameMessage, suggestFreeNames, createSupabaseLeaderboard } from '../game/supabaseLeaderboard';
+import { getVenue, loadVenueId, nextVenueId, saveVenueId } from '../game/venues';
 import { GameCanvas } from '../scene/GameCanvas';
 import { fanLayout } from './fanLayout';
 import { footSideAt, footTapAction } from './restartTap';
@@ -42,6 +43,14 @@ export function App() {
   const [kitReturn, setKitReturn] = useState<Overlay>('none');
   const [paused, setPaused] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
+  const [venueId, setVenueId] = useState(() => loadVenueId());
+  const cycleVenue = () => {
+    setVenueId((current) => {
+      const next = nextVenueId(current);
+      saveVenueId(next);
+      return next;
+    });
+  };
   const [nickname, setNickname] = useState<string | null>(() => loadNickname());
   const [countryChoice, setCountryChoice] = useState(() => loadStoredCountry());
   const [optIn, setOptIn] = useState<BoardOptIn>(() => loadBoardOptIn());
@@ -345,7 +354,7 @@ export function App() {
 
   return (
     <div className="app" onContextMenu={(e) => e.preventDefault()}>
-      <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} />
+      <GameCanvas controller={controller} skin={snap.skin} graphics={snap.settings.graphics} venueId={venueId} />
       {needsBody && phase === 'menu' && (
         <BodySelect onChoose={(body) => controller.chooseBody(body)} />
       )}
@@ -361,6 +370,8 @@ export function App() {
       {phase === 'menu' && overlay === 'none' && !needsBody && !needsOpt && !needsNick && !needsCountry && !(reviewOpen && board) && (
         <Home
           best={snap.save.best}
+          venueName={getVenue(venueId).name}
+          onCycleVenue={cycleVenue}
           onPlay={startGame}
           onSettings={() => setOverlay('settings')}
           onCustomise={() => setOverlay('customise')}

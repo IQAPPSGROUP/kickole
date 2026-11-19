@@ -1,25 +1,22 @@
 import { Component, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { AgXToneMapping, BackSide, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
+import { AgXToneMapping, EquirectangularReflectionMapping, PMREMGenerator, PerspectiveCamera, Vector3, type WebGLRenderer } from 'three';
 import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { releaseDecodedMusic, restoreMusicAfterContext } from '../game/audio';
 import type { GameController } from '../game/controller';
 import type { Skin } from '../game/skins';
 import type { GraphicsChoice, Quality } from '../game/storage';
+import { DEFAULT_VENUE_ID, getVenue } from '../game/venues';
 import { CharacterSwitch } from './CharacterSwitch';
 import { Ball } from './Ball';
-import { Court } from './Court';
 import { Effects } from './Effects';
 import { inspector } from './inspector';
 import { fx } from './fx';
 import { KeyLight } from './KeyLight';
 import { cameraSway, prefersReducedMotion } from './juice';
-import { SceneLife } from './SceneLife';
-import { AlleySky } from './AlleySky';
 import { ALLEY_VIEWS, alleyModelUrl, alleyViewFromSearch } from './alleyLayout';
 import { ENVIRONMENT_THEME } from './environment';
-import { PostFX } from './PostFX';
 import { STREET_ENV_INTENSITY, STREET_EXPOSURE, STREET_FILL, STREET_HDR_URL, STREET_HEMI } from './daylight';
 import { installPcss, restorePcss } from './pcss';
 import { contextLostNeedsReload, CONTEXT_RESTORE_WAIT_MS } from './glRecovery';
@@ -186,49 +183,7 @@ function StreetTone({ exposure }: { exposure: number }) {
   return null;
 }
 
-const SKY_VERTEX = /* glsl */ `
-  varying vec3 vDir;
-  void main() {
-    vDir = position;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const SKY_FRAGMENT = /* glsl */ `
-  varying vec3 vDir;
-  void main() {
-    vec3 dir = normalize(vDir);
-    float up = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
-    vec3 horizon = vec3(0.10, 0.38, 0.86);
-    vec3 zenith = vec3(0.02, 0.16, 0.62);
-    vec3 color = mix(horizon, zenith, pow(up, 0.65));
-    vec3 sunDir = normalize(vec3(0.55, 0.78, 0.28));
-    float sun = pow(max(dot(dir, sunDir), 0.0), 360.0);
-    float glow = pow(max(dot(dir, sunDir), 0.0), 8.0);
-    color += vec3(1.0, 0.62, 0.28) * sun * 1.6;
-    color += vec3(1.0, 0.78, 0.45) * glow * 0.18;
-    gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
-/** Deep blue sky with a warm sun. The gameplay camera looks at the horizon, so an equirect horizon would read grey. */
-function CarnivalSky() {
-  return (
-    <mesh frustumCulled={false} renderOrder={-1}>
-      <sphereGeometry args={[48, 28, 16]} />
-      <shaderMaterial
-        side={BackSide}
-        depthWrite={false}
-        fog={false}
-        toneMapped={false}
-        vertexShader={SKY_VERTEX}
-        fragmentShader={SKY_FRAGMENT}
-      />
-    </mesh>
-  );
-}
-
-/** Shared sunny HDR for reflections. CarnivalSky is the visible sky. */
+/** Shared sunny HDR for reflections. */
 function SunnyIbl({ ibl }: { ibl: boolean }) {
   const { gl, scene } = useThree();
   const generation = useSyncExternalStore(subscribeGpuRestore, gpuGeneration);
@@ -333,12 +288,9 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
   const profile = profileFor(quality);
   const shadows = profile.shadows !== 'none';
   useEffect(() => { onReady(); }, [onReady]);
-  const postProfile = ENVIRONMENT_THEME === 'beach' ? { ...profile, bloom: false, dof: false } : profile;
   return (
     <>
       <StreetTone exposure={STREET_EXPOSURE} />
-      <color attach="background" args={[alley ? '#8ec6ef' : '#1a6fd0']} />
-      {alley ? <AlleySky quality={quality} /> : <CarnivalSky />}
       <CameraRig shake={quality !== 'low'} quality={quality} />
       {!alley && (street || profile.sky !== 'flat') && <SunnyIbl ibl={profile.ibl} />}
       <Simulation controller={controller} />
@@ -346,13 +298,17 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
       <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
       <KeyLight quality={quality} engine={controller.engine} />
-      <Court key={generation} shadows={shadows} quality={quality} />
-      <SceneLife engine={controller.engine} quality={quality} />
-      {/* drei ContactShadows paints a flat blue disc on this court, so it stays off. */}
-      <CharacterSwitch key={`${skin.playerBody}-${generation}`} engine={controller.engine} skin={skin} quality={quality} />
-      <Ball engine={controller.engine} skin={skin} quality={quality} />
-      <Effects engine={controller.engine} quality={quality} />
-      <PostFX profile={postProfile} engine={controller.engine} />
+      <group scale={1.1} position={[0, -0.05, 0]}>
+        {shadows && (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
+            <planeGeometry args={[12, 12]} />
+            <shadowMaterial transparent opacity={0.35} />
+          </mesh>
+        )}
+        <CharacterSwitch key={`${skin.playerBody}-${generation}`} engine={controller.engine} skin={skin} quality={quality} />
+        <Ball engine={controller.engine} skin={skin} quality={quality} />
+        <Effects engine={controller.engine} quality={quality} />
+      </group>
     </>
   );
 }
@@ -383,7 +339,18 @@ function GlError({ message }: { message: string }) {
   );
 }
 
-export function GameCanvas({ controller, skin, graphics }: { controller: GameController; skin: Skin; graphics: GraphicsChoice }) {
+export function GameCanvas({
+  controller,
+  skin,
+  graphics,
+  venueId = DEFAULT_VENUE_ID,
+}: {
+  controller: GameController;
+  skin: Skin;
+  graphics: GraphicsChoice;
+  venueId?: string;
+}) {
+  const venue = getVenue(venueId);
   const [supported] = useState(hasWebGL);
   const [ready, setReady] = useState(false);
   const [lostAt, setLostAt] = useState<number | null>(null);
@@ -424,6 +391,7 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
   const shadowType = !shadowsOn ? false : profile.shadowFilter === 'pcss' ? 'basic' : 'variance';
   return (
     <Boundary fallback={<GlError message="Something went wrong while drawing the game." />}>
+      <img className="stage-backdrop" src={venue.image} alt="" aria-hidden="true" draggable={false} />
       {!ready && <div className="loading"><div className="spinner" />Loading…</div>}
       {showLost && <GlError message="The graphics context was lost. Reload to continue." />}
       {tier !== 'low' && <div className="vignette" />}
@@ -431,7 +399,9 @@ export function GameCanvas({ controller, skin, graphics }: { controller: GameCon
         key={tier}
         shadows={shadowType}
         dpr={dpr}
+        style={{ position: 'relative', zIndex: 1 }}
         gl={{
+          alpha: true,
           antialias: useMsaa(),
           powerPreference: 'high-performance',
           toneMapping: AgXToneMapping,

@@ -8,7 +8,8 @@ import { JUICE_PALETTE, particleBudget, prefersReducedMotion } from './juice';
 
 interface Particle { x: number; y: number; z: number; vx: number; vy: number; vz: number; life: number; max: number; size: number; color: Color; gravity: number }
 
-const PALETTE = [JUICE_PALETTE.pink, JUICE_PALETTE.gold, JUICE_PALETTE.white, JUICE_PALETTE.violet, JUICE_PALETTE.teal, JUICE_PALETTE.coral].map((c) => new Color(c));
+const PALETTE = ['#E2F804', '#00F0FF', '#F6F8FA', '#FF4D30', JUICE_PALETTE.gold, JUICE_PALETTE.teal].map((c) => new Color(c));
+const FEVER_PALETTE = ['#E2F804', '#00F0FF', '#FF4D30'].map((c) => new Color(c));
 const DUST = new Color('#9fb3b8');
 const dummy = new Object3D();
 const scratch = new Color();
@@ -24,7 +25,9 @@ function spawnInto(
   gravity: number,
   life: number,
   dust = false,
+  fever = false,
 ) {
+  const palette = fever ? FEVER_PALETTE : PALETTE;
   for (let i = 0; i < n && list.length < cap; i++) {
     const a = Math.random() * Math.PI * 2;
     const up = dust ? 0.2 + Math.random() * 0.5 : Math.random() * 1.2 - 0.2;
@@ -32,7 +35,7 @@ function spawnInto(
     list.push({
       x, y, z, vx: Math.cos(a) * s, vy: up * s, vz: Math.sin(a) * s,
       life: life * (0.6 + Math.random() * 0.4), max: life, size: dust ? 0.05 + Math.random() * 0.05 : 0.03 + Math.random() * 0.03,
-      color: dust ? DUST : PALETTE[(Math.random() * PALETTE.length) | 0], gravity,
+      color: dust ? DUST : palette[(Math.random() * palette.length) | 0], gravity,
     });
   }
 }
@@ -54,13 +57,15 @@ export function Effects({ engine, quality }: { engine: GameEngine; quality: Qual
       const list = parts.current;
       if (e.type === 'kick') {
         ringT.current = 0;
+        const inFever = e.streak >= 30;
         spawnInto(list, max, quality === 'low' ? 5 : 8, b.x, b.y - 0.04, b.z, 0.7, 1.4, 0.28, true);
-        if (e.grade === 'perfect') {
-          fx.shake = 1;
-          spawnInto(list, max, quality === 'low' ? 8 : 14, b.x, b.y, b.z, 2.2, 6, 0.7);
+        if (e.grade === 'perfect' || inFever) {
+          if (e.grade === 'perfect') fx.shake = 1;
+          const count = inFever ? (quality === 'low' ? 12 : 20) : (quality === 'low' ? 8 : 14);
+          spawnInto(list, max, count, b.x, b.y, b.z, inFever ? 2.8 : 2.2, 6, 0.75, false, inFever);
         }
         if (e.streak > 0 && e.streak % 10 === 0 && !reduced) {
-          spawnInto(list, max, Math.min(18, max), b.x, b.y + 0.3, b.z, 3.2, 5, 1.2);
+          spawnInto(list, max, Math.min(24, max), b.x, b.y + 0.3, b.z, 3.6, 5, 1.2, false, e.streak >= 30);
         }
       } else if (e.type === 'drop') {
         fx.shake = 0.7;

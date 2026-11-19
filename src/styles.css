@@ -2111,6 +2111,43 @@ button:focus-visible { outline: 3px solid #f5c94d; outline-offset: 4px; }
   z-index: 20;
 }
 
+/* 140px Bi-Lateral Radial Thumb Arcs with Slide/Swipe Gesture Affordance */
+.fan-left .foot-btn,
+.fan-right .foot-btn {
+  width: 124px;
+  height: 124px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.fan-left .foot-btn {
+  border-radius: 22px 124px 22px 22px;
+  padding-right: 14px;
+  padding-top: 10px;
+}
+
+.fan-right .foot-btn {
+  border-radius: 124px 22px 22px 22px;
+  padding-left: 14px;
+  padding-top: 10px;
+}
+
+.neo-arc-sub {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--cyan);
+  opacity: 0.9;
+}
+
+.fan-right .neo-arc-sub {
+  color: var(--volt);
+}
+
 .neo-venue-btn {
   display: inline-flex;
   align-items: center;

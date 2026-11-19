@@ -38,8 +38,16 @@ export function Hud({
         </div>
         <div className="hud-sub">
           <GraffitiText text={`KICK-UPS ${hud.kickUps}`} className="graffiti score-sub" />
-          {combo > 1 && <span className="combo" key={combo}>COMBO x{combo}</span>}
+          {combo > 1 && (
+            <span
+              className={`combo ${hud.streak >= 30 ? 'is-fever' : combo >= 3 ? 'is-combo' : ''}`}
+              key={combo}
+            >
+              {hud.streak >= 30 ? `5X FEVER · x${combo}` : `COMBO x${combo}`}
+            </span>
+          )}
         </div>
+        {hud.phase === 'playing' && <CadenceRail />}
         {hud.trickRepeat && (
           <p className={hud.trickRepeat.left <= 3 ? 'trick-repeat is-low' : 'trick-repeat'}>
             {trickRepeatText(hud.trickRepeat.kind, hud.trickRepeat.left)}
@@ -594,6 +602,40 @@ export function TouchZones({ controller, onPause }: { controller: GameController
           <span className="foot-btn-label">RIGHT</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Top-center BPM cadence beat rail synced to the active track's beat clock. */
+function CadenceRail() {
+  const diamondRef = useRef<HTMLSpanElement>(null);
+  const trackId = useSyncExternalStore(subscribeNowPlaying, () => {
+    // subscribeNowPlaying passes no snapshot reader; trackTitle handles fallback cleanly.
+    return MENU_TRACK_ID;
+  });
+  useEffect(() => {
+    if (prefersReducedMotion()) return undefined;
+    let frame = 0;
+    const tick = () => {
+      const el = diamondRef.current;
+      if (el) {
+        const { pulse } = beatClock();
+        el.style.transform = `rotate(45deg) scale(${(0.85 + pulse * 0.45).toFixed(3)})`;
+        el.style.opacity = String(0.55 + pulse * 0.45);
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  const label = trackTitle(trackId);
+  return (
+    <div className="neo-cadence-rail" aria-hidden="true">
+      <span className="neo-cadence-dot" />
+      <span className="neo-cadence-dot" />
+      <span ref={diamondRef} className="neo-cadence-diamond" title={label} />
+      <span className="neo-cadence-dot" />
+      <span className="neo-cadence-dot" />
     </div>
   );
 }

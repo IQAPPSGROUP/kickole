@@ -66,6 +66,10 @@ export function Home({
   return (
     <div className="screen home">
       <div className="home-top">
+        <div className="neo-badge-row">
+          <span className="neo-badge volt">CYPHER BATTLE</span>
+          <span className="neo-badge cyan">NEO-ARCADE</span>
+        </div>
         <p className="court-label">FUTEBOL DE RUA <span>•</span> STREET FREESTYLE</p>
         <Logo />
         <p className="tagline">Find your rhythm. Own the court.</p>
@@ -74,18 +78,37 @@ export function Home({
         <div className="pill-row">
           <div className="best-pill">BEST <b>{best}</b></div>
         </div>
-        <button className="btn primary big" onClick={onPlay}>LET’S PLAY <span aria-hidden="true">↗</span></button>
-        <div className="home-actions">
+        <button className="btn primary big neo-cta" onClick={onPlay}>LET’S PLAY <span aria-hidden="true">↗</span></button>
+        <div className="home-actions neo-action-grid">
           <button className="btn ghost" onClick={onCustomise}>CUSTOMISE</button>
+          <button className="btn ghost" onClick={onKitColours}>CHOOSE YOUR KIT</button>
+          <button className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
+          <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
         </div>
-        <button className="btn ghost" onClick={onKitColours}>CHOOSE YOUR KIT</button>
-        <button className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
-        <button className="btn ghost" onClick={onSettings}>SETTINGS</button>
+        <div className="neo-controls-strip" aria-hidden="true">
+          <span><b>TAP L/R</b> Juggle</span>
+          <span><b>HOLD</b> Stall</span>
+          <span><b>SWIPE</b> Tricks</span>
+        </div>
         <p className="home-help">Tap to juggle · Hold L or R to kick higher · Hold through the ball to stall</p>
         <p className="credit">IQ Apps Group · v1.0</p>
       </div>
     </div>
   );
+}
+
+function runRank(score: number, bestStreak: number): 'S' | 'A' | 'B' | 'C' {
+  if (score >= 1500 || bestStreak >= 30) return 'S';
+  if (score >= 600 || bestStreak >= 15) return 'A';
+  if (score >= 200 || bestStreak >= 6) return 'B';
+  return 'C';
+}
+
+function formatAirtime(durationMs: number): string {
+  const totalSec = Math.max(0, Math.floor(durationMs / 1000));
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 export function GameOver({
@@ -97,18 +120,29 @@ export function GameOver({
   onHome: () => void;
   onLeaderboard: () => void;
 }) {
+  const rank = runRank(result.score, result.bestStreak);
   return (
     <div className="screen over">
-      <div className="card over-card">
-        <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
+      <div className="card over-card neo-over-card">
+        <div className="neo-over-head">
+          <div>
+            <span className="neo-badge cyan">RUN COMPLETE</span>
+            <h2>{result.newBest ? 'NEW BEST!' : 'GAME OVER'}</h2>
+          </div>
+          <div className={`neo-rank-badge rank-${rank.toLowerCase()}`} aria-label={`Rank ${rank}`}>
+            <strong>{rank}</strong>
+            <span>RANK</span>
+          </div>
+        </div>
         <div className="final">{result.score}</div>
-        <div className="stats">
+        <div className="stats neo-stats-grid">
           <div><b>{result.kickUps}</b><span>KICK-UPS</span></div>
           <div><b>{best}</b><span>BEST</span></div>
           <div><b>{result.bestStreak}</b><span>BEST COMBO</span></div>
+          <div><b>{formatAirtime(result.durationMs)}</b><span>AIRTIME</span></div>
         </div>
         <button type="button" className="btn ghost" onClick={onLeaderboard}>LEADERBOARD</button>
-        <button className="btn primary big" onClick={onAgain} autoFocus>PLAY AGAIN</button>
+        <button className="btn primary big neo-cta" onClick={onAgain} autoFocus>PLAY AGAIN</button>
         <button className="btn ghost" onClick={onHome}>HOME</button>
       </div>
     </div>
@@ -514,7 +548,11 @@ export function SettingsScreen({
                   }}
                 >
                   <span className="song-tick-box" aria-hidden="true">{on ? '✓' : ''}</span>
-                  {track.title}
+                  <span className="neo-track-name">{track.title}</span>
+                  <span className="neo-track-meta">
+                    <em className="neo-track-role">{track.role}</em>
+                    <b>{track.bpm} BPM</b>
+                  </span>
                 </button>
               );
             })}
@@ -636,13 +674,17 @@ export function PauseScreen({
   const tracks = GAME_TRACKS.filter((track) => enabledSongs.includes(track.id));
   return (
     <div className="screen settings">
-      <div className="card">
-        <h2>PAUSE</h2>
+      <div className="card neo-over-card">
+        <div className="neo-soundtrack-head">
+          <span className="neo-badge cyan">CYPHER SOUNDTRACK</span>
+          <h2>PAUSE</h2>
+        </div>
         <div className="group">
           <label id="pause-song-label">Change song</label>
           <div className="song-list" role="group" aria-labelledby="pause-song-label">
             <button type="button" aria-pressed={song === SHUFFLE_SONG} onClick={() => onSong(SHUFFLE_SONG)}>
-              Shuffle
+              <span className="neo-track-name">Shuffle</span>
+              <span className="neo-track-meta"><b>AUTO ROTATE</b></span>
             </button>
             {tracks.map((track) => (
               <button
@@ -651,12 +693,16 @@ export function PauseScreen({
                 aria-pressed={song === track.id}
                 onClick={() => onSong(track.id)}
               >
-                {track.title}
+                <span className="neo-track-name">{track.title}</span>
+                <span className="neo-track-meta">
+                  <em className="neo-track-role">{track.role}</em>
+                  <b>{track.bpm} BPM</b>
+                </span>
               </button>
             ))}
           </div>
         </div>
-        <button type="button" className="btn primary" onClick={onClose}>RESUME</button>
+        <button type="button" className="btn primary neo-cta" onClick={onClose}>RESUME</button>
       </div>
     </div>
   );

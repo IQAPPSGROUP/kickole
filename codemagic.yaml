@@ -152,3 +152,104 @@ workflows:
             build
     artifacts:
       - /tmp/xcodebuild_logs/*.log
+
+  android-play-internal:
+    name: Android Play internal testing
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    # Start from the Codemagic UI. Do not publish on every push.
+    triggering:
+      events: []
+    environment:
+      node: "22"
+      java: 21
+      android_signing:
+        - kickole_upload
+      groups:
+        - google_play
+      vars:
+        PACKAGE_NAME: com.iqappsgroup.kickole
+        # Publishable client key. Not a service-role secret.
+        VITE_SUPABASE_URL: https://fjcidkbwxjimvxwzaoct.supabase.co
+        VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_cZICJMAPEFVMrHq6SysiEw_p_4PTVmA
+        VITE_PRIVACY_URL: https://www.iqappsgroup.co.uk/kickole/privacy
+        VITE_CHILD_SAFETY_URL: https://www.iqappsgroup.co.uk/kickole/child-safety
+        VITE_TERMS_URL: https://www.iqappsgroup.co.uk/kickole/terms
+    scripts:
+      - name: Require the Play service account
+        script: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS:-}" ]; then
+            echo "GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS is missing."
+            echo "In Codemagic, add it as a secret in the google_play environment group."
+            echo "Paste the service-account JSON. The account may release to testing tracks only."
+            echo "Do not commit the JSON, and do not print it in the build log."
+            exit 1
+          fi
+          echo "GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS is set."
+      - name: Require the upload keystore
+        script: |
+          set -euo pipefail
+          missing=0
+          for name in CM_KEYSTORE_PATH CM_KEYSTORE_PASSWORD CM_KEY_ALIAS CM_KEY_PASSWORD; do
+            if [ -z "${!name:-}" ]; then
+              echo "${name} is missing."
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            echo "In Codemagic, add the Kickolé upload keystore under Code signing identities."
+            echo "Use the reference name kickole_upload. Do not commit the keystore or its passwords."
+            exit 1
+          fi
+          if [ ! -f "${CM_KEYSTORE_PATH}" ]; then
+            echo "CM_KEYSTORE_PATH does not point at a file."
+            exit 1
+          fi
+          echo "Upload keystore variables are set."
+      - name: Require the Codemagic build number
+        script: |
+          set -euo pipefail
+          case "${BUILD_NUMBER:-}" in
+            ''|*[!0-9]*|0)
+              echo "BUILD_NUMBER must be a positive integer. It is the Android versionCode."
+              exit 1
+              ;;
+          esac
+          echo "Android versionCode: ${BUILD_NUMBER}"
+      - name: Install npm dependencies
+        script: |
+          set -euo pipefail
+          npm ci
+      - name: Run tests and typecheck
+        script: |
+          set -euo pipefail
+          npm test
+          npm run typecheck
+      - name: Build web assets and sync Android
+        script: |
+          set -euo pipefail
+          if [ -n "${VITE_ALLOW_MOCK:-}" ]; then
+            echo "VITE_ALLOW_MOCK must not be set for a store build."
+            exit 1
+          fi
+          npm run build:store
+          npx cap sync android
+      - name: Build the signed release bundle
+        script: |
+          set -euo pipefail
+          if ! grep -F "applicationId \"${PACKAGE_NAME}\"" android/app/build.gradle >/dev/null; then
+            echo "android/app/build.gradle applicationId is not ${PACKAGE_NAME}."
+            exit 1
+          fi
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > "$CM_BUILD_DIR/android/local.properties"
+          cd android
+          sh ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+    publishing:
+      # Internal testing only. Do not add a production track or a promotion.
+      google_play:
+        credentials: $GOOGLE_PLAY_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+

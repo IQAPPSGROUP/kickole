@@ -35,10 +35,9 @@ import {
   subscribeDevice,
   useMsaa,
 } from './qualityTier';
-import { GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
+import { GAMEPLAY_FOV, GAMEPLAY_TARGET, gameplayCameraPosition } from './gameplayCamera';
 
-// Calibrated 52° FOV for Stitch 2D backdrops (keeps gameplayCamera.ts untouched for alley-asset tests).
-const FOV = 52;
+const FOV = GAMEPLAY_FOV;
 const TARGET = GAMEPLAY_TARGET;
 
 const BASE = new Vector3();
@@ -299,7 +298,7 @@ function World({ controller, skin, quality, onReady }: SceneProps) {
       <hemisphereLight args={[STREET_HEMI.sky, STREET_HEMI.ground, STREET_HEMI.intensity]} />
       <directionalLight position={[-4.2, 4.2, -2.4]} intensity={STREET_FILL.intensity} color={STREET_FILL.color} />
       <KeyLight quality={quality} engine={controller.engine} />
-      <group scale={0.85} position={[0, -0.08, 0]}>
+      <group scale={1.1} position={[0, -0.05, 0]}>
         {shadows && (
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
             <planeGeometry args={[12, 12]} />

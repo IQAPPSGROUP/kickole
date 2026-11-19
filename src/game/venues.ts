@@ -9,33 +9,33 @@ const base = (file: string) => `${import.meta.env.BASE_URL}${file}`;
 
 export const STAGE_VENUES: readonly StageVenue[] = [
   {
+    id: 'neon-cage',
+    name: 'Neon Cage',
+    subtitle: 'Eye-Level Court · Dusk',
+    image: base('backdrops/neon-cage.png'),
+  },
+  {
     id: 'urban-concrete',
     name: 'Urban Concrete',
-    subtitle: 'Street Cage · Dusk',
+    subtitle: 'Rio Terrace · Street',
     image: base('backdrops/urban-concrete.png'),
   },
   {
-    id: 'favela-rooftop',
-    name: 'Favela Rooftop',
-    subtitle: 'Rio de Janeiro · Elevated',
-    image: base('backdrops/favela-rooftop.png'),
+    id: 'cliff-lookout',
+    name: 'Cliff Lookout',
+    subtitle: 'Copacabana Edge · Sunset',
+    image: base('backdrops/cliff-lookout.png'),
   },
   {
-    id: 'copacabana-beach',
-    name: 'Copacabana Beach',
-    subtitle: 'Rio Coast · Sunset',
-    image: base('backdrops/copacabana-beach.png'),
-  },
-  {
-    id: 'boardwalk-pier',
-    name: 'Boardwalk Pier',
-    subtitle: 'Ocean Deck · Golden Hour',
-    image: base('backdrops/boardwalk-pier.png'),
+    id: 'helipad-vista',
+    name: 'Helipad Vista',
+    subtitle: 'Skyline Deck · Golden Hour',
+    image: base('backdrops/helipad-vista.png'),
   },
 ] as const;
 
 export const DEFAULT_VENUE_ID = STAGE_VENUES[0].id;
-const VENUE_STORAGE_KEY = 'kickole.venue.v1';
+const VENUE_STORAGE_KEY = 'kickole.venue.v2';
 
 export function getVenue(id: string): StageVenue {
   return STAGE_VENUES.find((v) => v.id === id) ?? STAGE_VENUES[0];
